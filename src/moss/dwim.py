@@ -155,6 +155,12 @@ TOOL_REGISTRY: dict[str, ToolInfo] = {
             "ast",
             "classes",
             "functions",
+            "list",
+            "show",
+            "all",
+            "api",
+            "definition",
+            "public",
         ],
         parameters=["path", "pattern"],
     ),
@@ -170,12 +176,15 @@ TOOL_REGISTRY: dict[str, ToolInfo] = {
             "classes",
             "methods",
             "symbols",
+            "where",
+            "location",
+            "named",
         ],
         parameters=["path", "type", "name", "pattern"],
     ),
     "query": ToolInfo(
         name="query",
-        description="Search code with pattern matching, filters, and inheritance",
+        description="Search and filter code by size, complexity, and inheritance",
         keywords=[
             "search",
             "find",
@@ -185,7 +194,27 @@ TOOL_REGISTRY: dict[str, ToolInfo] = {
             "regex",
             "match",
             "inherits",
+            "inherit",
             "subclass",
+            "extends",
+            "extending",
+            "inheritance",
+            "base",
+            "derived",
+            "lines",
+            "complex",
+            "large",
+            "small",
+            "size",
+            "over",
+            "under",
+            "long",
+            "short",
+            "min",
+            "max",
+            "functions",
+            "classes",
+            "methods",
         ],
         parameters=["path", "name", "signature", "type", "inherits", "pattern"],
     ),
@@ -200,6 +229,12 @@ TOOL_REGISTRY: dict[str, ToolInfo] = {
             "branches",
             "paths",
             "complexity",
+            "call",
+            "logic",
+            "branch",
+            "loop",
+            "if",
+            "while",
         ],
         parameters=["path", "function"],
     ),
@@ -214,6 +249,12 @@ TOOL_REGISTRY: dict[str, ToolInfo] = {
             "packages",
             "requires",
             "uses",
+            "import",
+            "export",
+            "dependency",
+            "analysis",
+            "external",
+            "reverse",
         ],
         parameters=["path", "pattern"],
     ),
@@ -227,6 +268,12 @@ TOOL_REGISTRY: dict[str, ToolInfo] = {
             "info",
             "details",
             "comprehensive",
+            "explain",
+            "about",
+            "understand",
+            "what",
+            "does",
+            "describe",
         ],
         parameters=["path"],
     ),
@@ -556,6 +603,36 @@ def suggest_tool(query: str) -> ToolMatch | None:
     Returns the top match if confidence is above threshold, None otherwise.
     """
     return get_router().suggest_tool(query)
+
+
+def suggest_tools(query: str, top_k: int = 3) -> list[ToolMatch]:
+    """Suggest top-k tools for a query, regardless of threshold.
+
+    Always returns up to top_k results, even if confidence is low.
+    This is useful for showing alternatives when no confident match exists.
+
+    Args:
+        query: Natural language description of what the user wants
+        top_k: Maximum number of suggestions to return (default: 3)
+
+    Returns:
+        List of ToolMatch sorted by confidence (highest first).
+        Each match has a message indicating confidence level.
+    """
+    matches = analyze_intent(query)
+
+    # Add messages based on confidence
+    results = []
+    for match in matches[:top_k]:
+        if match.confidence >= AUTO_CORRECT_THRESHOLD:
+            match.message = "High confidence match"
+        elif match.confidence >= SUGGEST_THRESHOLD:
+            match.message = "Suggested match"
+        else:
+            match.message = "Low confidence - consider alternatives"
+        results.append(match)
+
+    return results
 
 
 # =============================================================================

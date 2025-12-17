@@ -17,8 +17,8 @@ Based on LLM evaluation findings (see `docs/llm-evaluation.md`).
 
 ### DWIM Tuning
 - [x] Lower `SUGGEST_THRESHOLD` from 0.5 to 0.3
-- [ ] Add more synonyms to tool descriptions
-- [ ] Consider top-k results regardless of threshold
+- [x] Add more synonyms to tool descriptions
+- [x] Consider top-k results regardless of threshold (`suggest_tools`)
 
 ### Output Improvements
 - [x] CFG summary mode (node/edge counts only)
