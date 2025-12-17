@@ -2,6 +2,15 @@
 
 ## v0.4.0
 
+### Phase 27: Advanced Library Learning
+Frequency-based abstraction learning inspired by DreamCoder:
+- `LearnedLibrary` plugin with pattern-based learning
+- `PatternExtractor` for code pattern detection (functions, expressions, idioms)
+- Persistent storage with JSON serialization
+- Compression gain estimation for abstraction scoring
+- Pattern frequency tracking across synthesis runs
+- 31 tests for library learning
+
 ### Phase 26: LLM Integration
 LLM-based code generation with mock support for testing:
 - `LLMGenerator` plugin using LiteLLM for unified provider access

@@ -91,10 +91,16 @@ Plugin system for synthesis components inspired by Synquid, miniKanren, DreamCod
 - [x] Cost estimation and budgeting
 - [x] 48 tests for LLM generator
 
-### Future: Advanced Library Learning
-- [ ] Frequency-based abstraction learning
-- [ ] DreamCoder-style compression-based learning
-- [ ] Persistent library storage
+### Phase 27: Advanced Library Learning ✅
+- [x] Frequency-based abstraction learning (LearnedLibrary)
+- [x] Pattern extraction from code (PatternExtractor)
+- [x] Persistent library storage (JSON file)
+- [x] Compression gain estimation (simplified DreamCoder metric)
+- [x] 31 tests for learned library
+
+### Future: DreamCoder-style Learning
+- [ ] Compression-based abstraction discovery
+- [ ] MDL-based abstraction scoring
 
 ### Future: Multi-Language Expansion
 - Full TypeScript/JavaScript synthesis support
