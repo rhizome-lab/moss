@@ -175,9 +175,7 @@ class TestEpisodicStore:
     async def test_find_similar(self, store: EpisodicStore):
         # Store some episodes
         for i in range(5):
-            state = StateSnapshot.create(
-                files=[f"src/module{i}.py"], context=f"code {i}"
-            )
+            state = StateSnapshot.create(files=[f"src/module{i}.py"], context=f"code {i}")
             action = Action.create(tool="edit", target=f"src/module{i}.py")
             episode = Episode.create(state=state, action=action, outcome=Outcome.SUCCESS)
             await store.store(episode)
@@ -418,9 +416,7 @@ class TestMemoryManager:
         assert len(context.relevant_episodes) > 0
 
     async def test_add_manual_rule(self, manager: MemoryManager):
-        rule_id = manager.add_rule(
-            pattern="edit python", action="Run ruff first", confidence=0.9
-        )
+        rule_id = manager.add_rule(pattern="edit python", action="Run ruff first", confidence=0.9)
 
         rule = manager.semantic.get_rule(rule_id)
         assert rule is not None

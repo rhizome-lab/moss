@@ -183,21 +183,15 @@ class TestDistro:
         assert distro.description == "A test distro"
 
     def test_distro_modifier(self):
-        distro = Distro("test").modify(
-            lambda c: c.with_validators(pytest=True)
-        )
+        distro = Distro("test").modify(lambda c: c.with_validators(pytest=True))
 
         config = distro.create_config()
 
         assert config.validators.pytest is True
 
     def test_distro_inheritance(self):
-        parent = Distro("parent").modify(
-            lambda c: c.with_validators(syntax=True)
-        )
-        child = Distro("child", extends=[parent]).modify(
-            lambda c: c.with_validators(pytest=True)
-        )
+        parent = Distro("parent").modify(lambda c: c.with_validators(syntax=True))
+        child = Distro("child", extends=[parent]).modify(lambda c: c.with_validators(pytest=True))
 
         config = child.create_config()
 
@@ -210,9 +204,7 @@ class TestDistro:
         # Parent sets max_iterations to 5
         parent = Distro("parent").modify(lambda c: c.with_loop(max_iterations=5))
         # Child overrides to 3
-        child = Distro("child", extends=[parent]).modify(
-            lambda c: c.with_loop(max_iterations=3)
-        )
+        child = Distro("child", extends=[parent]).modify(lambda c: c.with_loop(max_iterations=3))
 
         config = child.create_config()
 

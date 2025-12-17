@@ -107,18 +107,14 @@ class TestQuarantinePolicy:
     def policy(self):
         return QuarantinePolicy(repair_tools={"repair", "fix_syntax"})
 
-    async def test_allows_non_quarantined_files(
-        self, policy: QuarantinePolicy, tmp_path: Path
-    ):
+    async def test_allows_non_quarantined_files(self, policy: QuarantinePolicy, tmp_path: Path):
         target = tmp_path / "clean.py"
         ctx = ToolCallContext(tool_name="edit", target=target)
 
         result = await policy.evaluate(ctx)
         assert result.allowed
 
-    async def test_quarantines_broken_files(
-        self, policy: QuarantinePolicy, tmp_path: Path
-    ):
+    async def test_quarantines_broken_files(self, policy: QuarantinePolicy, tmp_path: Path):
         target = tmp_path / "broken.py"
         policy.quarantine(target, "Syntax error at line 5")
 
@@ -129,9 +125,7 @@ class TestQuarantinePolicy:
         assert result.decision == PolicyDecision.QUARANTINE
         assert "quarantined" in (result.reason or "").lower()
 
-    async def test_allows_repair_tools(
-        self, policy: QuarantinePolicy, tmp_path: Path
-    ):
+    async def test_allows_repair_tools(self, policy: QuarantinePolicy, tmp_path: Path):
         target = tmp_path / "broken.py"
         policy.quarantine(target, "Syntax error")
 
@@ -141,9 +135,7 @@ class TestQuarantinePolicy:
         assert result.allowed
         assert result.decision == PolicyDecision.WARN
 
-    async def test_release_from_quarantine(
-        self, policy: QuarantinePolicy, tmp_path: Path
-    ):
+    async def test_release_from_quarantine(self, policy: QuarantinePolicy, tmp_path: Path):
         target = tmp_path / "fixed.py"
         policy.quarantine(target, "Was broken")
 
@@ -151,9 +143,7 @@ class TestQuarantinePolicy:
         assert policy.release(target)
         assert not policy.is_quarantined(target)
 
-    async def test_quarantined_files_list(
-        self, policy: QuarantinePolicy, tmp_path: Path
-    ):
+    async def test_quarantined_files_list(self, policy: QuarantinePolicy, tmp_path: Path):
         f1 = tmp_path / "a.py"
         f2 = tmp_path / "b.py"
 
@@ -193,9 +183,7 @@ class TestRateLimitPolicy:
         assert result.decision == PolicyDecision.DENY
         assert "Rate limit" in (result.reason or "")
 
-    async def test_warns_after_target_limit(
-        self, policy: RateLimitPolicy, tmp_path: Path
-    ):
+    async def test_warns_after_target_limit(self, policy: RateLimitPolicy, tmp_path: Path):
         target = tmp_path / "busy.py"
 
         # Record max calls to this target
@@ -265,18 +253,14 @@ class TestPolicyEngine:
             ]
         )
 
-    async def test_allows_when_all_pass(
-        self, engine: PolicyEngine, tmp_path: Path
-    ):
+    async def test_allows_when_all_pass(self, engine: PolicyEngine, tmp_path: Path):
         target = tmp_path / "clean.py"
         result = await engine.check("edit", target=target)
 
         assert result.allowed
         assert len(result.results) == 3  # All policies evaluated
 
-    async def test_stops_on_first_deny(
-        self, engine: PolicyEngine, tmp_path: Path
-    ):
+    async def test_stops_on_first_deny(self, engine: PolicyEngine, tmp_path: Path):
         target = tmp_path / ".git" / "config"  # Blocked by PathPolicy
         result = await engine.check("edit", target=target)
 
@@ -318,9 +302,7 @@ class TestPolicyEngine:
         assert result.blocking_result is not None
         assert result.blocking_result.policy_name == "high"
 
-    async def test_collects_warnings(
-        self, tmp_path: Path
-    ):
+    async def test_collects_warnings(self, tmp_path: Path):
         # Create policies that warn
         quarantine = QuarantinePolicy(repair_tools={"repair"})
         target = tmp_path / "broken.py"

@@ -466,9 +466,7 @@ class APIHandler:
 
         return checkpoint
 
-    async def get_checkpoints(
-        self, request_id: str | None = None
-    ) -> list[CheckpointRequest]:
+    async def get_checkpoints(self, request_id: str | None = None) -> list[CheckpointRequest]:
         """Get pending checkpoints."""
         return self.tracker.get_pending_checkpoints(request_id)
 

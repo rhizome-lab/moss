@@ -235,12 +235,8 @@ class Worker(ABC):
 
             result.duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
-            self._state.status = (
-                WorkerStatus.COMPLETED if result.success else WorkerStatus.FAILED
-            )
-            ticket.status = (
-                TicketStatus.COMPLETED if result.success else TicketStatus.FAILED
-            )
+            self._state.status = WorkerStatus.COMPLETED if result.success else WorkerStatus.FAILED
+            ticket.status = TicketStatus.COMPLETED if result.success else TicketStatus.FAILED
             ticket.completed_at = end_time
 
             self._state.results.append(result)

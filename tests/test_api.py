@@ -16,7 +16,6 @@ from moss.api import (
     SSEEventType,
     TaskRequest,
     TaskResponse,
-    TaskStatusResponse,
     create_api_handler,
 )
 from moss.events import EventBus
@@ -42,17 +41,13 @@ async def git_repo(tmp_path: Path):
         "git", "config", "user.email", "test@test.com", cwd=repo
     )
     await proc.wait()
-    proc = await asyncio.create_subprocess_exec(
-        "git", "config", "user.name", "Test User", cwd=repo
-    )
+    proc = await asyncio.create_subprocess_exec("git", "config", "user.name", "Test User", cwd=repo)
     await proc.wait()
 
     (repo / "README.md").write_text("# Test")
     proc = await asyncio.create_subprocess_exec("git", "add", "-A", cwd=repo)
     await proc.wait()
-    proc = await asyncio.create_subprocess_exec(
-        "git", "commit", "-m", "Initial", cwd=repo
-    )
+    proc = await asyncio.create_subprocess_exec("git", "commit", "-m", "Initial", cwd=repo)
     await proc.wait()
 
     return repo
@@ -238,22 +233,19 @@ class TestRequestTracker:
                 )
             )
 
-        asyncio.create_task(resolve_later())
+        _task = asyncio.create_task(resolve_later())
 
-        response = await tracker.wait_for_checkpoint(
-            checkpoint.checkpoint_id, timeout=1.0
-        )
+        response = await tracker.wait_for_checkpoint(checkpoint.checkpoint_id, timeout=1.0)
 
         assert response is not None
         assert response.decision == "approve"
+        assert _task.done()
 
     async def test_wait_for_checkpoint_timeout(self, tracker: RequestTracker):
         request_id = tracker.create_request("Test task")
         checkpoint = tracker.create_checkpoint(request_id, "plan", "Approve?")
 
-        response = await tracker.wait_for_checkpoint(
-            checkpoint.checkpoint_id, timeout=0.01
-        )
+        response = await tracker.wait_for_checkpoint(checkpoint.checkpoint_id, timeout=0.01)
 
         assert response is None
 
@@ -382,12 +374,8 @@ class TestAPIHandler:
         request = TaskRequest(task="Test task")
         create_response = await handler.create_task(request)
 
-        await handler.create_checkpoint(
-            create_response.request_id, "plan", "Checkpoint 1"
-        )
-        await handler.create_checkpoint(
-            create_response.request_id, "merge", "Checkpoint 2"
-        )
+        await handler.create_checkpoint(create_response.request_id, "plan", "Checkpoint 1")
+        await handler.create_checkpoint(create_response.request_id, "merge", "Checkpoint 2")
 
         checkpoints = await handler.get_checkpoints()
 

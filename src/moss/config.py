@@ -298,9 +298,7 @@ class Distro:
         self.extends = extends or []
         self._modifiers: list[Callable[[MossConfig], MossConfig]] = []
 
-    def modify(
-        self, modifier: Callable[[MossConfig], MossConfig]
-    ) -> Distro:
+    def modify(self, modifier: Callable[[MossConfig], MossConfig]) -> Distro:
         """Add a configuration modifier."""
         self._modifiers.append(modifier)
         return self
@@ -330,20 +328,18 @@ class Distro:
 
 # Built-in distros
 
+
 def _python_modifier(config: MossConfig) -> MossConfig:
     """Python-focused configuration."""
-    return (
-        config
-        .with_validators(syntax=True, ruff=True, pytest=False)
-        .with_policies(velocity=True, quarantine=True)
+    return config.with_validators(syntax=True, ruff=True, pytest=False).with_policies(
+        velocity=True, quarantine=True
     )
 
 
 def _strict_modifier(config: MossConfig) -> MossConfig:
     """Strict configuration with all checks enabled."""
     return (
-        config
-        .with_validators(syntax=True, ruff=True, pytest=True)
+        config.with_validators(syntax=True, ruff=True, pytest=True)
         .with_policies(velocity=True, quarantine=True, rate_limit=True, path=True)
         .with_loop(max_iterations=5)  # Fail faster
     )
@@ -352,8 +348,7 @@ def _strict_modifier(config: MossConfig) -> MossConfig:
 def _lenient_modifier(config: MossConfig) -> MossConfig:
     """Lenient configuration with minimal checks."""
     return (
-        config
-        .with_validators(syntax=True, ruff=False, pytest=False)
+        config.with_validators(syntax=True, ruff=False, pytest=False)
         .with_policies(velocity=False, quarantine=False, rate_limit=False, path=True)
         .with_loop(max_iterations=20)  # More attempts allowed
     )
@@ -361,10 +356,8 @@ def _lenient_modifier(config: MossConfig) -> MossConfig:
 
 def _fast_modifier(config: MossConfig) -> MossConfig:
     """Fast iteration configuration."""
-    return (
-        config
-        .with_validators(syntax=True, ruff=False, pytest=False)
-        .with_loop(max_iterations=3, timeout_seconds=60)
+    return config.with_validators(syntax=True, ruff=False, pytest=False).with_loop(
+        max_iterations=3, timeout_seconds=60
     )
 
 
@@ -482,6 +475,4 @@ def load_config_file(path: Path) -> MossConfig:
                 return config
             raise TypeError(f"configure() must return MossConfig, got {type(config)}")
 
-    raise ValueError(
-        f"Config file must define 'config' variable or 'configure()' function: {path}"
-    )
+    raise ValueError(f"Config file must define 'config' variable or 'configure()' function: {path}")

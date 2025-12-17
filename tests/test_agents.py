@@ -14,7 +14,6 @@ from moss.agents import (
     TicketPriority,
     TicketResult,
     TicketStatus,
-    Worker,
     WorkerStatus,
     create_manager,
 )
@@ -41,17 +40,13 @@ async def git_repo(tmp_path: Path):
         "git", "config", "user.email", "test@test.com", cwd=repo
     )
     await proc.wait()
-    proc = await asyncio.create_subprocess_exec(
-        "git", "config", "user.name", "Test User", cwd=repo
-    )
+    proc = await asyncio.create_subprocess_exec("git", "config", "user.name", "Test User", cwd=repo)
     await proc.wait()
 
     (repo / "README.md").write_text("# Test")
     proc = await asyncio.create_subprocess_exec("git", "add", "-A", cwd=repo)
     await proc.wait()
-    proc = await asyncio.create_subprocess_exec(
-        "git", "commit", "-m", "Initial", cwd=repo
-    )
+    proc = await asyncio.create_subprocess_exec("git", "commit", "-m", "Initial", cwd=repo)
     await proc.wait()
 
     return repo
@@ -175,9 +170,7 @@ class TestWorker:
 
         return SimpleWorker(shadow_git, executor)
 
-    async def test_worker_lifecycle(
-        self, worker: SimpleWorker, shadow_git: ShadowGit
-    ):
+    async def test_worker_lifecycle(self, worker: SimpleWorker, shadow_git: ShadowGit):
         ticket = Ticket.create(task="Test task")
 
         result = await worker.run(ticket)
@@ -186,9 +179,7 @@ class TestWorker:
         assert worker.status == WorkerStatus.COMPLETED
         assert ticket.status == TicketStatus.COMPLETED
 
-    async def test_worker_creates_branch(
-        self, worker: SimpleWorker, shadow_git: ShadowGit
-    ):
+    async def test_worker_creates_branch(self, worker: SimpleWorker, shadow_git: ShadowGit):
         ticket = Ticket.create(task="Test task")
 
         await worker.spawn(ticket)
@@ -197,9 +188,7 @@ class TestWorker:
         assert f"worker-{worker.id}" in worker._state.branch.name
 
     async def test_worker_failure(self, shadow_git: ShadowGit):
-        async def failing_executor(
-            ticket: Ticket, branch: ShadowBranch
-        ) -> TicketResult:
+        async def failing_executor(ticket: Ticket, branch: ShadowBranch) -> TicketResult:
             raise RuntimeError("Simulated failure")
 
         worker = SimpleWorker(shadow_git, failing_executor)
@@ -247,9 +236,7 @@ class TestManager:
         assert pending[0].priority == TicketPriority.CRITICAL
         assert pending[2].priority == TicketPriority.LOW
 
-    async def test_delegate_to_worker(
-        self, manager: Manager, shadow_git: ShadowGit
-    ):
+    async def test_delegate_to_worker(self, manager: Manager, shadow_git: ShadowGit):
         async def executor(ticket: Ticket, branch: ShadowBranch) -> TicketResult:
             return TicketResult(
                 ticket_id=ticket.id,
@@ -266,9 +253,7 @@ class TestManager:
         assert result.ticket_id == ticket.id
         assert ticket.status == TicketStatus.COMPLETED
 
-    async def test_delegate_parallel(
-        self, manager: Manager, shadow_git: ShadowGit
-    ):
+    async def test_delegate_parallel(self, manager: Manager, shadow_git: ShadowGit):
         async def executor(ticket: Ticket, branch: ShadowBranch) -> TicketResult:
             await asyncio.sleep(0.01)  # Simulate work
             return TicketResult(
@@ -277,9 +262,7 @@ class TestManager:
                 summary=f"Done: {ticket.task}",
             )
 
-        tickets = [
-            manager.create_ticket(f"Task {i}") for i in range(3)
-        ]
+        tickets = [manager.create_ticket(f"Task {i}") for i in range(3)]
 
         def worker_factory():
             return SimpleWorker(shadow_git, executor)

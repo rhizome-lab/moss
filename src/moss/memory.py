@@ -310,9 +310,7 @@ class EpisodicStore:
 
         return episodes
 
-    async def find_failures(
-        self, tool: str | None = None, limit: int = 10
-    ) -> list[Episode]:
+    async def find_failures(self, tool: str | None = None, limit: int = 10) -> list[Episode]:
         """Find failure episodes, optionally filtered by tool."""
         failure_ids = self._by_outcome[Outcome.FAILURE]
 
@@ -400,9 +398,7 @@ class SemanticStore:
 
         return True
 
-    def find_matching_rules(
-        self, context: str, min_confidence: float = 0.5
-    ) -> list[SemanticRule]:
+    def find_matching_rules(self, context: str, min_confidence: float = 0.5) -> list[SemanticRule]:
         """Find rules that match the given context."""
         context_words = set(context.lower().split())
 
@@ -610,9 +606,7 @@ class MemoryManager:
         # Check for failure patterns
         failures = [ep for ep in similar if ep.outcome == Outcome.FAILURE]
         if len(failures) >= 2:
-            context.warnings.append(
-                f"Similar actions have failed {len(failures)} times recently"
-            )
+            context.warnings.append(f"Similar actions have failed {len(failures)} times recently")
 
         # Find matching semantic rules
         search_text = f"{action.tool} {action.target or ''} {' '.join(state.files)}"
