@@ -5,7 +5,7 @@
 ### Real-time Features
 - [x] File watching for incremental updates
 - [x] LSP integration
-- [ ] Live CFG rendering
+- [x] Live CFG rendering
 
 ## Backlog
 
@@ -18,6 +18,7 @@
 ## Completed
 
 See `docs/` for details on completed work:
+- **Phase 19g**: Live CFG Rendering — auto-refresh visualization, file watcher integration, modern UI
 - **Phase 19f**: LSP Integration — pygls-based server, diagnostics, hover info, document symbols, go-to-definition
 - **Phase 19e**: Visual CFG Output — Mermaid/Graphviz rendering, HTML visualization, CLI integration
 - **Phase 19c**: Auto-fix System — safe/unsafe classification, preview/diff, conflict resolution, Shadow Git rollback
