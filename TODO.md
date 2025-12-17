@@ -8,7 +8,7 @@
 - [x] Interactive REPL mode (`moss shell`)
 
 ### Performance
-- [ ] Caching layer for AST/CFG (avoid re-parsing unchanged files)
+- [x] Caching layer for AST/CFG (avoid re-parsing unchanged files)
 - [ ] Parallel file analysis (multi-threaded processing)
 
 ### Configuration
