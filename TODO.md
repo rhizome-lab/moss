@@ -1,87 +1,84 @@
 # Moss Roadmap
 
-## Phase 15: LLM Introspection Tooling
+## Current: Phase 17 — Introspection Improvements
 
-### CLI Enhancements ✅
-- [x] Add `--json` output flag to all CLI commands
-- [x] `moss skeleton <path>` - Extract and display code skeleton
-- [x] `moss anchors <path>` - List all anchors (functions, classes, methods)
-- [x] `moss cfg <path> [function]` - Display control flow graph
-- [x] `moss deps <path>` - Show dependencies (imports/exports)
-- [x] `moss context <path>` - Combined view (skeleton + deps + summary)
+Based on LLM evaluation findings (see `docs/llm-evaluation.md`).
 
-### Query Interface ✅
-- [x] `moss query` command with pattern matching
-- [x] Find functions by signature pattern
-- [x] Find classes by inheritance
-- [ ] Search by complexity metrics (lines, branches, etc.) - TODO: add line counting
+### Symbol Metrics
+- [ ] Add `end_line` to Symbol for size calculation
+- [ ] Add line count per function/method
+- [ ] `--min-lines` / `--max-lines` filters for query command
+- [ ] Cyclomatic complexity (optional)
 
-### MCP Server ✅
-- [x] Implement MCP server for direct tool access
-- [x] Expose skeleton extraction as MCP tool
-- [x] Expose anchor finding as MCP tool
-- [x] Expose CFG building as MCP tool
-- [x] Expose patch application as MCP tool
-- [x] Expose dependency extraction as MCP tool
-- [x] Expose context generation as MCP tool
+### Reverse Dependencies
+- [ ] "What imports this module?" query
+- [ ] `moss deps --reverse <module>` command
+- [ ] Internal dependency graph visualization
 
-### DWIM (Do What I Mean) ✅
-- [x] Create semantic tool routing module (`moss.dwim`)
-- [x] Implement TF-IDF cosine similarity for semantic matching
-- [x] Add fuzzy matching for typos (Levenshtein distance)
-- [x] Define semantic aliases for tools (e.g., "imports" → "deps")
-- [x] Add `analyze_intent` MCP tool for natural language → tool routing
-- [x] Add `resolve_tool` MCP tool for typo/alias resolution
-- [x] Add `list_capabilities` MCP tool for tool discovery
+### DWIM Tuning
+- [ ] Lower `SUGGEST_THRESHOLD` from 0.5 to 0.3
+- [ ] Add more synonyms to tool descriptions
+- [ ] Consider top-k results regardless of threshold
 
-### LLM Evaluation ✅
-- [x] Use Moss CLI to explore codebases
-- [x] Document what works well for LLM consumption (see docs/llm-evaluation.md)
-- [x] Identify gaps and iterate
+### Output Improvements
+- [ ] CFG summary mode (node/edge counts only)
+- [ ] `--group-by=file` for multi-file query results
+- [ ] `--public-only` filter for exported symbols
 
-## Phase 16: Plugin Architecture
+## Phase 18: Plugin Architecture
 
-> **Important**: This phase should only begin AFTER Phase 15 is complete and we've
-> validated the current implementation through real-world LLM usage. Premature
-> abstraction is worse than no abstraction.
+> Begin after Phase 17 validates current implementation.
 
-### Plugin System Design
-- [ ] Design plugin interface for view providers
-- [ ] Implement plugin discovery and loading
-- [ ] Create plugin registration and lifecycle management
+### Core
+- [ ] Plugin interface for view providers
+- [ ] Plugin discovery and loading
+- [ ] Registration and lifecycle management
 
-### Content Type Plugins
-- [ ] Refactor Python skeleton extraction as plugin
-- [ ] Refactor CFG building as plugin
-- [ ] Refactor dependency extraction as plugin
-- [ ] Add support for non-code content (markdown, JSON, YAML, etc.)
+### Built-in Plugins
+- [ ] Refactor Python skeleton as plugin
+- [ ] Refactor CFG as plugin
+- [ ] Refactor deps as plugin
 
-### Language Plugins
-- [ ] TypeScript/JavaScript plugin
-- [ ] Go plugin
-- [ ] Rust plugin
+### Language Support
+- [ ] TypeScript/JavaScript
+- [ ] Go
+- [ ] Rust
 
-### Third-Party Extension Support
-- [ ] Plugin API documentation
-- [ ] Plugin development guide
-- [ ] Example plugin implementation
+### Non-Code Content
+- [ ] Markdown structure
+- [ ] JSON/YAML schema
+- [ ] Config files
 
-## CI/CD Fixes ✅
-- [x] Add ruff to dev dependencies
-- [x] Fix CI to install dev extras (`uv sync --extra dev`)
-- [x] Remove Python 3.12 from CI (project requires 3.13+)
-- [x] Consolidate dev dependencies in pyproject.toml
-- [ ] Fix async fixture warnings (pytest 9 deprecation) - may need further work
+## Phase 19: Advanced Features
 
-## Future Ideas
-- Real-time file watching and incremental updates
-- Language server protocol (LSP) integration
-- Visual CFG rendering (graphviz/mermaid output)
-- Semantic code search with embeddings
+### Embedding-based Search
+- [ ] Vector embeddings for semantic code search
+- [ ] Integration with existing vector store
+- [ ] Hybrid TF-IDF + embedding routing
+
+### Auto-fix System
+- [ ] Safe vs unsafe fix classification
+- [ ] Preview/diff before applying
+- [ ] Shadow Git integration for rollback
+- [ ] Conflict resolution for overlapping fixes
+
+### Real-time Features
+- [ ] File watching for incremental updates
+- [ ] LSP integration
+- [ ] Live CFG rendering
+
+## Backlog
+
+- Visual CFG output (graphviz/mermaid)
 - Multi-file refactoring support
-- **Auto-fix for lints**: Design an auto-fix system where lints can suggest and apply
-  fixes automatically. This requires careful design work around:
-  - Safe vs unsafe fixes
-  - Preview/diff before applying
-  - Rollback support (integrate with Shadow Git)
-  - Conflict resolution when multiple fixes overlap
+- Configurable output verbosity
+- Progress indicators for large scans
+
+---
+
+## Completed
+
+See `docs/` for details on completed work:
+- **Phase 15**: LLM Introspection Tooling (`docs/tools.md`, `docs/cli-architecture.md`)
+- **Phase 16**: DWIM semantic routing (`docs/dwim-architecture.md`)
+- **CI/CD**: Fixed in `.github/workflows/ci.yml`
