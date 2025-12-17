@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.3.0
+
+### Phase 24: Refactoring Tools
+- Inline refactoring (function and variable inlining)
+- Codemod DSL with pattern matching ($var placeholders)
+- CodemodRunner for workspace-wide transformations
+- Built-in codemod factories (deprecation, API migration)
+- Preview/dry-run mode for all refactorings
+
+### Phase 23: Context & Memory
+- ContentHash merkle hashing for documents
+- DocumentSummary with recursive child aggregation
+- DocumentSummaryStore with caching and persistence
+- ChatMessage and ChatSession management
+- ChatlogStore with context window optimization
+- SimpleSummarizer (extractive summarization)
+- Session search with tag filtering
+
+### Phase 22: Synthesis Integration
+- Core synthesis framework (`src/moss/synthesis/`)
+- Abstract interfaces: Specification, Context, Subproblem, SynthesisResult
+- DecompositionStrategy ABC with metadata
+- Composer ABC: SequentialComposer, FunctionComposer, CodeComposer
+- StrategyRouter with TF-IDF keyword matching
+- SynthesisFramework engine with depth/iteration limits
+- TypeDrivenDecomposition strategy
+- TestDrivenDecomposition strategy (analysis/isolation/implementation)
+- PatternBasedDecomposition (CRUD, data transform, validation patterns)
+- CLI: `moss synthesize` command
+- Caching: SynthesisCache, SolutionCache, StrategyCache, ExecutionResultCache
+- Scale testing (depth 20+ problems)
+- 191+ synthesis tests
+
 ## v0.2.0
 
 ### Phase 21: Developer Experience & CI/CD
