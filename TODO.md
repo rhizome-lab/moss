@@ -10,6 +10,16 @@
 - [ ] `moss deps <path>` - Show dependencies (imports/exports)
 - [ ] `moss context <path>` - Combined view (skeleton + deps + summary)
 
+### Architecture Note
+> **Plugin Architecture**: Introspection commands (skeleton, anchors, cfg, deps) should
+> eventually be refactored into a plugin system. This enables:
+> - Non-code content analysis (documents, configs, data files)
+> - Language-specific implementations as separate plugins
+> - Third-party extensions for custom formats
+>
+> Current implementation is monolithic for rapid iteration. Refactor to plugins
+> once the API stabilizes and we've validated usefulness through LLM evaluation.
+
 ### Query Interface
 - [ ] `moss query` command with pattern matching
 - [ ] Find functions by signature pattern

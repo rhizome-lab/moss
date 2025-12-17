@@ -7,7 +7,7 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -18,6 +18,23 @@ def get_version() -> str:
     from moss import __version__
 
     return __version__
+
+
+def output_result(data: Any, args: Namespace) -> None:
+    """Output result in appropriate format."""
+    if getattr(args, "json", False):
+        print(json.dumps(data, indent=2, default=str))
+    else:
+        if isinstance(data, str):
+            print(data)
+        elif isinstance(data, dict):
+            for key, value in data.items():
+                print(f"{key}: {value}")
+        elif isinstance(data, list):
+            for item in data:
+                print(item)
+        else:
+            print(data)
 
 
 def cmd_init(args: Namespace) -> int:
@@ -182,6 +199,10 @@ def cmd_status(args: Namespace) -> int:
     # Get stats
     stats = handler.get_stats()
 
+    if getattr(args, "json", False):
+        output_result(stats, args)
+        return 0
+
     print("Moss Status")
     print("=" * 40)
     print(f"Project: {project_dir.name}")
@@ -276,6 +297,15 @@ def cmd_distros(args: Namespace) -> int:
 
     distros = list_distros()
 
+    if getattr(args, "json", False):
+        result = []
+        for name in sorted(distros):
+            distro = get_distro(name)
+            if distro:
+                result.append({"name": name, "description": distro.description})
+        output_result(result, args)
+        return 0
+
     print("Available Distros")
     print("=" * 40)
 
@@ -288,6 +318,358 @@ def cmd_distros(args: Namespace) -> int:
     return 0
 
 
+# =============================================================================
+# Introspection Commands
+# =============================================================================
+
+
+def cmd_skeleton(args: Namespace) -> int:
+    """Extract code skeleton from a file or directory."""
+    from moss.skeleton import extract_python_skeleton, format_skeleton
+
+    path = Path(args.path).resolve()
+
+    if not path.exists():
+        print(f"Error: Path {path} does not exist", file=sys.stderr)
+        return 1
+
+    results = []
+
+    if path.is_file():
+        files = [path]
+    else:
+        pattern = args.pattern or "**/*.py"
+        files = list(path.glob(pattern))
+
+    for file_path in files:
+        try:
+            source = file_path.read_text()
+            symbols = extract_python_skeleton(source)
+
+            if getattr(args, "json", False):
+                results.append(
+                    {
+                        "file": str(file_path),
+                        "symbols": [_symbol_to_dict(s) for s in symbols],
+                    }
+                )
+            else:
+                if len(files) > 1:
+                    print(f"\n=== {file_path} ===")
+                skeleton = format_skeleton(symbols)
+                if skeleton:
+                    print(skeleton)
+                elif not args.quiet:
+                    print("(no symbols found)")
+        except SyntaxError as e:
+            if getattr(args, "json", False):
+                results.append({"file": str(file_path), "error": str(e)})
+            else:
+                print(f"Syntax error in {file_path}: {e}", file=sys.stderr)
+
+    if getattr(args, "json", False):
+        output_result(results if len(results) > 1 else results[0] if results else {}, args)
+
+    return 0
+
+
+def _symbol_to_dict(symbol: Any) -> dict:
+    """Convert a Symbol to a dictionary."""
+    result = {
+        "name": symbol.name,
+        "kind": symbol.kind,
+        "line": symbol.lineno,
+    }
+    if symbol.signature:
+        result["signature"] = symbol.signature
+    if symbol.docstring:
+        result["docstring"] = symbol.docstring
+    if symbol.children:
+        result["children"] = [_symbol_to_dict(c) for c in symbol.children]
+    return result
+
+
+def cmd_anchors(args: Namespace) -> int:
+    """Find anchors (functions, classes, methods) in code."""
+    from moss.anchors import Anchor, AnchorType, find_anchors
+
+    path = Path(args.path).resolve()
+
+    if not path.exists():
+        print(f"Error: Path {path} does not exist", file=sys.stderr)
+        return 1
+
+    # Map type argument to AnchorType
+    type_map = {
+        "function": AnchorType.FUNCTION,
+        "class": AnchorType.CLASS,
+        "method": AnchorType.METHOD,
+        "all": None,
+    }
+    anchor_type = type_map.get(args.type)
+
+    results = []
+
+    if path.is_file():
+        files = [path]
+    else:
+        pattern = args.pattern or "**/*.py"
+        files = list(path.glob(pattern))
+
+    for file_path in files:
+        try:
+            source = file_path.read_text()
+
+            if anchor_type:
+                # Find specific type
+                anchor = Anchor(type=anchor_type, name=args.name or ".*")
+                matches = find_anchors(source, anchor)
+            else:
+                # Find all types
+                matches = []
+                for atype in [AnchorType.FUNCTION, AnchorType.CLASS, AnchorType.METHOD]:
+                    anchor = Anchor(type=atype, name=args.name or ".*")
+                    matches.extend(find_anchors(source, anchor))
+
+            for match in matches:
+                anchor_info = {
+                    "file": str(file_path),
+                    "name": match.anchor.name,
+                    "type": match.anchor.type.value,
+                    "line": match.lineno,
+                    "end_line": match.end_lineno,
+                    "col": match.col_offset,
+                    "end_col": match.end_col_offset,
+                }
+                if match.anchor.context:
+                    anchor_info["context"] = match.anchor.context
+                results.append(anchor_info)
+
+        except SyntaxError as e:
+            if not args.quiet:
+                print(f"Syntax error in {file_path}: {e}", file=sys.stderr)
+
+    if getattr(args, "json", False):
+        output_result(results, args)
+    else:
+        for r in results:
+            ctx = f" (in {r['context']})" if r.get("context") else ""
+            print(f"{r['file']}:{r['line']} {r['type']} {r['name']}{ctx}")
+
+    return 0
+
+
+def cmd_cfg(args: Namespace) -> int:
+    """Build and display control flow graph."""
+    from moss.cfg import build_cfg
+
+    path = Path(args.path).resolve()
+
+    if not path.exists():
+        print(f"Error: Path {path} does not exist", file=sys.stderr)
+        return 1
+
+    if not path.is_file():
+        print(f"Error: {path} must be a file", file=sys.stderr)
+        return 1
+
+    try:
+        source = path.read_text()
+        cfgs = build_cfg(source, function_name=args.function)
+    except SyntaxError as e:
+        print(f"Syntax error: {e}", file=sys.stderr)
+        return 1
+
+    if not cfgs:
+        print("No functions found", file=sys.stderr)
+        return 1
+
+    if getattr(args, "json", False):
+        results = []
+        for cfg in cfgs:
+            results.append(
+                {
+                    "name": cfg.name,
+                    "node_count": cfg.node_count,
+                    "edge_count": cfg.edge_count,
+                    "entry": cfg.entry_node,
+                    "exit": cfg.exit_node,
+                    "nodes": {
+                        nid: {
+                            "type": n.node_type.value,
+                            "statements": n.statements,
+                            "line_start": n.line_start,
+                        }
+                        for nid, n in cfg.nodes.items()
+                    },
+                    "edges": [
+                        {
+                            "source": e.source,
+                            "target": e.target,
+                            "type": e.edge_type.value,
+                            "condition": e.condition,
+                        }
+                        for e in cfg.edges
+                    ],
+                }
+            )
+        output_result(results, args)
+    else:
+        for cfg in cfgs:
+            if args.dot:
+                print(cfg.to_dot())
+            else:
+                print(cfg.to_text())
+                print()
+
+    return 0
+
+
+def cmd_deps(args: Namespace) -> int:
+    """Extract dependencies (imports/exports) from code."""
+    from moss.dependencies import extract_dependencies, format_dependencies
+
+    path = Path(args.path).resolve()
+
+    if not path.exists():
+        print(f"Error: Path {path} does not exist", file=sys.stderr)
+        return 1
+
+    results = []
+
+    if path.is_file():
+        files = [path]
+    else:
+        pattern = args.pattern or "**/*.py"
+        files = list(path.glob(pattern))
+
+    for file_path in files:
+        try:
+            source = file_path.read_text()
+            deps = extract_dependencies(source)
+
+            if getattr(args, "json", False):
+                results.append(
+                    {
+                        "file": str(file_path),
+                        "imports": [
+                            {
+                                "module": i.module,
+                                "names": i.names,
+                                "alias": i.alias,
+                                "line": i.lineno,
+                            }
+                            for i in deps.imports
+                        ],
+                        "exports": [
+                            {"name": e.name, "kind": e.kind, "line": e.lineno} for e in deps.exports
+                        ],
+                    }
+                )
+            else:
+                if len(files) > 1:
+                    print(f"\n=== {file_path} ===")
+                formatted = format_dependencies(deps)
+                if formatted:
+                    print(formatted)
+
+        except SyntaxError as e:
+            if not args.quiet:
+                print(f"Syntax error in {file_path}: {e}", file=sys.stderr)
+
+    if getattr(args, "json", False):
+        output_result(results if len(results) > 1 else results[0] if results else {}, args)
+
+    return 0
+
+
+def cmd_context(args: Namespace) -> int:
+    """Generate compiled context for a file (skeleton + deps + summary)."""
+    from moss.dependencies import extract_dependencies, format_dependencies
+    from moss.skeleton import extract_python_skeleton, format_skeleton
+
+    path = Path(args.path).resolve()
+
+    if not path.exists():
+        print(f"Error: Path {path} does not exist", file=sys.stderr)
+        return 1
+
+    if not path.is_file():
+        print(f"Error: {path} must be a file", file=sys.stderr)
+        return 1
+
+    try:
+        source = path.read_text()
+        symbols = extract_python_skeleton(source)
+        deps = extract_dependencies(source)
+    except SyntaxError as e:
+        print(f"Syntax error: {e}", file=sys.stderr)
+        return 1
+
+    # Count symbols
+    def count_symbols(syms: list) -> dict:
+        counts = {"classes": 0, "functions": 0, "methods": 0}
+        for s in syms:
+            kind = s.kind
+            if kind == "class":
+                counts["classes"] += 1
+            elif kind == "function":
+                counts["functions"] += 1
+            elif kind == "method":
+                counts["methods"] += 1
+            if s.children:
+                child_counts = count_symbols(s.children)
+                for k, v in child_counts.items():
+                    counts[k] += v
+        return counts
+
+    counts = count_symbols(symbols)
+    line_count = len(source.splitlines())
+
+    if getattr(args, "json", False):
+        result = {
+            "file": str(path),
+            "summary": {
+                "lines": line_count,
+                "classes": counts["classes"],
+                "functions": counts["functions"],
+                "methods": counts["methods"],
+                "imports": len(deps.imports),
+                "exports": len(deps.exports),
+            },
+            "symbols": [_symbol_to_dict(s) for s in symbols],
+            "imports": [
+                {"module": i.module, "names": i.names, "alias": i.alias, "line": i.lineno}
+                for i in deps.imports
+            ],
+            "exports": [{"name": e.name, "kind": e.kind, "line": e.lineno} for e in deps.exports],
+        }
+        output_result(result, args)
+    else:
+        print(f"=== {path.name} ===")
+        print(f"Lines: {line_count}")
+        print(
+            f"Classes: {counts['classes']}, "
+            f"Functions: {counts['functions']}, Methods: {counts['methods']}"
+        )
+        print(f"Imports: {len(deps.imports)}, Exports: {len(deps.exports)}")
+        print()
+
+        if deps.imports:
+            print("--- Imports ---")
+            print(format_dependencies(deps).split("Exports:")[0].strip())
+            print()
+
+        print("--- Skeleton ---")
+        skeleton = format_skeleton(symbols)
+        if skeleton:
+            print(skeleton)
+        else:
+            print("(no symbols)")
+
+    return 0
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser."""
     parser = argparse.ArgumentParser(
@@ -295,6 +677,7 @@ def create_parser() -> argparse.ArgumentParser:
         description="Headless agent orchestration layer for AI engineering",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {get_version()}")
+    parser.add_argument("--json", "-j", action="store_true", help="Output in JSON format")
 
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
@@ -388,6 +771,67 @@ def create_parser() -> argparse.ArgumentParser:
     # distros command
     distros_parser = subparsers.add_parser("distros", help="List available distros")
     distros_parser.set_defaults(func=cmd_distros)
+
+    # ==========================================================================
+    # Introspection commands
+    # ==========================================================================
+
+    # skeleton command
+    skeleton_parser = subparsers.add_parser(
+        "skeleton", help="Extract code skeleton (functions, classes, methods)"
+    )
+    skeleton_parser.add_argument("path", help="File or directory to analyze")
+    skeleton_parser.add_argument(
+        "--pattern", "-p", help="Glob pattern for directory (default: **/*.py)"
+    )
+    skeleton_parser.add_argument(
+        "--quiet", "-q", action="store_true", help="Suppress empty file messages"
+    )
+    skeleton_parser.set_defaults(func=cmd_skeleton)
+
+    # anchors command
+    anchors_parser = subparsers.add_parser(
+        "anchors", help="Find anchors (functions, classes, methods)"
+    )
+    anchors_parser.add_argument("path", help="File or directory to analyze")
+    anchors_parser.add_argument(
+        "--type",
+        "-t",
+        default="all",
+        choices=["function", "class", "method", "all"],
+        help="Type of anchors to find",
+    )
+    anchors_parser.add_argument("--name", "-n", help="Filter by name (regex)")
+    anchors_parser.add_argument(
+        "--pattern", "-p", help="Glob pattern for directory (default: **/*.py)"
+    )
+    anchors_parser.add_argument("--quiet", "-q", action="store_true", help="Suppress errors")
+    anchors_parser.set_defaults(func=cmd_anchors)
+
+    # cfg command
+    cfg_parser = subparsers.add_parser("cfg", help="Build control flow graph")
+    cfg_parser.add_argument("path", help="Python file to analyze")
+    cfg_parser.add_argument("function", nargs="?", help="Specific function to analyze")
+    cfg_parser.add_argument(
+        "--dot", action="store_true", help="Output in DOT format (for graphviz)"
+    )
+    cfg_parser.set_defaults(func=cmd_cfg)
+
+    # deps command
+    deps_parser = subparsers.add_parser("deps", help="Extract dependencies (imports/exports)")
+    deps_parser.add_argument("path", help="File or directory to analyze")
+    deps_parser.add_argument(
+        "--pattern", "-p", help="Glob pattern for directory (default: **/*.py)"
+    )
+    deps_parser.add_argument("--quiet", "-q", action="store_true", help="Suppress errors")
+    deps_parser.set_defaults(func=cmd_deps)
+
+    # context command
+    context_parser = subparsers.add_parser(
+        "context", help="Generate compiled context (skeleton + deps + summary)"
+    )
+    context_parser.add_argument("path", help="Python file to analyze")
+    context_parser.set_defaults(func=cmd_context)
 
     return parser
 
