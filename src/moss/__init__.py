@@ -39,6 +39,16 @@ from moss.api import (
     TaskStatusResponse,
     create_api_handler,
 )
+from moss.cfg import (
+    CFGBuilder,
+    CFGEdge,
+    CFGNode,
+    CFGViewProvider,
+    ControlFlowGraph,
+    EdgeType,
+    NodeType,
+    build_cfg,
+)
 from moss.cli import main as cli_main
 from moss.config import (
     Distro,
@@ -60,6 +70,13 @@ from moss.dependencies import (
     PythonDependencyProvider,
     extract_dependencies,
     format_dependencies,
+)
+from moss.elided_literals import (
+    ElidedLiteralsProvider,
+    ElisionConfig,
+    ElisionStats,
+    elide_literals,
+    elide_literals_regex,
 )
 from moss.events import Event, EventBus, EventType
 from moss.handles import (
@@ -177,6 +194,10 @@ __all__ = [
     "AnchorResolver",
     "AnchorType",
     "BinaryFileHandle",
+    "CFGBuilder",
+    "CFGEdge",
+    "CFGNode",
+    "CFGViewProvider",
     "CheckpointRequest",
     "CheckpointResponse",
     "ChromaVectorStore",
@@ -185,9 +206,14 @@ __all__ = [
     "CompiledContext",
     "Constraint",
     "ContextHost",
+    "ControlFlowGraph",
     "DeferredHandle",
     "DependencyInfo",
     "Distro",
+    "EdgeType",
+    "ElidedLiteralsProvider",
+    "ElisionConfig",
+    "ElisionStats",
     "Episode",
     "EpisodicStore",
     "Event",
@@ -217,6 +243,7 @@ __all__ = [
     "MergeResult",
     "MergeStrategy",
     "MossConfig",
+    "NodeType",
     "Outcome",
     "Patch",
     "PatchResult",
@@ -287,6 +314,7 @@ __all__ = [
     "apply_patch",
     "apply_patch_with_fallback",
     "apply_text_patch",
+    "build_cfg",
     "cli_main",
     "create_api_handler",
     "create_config",
@@ -297,6 +325,8 @@ __all__ = [
     "create_python_validator_chain",
     "create_vector_store",
     "document_hash",
+    "elide_literals",
+    "elide_literals_regex",
     "extract_dependencies",
     "extract_python_skeleton",
     "find_anchors",
