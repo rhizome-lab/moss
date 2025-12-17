@@ -3,9 +3,9 @@
 ## Current: Phase 20 — Integration & Polish
 
 ### CLI Improvements
-- [ ] Wire output module into all CLI commands (consistent verbosity flags)
-- [ ] Add `--json` and `--quiet` global flags
-- [ ] Interactive REPL mode (`moss shell`)
+- [x] Wire output module into all CLI commands (consistent verbosity flags)
+- [x] Add `--json` and `--quiet` global flags
+- [x] Interactive REPL mode (`moss shell`)
 
 ### Performance
 - [ ] Caching layer for AST/CFG (avoid re-parsing unchanged files)

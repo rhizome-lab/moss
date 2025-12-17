@@ -1167,6 +1167,14 @@ def cmd_lsp(args: Namespace) -> int:
         return 0
 
 
+def cmd_shell(args: Namespace) -> int:
+    """Start interactive shell."""
+    from moss.shell import start_shell
+
+    directory = Path(getattr(args, "directory", ".")).resolve()
+    return start_shell(directory)
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser."""
     parser = argparse.ArgumentParser(
@@ -1419,6 +1427,16 @@ def create_parser() -> argparse.ArgumentParser:
         help="Transport: 'stdio' (default) or 'tcp:host:port'",
     )
     lsp_parser.set_defaults(func=cmd_lsp)
+
+    # shell command
+    shell_parser = subparsers.add_parser("shell", help="Interactive shell for code exploration")
+    shell_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Workspace directory (default: current)",
+    )
+    shell_parser.set_defaults(func=cmd_shell)
 
     return parser
 
