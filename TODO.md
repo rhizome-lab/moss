@@ -2,17 +2,6 @@
 
 ## Current: Phase 19 — Advanced Features
 
-### Embedding-based Search
-- [ ] Vector embeddings for semantic code search
-- [ ] Integration with existing vector store
-- [ ] Hybrid TF-IDF + embedding routing
-
-### Auto-fix System
-- [ ] Safe vs unsafe fix classification
-- [ ] Preview/diff before applying
-- [ ] Shadow Git integration for rollback
-- [ ] Conflict resolution for overlapping fixes
-
 ### Real-time Features
 - [ ] File watching for incremental updates
 - [ ] LSP integration
@@ -30,6 +19,8 @@
 ## Completed
 
 See `docs/` for details on completed work:
+- **Phase 19c**: Auto-fix System — safe/unsafe classification, preview/diff, conflict resolution, Shadow Git rollback
+- **Phase 19b**: Embedding-based Search — hybrid TF-IDF + embedding routing, code indexer, CLI command
 - **Phase 19a**: Non-Code Content Plugins — Markdown structure, JSON/YAML/TOML schema extraction
 - **Phase 18**: Plugin Architecture — extensible view provider system, entry points discovery, multi-language support (tree-sitter)
 - **Phase 17**: Introspection Improvements — symbol metrics, reverse deps, DWIM tuning, output improvements
