@@ -43,8 +43,8 @@
 - [x] Manager/merge conflict resolution
 
 ## Phase 8: Configuration
-- [ ] Executable config (TypeScript/Python DSL)
-- [ ] Distro system (composable presets)
+- [x] Executable config (TypeScript/Python DSL)
+- [x] Distro system (composable presets)
 
 ## Phase 9: API Surface
 - [ ] Headless HTTP API
