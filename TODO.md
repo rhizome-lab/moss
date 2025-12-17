@@ -1,31 +1,18 @@
 # Moss Roadmap
 
-## Current: Phase 20 — Integration & Polish
+## Current: Phase 21 — Developer Experience
 
-### CLI Improvements
-- [x] Wire output module into all CLI commands (consistent verbosity flags)
-- [x] Add `--json` and `--quiet` global flags
-- [x] Interactive REPL mode (`moss shell`)
-
-### Performance
-- [x] Caching layer for AST/CFG (avoid re-parsing unchanged files)
-- [x] Parallel file analysis (multi-threaded processing)
-
-### Configuration
-- [x] Project config file (`moss.toml` or `.mossrc`)
-- [x] Per-directory overrides
-
-## Backlog
-
-### Developer Experience
+### Watch & Feedback
 - [ ] Watch mode for tests (auto-run on file changes)
 - [ ] Metrics dashboard (HTML report of codebase health)
 - [ ] Custom analysis rules (user-defined patterns)
 
 ### Git Integration
+- [x] Pre-commit hook integration
 - [ ] Diff analysis (analyze changes between commits)
 - [ ] PR review helper (summarize changes, detect issues)
-- [ ] Pre-commit hook integration
+
+## Backlog
 
 ### Export & Integration
 - [ ] SARIF output (for CI/CD integration)
@@ -37,6 +24,12 @@
 ## Completed
 
 See `docs/phase19-features.md` for detailed documentation.
+
+### Phase 20: Integration & Polish
+- CLI improvements: global flags, consistent output module
+- Interactive shell (moss shell)
+- Performance: caching layer, parallel file analysis
+- Configuration: moss.toml, per-directory overrides
 
 ### Phase 19: Advanced Features
 - **19j**: Configurable Output Verbosity

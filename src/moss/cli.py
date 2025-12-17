@@ -1175,6 +1175,59 @@ def cmd_shell(args: Namespace) -> int:
     return start_shell(directory)
 
 
+def cmd_hooks(args: Namespace) -> int:
+    """Manage git pre-commit hooks."""
+    from moss.hooks import (
+        check_hooks_installed,
+        generate_hook_config_yaml,
+        install_hooks,
+        uninstall_hooks,
+    )
+
+    output = setup_output(args)
+    project_dir = Path(getattr(args, "directory", ".")).resolve()
+    action = getattr(args, "action", "status")
+
+    if action == "install":
+        try:
+            force = getattr(args, "force", False)
+            install_hooks(project_dir, force=force)
+            output.success("Pre-commit hooks installed successfully")
+            return 0
+        except FileNotFoundError as e:
+            output.error(str(e))
+            return 1
+        except FileExistsError as e:
+            output.error(str(e))
+            return 1
+
+    elif action == "uninstall":
+        if uninstall_hooks(project_dir):
+            output.success("Pre-commit hooks uninstalled")
+            return 0
+        else:
+            output.warning("No moss hooks found to uninstall")
+            return 0
+
+    elif action == "config":
+        # Generate pre-commit config
+        try:
+            config_yaml = generate_hook_config_yaml()
+            output.print(config_yaml)
+            return 0
+        except ImportError:
+            output.error("PyYAML not installed. Install with: pip install pyyaml")
+            return 1
+
+    else:  # status
+        if check_hooks_installed(project_dir):
+            output.success("Moss pre-commit hooks are installed")
+        else:
+            output.info("Moss pre-commit hooks are not installed")
+            output.info("Run 'moss hooks install' to install them")
+        return 0
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser."""
     parser = argparse.ArgumentParser(
@@ -1437,6 +1490,29 @@ def create_parser() -> argparse.ArgumentParser:
         help="Workspace directory (default: current)",
     )
     shell_parser.set_defaults(func=cmd_shell)
+
+    # hooks command
+    hooks_parser = subparsers.add_parser("hooks", help="Manage git pre-commit hooks")
+    hooks_parser.add_argument(
+        "action",
+        nargs="?",
+        choices=["install", "uninstall", "status", "config"],
+        default="status",
+        help="Action to perform (default: status)",
+    )
+    hooks_parser.add_argument(
+        "-C",
+        "--directory",
+        default=".",
+        help="Project directory (default: current)",
+    )
+    hooks_parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Force overwrite existing hooks",
+    )
+    hooks_parser.set_defaults(func=cmd_hooks)
 
     return parser
 
