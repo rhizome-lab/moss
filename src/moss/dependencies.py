@@ -121,6 +121,86 @@ def extract_dependencies(source: str) -> DependencyInfo:
     )
 
 
+@dataclass
+class ReverseDependency:
+    """A file that imports a target module."""
+
+    file: str
+    import_line: int
+    import_type: str  # "import" or "from"
+    names: list[str]  # Names imported (for "from X import Y")
+
+
+def find_reverse_dependencies(
+    target_module: str,
+    search_path: str,
+    pattern: str = "**/*.py",
+) -> list[ReverseDependency]:
+    """Find all files that import a target module.
+
+    Args:
+        target_module: Module name to search for (e.g., "moss.skeleton")
+        search_path: Directory to search in
+        pattern: Glob pattern for files to search
+
+    Returns:
+        List of ReverseDependency showing files that import the target
+    """
+    from pathlib import Path
+
+    results: list[ReverseDependency] = []
+    search_dir = Path(search_path)
+
+    if not search_dir.exists():
+        return results
+
+    for file_path in search_dir.glob(pattern):
+        try:
+            source = file_path.read_text()
+            deps = extract_dependencies(source)
+
+            for imp in deps.imports:
+                # Check if this import matches the target module
+                # Handle both "import X" and "from X import Y"
+                module = imp.module
+
+                # Exact match
+                if module == target_module:
+                    results.append(
+                        ReverseDependency(
+                            file=str(file_path),
+                            import_line=imp.lineno,
+                            import_type="from" if imp.names else "import",
+                            names=imp.names,
+                        )
+                    )
+                # Prefix match (e.g., target="moss" matches "moss.skeleton")
+                elif module.startswith(target_module + "."):
+                    results.append(
+                        ReverseDependency(
+                            file=str(file_path),
+                            import_line=imp.lineno,
+                            import_type="from" if imp.names else "import",
+                            names=imp.names,
+                        )
+                    )
+                # Check if target is imported as a name (from X import target)
+                elif target_module in imp.names:
+                    results.append(
+                        ReverseDependency(
+                            file=str(file_path),
+                            import_line=imp.lineno,
+                            import_type="from",
+                            names=[target_module],
+                        )
+                    )
+
+        except (SyntaxError, OSError):
+            continue
+
+    return results
+
+
 def format_dependencies(info: DependencyInfo, include_exports: bool = True) -> str:
     """Format dependency info as text."""
     lines = []

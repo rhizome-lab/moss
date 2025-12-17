@@ -11,8 +11,8 @@ Based on LLM evaluation findings (see `docs/llm-evaluation.md`).
 - [ ] Cyclomatic complexity (optional)
 
 ### Reverse Dependencies
-- [ ] "What imports this module?" query
-- [ ] `moss deps --reverse <module>` command
+- [x] "What imports this module?" query
+- [x] `moss deps --reverse <module>` command
 - [ ] Internal dependency graph visualization
 
 ### DWIM Tuning

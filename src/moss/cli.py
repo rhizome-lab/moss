@@ -653,7 +653,11 @@ def cmd_cfg(args: Namespace) -> int:
 
 def cmd_deps(args: Namespace) -> int:
     """Extract dependencies (imports/exports) from code."""
-    from moss.dependencies import extract_dependencies, format_dependencies
+    from moss.dependencies import (
+        extract_dependencies,
+        find_reverse_dependencies,
+        format_dependencies,
+    )
 
     path = Path(args.path).resolve()
 
@@ -661,6 +665,35 @@ def cmd_deps(args: Namespace) -> int:
         print(f"Error: Path {path} does not exist", file=sys.stderr)
         return 1
 
+    # Handle --reverse mode: find what imports the target module
+    if args.reverse:
+        search_dir = args.search_dir or "."
+        pattern = args.pattern or "**/*.py"
+        reverse_deps = find_reverse_dependencies(args.reverse, search_dir, pattern)
+
+        if getattr(args, "json", False):
+            results = [
+                {
+                    "file": rd.file,
+                    "line": rd.import_line,
+                    "type": rd.import_type,
+                    "names": rd.names,
+                }
+                for rd in reverse_deps
+            ]
+            output_result({"target": args.reverse, "importers": results}, args)
+        else:
+            if reverse_deps:
+                print(f"Files that import '{args.reverse}':")
+                for rd in reverse_deps:
+                    names = f" ({', '.join(rd.names)})" if rd.names else ""
+                    print(f"  {rd.file}:{rd.import_line} {rd.import_type}{names}")
+            else:
+                print(f"No files found that import '{args.reverse}'")
+
+        return 0
+
+    # Normal mode: show dependencies of file(s)
     results = []
 
     if path.is_file():
@@ -989,6 +1022,12 @@ def create_parser() -> argparse.ArgumentParser:
     deps_parser.add_argument("path", help="File or directory to analyze")
     deps_parser.add_argument(
         "--pattern", "-p", help="Glob pattern for directory (default: **/*.py)"
+    )
+    deps_parser.add_argument(
+        "--reverse", "-r", help="Find files that import this module (reverse dependency)"
+    )
+    deps_parser.add_argument(
+        "--search-dir", "-d", dest="search_dir", help="Directory to search for reverse deps"
     )
     deps_parser.add_argument("--quiet", "-q", action="store_true", help="Suppress errors")
     deps_parser.set_defaults(func=cmd_deps)
