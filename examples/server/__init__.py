@@ -1,0 +1,1 @@
+"""Moss FastAPI server example."""

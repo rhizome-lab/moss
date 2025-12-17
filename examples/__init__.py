@@ -1,0 +1,1 @@
+"""Moss example applications."""
