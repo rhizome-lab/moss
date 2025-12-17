@@ -81,6 +81,46 @@ class TestPlaceholderGenerator:
         gen = PlaceholderGenerator()
         assert isinstance(gen, CodeGenerator)
 
+    @pytest.mark.asyncio
+    async def test_generate_from_primitive(self):
+        """Test returning primitive match from context."""
+        gen = PlaceholderGenerator()
+        spec = Specification(description="use the print function")
+        context = Context(primitives=("print", "len", "str"))
+
+        result = await gen.generate(spec, context)
+
+        assert result.success is True
+        assert result.code == "print"
+        assert result.confidence == 0.5
+        assert result.metadata.get("source") == "primitive"
+
+    @pytest.mark.asyncio
+    async def test_generate_with_constraints(self):
+        """Test placeholder includes constraints in output."""
+        gen = PlaceholderGenerator()
+        spec = Specification(
+            description="test function",
+            constraints=("must be pure", "no side effects"),
+        )
+
+        result = await gen.generate(spec, Context())
+
+        assert result.success is True
+        assert "Constraints:" in result.code
+        assert "must be pure" in result.code
+        assert "no side effects" in result.code
+
+    def test_estimate_cost(self, spec, context):
+        """Test cost estimation."""
+        gen = PlaceholderGenerator()
+
+        cost = gen.estimate_cost(spec, context)
+
+        assert cost.time_estimate_ms == 1
+        assert cost.token_estimate == 0
+        assert cost.complexity_score == 0
+
 
 class TestTemplateGenerator:
     """Tests for TemplateGenerator."""
