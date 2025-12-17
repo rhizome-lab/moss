@@ -22,10 +22,10 @@
 - [x] Fallback to text-based editing for broken AST
 
 ## Phase 4: Validation Loop
-- [ ] Validator protocol
-- [ ] Built-in validators (syntax, ruff, pytest)
-- [ ] Silent loop orchestration (draft → validate → fix → commit)
-- [ ] Velocity monitoring (detect oscillation/stalls)
+- [x] Validator protocol
+- [x] Built-in validators (syntax, ruff, pytest)
+- [x] Silent loop orchestration (draft → validate → fix → commit)
+- [x] Velocity monitoring (detect oscillation/stalls)
 
 ## Phase 5: Policy & Safety
 - [ ] Policy engine (intercept tool calls)
