@@ -33,9 +33,9 @@
 - [x] Velocity checks
 
 ## Phase 6: Memory Layer
-- [ ] Episodic store (state, action, outcome logging)
-- [ ] Vector indexing for episode retrieval
-- [ ] Semantic rule extraction (offline pattern matcher)
+- [x] Episodic store (state, action, outcome logging)
+- [x] Vector indexing for episode retrieval
+- [x] Semantic rule extraction (offline pattern matcher)
 
 ## Phase 7: Multi-Agent
 - [ ] Ticket protocol (task, handles, constraints)
