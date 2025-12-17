@@ -72,16 +72,16 @@ Plugin system for synthesis components inspired by Synquid, miniKanren, DreamCod
 
 ## Future Work
 
-### Phase D: Strategy Auto-Discovery (TODO)
-- [ ] Convert DecompositionStrategy to StrategyPlugin protocol
-- [ ] Entry point discovery for strategies
-- [ ] Config-based enable/disable
+### Phase D: Strategy Auto-Discovery ✅
+- [x] Convert DecompositionStrategy to StrategyPlugin protocol
+- [x] Entry point discovery for strategies
+- [x] Config-based enable/disable
 
-### Phase F: Configuration System (TODO)
-- [ ] `[synthesis.*]` sections in moss.toml
-- [ ] Template directory configuration
-- [ ] Plugin enable/disable
-- [ ] Validation retry settings
+### Phase F: Configuration System ✅
+- [x] `[synthesis.*]` sections in moss.toml
+- [x] Template directory configuration
+- [x] Plugin enable/disable
+- [x] Validation retry settings
 
 ### Future: LLM Integration
 - [ ] `LLMGenerator` - Claude/GPT code generation

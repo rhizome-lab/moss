@@ -9,6 +9,23 @@
 - Synthesis fallback for complex/novel tasks
 - Configuration presets: default, research, production, minimal
 
+### Phase 22d: Optimization & Learning
+- StrategyLearner with feature extraction
+- Feature-based strategy scoring (EMA updates)
+- Similar problem lookup from history
+- Router integration: 4-signal ranking (TF-IDF, estimate, history, learned)
+
+### Phase D: Strategy Auto-Discovery
+- StrategyPlugin protocol for pluggable strategies
+- StrategyRegistry with enable/disable support
+- Entry point discovery (moss.synthesis.strategies)
+
+### Phase F: Configuration System
+- SynthesisConfigWrapper for TOML-based config
+- SynthesisConfigLoader fluent builder
+- Subsystem configs: generators, validators, strategies, learning
+- load_synthesis_config() for moss.toml
+
 ### Phase 25: Synthesis Plugin Architecture
 Plugin system for synthesis components (inspired by Synquid, miniKanren, DreamCoder, λ²):
 - `CodeGenerator` protocol with PlaceholderGenerator, TemplateGenerator
