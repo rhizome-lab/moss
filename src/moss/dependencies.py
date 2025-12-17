@@ -235,6 +235,122 @@ def format_dependencies(info: DependencyInfo, include_exports: bool = True) -> s
     return "\n".join(lines).strip()
 
 
+def build_dependency_graph(
+    search_path: str,
+    pattern: str = "**/*.py",
+    internal_only: bool = True,
+) -> dict[str, list[str]]:
+    """Build a dependency graph from a directory of Python files.
+
+    Args:
+        search_path: Directory to scan
+        pattern: Glob pattern for files
+        internal_only: If True, only include imports within the search_path
+
+    Returns:
+        Dict mapping module paths to list of imported modules
+    """
+    from pathlib import Path
+
+    search_dir = Path(search_path)
+    if not search_dir.exists():
+        return {}
+
+    # Try to determine package name from directory name
+    package_name = search_dir.name
+
+    # Build graph: file -> list of imported modules
+    graph: dict[str, list[str]] = {}
+    internal_modules: set[str] = set()
+
+    # First pass: collect all internal modules (using package prefix)
+    for file_path in search_dir.glob(pattern):
+        rel_path = file_path.relative_to(search_dir)
+        short_name = str(rel_path.with_suffix("")).replace("/", ".").replace("\\", ".")
+        # Store both short name and full package name
+        internal_modules.add(short_name)
+        internal_modules.add(f"{package_name}.{short_name}")
+
+    # Second pass: extract dependencies
+    for file_path in search_dir.glob(pattern):
+        try:
+            source = file_path.read_text()
+            deps = extract_dependencies(source)
+
+            rel_path = file_path.relative_to(search_dir)
+            short_name = str(rel_path.with_suffix("")).replace("/", ".").replace("\\", ".")
+
+            imports = []
+            for imp in deps.imports:
+                if imp.is_relative:
+                    # Skip relative imports for now (complex to resolve)
+                    continue
+
+                module = imp.module
+                if internal_only:
+                    # Check if import matches internal modules
+                    # Handle both "moss.skeleton" and prefix matches
+                    if module in internal_modules or any(
+                        module.startswith(m + ".") for m in internal_modules
+                    ):
+                        # Normalize to short name for graph
+                        if module.startswith(package_name + "."):
+                            module = module[len(package_name) + 1 :]
+                        imports.append(module)
+                else:
+                    imports.append(module)
+
+            if imports:
+                graph[short_name] = imports
+
+        except (SyntaxError, OSError):
+            continue
+
+    return graph
+
+
+def dependency_graph_to_dot(
+    graph: dict[str, list[str]],
+    title: str = "Dependencies",
+) -> str:
+    """Convert a dependency graph to DOT format.
+
+    Args:
+        graph: Dict mapping modules to their imports
+        title: Title for the graph
+
+    Returns:
+        DOT format string
+    """
+    lines = [f'digraph "{title}" {{']
+    lines.append("  rankdir=LR;")
+    lines.append('  node [shape=box, fontname="Helvetica"];')
+    lines.append('  edge [color="gray"];')
+    lines.append("")
+
+    # Collect all nodes
+    all_nodes: set[str] = set()
+    for module, imports in graph.items():
+        all_nodes.add(module)
+        all_nodes.update(imports)
+
+    # Add nodes with shortened labels
+    for node in sorted(all_nodes):
+        # Use short name as label
+        short_name = node.split(".")[-1]
+        lines.append(f'  "{node}" [label="{short_name}"];')
+
+    lines.append("")
+
+    # Add edges
+    for module, imports in sorted(graph.items()):
+        for imp in sorted(set(imports)):
+            lines.append(f'  "{module}" -> "{imp}";')
+
+    lines.append("}")
+    return "\n".join(lines)
+
+
 class PythonDependencyProvider(ViewProvider):
     """Dependency graph provider for Python files."""
 

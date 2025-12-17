@@ -685,6 +685,8 @@ def cmd_cfg(args: Namespace) -> int:
 def cmd_deps(args: Namespace) -> int:
     """Extract dependencies (imports/exports) from code."""
     from moss.dependencies import (
+        build_dependency_graph,
+        dependency_graph_to_dot,
         extract_dependencies,
         find_reverse_dependencies,
         format_dependencies,
@@ -695,6 +697,23 @@ def cmd_deps(args: Namespace) -> int:
     if not path.exists():
         print(f"Error: Path {path} does not exist", file=sys.stderr)
         return 1
+
+    # Handle --dot mode: generate dependency graph visualization
+    if getattr(args, "dot", False):
+        if not path.is_dir():
+            print("Error: --dot requires a directory path", file=sys.stderr)
+            return 1
+
+        pattern = args.pattern or "**/*.py"
+        graph = build_dependency_graph(str(path), pattern)
+
+        if not graph:
+            print("No internal dependencies found", file=sys.stderr)
+            return 1
+
+        dot_output = dependency_graph_to_dot(graph, title=path.name)
+        print(dot_output)
+        return 0
 
     # Handle --reverse mode: find what imports the target module
     if args.reverse:
@@ -1070,6 +1089,9 @@ def create_parser() -> argparse.ArgumentParser:
         "--search-dir", "-d", dest="search_dir", help="Directory to search for reverse deps"
     )
     deps_parser.add_argument("--quiet", "-q", action="store_true", help="Suppress errors")
+    deps_parser.add_argument(
+        "--dot", action="store_true", help="Output dependency graph in DOT format"
+    )
     deps_parser.set_defaults(func=cmd_deps)
 
     # context command

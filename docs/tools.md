@@ -10,7 +10,7 @@
 - **anchors** `<path>` — find code elements; `--type` (function/class/method), `--name` (regex)
 - **query** `<path>` — pattern search; `--name`, `--signature`, `--type`, `--inherits`, `--min-lines`, `--max-lines`, `--group-by=file`
 - **cfg** `<file> [function]` — control flow graph with cyclomatic complexity; `--dot`, `--summary`
-- **deps** `<path>` — imports and exports; `--reverse <module>` for reverse lookup
+- **deps** `<path>` — imports and exports; `--reverse <module>`, `--dot` for graph visualization
 - **context** `<file>` — combined skeleton + deps + summary
 
 ## Editing

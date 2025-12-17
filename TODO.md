@@ -13,7 +13,7 @@ Based on LLM evaluation findings (see `docs/llm-evaluation.md`).
 ### Reverse Dependencies
 - [x] "What imports this module?" query
 - [x] `moss deps --reverse <module>` command
-- [ ] Internal dependency graph visualization
+- [x] Internal dependency graph visualization (`moss deps --dot`)
 
 ### DWIM Tuning
 - [x] Lower `SUGGEST_THRESHOLD` from 0.5 to 0.3
