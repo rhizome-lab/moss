@@ -257,6 +257,75 @@ class TestMemoryLibrary:
         lib = MemoryLibrary()
         assert isinstance(lib, LibraryPlugin)
 
+    def test_remove_abstraction(self):
+        """Test removing an abstraction."""
+        lib = MemoryLibrary()
+        abstraction = Abstraction(name="to_remove", code="pass")
+        lib.add_abstraction(abstraction)
+
+        assert lib.remove_abstraction("to_remove") is True
+        assert lib.remove_abstraction("nonexistent") is False
+        assert len(lib.get_abstractions()) == 0
+
+    def test_clear(self):
+        """Test clearing all abstractions."""
+        lib = MemoryLibrary()
+        lib.add_abstraction(Abstraction(name="a", code="pass"))
+        lib.add_abstraction(Abstraction(name="b", code="pass"))
+
+        lib.clear()
+
+        assert len(lib.get_abstractions()) == 0
+        assert len(lib) == 0
+
+    def test_len(self):
+        """Test __len__ method."""
+        lib = MemoryLibrary()
+        assert len(lib) == 0
+
+        lib.add_abstraction(Abstraction(name="a", code="pass"))
+        assert len(lib) == 1
+
+        lib.add_abstraction(Abstraction(name="b", code="pass"))
+        assert len(lib) == 2
+
+    @pytest.mark.asyncio
+    async def test_learn_abstraction_returns_none(self, spec):
+        """Test that MemoryLibrary doesn't learn (returns None)."""
+        lib = MemoryLibrary()
+        result = await lib.learn_abstraction(["code1", "code2"], spec)
+        assert result is None
+
+    def test_search_with_type_signature(self, context):
+        """Test searching with type signature matching."""
+        lib = MemoryLibrary()
+
+        lib.add_abstraction(
+            Abstraction(
+                name="int_func",
+                code="def f(x): return x + 1",
+                type_signature="(int) -> int",
+                description="Integer function",
+            )
+        )
+        lib.add_abstraction(
+            Abstraction(
+                name="str_func",
+                code="def f(x): return str(x)",
+                type_signature="(int) -> str",
+                description="String function",
+            )
+        )
+
+        spec_int = Specification(
+            description="test integer function",
+            type_signature="(int) -> int",
+        )
+        results = lib.search_abstractions(spec_int, context)
+
+        # int_func should match better due to return type
+        assert len(results) > 0
+
 
 class TestSynthesisRegistry:
     """Tests for SynthesisRegistry."""
