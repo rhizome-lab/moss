@@ -14,6 +14,7 @@ Moss implements a "Compiled Context" approach that prioritizes architectural awa
 - **Memory System**: Episodic and semantic stores for learning from past actions
 - **Multi-Agent Support**: Ticket-based coordination with isolated workers
 - **Configuration DSL**: Distro-based configuration with inheritance
+- **Code Synthesis**: Plugin-based code generation with decomposition strategies and LLM integration
 
 ## Architecture
 
@@ -115,6 +116,23 @@ moss status
 
 # Verbose output
 moss status -v
+```
+
+### Code Synthesis
+
+```bash
+# Synthesize code from a specification
+moss synthesize "Create a function that validates email addresses"
+
+# Show the decomposition strategy without generating code
+moss synthesize "Build a REST API for user management" --dry-run
+
+# Show detailed decomposition tree
+moss synthesize "Implement a binary search tree" --show-decomposition
+
+# Use a specific code generator
+moss synthesize "Parse JSON config file" --generator llm  # LLM-based
+moss synthesize "CRUD operations for users" --generator template  # Template-based
 ```
 
 ### Configuration
@@ -275,6 +293,55 @@ if not result.allowed:
     print(f"Blocked by {result.blocking_result.policy_name}")
 ```
 
+### Code Synthesis
+
+Plugin-based code generation:
+
+```python
+from moss.synthesis import SynthesisFramework, Specification
+from moss.synthesis.plugins import get_synthesis_registry
+
+# Get the global registry (discovers plugins automatically)
+registry = get_synthesis_registry()
+
+# Create the framework
+framework = SynthesisFramework()
+
+# Define what to generate
+spec = Specification(
+    name="validate_email",
+    description="Validate email address format",
+    type_signature="(email: str) -> bool",
+    language="python",
+)
+
+# Synthesize code
+result = await framework.solve(spec)
+if result.success:
+    print(result.code)
+```
+
+#### Built-in Generators
+
+| Generator | Description |
+|-----------|-------------|
+| `placeholder` | Returns TODO placeholders (safe fallback) |
+| `template` | User-configurable templates for common patterns |
+| `llm` | LLM-based generation via LiteLLM (Claude, GPT, etc.) |
+
+#### LLM Generator
+
+```python
+from moss.synthesis.plugins.generators import create_llm_generator
+
+# Create with real LLM provider (requires litellm)
+generator = create_llm_generator(model="claude-sonnet-4-20250514")
+
+# Or use mock for testing
+from moss.synthesis.plugins.generators import create_mock_generator
+generator = create_mock_generator()
+```
+
 ## Development
 
 ```bash
@@ -329,7 +396,15 @@ src/moss/
 ├── memory.py        # Episodic/semantic memory
 ├── agents.py        # Multi-agent coordination
 ├── config.py        # Configuration DSL
-└── api.py           # API surface
+├── api.py           # API surface
+└── synthesis/       # Code synthesis framework
+    ├── framework.py     # Main synthesis engine
+    ├── strategy.py      # Decomposition strategies
+    ├── types.py         # Specification, Context types
+    └── plugins/         # Pluggable components
+        ├── generators/  # Code generators (placeholder, template, LLM)
+        ├── validators/  # Synthesis validators (pytest, type check)
+        └── libraries/   # Abstraction libraries (memory, learned)
 ```
 
 ## License
