@@ -12,8 +12,8 @@
 - [x] Parallel file analysis (multi-threaded processing)
 
 ### Configuration
-- [ ] Project config file (`moss.toml` or `.mossrc`)
-- [ ] Per-directory overrides
+- [x] Project config file (`moss.toml` or `.mossrc`)
+- [x] Per-directory overrides
 
 ## Backlog
 
