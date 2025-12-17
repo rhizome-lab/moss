@@ -38,9 +38,9 @@
 - [x] Semantic rule extraction (offline pattern matcher)
 
 ## Phase 7: Multi-Agent
-- [ ] Ticket protocol (task, handles, constraints)
-- [ ] Worker lifecycle (spawn, execute, die)
-- [ ] Manager/merge conflict resolution
+- [x] Ticket protocol (task, handles, constraints)
+- [x] Worker lifecycle (spawn, execute, die)
+- [x] Manager/merge conflict resolution
 
 ## Phase 8: Configuration
 - [ ] Executable config (TypeScript/Python DSL)
