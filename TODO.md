@@ -21,9 +21,9 @@ Based on LLM evaluation findings (see `docs/llm-evaluation.md`).
 - [ ] Consider top-k results regardless of threshold
 
 ### Output Improvements
-- [ ] CFG summary mode (node/edge counts only)
+- [x] CFG summary mode (node/edge counts only)
 - [ ] `--group-by=file` for multi-file query results
-- [ ] `--public-only` filter for exported symbols
+- [x] `--public-only` filter for exported symbols
 
 ## Phase 18: Plugin Architecture
 

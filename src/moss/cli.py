@@ -341,10 +341,13 @@ def cmd_skeleton(args: Namespace) -> int:
         pattern = args.pattern or "**/*.py"
         files = list(path.glob(pattern))
 
+    # Determine if we should include private symbols
+    include_private = not getattr(args, "public_only", False)
+
     for file_path in files:
         try:
             source = file_path.read_text()
-            symbols = extract_python_skeleton(source)
+            symbols = extract_python_skeleton(source, include_private=include_private)
 
             if getattr(args, "json", False):
                 results.append(
@@ -613,36 +616,40 @@ def cmd_cfg(args: Namespace) -> int:
     if getattr(args, "json", False):
         results = []
         for cfg in cfgs:
-            results.append(
-                {
-                    "name": cfg.name,
-                    "node_count": cfg.node_count,
-                    "edge_count": cfg.edge_count,
-                    "entry": cfg.entry_node,
-                    "exit": cfg.exit_node,
-                    "nodes": {
-                        nid: {
-                            "type": n.node_type.value,
-                            "statements": n.statements,
-                            "line_start": n.line_start,
-                        }
-                        for nid, n in cfg.nodes.items()
-                    },
-                    "edges": [
-                        {
-                            "source": e.source,
-                            "target": e.target,
-                            "type": e.edge_type.value,
-                            "condition": e.condition,
-                        }
-                        for e in cfg.edges
-                    ],
+            result = {
+                "name": cfg.name,
+                "node_count": cfg.node_count,
+                "edge_count": cfg.edge_count,
+            }
+            # Include full graph details unless --summary
+            if not args.summary:
+                result["entry"] = cfg.entry_node
+                result["exit"] = cfg.exit_node
+                result["nodes"] = {
+                    nid: {
+                        "type": n.node_type.value,
+                        "statements": n.statements,
+                        "line_start": n.line_start,
+                    }
+                    for nid, n in cfg.nodes.items()
                 }
-            )
+                result["edges"] = [
+                    {
+                        "source": e.source,
+                        "target": e.target,
+                        "type": e.edge_type.value,
+                        "condition": e.condition,
+                    }
+                    for e in cfg.edges
+                ]
+            results.append(result)
         output_result(results, args)
     else:
         for cfg in cfgs:
-            if args.dot:
+            if args.summary:
+                # Summary mode: just show counts
+                print(f"{cfg.name}: {cfg.node_count} nodes, {cfg.edge_count} edges")
+            elif args.dot:
                 print(cfg.to_dot())
             else:
                 print(cfg.to_text())
@@ -959,6 +966,9 @@ def create_parser() -> argparse.ArgumentParser:
         "--pattern", "-p", help="Glob pattern for directory (default: **/*.py)"
     )
     skeleton_parser.add_argument(
+        "--public-only", action="store_true", dest="public_only", help="Exclude private symbols"
+    )
+    skeleton_parser.add_argument(
         "--quiet", "-q", action="store_true", help="Suppress empty file messages"
     )
     skeleton_parser.set_defaults(func=cmd_skeleton)
@@ -1014,6 +1024,9 @@ def create_parser() -> argparse.ArgumentParser:
     cfg_parser.add_argument("function", nargs="?", help="Specific function to analyze")
     cfg_parser.add_argument(
         "--dot", action="store_true", help="Output in DOT format (for graphviz)"
+    )
+    cfg_parser.add_argument(
+        "--summary", "-s", action="store_true", help="Show only node/edge counts"
     )
     cfg_parser.set_defaults(func=cmd_cfg)
 
