@@ -18,7 +18,9 @@ from moss.synthesis.plugins import (
 )
 from moss.synthesis.plugins.generators import PlaceholderGenerator, TemplateGenerator
 from moss.synthesis.plugins.libraries import MemoryLibrary
+from moss.synthesis.plugins.strategies import StrategyRegistry
 from moss.synthesis.plugins.validators import TestValidator, TypeValidator
+from moss.synthesis.strategies import TypeDrivenDecomposition
 from moss.synthesis.types import Context, Specification
 
 
@@ -452,3 +454,73 @@ class TestSynthesisRegistry:
 
         with pytest.raises(ValueError, match="already registered"):
             registry.generators.register(gen)
+
+
+class TestStrategyRegistry:
+    """Tests for StrategyRegistry."""
+
+    def test_register_and_get(self):
+        """Test registering and retrieving a strategy."""
+        registry = StrategyRegistry()
+        strategy = TypeDrivenDecomposition()
+
+        registry.register(strategy)
+
+        assert registry.get("type_driven") is strategy
+        assert registry.is_enabled("type_driven") is True
+
+    def test_unregister(self):
+        """Test unregistering a strategy."""
+        registry = StrategyRegistry()
+        strategy = TypeDrivenDecomposition()
+        registry.register(strategy)
+
+        registry.unregister("type_driven")
+
+        assert registry.get("type_driven") is None
+        assert registry.is_enabled("type_driven") is False
+
+    def test_enable_disable(self):
+        """Test enabling and disabling strategies."""
+        registry = StrategyRegistry()
+        strategy = TypeDrivenDecomposition()
+        registry.register(strategy)
+
+        registry.disable("type_driven")
+        assert registry.is_enabled("type_driven") is False
+        assert "type_driven" in registry.get_disabled()
+
+        registry.enable("type_driven")
+        assert registry.is_enabled("type_driven") is True
+        assert "type_driven" in registry.get_enabled()
+
+    def test_get_all(self):
+        """Test getting all strategies."""
+        registry = StrategyRegistry()
+        strategy = TypeDrivenDecomposition()
+        registry.register(strategy)
+
+        # Enabled only (default)
+        all_enabled = registry.get_all(enabled_only=True)
+        assert len(all_enabled) == 1
+
+        # Disable and check
+        registry.disable("type_driven")
+        all_enabled = registry.get_all(enabled_only=True)
+        assert len(all_enabled) == 0
+
+        # All regardless of status
+        all_strategies = registry.get_all(enabled_only=False)
+        assert len(all_strategies) == 1
+
+    def test_register_builtins(self):
+        """Test registering built-in strategies."""
+        registry = StrategyRegistry()
+        registry.register_builtins()
+
+        # Should have type_driven, test_driven, pattern_based
+        all_strategies = registry.get_all()
+        names = [s.name for s in all_strategies]
+        assert "type_driven" in names
+        assert "test_driven" in names
+        assert "pattern_based" in names
