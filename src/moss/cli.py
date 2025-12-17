@@ -629,6 +629,17 @@ def cmd_cfg(args: Namespace) -> int:
         print(f"Error: {path} must be a file", file=sys.stderr)
         return 1
 
+    # Handle --live mode
+    if getattr(args, "live", False):
+        from moss.live_cfg import start_live_cfg
+
+        start_live_cfg(
+            path=path,
+            function_name=args.function,
+            port=getattr(args, "port", 8765),
+        )
+        return 0
+
     registry = get_registry()
     target = ViewTarget(path=path)
     plugin = registry.find_plugin(target, "cfg")
@@ -1318,6 +1329,12 @@ def create_parser() -> argparse.ArgumentParser:
     )
     cfg_parser.add_argument(
         "--summary", "-s", action="store_true", help="Show only node/edge counts"
+    )
+    cfg_parser.add_argument(
+        "--live", action="store_true", help="Start live CFG viewer with auto-refresh"
+    )
+    cfg_parser.add_argument(
+        "--port", type=int, default=8765, help="Port for live server (default: 8765)"
     )
     cfg_parser.set_defaults(func=cmd_cfg)
 
