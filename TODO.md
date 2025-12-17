@@ -3,7 +3,7 @@
 ## Current: Phase 19 — Advanced Features
 
 ### Real-time Features
-- [ ] File watching for incremental updates
+- [x] File watching for incremental updates
 - [ ] LSP integration
 - [ ] Live CFG rendering
 
