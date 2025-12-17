@@ -640,6 +640,7 @@ def cmd_cfg(args: Namespace) -> int:
                 "name": cfg.name,
                 "node_count": cfg.node_count,
                 "edge_count": cfg.edge_count,
+                "cyclomatic_complexity": cfg.cyclomatic_complexity,
             }
             # Include full graph details unless --summary
             if not args.summary:
@@ -667,8 +668,11 @@ def cmd_cfg(args: Namespace) -> int:
     else:
         for cfg in cfgs:
             if args.summary:
-                # Summary mode: just show counts
-                print(f"{cfg.name}: {cfg.node_count} nodes, {cfg.edge_count} edges")
+                # Summary mode: just show counts and complexity
+                print(
+                    f"{cfg.name}: {cfg.node_count} nodes, {cfg.edge_count} edges, "
+                    f"complexity {cfg.cyclomatic_complexity}"
+                )
             elif args.dot:
                 print(cfg.to_dot())
             else:

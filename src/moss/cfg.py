@@ -147,6 +147,15 @@ class ControlFlowGraph:
         """Number of edges in the graph."""
         return len(self.edges)
 
+    @property
+    def cyclomatic_complexity(self) -> int:
+        """McCabe cyclomatic complexity: E - N + 2.
+
+        Measures the number of linearly independent paths through the code.
+        Higher values indicate more complex control flow.
+        """
+        return self.edge_count - self.node_count + 2
+
     def to_dot(self) -> str:
         """Convert CFG to DOT format for visualization."""
         lines = [f'digraph "{self.name}" {{']
@@ -201,7 +210,10 @@ class ControlFlowGraph:
     def to_text(self) -> str:
         """Convert CFG to human-readable text format."""
         lines = [f"CFG for {self.name}:"]
-        lines.append(f"  Nodes: {self.node_count}, Edges: {self.edge_count}")
+        lines.append(
+            f"  Nodes: {self.node_count}, Edges: {self.edge_count}, "
+            f"Complexity: {self.cyclomatic_complexity}"
+        )
         lines.append("")
 
         for node in self.nodes.values():

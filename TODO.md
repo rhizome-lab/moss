@@ -8,7 +8,7 @@ Based on LLM evaluation findings (see `docs/llm-evaluation.md`).
 - [x] Add `end_line` to Symbol for size calculation
 - [x] Add line count per function/method
 - [x] `--min-lines` / `--max-lines` filters for query command
-- [ ] Cyclomatic complexity (optional)
+- [x] Cyclomatic complexity (in CFG output)
 
 ### Reverse Dependencies
 - [x] "What imports this module?" query
