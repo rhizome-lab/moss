@@ -2,6 +2,16 @@
 
 ## v0.4.0
 
+### Phase 26: LLM Integration
+LLM-based code generation with mock support for testing:
+- `LLMGenerator` plugin using LiteLLM for unified provider access
+- `MockLLMProvider` for testing without API calls
+- `LiteLLMProvider` supporting Anthropic, OpenAI, and other backends
+- Streaming generation support
+- Cost estimation and budgeting with per-model pricing
+- Factory functions: `create_llm_generator()`, `create_mock_generator()`
+- 48 tests for LLM generation
+
 ### Phase 22c: CLI & Edit Integration
 - `moss edit` command with intelligent complexity routing
 - TaskComplexity analysis (simple/medium/complex/novel)

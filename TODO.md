@@ -83,10 +83,13 @@ Plugin system for synthesis components inspired by Synquid, miniKanren, DreamCod
 - [x] Plugin enable/disable
 - [x] Validation retry settings
 
-### Future: LLM Integration
-- [ ] `LLMGenerator` - Claude/GPT code generation
-- [ ] Streaming generation support
-- [ ] Cost estimation and budgeting
+### Phase 26: LLM Integration ✅
+- [x] `LLMGenerator` - Claude/GPT code generation via LiteLLM
+- [x] `MockLLMProvider` - testing without API calls
+- [x] `LiteLLMProvider` - unified access to multiple LLM backends
+- [x] Streaming generation support
+- [x] Cost estimation and budgeting
+- [x] 48 tests for LLM generator
 
 ### Future: Advanced Library Learning
 - [ ] Frequency-based abstraction learning
