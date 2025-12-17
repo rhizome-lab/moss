@@ -1,32 +1,36 @@
 # Moss Roadmap
 
-## Phase 10: Developer Experience ✓
-- [x] CLI interface (`moss init`, `moss run`, `moss status`)
-- [x] Expand README with architecture overview
-- [x] Usage examples and tutorials
-- [x] API documentation (docstrings → generated docs)
+## Phase 15: LLM Introspection Tooling
 
-## Phase 11: Enhanced Capabilities ✓
-- [x] Real vector store integration (Chroma, Pinecone, etc.)
-- [x] Tree-sitter integration for multi-language AST
-- [x] Control Flow Graph (CFG) view provider
-- [x] Elided Literals view provider
-- [x] Additional language support beyond Python (TypeScript, JS, Go, Rust)
+### CLI Enhancements
+- [ ] Add `--json` output flag to all CLI commands
+- [ ] `moss skeleton <path>` - Extract and display code skeleton
+- [ ] `moss anchors <path>` - List all anchors (functions, classes, methods)
+- [ ] `moss cfg <path> [function]` - Display control flow graph
+- [ ] `moss deps <path>` - Show dependencies (imports/exports)
+- [ ] `moss context <path>` - Combined view (skeleton + deps + summary)
 
-## Phase 12: Hardening & Quality ✓
-- [x] Integration tests (component interactions)
-- [x] E2E tests (full flows: user request → commit handle)
-- [x] Fuzzing tests (malformed inputs, AST edge cases)
-- [x] CI/CD setup (GitHub Actions for tests, lint)
+### Query Interface
+- [ ] `moss query` command with pattern matching
+- [ ] Find functions by signature pattern
+- [ ] Find classes by inheritance
+- [ ] Search by complexity metrics (lines, branches, etc.)
 
-## Phase 13: Production Readiness ✓
-- [x] FastAPI/Flask example server
-- [x] Structured logging throughout
-- [x] Observability (metrics, tracing)
-- [x] Performance profiling and optimization
-- [x] Error handling audit
+### MCP Server
+- [ ] Implement MCP server for direct tool access
+- [ ] Expose skeleton extraction as MCP tool
+- [ ] Expose anchor finding as MCP tool
+- [ ] Expose CFG building as MCP tool
+- [ ] Expose patch application as MCP tool
 
-## Phase 14: Dogfooding ✓
-- [x] Self-hosting test (use Moss on Moss)
-- [x] Real-world codebase testing
-- [x] Gap analysis and iteration
+### LLM Evaluation
+- [ ] Use Moss CLI to explore codebases
+- [ ] Document what works well for LLM consumption
+- [ ] Identify gaps and iterate
+
+## Future Ideas
+- Real-time file watching and incremental updates
+- Language server protocol (LSP) integration
+- Visual CFG rendering (graphviz/mermaid output)
+- Semantic code search with embeddings
+- Multi-file refactoring support
