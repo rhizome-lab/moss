@@ -57,3 +57,9 @@ known-first-party = ["moss"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "pytest-cov>=7.0.0",
+]

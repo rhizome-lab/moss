@@ -13,11 +13,11 @@
 - [x] Elided Literals view provider
 - [x] Additional language support beyond Python (TypeScript, JS, Go, Rust)
 
-## Phase 12: Hardening & Quality
-- [ ] Integration tests (component interactions)
-- [ ] E2E tests (full flows: user request → commit handle)
-- [ ] Fuzzing tests (malformed inputs, AST edge cases)
-- [ ] CI/CD setup (GitHub Actions for tests, lint)
+## Phase 12: Hardening & Quality ✓
+- [x] Integration tests (component interactions)
+- [x] E2E tests (full flows: user request → commit handle)
+- [x] Fuzzing tests (malformed inputs, AST edge cases)
+- [x] CI/CD setup (GitHub Actions for tests, lint)
 
 ## Phase 13: Production Readiness
 - [ ] FastAPI/Flask example server
