@@ -17,7 +17,15 @@ class Symbol:
     signature: str  # Full signature line
     docstring: str | None
     lineno: int
+    end_lineno: int | None  # End line for size calculation
     children: list[Symbol]
+
+    @property
+    def line_count(self) -> int | None:
+        """Number of lines in this symbol, or None if end_lineno unknown."""
+        if self.end_lineno is None:
+            return None
+        return self.end_lineno - self.lineno + 1
 
 
 class PythonSkeletonExtractor(ast.NodeVisitor):
@@ -92,6 +100,7 @@ class PythonSkeletonExtractor(ast.NodeVisitor):
             signature=signature,
             docstring=self._get_docstring(node),
             lineno=node.lineno,
+            end_lineno=node.end_lineno,
             children=[],
         )
 
@@ -111,6 +120,7 @@ class PythonSkeletonExtractor(ast.NodeVisitor):
             signature=self._get_signature(node),
             docstring=self._get_docstring(node),
             lineno=node.lineno,
+            end_lineno=node.end_lineno,
             children=[],
         )
 
@@ -128,6 +138,7 @@ class PythonSkeletonExtractor(ast.NodeVisitor):
             signature=self._get_signature(node),
             docstring=self._get_docstring(node),
             lineno=node.lineno,
+            end_lineno=node.end_lineno,
             children=[],
         )
 

@@ -380,6 +380,9 @@ def _symbol_to_dict(symbol: Any) -> dict:
         "kind": symbol.kind,
         "line": symbol.lineno,
     }
+    if symbol.end_lineno is not None:
+        result["end_line"] = symbol.end_lineno
+        result["line_count"] = symbol.line_count
     if symbol.signature:
         result["signature"] = symbol.signature
     if symbol.docstring:
@@ -519,6 +522,16 @@ def cmd_query(args: Namespace) -> int:
             if f"({args.inherits}" not in sym.signature:
                 return False
 
+        # Line count filters
+        if args.min_lines is not None or args.max_lines is not None:
+            line_count = sym.line_count
+            if line_count is None:
+                return False  # Can't filter if no line count
+            if args.min_lines is not None and line_count < args.min_lines:
+                return False
+            if args.max_lines is not None and line_count > args.max_lines:
+                return False
+
         return True
 
     def collect_matches(symbols: list, file_str: str, parent: str | None = None) -> None:
@@ -532,6 +545,9 @@ def cmd_query(args: Namespace) -> int:
                     "line": sym.lineno,
                     "signature": sym.signature,
                 }
+                if sym.end_lineno is not None:
+                    result["end_line"] = sym.end_lineno
+                    result["line_count"] = sym.line_count
                 if sym.docstring:
                     result["docstring"] = sym.docstring
                 if parent:
@@ -949,6 +965,9 @@ def create_parser() -> argparse.ArgumentParser:
     query_parser.add_argument("--inherits", "-i", help="Filter classes by base class")
     query_parser.add_argument(
         "--min-lines", type=int, dest="min_lines", help="Minimum lines (complexity)"
+    )
+    query_parser.add_argument(
+        "--max-lines", type=int, dest="max_lines", help="Maximum lines (complexity)"
     )
     query_parser.add_argument(
         "--pattern", "-p", help="Glob pattern for directory (default: **/*.py)"

@@ -310,7 +310,7 @@ PARAM_ALIASES: dict[str, str] = {
 
 # Confidence thresholds
 AUTO_CORRECT_THRESHOLD = 0.85  # Auto-correct if confidence >= this
-SUGGEST_THRESHOLD = 0.5  # Suggest if confidence >= this
+SUGGEST_THRESHOLD = 0.3  # Suggest if confidence >= this (lowered from 0.5 for better NL support)
 
 
 def string_similarity(a: str, b: str) -> float:

@@ -268,6 +268,9 @@ def _symbol_to_dict(symbol: Any) -> dict:
         "kind": symbol.kind,
         "line": symbol.lineno,
     }
+    if symbol.end_lineno is not None:
+        result["end_line"] = symbol.end_lineno
+        result["line_count"] = symbol.line_count
     if symbol.signature:
         result["signature"] = symbol.signature
     if symbol.docstring:

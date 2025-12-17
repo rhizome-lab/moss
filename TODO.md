@@ -5,9 +5,9 @@
 Based on LLM evaluation findings (see `docs/llm-evaluation.md`).
 
 ### Symbol Metrics
-- [ ] Add `end_line` to Symbol for size calculation
-- [ ] Add line count per function/method
-- [ ] `--min-lines` / `--max-lines` filters for query command
+- [x] Add `end_line` to Symbol for size calculation
+- [x] Add line count per function/method
+- [x] `--min-lines` / `--max-lines` filters for query command
 - [ ] Cyclomatic complexity (optional)
 
 ### Reverse Dependencies
@@ -16,7 +16,7 @@ Based on LLM evaluation findings (see `docs/llm-evaluation.md`).
 - [ ] Internal dependency graph visualization
 
 ### DWIM Tuning
-- [ ] Lower `SUGGEST_THRESHOLD` from 0.5 to 0.3
+- [x] Lower `SUGGEST_THRESHOLD` from 0.5 to 0.3
 - [ ] Add more synonyms to tool descriptions
 - [ ] Consider top-k results regardless of threshold
 

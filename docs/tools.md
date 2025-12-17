@@ -8,7 +8,7 @@
 
 - **skeleton** `<path>` — classes, functions, methods with signatures and docstrings
 - **anchors** `<path>` — find code elements; `--type` (function/class/method), `--name` (regex)
-- **query** `<path>` — pattern search; `--name`, `--signature`, `--type`, `--inherits`
+- **query** `<path>` — pattern search; `--name`, `--signature`, `--type`, `--inherits`, `--min-lines`, `--max-lines`
 - **cfg** `<file> [function]` — control flow graph; `--dot` for graphviz
 - **deps** `<path>` — imports and exports
 - **context** `<file>` — combined skeleton + deps + summary
