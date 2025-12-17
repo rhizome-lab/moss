@@ -353,7 +353,7 @@ def baz():
 
         assert result == 0  # Continues despite error
         captured = capsys.readouterr()
-        assert "Syntax error" in captured.err
+        assert "Error in" in captured.err  # Error reported via plugin system
 
     def test_directory_with_pattern(self, tmp_path: Path, capsys):
         (tmp_path / "a.py").write_text("def foo(): pass")

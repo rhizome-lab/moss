@@ -29,7 +29,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from moss.handles import Handle
-    from moss.views import View, ViewOptions
+    from moss.plugins import PluginMetadata
+    from moss.views import View, ViewOptions, ViewTarget
 
 
 class EdgeType(Enum):
@@ -618,3 +619,115 @@ def build_cfg(source: str, function_name: str | None = None) -> list[ControlFlow
     """
     builder = CFGBuilder()
     return builder.build_from_source(source, function_name)
+
+
+# =============================================================================
+# Plugin Wrapper
+# =============================================================================
+
+
+class PythonCFGPlugin:
+    """Plugin wrapper for CFG generation.
+
+    This provides a ViewPlugin interface for CFG generation,
+    adapting from the Handle-based CFGViewProvider to ViewTarget.
+    """
+
+    def __init__(self) -> None:
+        self._builder = CFGBuilder()
+
+    @property
+    def metadata(self) -> PluginMetadata:
+        from moss.plugins import PluginMetadata
+
+        return PluginMetadata(
+            name="python-cfg",
+            view_type="cfg",
+            languages=frozenset(["python"]),
+            priority=5,
+            version="0.1.0",
+            description="Python control flow graph generation",
+        )
+
+    def supports(self, target: ViewTarget) -> bool:
+        """Check if this plugin can handle the target."""
+        from moss.plugins import detect_language
+
+        if not target.path.exists():
+            return False
+        return detect_language(target.path) == "python"
+
+    async def render(
+        self,
+        target: ViewTarget,
+        options: ViewOptions | None = None,
+    ) -> View:
+        """Render a CFG view for the target."""
+        from moss.views import View, ViewOptions, ViewType
+
+        opts = options or ViewOptions()
+        source = target.path.read_text()
+
+        # Get function name from options or target
+        function_name = target.symbol or opts.extra.get("function_name")
+
+        try:
+            cfgs = self._builder.build_from_source(source, function_name)
+        except SyntaxError as e:
+            return View(
+                target=target,
+                view_type=ViewType.CFG,
+                content=f"# Parse error: {e}",
+                metadata={"error": str(e)},
+            )
+
+        # Format output
+        output_lines = []
+        dot_lines = []
+        cfg_data = []
+
+        for cfg in cfgs:
+            output_lines.append(cfg.to_text())
+            output_lines.append("")
+            dot_lines.append(cfg.to_dot())
+
+            # Serialize CFG data for JSON output
+            cfg_data.append(
+                {
+                    "name": cfg.name,
+                    "node_count": cfg.node_count,
+                    "edge_count": cfg.edge_count,
+                    "cyclomatic_complexity": cfg.cyclomatic_complexity,
+                    "entry": cfg.entry_node,
+                    "exit": cfg.exit_node,
+                    "nodes": {
+                        nid: {
+                            "type": n.node_type.value,
+                            "statements": n.statements,
+                            "line_start": n.line_start,
+                        }
+                        for nid, n in cfg.nodes.items()
+                    },
+                    "edges": [
+                        {
+                            "source": e.source,
+                            "target": e.target,
+                            "type": e.edge_type.value,
+                            "condition": e.condition,
+                        }
+                        for e in cfg.edges
+                    ],
+                }
+            )
+
+        return View(
+            target=target,
+            view_type=ViewType.CFG,
+            content="\n".join(output_lines),
+            metadata={
+                "function_count": len(cfgs),
+                "cfgs": cfg_data,
+                "dot": "\n".join(dot_lines),
+                "language": "python",
+            },
+        )

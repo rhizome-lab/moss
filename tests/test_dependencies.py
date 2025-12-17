@@ -176,8 +176,8 @@ class App:
         assert "from pathlib import Path" in view.content
         assert "function: main" in view.content
         assert "class: App" in view.content
-        assert view.metadata["imports"] == 2
-        assert view.metadata["exports"] == 2
+        assert view.metadata["import_count"] == 2
+        assert view.metadata["export_count"] == 2
 
     async def test_render_syntax_error(self, provider: PythonDependencyProvider, tmp_path: Path):
         f = tmp_path / "broken.py"

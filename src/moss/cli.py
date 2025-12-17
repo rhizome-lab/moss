@@ -325,7 +325,8 @@ def cmd_distros(args: Namespace) -> int:
 
 def cmd_skeleton(args: Namespace) -> int:
     """Extract code skeleton from a file or directory."""
-    from moss.skeleton import extract_python_skeleton, format_skeleton
+    from moss.plugins import get_registry
+    from moss.views import ViewOptions, ViewTarget
 
     path = Path(args.path).resolve()
 
@@ -334,6 +335,7 @@ def cmd_skeleton(args: Namespace) -> int:
         return 1
 
     results = []
+    registry = get_registry()
 
     if path.is_file():
         files = [path]
@@ -343,56 +345,60 @@ def cmd_skeleton(args: Namespace) -> int:
 
     # Determine if we should include private symbols
     include_private = not getattr(args, "public_only", False)
+    options = ViewOptions(include_private=include_private)
 
-    for file_path in files:
-        try:
-            source = file_path.read_text()
-            symbols = extract_python_skeleton(source, include_private=include_private)
+    async def render_file(file_path: Path) -> dict | None:
+        """Render skeleton for a single file."""
+        target = ViewTarget(path=file_path)
+        plugin = registry.find_plugin(target, "skeleton")
 
+        if plugin is None:
+            return {"file": str(file_path), "error": "No plugin found for this file type"}
+
+        view = await plugin.render(target, options)
+
+        if "error" in view.metadata:
+            return {"file": str(file_path), "error": view.metadata["error"]}
+
+        return {
+            "file": str(file_path),
+            "content": view.content,
+            "symbols": view.metadata.get("symbols", []),
+        }
+
+    # Run async rendering
+    async def render_all() -> list[dict]:
+        render_results = []
+        for file_path in files:
+            result = await render_file(file_path)
+            if result:
+                render_results.append(result)
+        return render_results
+
+    rendered = asyncio.run(render_all())
+
+    for result in rendered:
+        if "error" in result:
             if getattr(args, "json", False):
-                results.append(
-                    {
-                        "file": str(file_path),
-                        "symbols": [_symbol_to_dict(s) for s in symbols],
-                    }
-                )
+                results.append({"file": result["file"], "error": result["error"]})
+            else:
+                print(f"Error in {result['file']}: {result['error']}", file=sys.stderr)
+        else:
+            if getattr(args, "json", False):
+                results.append({"file": result["file"], "symbols": result["symbols"]})
             else:
                 if len(files) > 1:
-                    print(f"\n=== {file_path} ===")
-                skeleton = format_skeleton(symbols)
-                if skeleton:
-                    print(skeleton)
+                    print(f"\n=== {result['file']} ===")
+                content = result["content"]
+                if content:
+                    print(content)
                 elif not args.quiet:
                     print("(no symbols found)")
-        except SyntaxError as e:
-            if getattr(args, "json", False):
-                results.append({"file": str(file_path), "error": str(e)})
-            else:
-                print(f"Syntax error in {file_path}: {e}", file=sys.stderr)
 
     if getattr(args, "json", False):
         output_result(results if len(results) > 1 else results[0] if results else {}, args)
 
     return 0
-
-
-def _symbol_to_dict(symbol: Any) -> dict:
-    """Convert a Symbol to a dictionary."""
-    result = {
-        "name": symbol.name,
-        "kind": symbol.kind,
-        "line": symbol.lineno,
-    }
-    if symbol.end_lineno is not None:
-        result["end_line"] = symbol.end_lineno
-        result["line_count"] = symbol.line_count
-    if symbol.signature:
-        result["signature"] = symbol.signature
-    if symbol.docstring:
-        result["docstring"] = symbol.docstring
-    if symbol.children:
-        result["children"] = [_symbol_to_dict(c) for c in symbol.children]
-    return result
 
 
 def cmd_anchors(args: Namespace) -> int:
@@ -610,7 +616,8 @@ def cmd_query(args: Namespace) -> int:
 
 def cmd_cfg(args: Namespace) -> int:
     """Build and display control flow graph."""
-    from moss.cfg import build_cfg
+    from moss.plugins import get_registry
+    from moss.views import ViewOptions, ViewTarget
 
     path = Path(args.path).resolve()
 
@@ -622,12 +629,26 @@ def cmd_cfg(args: Namespace) -> int:
         print(f"Error: {path} must be a file", file=sys.stderr)
         return 1
 
-    try:
-        source = path.read_text()
-        cfgs = build_cfg(source, function_name=args.function)
-    except SyntaxError as e:
-        print(f"Syntax error: {e}", file=sys.stderr)
+    registry = get_registry()
+    target = ViewTarget(path=path)
+    plugin = registry.find_plugin(target, "cfg")
+
+    if plugin is None:
+        print("Error: No CFG plugin available for this file type", file=sys.stderr)
         return 1
+
+    options = ViewOptions(extra={"function_name": args.function})
+
+    async def render_cfg():
+        return await plugin.render(target, options)
+
+    view = asyncio.run(render_cfg())
+
+    if "error" in view.metadata:
+        print(f"Error: {view.metadata['error']}", file=sys.stderr)
+        return 1
+
+    cfgs = view.metadata.get("cfgs", [])
 
     if not cfgs:
         print("No functions found", file=sys.stderr)
@@ -635,49 +656,35 @@ def cmd_cfg(args: Namespace) -> int:
 
     if getattr(args, "json", False):
         results = []
-        for cfg in cfgs:
+        for cfg_data in cfgs:
             result = {
-                "name": cfg.name,
-                "node_count": cfg.node_count,
-                "edge_count": cfg.edge_count,
-                "cyclomatic_complexity": cfg.cyclomatic_complexity,
+                "name": cfg_data["name"],
+                "node_count": cfg_data["node_count"],
+                "edge_count": cfg_data["edge_count"],
+                "cyclomatic_complexity": cfg_data["cyclomatic_complexity"],
             }
             # Include full graph details unless --summary
             if not args.summary:
-                result["entry"] = cfg.entry_node
-                result["exit"] = cfg.exit_node
-                result["nodes"] = {
-                    nid: {
-                        "type": n.node_type.value,
-                        "statements": n.statements,
-                        "line_start": n.line_start,
-                    }
-                    for nid, n in cfg.nodes.items()
-                }
-                result["edges"] = [
-                    {
-                        "source": e.source,
-                        "target": e.target,
-                        "type": e.edge_type.value,
-                        "condition": e.condition,
-                    }
-                    for e in cfg.edges
-                ]
+                result["entry"] = cfg_data.get("entry")
+                result["exit"] = cfg_data.get("exit")
+                result["nodes"] = cfg_data.get("nodes", {})
+                result["edges"] = cfg_data.get("edges", [])
             results.append(result)
         output_result(results, args)
     else:
-        for cfg in cfgs:
-            if args.summary:
-                # Summary mode: just show counts and complexity
+        if args.summary:
+            # Summary mode: just show counts and complexity
+            for cfg_data in cfgs:
                 print(
-                    f"{cfg.name}: {cfg.node_count} nodes, {cfg.edge_count} edges, "
-                    f"complexity {cfg.cyclomatic_complexity}"
+                    f"{cfg_data['name']}: {cfg_data['node_count']} nodes, "
+                    f"{cfg_data['edge_count']} edges, "
+                    f"complexity {cfg_data['cyclomatic_complexity']}"
                 )
-            elif args.dot:
-                print(cfg.to_dot())
-            else:
-                print(cfg.to_text())
-                print()
+        elif args.dot:
+            # DOT output - use raw content from view
+            print(view.metadata.get("dot", view.content))
+        else:
+            print(view.content)
 
     return 0
 
@@ -687,10 +694,10 @@ def cmd_deps(args: Namespace) -> int:
     from moss.dependencies import (
         build_dependency_graph,
         dependency_graph_to_dot,
-        extract_dependencies,
         find_reverse_dependencies,
-        format_dependencies,
     )
+    from moss.plugins import get_registry
+    from moss.views import ViewTarget
 
     path = Path(args.path).resolve()
 
@@ -743,8 +750,9 @@ def cmd_deps(args: Namespace) -> int:
 
         return 0
 
-    # Normal mode: show dependencies of file(s)
+    # Normal mode: show dependencies of file(s) using plugin registry
     results = []
+    registry = get_registry()
 
     if path.is_file():
         files = [path]
@@ -752,39 +760,57 @@ def cmd_deps(args: Namespace) -> int:
         pattern = args.pattern or "**/*.py"
         files = list(path.glob(pattern))
 
-    for file_path in files:
-        try:
-            source = file_path.read_text()
-            deps = extract_dependencies(source)
+    async def render_file(file_path: Path) -> dict | None:
+        """Render dependencies for a single file."""
+        target = ViewTarget(path=file_path)
+        plugin = registry.find_plugin(target, "dependency")
 
+        if plugin is None:
+            return {"file": str(file_path), "error": "No plugin found for this file type"}
+
+        view = await plugin.render(target)
+
+        if "error" in view.metadata:
+            return {"file": str(file_path), "error": view.metadata["error"]}
+
+        return {
+            "file": str(file_path),
+            "content": view.content,
+            "imports": view.metadata.get("imports", []),
+            "exports": view.metadata.get("exports", []),
+        }
+
+    async def render_all() -> list[dict]:
+        render_results = []
+        for file_path in files:
+            result = await render_file(file_path)
+            if result:
+                render_results.append(result)
+        return render_results
+
+    rendered = asyncio.run(render_all())
+
+    for result in rendered:
+        if "error" in result:
+            if not args.quiet:
+                print(f"Error in {result['file']}: {result['error']}", file=sys.stderr)
+            if getattr(args, "json", False):
+                results.append({"file": result["file"], "error": result["error"]})
+        else:
             if getattr(args, "json", False):
                 results.append(
                     {
-                        "file": str(file_path),
-                        "imports": [
-                            {
-                                "module": i.module,
-                                "names": i.names,
-                                "alias": i.alias,
-                                "line": i.lineno,
-                            }
-                            for i in deps.imports
-                        ],
-                        "exports": [
-                            {"name": e.name, "kind": e.kind, "line": e.lineno} for e in deps.exports
-                        ],
+                        "file": result["file"],
+                        "imports": result["imports"],
+                        "exports": result["exports"],
                     }
                 )
             else:
                 if len(files) > 1:
-                    print(f"\n=== {file_path} ===")
-                formatted = format_dependencies(deps)
-                if formatted:
-                    print(formatted)
-
-        except SyntaxError as e:
-            if not args.quiet:
-                print(f"Syntax error in {file_path}: {e}", file=sys.stderr)
+                    print(f"\n=== {result['file']} ===")
+                content = result["content"]
+                if content:
+                    print(content)
 
     if getattr(args, "json", False):
         output_result(results if len(results) > 1 else results[0] if results else {}, args)
@@ -794,8 +820,8 @@ def cmd_deps(args: Namespace) -> int:
 
 def cmd_context(args: Namespace) -> int:
     """Generate compiled context for a file (skeleton + deps + summary)."""
-    from moss.dependencies import extract_dependencies, format_dependencies
-    from moss.skeleton import extract_python_skeleton, format_skeleton
+    from moss.plugins import get_registry
+    from moss.views import ViewTarget
 
     path = Path(args.path).resolve()
 
@@ -807,32 +833,66 @@ def cmd_context(args: Namespace) -> int:
         print(f"Error: {path} must be a file", file=sys.stderr)
         return 1
 
-    try:
-        source = path.read_text()
-        symbols = extract_python_skeleton(source)
-        deps = extract_dependencies(source)
-    except SyntaxError as e:
-        print(f"Syntax error: {e}", file=sys.stderr)
+    registry = get_registry()
+    target = ViewTarget(path=path)
+
+    # Find plugins for skeleton and dependency
+    skeleton_plugin = registry.find_plugin(target, "skeleton")
+    deps_plugin = registry.find_plugin(target, "dependency")
+
+    if skeleton_plugin is None and deps_plugin is None:
+        print("Error: No plugins available for this file type", file=sys.stderr)
         return 1
 
-    # Count symbols
+    async def render_views():
+        skeleton_view = None
+        deps_view = None
+
+        if skeleton_plugin:
+            skeleton_view = await skeleton_plugin.render(target)
+        if deps_plugin:
+            deps_view = await deps_plugin.render(target)
+
+        return skeleton_view, deps_view
+
+    skeleton_view, deps_view = asyncio.run(render_views())
+
+    # Check for errors
+    if skeleton_view and "error" in skeleton_view.metadata:
+        print(f"Error: {skeleton_view.metadata['error']}", file=sys.stderr)
+        return 1
+
+    if deps_view and "error" in deps_view.metadata:
+        print(f"Error: {deps_view.metadata['error']}", file=sys.stderr)
+        return 1
+
+    # Get data from views
+    symbols = skeleton_view.metadata.get("symbols", []) if skeleton_view else []
+    imports = deps_view.metadata.get("imports", []) if deps_view else []
+    exports = deps_view.metadata.get("exports", []) if deps_view else []
+    skeleton_content = skeleton_view.content if skeleton_view else ""
+    deps_content = deps_view.content if deps_view else ""
+
+    # Count symbols from metadata
     def count_symbols(syms: list) -> dict:
         counts = {"classes": 0, "functions": 0, "methods": 0}
         for s in syms:
-            kind = s.kind
+            kind = s.get("kind", "")
             if kind == "class":
                 counts["classes"] += 1
             elif kind == "function":
                 counts["functions"] += 1
             elif kind == "method":
                 counts["methods"] += 1
-            if s.children:
-                child_counts = count_symbols(s.children)
+            children = s.get("children", [])
+            if children:
+                child_counts = count_symbols(children)
                 for k, v in child_counts.items():
                     counts[k] += v
         return counts
 
     counts = count_symbols(symbols)
+    source = path.read_text()
     line_count = len(source.splitlines())
 
     if getattr(args, "json", False):
@@ -843,15 +903,12 @@ def cmd_context(args: Namespace) -> int:
                 "classes": counts["classes"],
                 "functions": counts["functions"],
                 "methods": counts["methods"],
-                "imports": len(deps.imports),
-                "exports": len(deps.exports),
+                "imports": len(imports),
+                "exports": len(exports),
             },
-            "symbols": [_symbol_to_dict(s) for s in symbols],
-            "imports": [
-                {"module": i.module, "names": i.names, "alias": i.alias, "line": i.lineno}
-                for i in deps.imports
-            ],
-            "exports": [{"name": e.name, "kind": e.kind, "line": e.lineno} for e in deps.exports],
+            "symbols": symbols,
+            "imports": imports,
+            "exports": exports,
         }
         output_result(result, args)
     else:
@@ -861,18 +918,19 @@ def cmd_context(args: Namespace) -> int:
             f"Classes: {counts['classes']}, "
             f"Functions: {counts['functions']}, Methods: {counts['methods']}"
         )
-        print(f"Imports: {len(deps.imports)}, Exports: {len(deps.exports)}")
+        print(f"Imports: {len(imports)}, Exports: {len(exports)}")
         print()
 
-        if deps.imports:
+        if imports and deps_content:
             print("--- Imports ---")
-            print(format_dependencies(deps).split("Exports:")[0].strip())
+            # Extract just the imports section from deps content
+            imports_section = deps_content.split("Exports:")[0].strip()
+            print(imports_section)
             print()
 
         print("--- Skeleton ---")
-        skeleton = format_skeleton(symbols)
-        if skeleton:
-            print(skeleton)
+        if skeleton_content:
+            print(skeleton_content)
         else:
             print("(no symbols)")
 

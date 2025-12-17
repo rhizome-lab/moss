@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from moss.views import View, ViewOptions, ViewProvider, ViewTarget, ViewType
+
+if TYPE_CHECKING:
+    from moss.plugins import PluginMetadata
 
 
 @dataclass
@@ -383,8 +387,61 @@ class PythonDependencyProvider(ViewProvider):
             view_type=ViewType.DEPENDENCY,
             content=content,
             metadata={
-                "imports": len(info.imports),
-                "exports": len(info.exports),
+                "import_count": len(info.imports),
+                "export_count": len(info.exports),
+                "imports": [
+                    {
+                        "module": i.module,
+                        "names": i.names,
+                        "alias": i.alias,
+                        "line": i.lineno,
+                    }
+                    for i in info.imports
+                ],
+                "exports": [
+                    {"name": e.name, "kind": e.kind, "line": e.lineno} for e in info.exports
+                ],
                 "language": "python",
             },
         )
+
+
+# =============================================================================
+# Plugin Wrapper
+# =============================================================================
+
+
+class PythonDependencyPlugin:
+    """Plugin wrapper for PythonDependencyProvider.
+
+    This wraps the ViewProvider implementation as a ViewPlugin for use
+    with the plugin registry.
+    """
+
+    def __init__(self) -> None:
+        self._provider = PythonDependencyProvider()
+
+    @property
+    def metadata(self) -> PluginMetadata:
+        from moss.plugins import PluginMetadata
+
+        return PluginMetadata(
+            name="python-dependency",
+            view_type="dependency",
+            languages=frozenset(["python"]),
+            priority=5,
+            version="0.1.0",
+            description="Python dependency extraction via AST",
+        )
+
+    def supports(self, target: ViewTarget) -> bool:
+        """Check if this plugin can handle the target."""
+        return self._provider.supports(target)
+
+    async def render(
+        self,
+        target: ViewTarget,
+        options: ViewOptions | None = None,
+    ) -> View:
+        """Render a dependency view for the target."""
+        return await self._provider.render(target, options)

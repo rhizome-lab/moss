@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from moss.dependencies import PythonDependencyProvider
-from moss.skeleton import PythonSkeletonProvider
 from moss.views import (
     Intent,
     RawViewProvider,
@@ -17,6 +16,8 @@ from moss.views import (
     ViewTarget,
     ViewType,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -71,11 +72,51 @@ class ContextHost:
 
     @staticmethod
     def _create_default_registry() -> ViewRegistry:
-        """Create registry with all default providers."""
+        """Create registry with default providers via plugin discovery.
+
+        Uses the PluginRegistry to discover available plugins and registers
+        their underlying providers with the ViewRegistry. This enables
+        automatic discovery of installed plugins while maintaining the
+        ViewType-based interface.
+        """
+        from moss.plugins import get_registry as get_plugin_registry
+
         registry = ViewRegistry()
+
+        # Always register the raw view provider
         registry.register(RawViewProvider())
-        registry.register(PythonSkeletonProvider())
-        registry.register(PythonDependencyProvider())
+
+        # Use plugin registry to discover providers
+        plugin_registry = get_plugin_registry()
+
+        # Map plugin view types to ViewType enum
+        view_type_map = {
+            "skeleton": ViewType.SKELETON,
+            "dependency": ViewType.DEPENDENCY,
+            "cfg": ViewType.CFG,
+        }
+
+        # Register plugins that have matching providers
+        for plugin in plugin_registry.get_all_plugins():
+            meta = plugin.metadata
+            view_type = view_type_map.get(meta.view_type)
+
+            if view_type is None:
+                logger.debug(
+                    "Skipping plugin %s: no ViewType mapping for %s",
+                    meta.name,
+                    meta.view_type,
+                )
+                continue
+
+            # Create a wrapper that adapts the plugin to ViewProvider interface
+            wrapper = _PluginViewProviderWrapper(plugin, view_type)
+            try:
+                registry.register(wrapper)
+                logger.debug("Registered plugin %s for %s", meta.name, view_type.name)
+            except Exception as e:
+                logger.warning("Failed to register plugin %s: %s", meta.name, e)
+
         return registry
 
     def set_token_budget(self, budget: int | None) -> None:
@@ -228,3 +269,48 @@ class ContextHost:
         """Get raw view for a file."""
         target = ViewTarget(path=path)
         return await self.registry.render(target, ViewType.RAW, options)
+
+
+# =============================================================================
+# Plugin Adapter
+# =============================================================================
+
+
+class _PluginViewProviderWrapper:
+    """Adapts a ViewPlugin to the ViewProvider interface.
+
+    This wrapper allows plugins discovered via PluginRegistry to be used
+    with the ViewRegistry, which expects the ViewProvider ABC interface.
+    """
+
+    def __init__(self, plugin: Any, view_type: ViewType) -> None:
+        """Initialize wrapper with a plugin and target ViewType.
+
+        Args:
+            plugin: A ViewPlugin instance
+            view_type: The ViewType enum value this wrapper provides
+        """
+        self._plugin = plugin
+        self._view_type = view_type
+
+    @property
+    def view_type(self) -> ViewType:
+        """The type of view this provider produces."""
+        return self._view_type
+
+    @property
+    def supported_languages(self) -> set[str]:
+        """Languages this provider supports."""
+        return set(self._plugin.metadata.languages)
+
+    def supports(self, target: ViewTarget) -> bool:
+        """Check if this provider can render the target."""
+        return self._plugin.supports(target)
+
+    async def render(
+        self,
+        target: ViewTarget,
+        options: ViewOptions | None = None,
+    ) -> View:
+        """Render the view for the target."""
+        return await self._plugin.render(target, options)

@@ -210,7 +210,7 @@ def main():
         assert "class Calculator" in view.content
         assert "def add" in view.content
         assert "def main" in view.content
-        assert view.metadata["symbols"] == 2  # Calculator and main
+        assert view.metadata["symbol_count"] == 2  # Calculator and main
         assert view.metadata["language"] == "python"
 
     async def test_render_exclude_private(self, provider: PythonSkeletonProvider, tmp_path: Path):

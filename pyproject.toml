@@ -9,6 +9,12 @@ dependencies = []
 [project.scripts]
 moss = "moss.cli:main"
 
+[project.entry-points."moss.plugins"]
+python-skeleton = "moss.skeleton:PythonSkeletonPlugin"
+python-dependency = "moss.dependencies:PythonDependencyPlugin"
+python-cfg = "moss.cfg:PythonCFGPlugin"
+tree-sitter-skeleton = "moss.plugins.tree_sitter:TreeSitterSkeletonPlugin"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",

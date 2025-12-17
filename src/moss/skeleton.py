@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from moss.views import View, ViewOptions, ViewProvider, ViewTarget, ViewType
+
+if TYPE_CHECKING:
+    from moss.plugins import PluginMetadata
 
 
 @dataclass
@@ -210,10 +214,30 @@ class PythonSkeletonProvider(ViewProvider):
             view_type=ViewType.SKELETON,
             content=content,
             metadata={
-                "symbols": len(extractor.symbols),
+                "symbol_count": len(extractor.symbols),
+                "symbols": [_symbol_to_dict(s) for s in extractor.symbols],
                 "language": "python",
             },
         )
+
+
+def _symbol_to_dict(symbol: Symbol) -> dict:
+    """Convert a Symbol to a serializable dictionary."""
+    result = {
+        "name": symbol.name,
+        "kind": symbol.kind,
+        "line": symbol.lineno,
+    }
+    if symbol.end_lineno is not None:
+        result["end_line"] = symbol.end_lineno
+        result["line_count"] = symbol.line_count
+    if symbol.signature:
+        result["signature"] = symbol.signature
+    if symbol.docstring:
+        result["docstring"] = symbol.docstring
+    if symbol.children:
+        result["children"] = [_symbol_to_dict(c) for c in symbol.children]
+    return result
 
 
 def extract_python_skeleton(source: str, include_private: bool = False) -> list[Symbol]:
@@ -222,3 +246,44 @@ def extract_python_skeleton(source: str, include_private: bool = False) -> list[
     extractor = PythonSkeletonExtractor(source, include_private)
     extractor.visit(tree)
     return extractor.symbols
+
+
+# =============================================================================
+# Plugin Wrapper
+# =============================================================================
+
+
+class PythonSkeletonPlugin:
+    """Plugin wrapper for PythonSkeletonProvider.
+
+    This wraps the ViewProvider implementation as a ViewPlugin for use
+    with the plugin registry.
+    """
+
+    def __init__(self) -> None:
+        self._provider = PythonSkeletonProvider()
+
+    @property
+    def metadata(self) -> PluginMetadata:
+        from moss.plugins import PluginMetadata
+
+        return PluginMetadata(
+            name="python-skeleton",
+            view_type="skeleton",
+            languages=frozenset(["python"]),
+            priority=5,
+            version="0.1.0",
+            description="Python skeleton extraction via AST",
+        )
+
+    def supports(self, target: ViewTarget) -> bool:
+        """Check if this plugin can handle the target."""
+        return self._provider.supports(target)
+
+    async def render(
+        self,
+        target: ViewTarget,
+        options: ViewOptions | None = None,
+    ) -> View:
+        """Render a skeleton view for the target."""
+        return await self._provider.render(target, options)
