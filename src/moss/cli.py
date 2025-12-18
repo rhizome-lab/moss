@@ -2042,6 +2042,41 @@ def cmd_check_refs(args: Namespace) -> int:
     return 0
 
 
+def cmd_external_deps(args: Namespace) -> int:
+    """Analyze external dependencies from pyproject.toml/requirements.txt."""
+    from moss.external_deps import ExternalDependencyAnalyzer
+
+    output = setup_output(args)
+    root = Path(getattr(args, "directory", ".")).resolve()
+
+    if not root.exists():
+        output.error(f"Directory not found: {root}")
+        return 1
+
+    analyzer = ExternalDependencyAnalyzer(root)
+    resolve = getattr(args, "resolve", False)
+
+    output.info(f"Analyzing dependencies in {root.name}...")
+
+    try:
+        result = analyzer.analyze(resolve=resolve)
+    except Exception as e:
+        output.error(f"Failed to analyze dependencies: {e}")
+        return 1
+
+    if not result.sources:
+        output.warning("No dependency files found (pyproject.toml, requirements.txt)")
+        return 0
+
+    # Output format
+    if getattr(args, "json", False):
+        output.data(result.to_dict())
+    else:
+        output.print(result.to_markdown())
+
+    return 0
+
+
 def cmd_roadmap(args: Namespace) -> int:
     """Show project roadmap and progress from TODO.md."""
     from moss.roadmap import display_roadmap, find_todo_md
@@ -2965,6 +3000,30 @@ def create_parser() -> argparse.ArgumentParser:
         help="Output as JSON",
     )
     check_refs_parser.set_defaults(func=cmd_check_refs)
+
+    # external-deps command
+    external_deps_parser = subparsers.add_parser(
+        "external-deps", help="Analyze external dependencies (PyPI packages)"
+    )
+    external_deps_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Directory to analyze (default: current)",
+    )
+    external_deps_parser.add_argument(
+        "--resolve",
+        "-r",
+        action="store_true",
+        help="Resolve transitive dependencies (requires pip)",
+    )
+    external_deps_parser.add_argument(
+        "--json",
+        "-j",
+        action="store_true",
+        help="Output as JSON",
+    )
+    external_deps_parser.set_defaults(func=cmd_external_deps)
 
     # health command
     health_parser = subparsers.add_parser(
