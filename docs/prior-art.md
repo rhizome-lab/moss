@@ -1045,6 +1045,130 @@ vulnerable patterns that text-based tools miss.
 - Use skeleton as context for explanations
 - Consider: Dynamic docs in TUI/LSP (hover for explanation)
 
+## Multi-Agent Coordination Patterns
+
+### Architectures
+
+| Pattern | Description | Use Case |
+|---------|-------------|----------|
+| **Peer-to-Peer** | Decentralized, any agent talks to any | Maximum flexibility, complex coordination |
+| **Centralized** | Supervisor directs all agents | Clear control, simpler debugging |
+| **Hierarchical** | Nested supervisors | Large systems, domain separation |
+| **Fully-Connected** | Every agent to every agent | Small systems, emergent behavior |
+
+### Key Frameworks
+
+**CAMEL**: Role-playing framework with task-specific + cooperating agents.
+**AutoGen**: Flexible behaviors, conversation-based cooperation, subtask decomposition.
+
+### Best Practices (from 94+ studies)
+- **Functional correctness**: Rigorous specification adherence
+- **Role-based decomposition**: Clear agent responsibilities
+- **Continuous validation**: Verify outputs at each step
+- **Modularity**: Formalized interfaces, hierarchical/adapter patterns
+- **Orchestration logic**: State transitions, message routing, coordination
+
+### Challenges
+- **Communication breakdowns**: 13.48% failures from output verification
+- **Goal misalignment**: Inconsistent understanding between agents
+- **Memory management**: Context sharing and isolation
+- **Theory of Mind**: LLMs struggle with partner beliefs/intentions
+
+### Emerging: Evolving Orchestration
+- "Puppeteer-style" centralized orchestrator
+- Trained via RL to adaptively sequence agents
+- Dynamic response to evolving task states
+
+### Moss Implementation Notes
+- Ticket-based model already isolates agents
+- Add: Dynamic orchestrator that assigns tickets
+- Consider: RL-based ticket prioritization
+- Monitor: Inter-agent communication patterns
+
+## Local LLMs for Code
+
+### The 2025 Landscape
+Running powerful coding AI locally is now practical, not aspirational.
+
+### Key Tools
+
+| Tool | Description |
+|------|-------------|
+| **Ollama** | One-line commands for popular models, handles model management |
+| **llama.cpp** | C/C++ inference, extremely fast, cross-platform |
+| **GGUF/GPTQ** | Quantization formats for running on less powerful hardware |
+
+### Top Local Coding Models (2025)
+
+| Model | VRAM | Notes |
+|-------|------|-------|
+| Code Llama 70B | 40GB+ (full), 12-24GB (quant) | Strong general coding |
+| DeepSeek-Coder | Variable | 300+ languages, SOTA benchmarks |
+| Qwen 2.5 Coder | 12-24GB | Agentic task handling |
+| StarCoder2 | 12-24GB | Multi-language |
+| Phi-3 Mini | 4-8GB | Entry-level GPUs, laptops |
+
+### Hardware Requirements
+- **High-end** (70B models): 40GB+ VRAM or ~12-24GB with quantization
+- **Mid-tier** (14-20B): 12-24GB VRAM
+- **Lightweight** (3-7B): 4-8GB, can run on laptops
+
+### DeepSeek-Coder
+- 2 trillion tokens training (code + natural language)
+- 300+ programming languages
+- State-of-the-art on coding benchmarks
+- Install: `ollama pull deepseek-coder:33b`
+
+### Moss Implementation Notes
+- Support local models via Ollama integration
+- Allow model selection in config
+- Fallback chain: local → API
+- Consider: Quantized models for fast iteration, API for final synthesis
+
+## Fill-in-the-Middle (FIM) Code Completion
+
+### The Paradigm
+FIM generates code between a prefix and suffix, conditioning on both contexts.
+Unlike left-to-right completion, must reconcile preceding AND succeeding code.
+
+### Training Approach (OpenAI)
+Split document into: prefix, middle, suffix (before tokenization)
+Formats:
+- **PSM** (Prefix-Suffix-Middle): Most common
+- **SPM** (Suffix-Prefix-Middle): Alternative ordering
+- 50% PSM/SPM split provides best results
+
+### Models with FIM Support
+- StarCoder, DeepSeek-Coder, Code Llama (modern)
+- Codex, CodeGen (early, L2R only)
+
+### Recent Advances
+
+**AST-FIM (Structure-Aware):**
+- Mask complete syntactic structures, not random spans
+- Aligned with code editing patterns (blocks, expressions, functions)
+- Better than treating code as plain text
+
+**Horizon-Length Prediction (HLP):**
+- Teaches planning over arbitrary horizons
+- 24% improvement in FIM benchmarks
+- Negligible training overhead, zero inference overhead
+
+**Instruction-Aware FIM (IFIM):**
+- Standard instruction-tuning degrades FIM performance
+- IFIM preserves both instruction-following AND infilling
+
+### Challenges
+- OOV tokens, project-specific APIs
+- Cross-language adaptation
+- Accuracy vs latency trade-off (especially real-time IDE)
+
+### Moss Implementation Notes
+- Anchor-based patching is similar to FIM (prefix + suffix)
+- Could use FIM models for hole-filling synthesis
+- AST-FIM aligns with moss's structural awareness
+- Consider: FIM for `SketchGenerator` (fill holes in templates)
+
 ## Benchmarking TODO
 
 - [ ] Implement SWE-bench evaluation harness
