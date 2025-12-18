@@ -3,6 +3,10 @@
 Provides a unified interface for calling LLMs from multiple providers.
 Supports both direct SDK integrations and CLI-based providers.
 
+Providers can be registered via entry points or programmatically.
+
+Entry point group: moss.llm.providers
+
 Example:
     from moss.llm import get_provider, complete
 
@@ -23,17 +27,21 @@ Available providers (when dependencies installed):
 - litellm: LiteLLM multi-provider gateway
 - llm: Simon Willison's llm library
 - bifrost: Bifrost high-performance gateway
+- llamacpp: llama.cpp local inference
+- kobold: KoboldAI/KoboldCpp
+- exllama: ExLlamaV2
+
+Example plugin registration in pyproject.toml:
+    [project.entry-points."moss.llm.providers"]
+    my_provider = "my_package.providers:MyProvider"
 """
 
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
+from importlib.metadata import entry_points
 
 from moss.llm.protocol import LLMProvider, LLMResponse, Message, Role
-
-if TYPE_CHECKING:
-    pass
 
 # Registry of available providers
 _PROVIDERS: dict[str, type[LLMProvider]] = {}
@@ -124,9 +132,24 @@ def complete(
     return response.content
 
 
-# Auto-register available providers
-def _register_available_providers() -> None:
-    """Register all available providers based on installed dependencies."""
+def _discover_entry_points() -> None:
+    """Discover and register providers from entry points."""
+    try:
+        eps = entry_points(group="moss.llm.providers")
+        for ep in eps:
+            try:
+                provider_class = ep.load()
+                # Only register if not already registered (builtins take precedence)
+                if ep.name not in _PROVIDERS:
+                    register_provider(ep.name, provider_class)
+            except Exception:
+                pass  # Skip failed imports
+    except Exception:
+        pass
+
+
+def _register_builtin_providers() -> None:
+    """Register built-in providers based on installed dependencies."""
     # CLI provider (always available - zero deps)
     from moss.llm.providers.cli import CLIProvider
 
@@ -197,7 +220,9 @@ def _register_available_providers() -> None:
         pass
 
 
-_register_available_providers()
+# Auto-register on import
+_register_builtin_providers()
+_discover_entry_points()
 
 __all__ = [
     "LLMProvider",
