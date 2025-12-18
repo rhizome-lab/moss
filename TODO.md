@@ -18,10 +18,10 @@ Candidates for the next session, roughly by size:
 - [ ] **Test ComponentGenerator/SMTGenerator** (small) - Add tests for new generators
   - Unit tests with mock context/specs
   - Integration tests with actual library composition
-- [ ] **Drift auto-update in pre-commit** (small) - Run check_gen_drift.py --update automatically
-  - Prevents CI failures from forgetting to update specs
-- [ ] **CheckpointAPI to MossAPI** (small) - Expose checkpoint commands via library API
-  - Currently CLI-only, should be programmatically accessible
+- [x] **Drift auto-update in pre-commit** (small) - Run check_gen_drift.py --update automatically
+  - Added to scripts/pre-commit hook
+- [x] **CheckpointAPI to MossAPI** (small) - Expose checkpoint commands via library API
+  - Added to GitAPI: create_checkpoint, list_checkpoints, diff_checkpoint, merge_checkpoint, abort_checkpoint
 
 ## Future Work
 
@@ -266,6 +266,11 @@ Potential additions:
   - Future improvements:
     - [ ] Pre-filters for performance (don't run every rule on every file)
     - [ ] Multi-backend composition: `@rule(backend=["ast-grep", "pyright"])`
+- [ ] `moss tree` - Git-aware tree visualization:
+  - Display tracked files in tree format (`git ls-tree -r --name-only HEAD | tree --fromfile`)
+  - Option to show only tracked files (exclude .gitignore'd)
+  - Option to show with file sizes, last modified dates
+  - Integration with `moss skeleton` for code structure within files
 - [ ] `moss clones` - Structural similarity via hashing:
   - Normalize AST subtrees: replace variable names with positional placeholders ($1, $2, $3)
   - Hash normalized structure → same hash = same structure
@@ -617,7 +622,7 @@ Multi-agent coordination, trust levels, checkpoints.
 - Trust levels: Already designed in detail above
   - Pattern learning, scope-based, time-bounded, rollback-aware
 - Checkpoints: `moss checkpoint create/list/diff/merge/abort` - [IMPLEMENTED]
-  - [ ] Add `CheckpointAPI` to `MossAPI` (currently CLI-only)
+  - [x] Add `CheckpointAPI` to `MossAPI` (GitAPI.create_checkpoint, list_checkpoints, etc.)
 - Indexing: Auto-index on project load (background)
   - Integrate with RAG
 

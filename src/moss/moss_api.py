@@ -469,6 +469,102 @@ class GitAPI:
         git = self.init()
         return await git.commit(branch, message)
 
+    async def create_checkpoint(
+        self, name: str | None = None, message: str | None = None
+    ) -> dict[str, str]:
+        """Create a checkpoint with current changes.
+
+        Checkpoints are shadow branches that capture current work state,
+        allowing safe experimentation with easy rollback.
+
+        Args:
+            name: Optional checkpoint name (auto-generated if not provided)
+            message: Optional commit message for initial checkpoint state
+
+        Returns:
+            Dict with 'branch' name and 'commit' SHA
+        """
+        import time
+
+        git = self.init()
+        branch_name = name or f"checkpoint/{int(time.time())}"
+        branch = await git.create_shadow_branch(branch_name)
+        commit_msg = message or f"Checkpoint: {branch_name}"
+        handle = await git.commit(branch, commit_msg)
+        return {"branch": branch.name, "commit": handle.sha}
+
+    async def list_checkpoints(self) -> list[dict[str, str]]:
+        """List active checkpoints.
+
+        Returns:
+            List of checkpoint info dicts with 'name' and 'type' keys
+        """
+        git = self.init()
+        result = await git._run_git("branch", "--list", "shadow/*", "checkpoint/*")
+        branches = [b.strip() for b in result.stdout.strip().split("\n") if b.strip()]
+        checkpoints = []
+        for branch in branches:
+            # Remove leading * and whitespace for current branch
+            branch = branch.lstrip("* ").strip()
+            checkpoint_type = "checkpoint" if branch.startswith("checkpoint/") else "shadow"
+            checkpoints.append({"name": branch, "type": checkpoint_type})
+        return checkpoints
+
+    async def diff_checkpoint(self, name: str) -> dict[str, str]:
+        """Show changes in a checkpoint.
+
+        Args:
+            name: Checkpoint branch name
+
+        Returns:
+            Dict with 'diff' (full diff) and 'stat' (summary stats)
+        """
+        git = self.init()
+        # Create a temporary branch object for the diff
+        branch = ShadowBranch(name, git.root)
+        diff = await git.diff(branch)
+        stat = await git.diff_stat(branch)
+        return {"diff": diff, "stat": stat}
+
+    async def merge_checkpoint(self, name: str, message: str | None = None) -> dict[str, str]:
+        """Merge checkpoint changes into base branch.
+
+        Args:
+            name: Checkpoint branch name to merge
+            message: Optional merge commit message
+
+        Returns:
+            Dict with 'commit' SHA of merge commit
+        """
+        git = self.init()
+        branch = ShadowBranch(name, git.root)
+        merge_msg = message or f"Merge checkpoint {name}"
+        handle = await git.squash_merge(branch, merge_msg)
+        return {"commit": handle.sha}
+
+    async def abort_checkpoint(self, name: str) -> dict[str, bool]:
+        """Abandon a checkpoint and delete its branch.
+
+        Args:
+            name: Checkpoint branch name to abort
+
+        Returns:
+            Dict with 'success' boolean
+        """
+        git = self.init()
+        # Get current branch to check if we're on the checkpoint
+        current = await git._get_current_branch()
+        if current == name:
+            # Switch to main/master before deleting
+            try:
+                await git._run_git("checkout", "main")
+            except Exception:
+                await git._run_git("checkout", "master")
+
+        branch = ShadowBranch(name, git.root)
+        await git.abort(branch)
+        return {"success": True}
+
 
 @dataclass
 class ContextAPI:

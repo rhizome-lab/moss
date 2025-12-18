@@ -251,6 +251,22 @@
     "name": "validation_validate"
   },
   {
+    "description": "Abandon a checkpoint and delete its branch. Dict with 'success' boolean",
+    "inputSchema": {
+      "properties": {
+        "name": {
+          "description": "Checkpoint branch name to abort",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "git_abort_checkpoint"
+  },
+  {
     "description": "Create a commit on the specified shadow branch. CommitHandle referencing the new commit",
     "inputSchema": {
       "properties": {
@@ -285,12 +301,73 @@
     "name": "git_create_branch"
   },
   {
+    "description": "Create a checkpoint with current changes. Checkpoints are shadow branches that capture current work state, allowing safe experimentation with easy rollback. Dict with 'branch' name and 'commit' SHA",
+    "inputSchema": {
+      "properties": {
+        "message": {
+          "description": "Optional commit message for initial checkpoint state",
+          "type": "string"
+        },
+        "name": {
+          "description": "Optional checkpoint name (auto-generated if not provided)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "git_create_checkpoint"
+  },
+  {
+    "description": "Show changes in a checkpoint. Dict with 'diff' (full diff) and 'stat' (summary stats)",
+    "inputSchema": {
+      "properties": {
+        "name": {
+          "description": "Checkpoint branch name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "git_diff_checkpoint"
+  },
+  {
     "description": "Initialize shadow git for the project. ShadowGit instance for managing branches",
     "inputSchema": {
       "properties": {},
       "type": "object"
     },
     "name": "git_init"
+  },
+  {
+    "description": "List active checkpoints. List of checkpoint info dicts with 'name' and 'type' keys",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "git_list_checkpoints"
+  },
+  {
+    "description": "Merge checkpoint changes into base branch. Dict with 'commit' SHA of merge commit",
+    "inputSchema": {
+      "properties": {
+        "message": {
+          "description": "Optional merge commit message",
+          "type": "string"
+        },
+        "name": {
+          "description": "Checkpoint branch name to merge",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "git_merge_checkpoint"
   },
   {
     "description": "Compile context for the given files. CompiledContext with rendered views",
