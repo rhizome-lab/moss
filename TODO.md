@@ -8,16 +8,19 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 Candidates for the next session, roughly by size:
 
-- [ ] **Integrate trust into policy engine** (small) - Wire TrustManager into PolicyEngine
-  - Use trust decisions in tool execution flow
-- [ ] **Strategy pattern detection** (small) - Add to `moss patterns`
-  - Detect interface + multiple implementations pattern
-- [ ] **`moss weaknesses`** (medium) - Identify architectural gaps
-  - See TODO.md under "Codebase Analysis Gaps"
-- [ ] **ACP agent integration** (medium) - Connect ACP server to moss tools
-  - Currently returns basic responses, needs full tool integration
-- [ ] **EnumerativeGenerator** (large) - Non-LLM code synthesis
-  - Bottom-up AST enumeration, see "Non-LLM Code Generators" section
+- [ ] **ComponentGenerator** (medium) - Combine library functions bottom-up (SyPet/InSynth)
+  - Build type graph from available functions
+  - Petri net representation for reachability
+- [ ] **SMTGenerator** (medium) - Z3-based type-guided synthesis (Synquid)
+  - Translate Python specs to Z3 constraints
+  - Bidirectional type propagation
+- [ ] **Weakness reporting improvements** (small) - Enhance `moss weaknesses` output
+  - Add SARIF output format for CI integration
+  - Add --fix suggestions for auto-correctable issues
+- [ ] **ACP streaming** (small) - Add streaming support to ACP server
+  - Progressive updates during long-running analyses
+- [ ] **Sessions MVP** (large) - First-class session support
+  - See "Sessions as First-Class Citizens" section
 
 ## Future Work
 
@@ -74,10 +77,10 @@ Still needed:
 Alternative synthesis approaches that don't rely on LLMs. See `docs/synthesis-generators.md` and `docs/prior-art.md` for details.
 
 #### High Priority
-- [ ] `EnumerativeGenerator` - enumerate ASTs, test against examples (Escher/Myth)
-  - Bottom-up AST enumeration with special handling for conditionals/recursion
-  - Use Python type hints as refinement constraints (from Myth's approach)
-  - Combine types + examples: tests = examples, type hints = types
+- [x] `EnumerativeGenerator` - enumerate ASTs, test against examples (Escher/Myth)
+  - Bottom-up AST enumeration with depth-based exploration
+  - Tests against input/output examples for pruning
+  - See `src/moss/synthesis/plugins/generators/enumeration.py`
 - [ ] `ComponentGenerator` - combine library functions bottom-up (SyPet/InSynth)
   - Build type graph from available functions (use `moss deps` + `external-deps`)
   - Petri net representation: places=types, transitions=methods, tokens=variables
@@ -201,19 +204,17 @@ Potential additions:
   - [x] Factory patterns
   - [x] Singleton patterns
   - [x] Coupling analysis (which modules know about each other)
-  - [ ] Strategy patterns, adapter patterns
+  - [x] Strategy patterns (interface + 2+ implementations, strategy holders)
+  - [ ] Adapter patterns
   - [ ] Inconsistent patterns (e.g., some registries use entry points, others don't)
   - [ ] Report: "X uses plugin pattern, Y could benefit from it"
-- [ ] `moss weaknesses` / `moss gaps` - Identify architectural weaknesses and gaps:
-  - Hardcoded assumptions (e.g., parsing only supports one format)
-  - Missing abstractions (e.g., no plugin system where one would help)
-  - Tight coupling between components
-  - Single points of failure
-  - Missing error handling patterns
-  - Inconsistent patterns across similar code
-  - Technical debt indicators
-  - Self-analysis: moss should be able to identify its own architectural gaps
-    (eating our own dogfood, providing actionable feedback during development)
+- [x] `moss weaknesses` - Identify architectural weaknesses and gaps:
+  - [x] Coupling issues (high fan-in/fan-out)
+  - [x] Missing abstractions (god classes, long functions, long param lists)
+  - [x] Hardcoded values (URLs, paths, IPs)
+  - [x] Error handling issues (bare except, swallowed exceptions)
+  - [x] Pattern consistency checks (via patterns analysis)
+  - See `src/moss/weaknesses.py` for implementation
 - [x] `moss rules` - Custom structural analysis framework (Phase A complete):
   - [x] User-defined rules as Python files (LLM-writable, type-checkable)
   - [x] Pattern: `@rule(backend="ast-grep")` decorator + check function
@@ -314,10 +315,10 @@ See `docs/prior-art.md` for detailed research (updated Dec 2025).
 
 **New patterns to adopt from IDE research:**
 - [ ] **Smart Trust Levels** (inspired by Warp's Dispatch mode) - see design below
-- [x] **ACP Server** (HIGH PRIORITY) - implement Agent Client Protocol for Zed/JetBrains integration
-  - Create `moss.acp_server` module
-  - JSON-RPC 2.0 over stdio
-  - Map moss tools to ACP capabilities
+- [x] **ACP Server** - Agent Client Protocol for Zed/JetBrains integration
+  - `moss.acp_server` module with JSON-RPC 2.0 over stdio
+  - Integrated with moss tools: skeleton, deps, complexity, health, patterns, weaknesses, security
+  - Uses DWIM for semantic routing of unknown prompts
   - See `docs/prior-art.md` for protocol details
 - [ ] **Intent Prediction** (Windsurf's Supercomplete) - predict what user wants, not just next token
 - [ ] **Manager View** (Antigravity) - UI for orchestrating multiple concurrent agents
@@ -391,6 +392,7 @@ Smart features beyond basic approve/deny:
 - [ ] **Explain risk**: Show what command does, why it's flagged, what could go wrong
 - [x] **Glob patterns**: `write:src/**/*.py` for fine-grained path matching
 - [x] **Command patterns**: `bash:git *` to trust all git commands
+- [x] **PolicyEngine integration**: TrustPolicy wired into policy evaluation pipeline
 
 Key insight: The goal isn't "maximum safety" - it's *appropriate* safety that doesn't
 destroy the productivity gains of agentic coding.
