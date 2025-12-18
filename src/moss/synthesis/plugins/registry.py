@@ -330,6 +330,22 @@ class SynthesisRegistry:
         except ImportError:
             logger.debug("LLMGenerator not available")
 
+        try:
+            from moss.synthesis.plugins.generators import ComponentGenerator
+
+            if "component" not in [g.metadata.name for g in self.generators.get_all()]:
+                self.generators.register(ComponentGenerator())
+        except ImportError:
+            logger.debug("ComponentGenerator not available")
+
+        try:
+            from moss.synthesis.plugins.generators import SMTGenerator
+
+            if "smt" not in [g.metadata.name for g in self.generators.get_all()]:
+                self.generators.register(SMTGenerator())
+        except ImportError:
+            logger.debug("SMTGenerator not available")
+
         # Import built-in validators
         try:
             from moss.synthesis.plugins.validators import PytestValidator

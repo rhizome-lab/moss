@@ -5,8 +5,11 @@ Generators:
 - TemplateGenerator: User-configurable code templates
 - LLMGenerator: LLM-based code generation via LiteLLM
 - EnumerativeGenerator: Bottom-up AST enumeration for simple synthesis
+- ComponentGenerator: Type-directed library composition (SyPet/InSynth style)
+- SMTGenerator: Z3-based type-driven synthesis (Synquid style)
 """
 
+from .component import ComponentGenerator
 from .enumeration import EnumerationConfig, EnumerativeGenerator
 from .llm import (
     LiteLLMProvider,
@@ -20,9 +23,11 @@ from .llm import (
     create_mock_generator,
 )
 from .placeholder import PlaceholderGenerator
+from .smt import SMTGenerator
 from .template import TemplateGenerator
 
 __all__ = [
+    "ComponentGenerator",
     "EnumerationConfig",
     "EnumerativeGenerator",
     "LLMGenerator",
@@ -32,6 +37,7 @@ __all__ = [
     "LiteLLMProvider",
     "MockLLMProvider",
     "PlaceholderGenerator",
+    "SMTGenerator",
     "TemplateGenerator",
     "TokenUsage",
     "create_llm_generator",
