@@ -24,20 +24,19 @@ Get a complete project snapshot in one command:
 
 ```bash
 moss --compact overview
-# health: F (24%) | deps: 0 direct, 6 dev | docs: 18% | todos: 22 pending | refs: ok
+# health: F (24%) - 103 files, 45K lines (18% docs, 294 hotspots)
+#   - docs: Documentation coverage is only 18%
+# deps: 0 direct, 6 dev
+# todos: 30 pending, 12 done
+#   - `moss.gen.lsp` - Generate LSP handlers from API
+#   - `moss.gen.grpc` - Generate gRPC proto + handlers from API
+# refs: ok
 
 moss overview --preset ci    # Quick CI check (health + deps)
 moss overview --preset quick # Just health check
-moss --json overview         # Full JSON for programmatic use
 ```
 
-**Token-efficient output** for AI agents:
-
-```bash
-moss --compact health        # health: B (82%) | 45 files, 12K lines | 3 issues
-moss --compact external-deps # deps: 5 direct, 2 dev | vulns: 0 | licenses: ok
-moss --jq ".stats" external-deps  # Extract specific fields via jq
-```
+The `--compact` format shows **why** scores are what they are, plus actionable items like pending TODOs. Prefer this over `--json` for LLM consumption - plain text is more token-efficient.
 
 ## Common Commands
 
