@@ -40,6 +40,7 @@ def setup_output(args: Namespace) -> Output:
     output = configure_output(
         verbosity=verbosity,
         json_format=getattr(args, "json", False),
+        compact=getattr(args, "compact", False),
         no_color=getattr(args, "no_color", False),
     )
 
@@ -1849,7 +1850,10 @@ def cmd_summarize(args: Namespace) -> int:
             output.error(f"Failed to summarize docs: {e}")
             return 1
 
-        if getattr(args, "json", False):
+        compact = getattr(args, "compact", False)
+        if compact and not getattr(args, "json", False):
+            output.print(summary.to_compact())
+        elif getattr(args, "json", False):
             output.data(summary.to_dict())
         else:
             output.print(summary.to_markdown())
@@ -1873,7 +1877,10 @@ def cmd_summarize(args: Namespace) -> int:
         return 1
 
     # Output format
-    if getattr(args, "json", False):
+    compact = getattr(args, "compact", False)
+    if compact and not getattr(args, "json", False):
+        output.print(summary.to_compact())
+    elif getattr(args, "json", False):
         output.data(summary.to_dict())
     else:
         output.print(summary.to_markdown())
@@ -1903,7 +1910,10 @@ def cmd_check_docs(args: Namespace) -> int:
         return 1
 
     # Output format
-    if getattr(args, "json", False):
+    compact = getattr(args, "compact", False)
+    if compact and not getattr(args, "json", False):
+        output.print(result.to_compact())
+    elif getattr(args, "json", False):
         output.data(result.to_dict())
     else:
         output.print(result.to_markdown())
@@ -1939,7 +1949,10 @@ def cmd_check_todos(args: Namespace) -> int:
         return 1
 
     # Output format
-    if getattr(args, "json", False):
+    compact = getattr(args, "compact", False)
+    if compact and not getattr(args, "json", False):
+        output.print(result.to_compact())
+    elif getattr(args, "json", False):
         output.data(result.to_dict())
     else:
         output.print(result.to_markdown())
@@ -1991,7 +2004,10 @@ def cmd_mutate(args: Namespace) -> int:
         return 1
 
     # Output format
-    if getattr(args, "json", False):
+    compact = getattr(args, "compact", False)
+    if compact and not getattr(args, "json", False):
+        output.print(result.to_compact())
+    elif getattr(args, "json", False):
         output.data(result.to_dict())
     else:
         output.print(result.to_markdown())
@@ -2028,7 +2044,10 @@ def cmd_check_refs(args: Namespace) -> int:
         return 1
 
     # Output format
-    if getattr(args, "json", False):
+    compact = getattr(args, "compact", False)
+    if compact and not getattr(args, "json", False):
+        output.print(result.to_compact())
+    elif getattr(args, "json", False):
         output.data(result.to_dict())
     else:
         output.print(result.to_markdown())
@@ -2074,7 +2093,10 @@ def cmd_external_deps(args: Namespace) -> int:
         return 0
 
     # Output format
-    if getattr(args, "json", False):
+    compact = getattr(args, "compact", False)
+    if compact and not getattr(args, "json", False):
+        output.print(result.to_compact())
+    elif getattr(args, "json", False):
         output.data(result.to_dict(weight_threshold=warn_weight))
     else:
         output.print(result.to_markdown(weight_threshold=warn_weight))
@@ -2181,7 +2203,10 @@ def cmd_health(args: Namespace) -> int:
     ]
 
     # Output format
-    if getattr(args, "json", False):
+    compact = getattr(args, "compact", False)
+    if compact and not getattr(args, "json", False):
+        output.print(status.to_compact())
+    elif getattr(args, "json", False):
         output.data(status.to_dict())
     else:
         output.print(_format_concise_health(status))
@@ -2289,6 +2314,12 @@ def create_parser() -> argparse.ArgumentParser:
 
     # Global output options
     parser.add_argument("--json", "-j", action="store_true", help="Output in JSON format")
+    parser.add_argument(
+        "--compact",
+        "-c",
+        action="store_true",
+        help="Compact output (token-efficient for AI agents)",
+    )
     parser.add_argument("--quiet", "-q", action="store_true", help="Quiet mode (errors only)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument("--debug", action="store_true", help="Debug output (most verbose)")

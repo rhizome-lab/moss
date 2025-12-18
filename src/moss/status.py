@@ -238,6 +238,31 @@ class ProjectStatus:
 
         return "\n".join(lines)
 
+    def to_compact(self) -> str:
+        """Format as compact single-line summary (token-efficient).
+
+        Example: status: B (82%) | 45 files, 12K lines | 3 issues | todos: 5 pending
+        """
+        parts = []
+
+        # Health score
+        parts.append(f"status: {self.health_grade} ({self.health_score:.0f}%)")
+
+        # Code stats
+        lines_k = self.total_lines / 1000 if self.total_lines >= 1000 else self.total_lines
+        lines_fmt = f"{lines_k:.0f}K" if self.total_lines >= 1000 else str(self.total_lines)
+        parts.append(f"{self.total_files} files, {lines_fmt} lines")
+
+        # Issues
+        if self.weak_spots:
+            parts.append(f"{len(self.weak_spots)} issues")
+
+        # TODOs
+        if self.todos_pending:
+            parts.append(f"todos: {self.todos_pending} pending")
+
+        return " | ".join(parts)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON output."""
         return {

@@ -58,6 +58,16 @@ Analyze PyPI/npm dependencies (not just internal imports):
 - [x] License compatibility checking (`--check-licenses` flag)
 - [x] package.json/npm support (dependencies, devDependencies, optional, peer)
 
+### CLI Output Enhancement
+
+Token-efficient output modes for AI agent consumption:
+
+- [x] `--compact` flag for single-line summaries (e.g., `deps: 5 direct | vulns: 0 | licenses: ok`)
+- [ ] `--jq EXPR` flag - pipe JSON output through jq for field extraction
+- [ ] `--query EXPR` flag - relaxed DWIM syntax for flexible querying (needs design work)
+
+The `--jq` option is straightforward (shell out to jq). The `--query` variant would allow more natural queries like `"direct deps"` or `"high vulns"` but requires careful design to handle fuzzy matching.
+
 ### Enterprise Features
 
 - [ ] Team collaboration (shared caches)

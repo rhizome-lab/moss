@@ -135,6 +135,22 @@ class RefCheckResult:
             "stale": [s.to_dict() for s in self.stale_references],
         }
 
+    def to_compact(self) -> str:
+        """Format as compact single-line summary (token-efficient).
+
+        Example: refs: ok | 12 valid | 0 broken | 2 stale
+        """
+        valid = len(self.code_to_docs) + len(self.docs_to_code)
+        broken = self.error_count
+        status = "FAIL" if broken else "ok"
+        parts = [f"refs: {status}"]
+        parts.append(f"{valid} valid")
+        if broken:
+            parts.append(f"{broken} broken")
+        if self.stale_references:
+            parts.append(f"{len(self.stale_references)} stale")
+        return " | ".join(parts)
+
     def to_markdown(self) -> str:
         lines = ["# Reference Check Results", ""]
 

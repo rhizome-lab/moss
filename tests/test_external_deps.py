@@ -481,6 +481,40 @@ class TestDependencyAnalysisResult:
         assert "gpl-lib" in md
         assert "GPL-3.0" in md
 
+    def test_to_compact_empty(self):
+        result = DependencyAnalysisResult()
+        compact = result.to_compact()
+        assert "deps: 0" in compact
+        assert "vulns: 0" in compact
+
+    def test_to_compact_with_deps(self):
+        result = DependencyAnalysisResult(
+            dependencies=[Dependency(name="a"), Dependency(name="b")],
+            dev_dependencies=[Dependency(name="c", is_dev=True)],
+        )
+        compact = result.to_compact()
+        assert "2 direct" in compact
+        assert "1 dev" in compact
+
+    def test_to_compact_with_vulns(self):
+        result = DependencyAnalysisResult(
+            vulnerabilities=[
+                Vulnerability(id="CVE-1", package="a", severity="CRITICAL", summary="x"),
+            ]
+        )
+        compact = result.to_compact()
+        assert "vulns: 1 CRIT" in compact
+
+    def test_to_compact_with_license_issues(self):
+        result = DependencyAnalysisResult(
+            license_issues=[
+                LicenseIssue(package="a", license="GPL", issue="copyleft"),
+                LicenseIssue(package="b", license="Unknown", issue="unknown"),
+            ]
+        )
+        compact = result.to_compact()
+        assert "licenses: 2 issues" in compact
+
 
 # =============================================================================
 # ExternalDependencyAnalyzer Tests

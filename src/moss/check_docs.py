@@ -82,6 +82,23 @@ class DocCheckResult:
             },
         }
 
+    def to_compact(self) -> str:
+        """Format as compact single-line summary (token-efficient).
+
+        Example: docs: 85% coverage | 12/14 modules | 2 errors, 1 warning
+        """
+        doc, found = self.modules_documented, self.modules_found
+        parts = [f"docs: {self.coverage:.0%} coverage"]
+        parts.append(f"{doc}/{found} modules")
+        if self.error_count or self.warning_count:
+            issue_parts = []
+            if self.error_count:
+                issue_parts.append(f"{self.error_count} errors")
+            if self.warning_count:
+                issue_parts.append(f"{self.warning_count} warnings")
+            parts.append(", ".join(issue_parts))
+        return " | ".join(parts)
+
     def to_markdown(self) -> str:
         lines = ["# Documentation Check Results", ""]
 

@@ -184,6 +184,20 @@ class ProjectSummary:
 
         return "\n".join(lines)
 
+    def to_compact(self) -> str:
+        """Format as compact single-line summary (token-efficient).
+
+        Example: summary: myproject | 45 files, 12K lines | 15 classes, 89 funcs
+        """
+        lines_k = self.total_lines / 1000 if self.total_lines >= 1000 else self.total_lines
+        lines_fmt = f"{lines_k:.0f}K" if self.total_lines >= 1000 else str(self.total_lines)
+        total_classes = sum(p.total_classes for p in self.packages)
+        total_functions = sum(p.total_functions for p in self.packages)
+        parts = [f"summary: {self.name}"]
+        parts.append(f"{self.total_files} files, {lines_fmt} lines")
+        parts.append(f"{total_classes} classes, {total_functions} funcs")
+        return " | ".join(parts)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON output."""
         return {
@@ -494,6 +508,23 @@ class DocSummary:
                 for f in self.files
             ],
         }
+
+    def to_compact(self) -> str:
+        """Format as compact single-line summary (token-efficient).
+
+        Example: docs: 12 files, 5K words | README.md, CLAUDE.md, ...
+        """
+        words_fmt = (
+            f"{self.total_words / 1000:.0f}K" if self.total_words >= 1000 else str(self.total_words)
+        )
+        parts = [f"docs: {len(self.files)} files, {words_fmt} words"]
+        # List a few file names
+        if self.files:
+            names = [f.path.name for f in self.files[:3]]
+            if len(self.files) > 3:
+                names.append(f"+{len(self.files) - 3} more")
+            parts.append(", ".join(names))
+        return " | ".join(parts)
 
 
 class DocSummarizer:

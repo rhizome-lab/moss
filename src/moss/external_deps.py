@@ -208,6 +208,47 @@ class DependencyAnalysisResult:
     def unknown_licenses(self) -> list[License]:
         return [lic for lic in self.licenses if lic.license_category == "unknown"]
 
+    def to_compact(self) -> str:
+        """Format result as compact single-line summary (token-efficient).
+
+        Example: deps: 5 direct, 2 dev, 12 trans | vulns: 1 HIGH | licenses: 2 issues
+        """
+        parts = []
+
+        # Dependencies
+        deps_parts = []
+        if self.total_direct:
+            deps_parts.append(f"{self.total_direct} direct")
+        if self.total_dev:
+            deps_parts.append(f"{self.total_dev} dev")
+        if self.total_transitive:
+            deps_parts.append(f"{self.total_transitive} trans")
+        if deps_parts:
+            parts.append(f"deps: {', '.join(deps_parts)}")
+        else:
+            parts.append("deps: 0")
+
+        # Vulnerabilities
+        if self.vulnerabilities:
+            crit = len(self.critical_vulns)
+            high = len(self.high_vulns)
+            if crit:
+                parts.append(f"vulns: {crit} CRIT")
+            elif high:
+                parts.append(f"vulns: {high} HIGH")
+            else:
+                parts.append(f"vulns: {len(self.vulnerabilities)}")
+        else:
+            parts.append("vulns: 0")
+
+        # Licenses
+        if self.license_issues:
+            parts.append(f"licenses: {len(self.license_issues)} issues")
+        elif self.licenses:
+            parts.append("licenses: ok")
+
+        return " | ".join(parts)
+
     def to_dict(self, *, weight_threshold: int = 0) -> dict[str, Any]:
         heavy = self.get_heavy_dependencies(weight_threshold) if weight_threshold > 0 else []
         return {

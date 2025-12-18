@@ -84,6 +84,19 @@ class MutationResult:
             "tested_files": [str(f) for f in self.tested_files],
         }
 
+    def to_compact(self) -> str:
+        """Format as compact single-line summary (token-efficient).
+
+        Example: mutate: 85% score | 17/20 killed | 3 survived
+        """
+        score_pct = f"{self.mutation_score:.0%}"
+        testable = self.total_mutants - self.skipped
+        parts = [f"mutate: {score_pct} score"]
+        parts.append(f"{self.killed}/{testable} killed")
+        if self.survived:
+            parts.append(f"{self.survived} survived")
+        return " | ".join(parts)
+
     def to_markdown(self) -> str:
         lines = ["# Mutation Testing Results", ""]
 

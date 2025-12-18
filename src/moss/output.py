@@ -388,6 +388,7 @@ def reset_output() -> None:
 def configure_output(
     verbosity: Verbosity | None = None,
     json_format: bool = False,
+    compact: bool = False,
     no_color: bool = False,
 ) -> Output:
     """Configure the global output instance.
@@ -395,6 +396,7 @@ def configure_output(
     Args:
         verbosity: Verbosity level
         json_format: Use JSON output format
+        compact: Use compact output format (token-efficient for AI agents)
         no_color: Disable colors
 
     Returns:
@@ -405,7 +407,9 @@ def configure_output(
     if verbosity is not None:
         output.set_verbosity(verbosity)
 
-    if json_format:
+    if compact:
+        output.use_compact()
+    elif json_format:
         output.use_json()
 
     if no_color:

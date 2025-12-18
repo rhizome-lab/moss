@@ -85,6 +85,21 @@ class TodoCheckResult:
             },
         }
 
+    def to_compact(self) -> str:
+        """Format as compact single-line summary (token-efficient).
+
+        Example: todos: 5 pending, 12 done | 2 stale, 1 orphan
+        """
+        parts = [f"todos: {self.pending_count} pending, {self.done_count} done"]
+        issues = []
+        if self.stale_count:
+            issues.append(f"{self.stale_count} stale")
+        if self.orphan_count:
+            issues.append(f"{self.orphan_count} orphan")
+        if issues:
+            parts.append(", ".join(issues))
+        return " | ".join(parts)
+
     def to_markdown(self) -> str:
         lines = ["# TODO Check Results", ""]
 
