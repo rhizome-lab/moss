@@ -91,6 +91,53 @@ Alternative synthesis approaches that don't rely on LLMs. See `docs/synthesis-ge
 - [ ] Full TypeScript/JavaScript synthesis support
 - [ ] Go and Rust synthesis strategies
 
+### Interactive Exploration (Core UX Vision)
+
+**Goal**: Natural, intuitive codebase exploration that exposes structural power through discoverable interactions. Same mental model across all interfaces.
+
+**UX Principles:**
+- **No modals** - Everything inline, no popups blocking context
+- **No nested menus** - Flat, searchable action lists
+- **Actions visible** - Don't hide capabilities; show what's possible
+- **Direct manipulation** - Click/select to act, not "open menu → find action"
+- **Mouse support** - Full mouse interaction in TUI (click, scroll, drag)
+- **Progressive disclosure** - Start simple, reveal depth on demand
+
+**Unified Navigation Model:**
+- Start anywhere: file, function, class, symbol, or natural language query
+- Traverse by relationship: calls → called-by → imports → imported-by → similar-to
+- Zoom fluently: source ↔ skeleton ↔ signature ↔ one-liner
+- Context preserved: breadcrumb trail, back/forward navigation
+
+**`moss explore` - Interactive REPL:**
+```
+moss explore [path]
+
+> src/moss/cli.py (4500 lines, 47 functions)
+>
+> [Tab: completions]  [?: help]  [/: search]  [q: quit]
+>
+> skeleton          Show structure
+> calls <symbol>    What does this call?
+> callers <symbol>  What calls this?
+> deps              Import graph
+> similar           Structurally similar code
+> "question"        Natural language query
+```
+
+**Implementation across surfaces:**
+- [ ] CLI: `moss explore` REPL with readline, completions, history
+- [ ] TUI: Visual explorer with panes, mouse, keyboard nav
+- [ ] LSP: Workspace commands exposing same navigation
+- [ ] MCP: Tools for exploration (for AI-assisted navigation)
+- [ ] Web: Same model via HTTP API + frontend
+
+**Prior art to study:**
+- Sourcegraph (code navigation at scale)
+- GitHub code search (natural language → code)
+- Telescope.nvim (fuzzy finder UX)
+- Lazygit (TUI done right)
+
 ### CLI Output Enhancement
 
 Remaining token-efficient output features:
@@ -531,6 +578,15 @@ Moss's structural awareness is the differentiator.
   - Token budget allocation across parallel agents
   - Rate limiting for API calls
   - Priority queues for agent scheduling
+
+**Specialized Subagents:**
+- [ ] **Terminal subagent**: Persistent shell session for interactive tasks
+  - State tracking (cwd, env vars, running processes)
+  - Compare to SWE-agent's stateless subprocess.run model
+- [ ] **Browser subagent**: Web automation for testing/scraping
+  - Playwright/Puppeteer integration
+  - Screenshot → vision model → action loop
+  - Useful for E2E testing, documentation scraping
 
 **Already implemented:**
 - [x] `moss/autofix.py` - FixEngine with safety classification
