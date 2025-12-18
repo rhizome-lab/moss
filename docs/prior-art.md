@@ -1169,6 +1169,142 @@ Formats:
 - AST-FIM aligns with moss's structural awareness
 - Consider: FIM for `SketchGenerator` (fill holes in templates)
 
+## Code Search & Retrieval
+
+### The Challenge
+Simple semantic search (embed files, find similar) often fails on codebases.
+Even queries like "Session management code" yield poor results.
+
+### Why Codebases Are Hard (Greptile)
+- Code is structured, not prose
+- Meaning depends on context (imports, types, call sites)
+- Noise negatively impacts retrieval significantly
+
+### What Works Better
+
+**Translate to Natural Language First:**
+- Generate natural language descriptions before embedding
+- Embed the descriptions, not raw code
+
+**Tighter Chunking:**
+- Per-function, not per-file
+- Use AST-aware splitters (respect class/function boundaries)
+
+**Agent-Based Search (RepoRift):**
+- RAG-powered agents enhance queries with repo context
+- 78.2% Success@10 on CodeSearchNet
+
+**Cursor's Approach:**
+- Train embedding model on agent session traces
+- Agent searches → opens files → finds code
+- Use these traces to rank what should have been retrieved
+- 12.5% higher accuracy (6.5-23.5% depending on model)
+
+### Code Embedding Models (2025)
+
+| Model | Score | Notes |
+|-------|-------|-------|
+| Qodo-Embed-1-7B | 71.5 (CoIR) | State-of-the-art |
+| Qodo-Embed-1 (1.5B) | 68.53 | Beats larger 7B models |
+| CodeRankEmbed | - | Trained on Stack V2 |
+| Nomic Embed Code | - | Excels at retrieval |
+| CodeSage Large V2 | - | Various code understanding |
+
+### Hybrid Search Pipeline
+1. **First stage**: Bulk retrieval (embeddings)
+2. **Second stage**: Reranking (slower, better model)
+3. **Enhancements**: HyDE, hybrid vector-search
+
+### Moss Implementation Notes
+- Already have: grep-based search, AST parsing
+- Needed: Semantic search with code embeddings
+- Use skeleton as natural language descriptions
+- Consider: Agent-based search refinement
+- Key: Per-function chunking, not per-file
+
+## LLM-Based Fault Localization
+
+### The Problem
+Developers spend ~66% of debugging time on fault isolation.
+Finding the buggy line(s) is often harder than fixing them.
+
+### 2025 State of the Art
+
+| Tool | Approach | Results |
+|------|----------|---------|
+| **MemFL** | External memory + project context | +12.7% bugs (27.6% on complex), $0.0033/bug |
+| **AgentFL** | Multi-agent: comprehend → navigate → confirm | 157/395 Top-1, $0.074/bug, 97s/bug |
+| **FaR-Loc** | Analyze failing tests + functionality description | Method-level FL |
+| **DEVLoRe** | End-to-end: FL + repair | 274 bugs fixed (60.2% more than GiantRepair) |
+| **AutoCrashFL** | Industrial-scale crash localization | Stack trace analysis |
+
+### Key Techniques
+
+**MemFL's Memory Architecture:**
+- Static summaries of project
+- Dynamic debugging insights from previous attempts
+- Iterative refinement
+
+**AgentFL's Three-Step Process:**
+1. **Comprehension**: Understand the bug report
+2. **Navigation**: Explore codebase to find relevant code
+3. **Confirmation**: Verify the suspicious location
+
+### Moss Implementation Notes
+- Could add `moss localize <failing_test>` command
+- Use skeleton + deps for project context
+- Iterative: narrow down with each attempt
+- Integrate with validator loop (when tests fail, localize first)
+
+## Automated Code Refactoring
+
+### The Landscape
+
+**MANTRA** (March 2025 - SOTA):
+- Multi-agent + contextual RAG
+- 582/703 compilable, test-passing refactorings
+- 50% improvement over EM-Assist
+- User study: similar to developer-written code
+
+**ECO** (Google, March 2025):
+- Mine historical commits for anti-patterns
+- Find similar patterns in billions of LOC
+- Fine-tuned LLM applies similar edits
+- Auto-verify and submit for review
+
+### Challenges (ICSE 2025)
+- LLMs lack contextual understanding
+- May conflict with project conventions
+- **37% correct** without fact-checking
+- **98% correct** with fact-checking
+
+### Key Techniques
+
+**RefactoringMirror** (Detect-and-Reapply):
+- LLM identifies refactoring to apply
+- Reapply using tested refactoring engines (not LLM)
+- 94.3% accuracy, avoids all buggy solutions
+
+**Few-Shot Learning:**
+- Retrieve similar refactoring patterns from project history
+- Use as contextual cues for LLM
+
+### Traditional vs AI
+Traditional tools (parsing, symbol resolution) are more reliable for:
+- Enforcing coding style
+- Guaranteed behavior preservation
+- Complex architectural changes
+
+AI is easier to set up but "you can never be sure if it gets everything."
+
+### Moss Implementation Notes
+- `moss refactor` command with specific patterns:
+  - Extract method, rename, move
+  - Use RefactoringMirror pattern (LLM identifies, tool applies)
+- Mine project history for anti-patterns
+- Validate: tests pass before/after
+- Consider: Use rope/libcst for safe refactoring, not raw LLM edits
+
 ## Benchmarking TODO
 
 - [ ] Implement SWE-bench evaluation harness
