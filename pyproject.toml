@@ -84,9 +84,21 @@ lsp = [
 llm = [
     "litellm>=1.0.0",
 ]
+anthropic = [
+    "anthropic>=0.18.0",
+]
+openai = [
+    "openai>=1.0.0",
+]
+llm-lib = [
+    "llm>=0.13.0",
+]
+local-llm = [
+    "llama-cpp-python>=0.2.0",
+]
 # Meta-group: install all optional features
 all = [
-    "moss[server,mcp,lsp,llm,tree-sitter,chroma]",
+    "moss[server,mcp,lsp,llm,anthropic,openai,tree-sitter,chroma]",
 ]
 
 [build-system]

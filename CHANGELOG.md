@@ -1,5 +1,57 @@
 # Changelog
 
+## v0.6.2
+
+### Phase 31: Preference Extraction from Agent Logs
+
+Extract user preferences from AI coding assistant session logs and output to agent instruction formats.
+
+**LLM Provider Module** (`moss.llm`)
+- Protocol-based design with 9 provider implementations
+- CLI provider (zero-dep fallback using llm/claude/gemini CLIs)
+- Anthropic, OpenAI, LiteLLM (multi-provider gateway)
+- llm (Simon Willison's library), Bifrost (high-performance gateway)
+- Local LLM support: llama.cpp, KoboldCpp, ExLlamaV2
+- Provider auto-discovery based on installed dependencies
+- Convenience functions: `get_provider()`, `complete()`, `list_providers()`
+
+**Multi-Format Session Log Parsing**
+- Claude Code (Anthropic message format, JSONL)
+- Gemini CLI (Google message format)
+- Cline, Roo Code (VSCode extensions)
+- Aider (markdown-based chat logs)
+- Generic JSONL/chat fallback
+- Auto-detection with explicit format override
+- Tool name normalization across different agents
+
+**Preference Extractors**
+- `ExplicitExtractor`: "always/never/prefer" pattern matching
+- `CorrectionsExtractor`: Detect user corrections after assistant actions
+- `WorkflowExtractor`: Tool friction analysis, intervention patterns
+
+**Output Format Adapters**
+- Claude Code → `CLAUDE.md`
+- Gemini CLI → `GEMINI.md`
+- Google Antigravity → `.agent/rules/*.md`
+- Cursor → `.cursorrules`
+- Generic → Plain markdown
+- JSON → Structured data
+
+**Optional LLM Synthesis**
+- Synthesize extracted preferences into natural language rules
+- Configurable provider and model
+
+**CLI Commands**
+- `moss extract-preferences <paths>` - Extract and format preferences
+  - `--format` (claude/gemini/antigravity/cursor/generic/json)
+  - `--log-format` (auto/claude_code/gemini_cli/cline/roo/aider)
+  - `--min-confidence` (low/medium/high)
+  - `--synthesize` with `--provider` and `--model`
+- `moss diff-preferences <old.json> <new.json>` - Compare preference sets
+
+**Tests**
+- 28 tests covering models, parsing, extractors, and adapters
+
 ## v0.6.1
 
 ### Phase 30: Codebase Analysis Tools

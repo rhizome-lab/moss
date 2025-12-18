@@ -2198,6 +2198,145 @@ def cmd_analyze_session(args: Namespace) -> int:
     return 0
 
 
+def cmd_extract_preferences(args: Namespace) -> int:
+    """Extract user preferences from session logs."""
+    from moss.preferences import LogFormat, extract_preferences, format_preferences
+
+    output = setup_output(args)
+    paths = [Path(p) for p in getattr(args, "session_paths", [])]
+    output_format = getattr(args, "format", "generic")
+    synthesize = getattr(args, "synthesize", False)
+    min_confidence = getattr(args, "min_confidence", "low")
+    log_format_str = getattr(args, "log_format", "auto")
+
+    # Validate paths
+    for path in paths:
+        if not path.exists():
+            output.error(f"Session file not found: {path}")
+            return 1
+
+    # Map log format
+    log_format_map = {
+        "auto": LogFormat.AUTO,
+        "claude": LogFormat.CLAUDE_CODE,
+        "gemini": LogFormat.GEMINI_CLI,
+        "cline": LogFormat.CLINE,
+        "roo": LogFormat.ROO_CODE,
+        "aider": LogFormat.AIDER,
+    }
+    log_format = log_format_map.get(log_format_str, LogFormat.AUTO)
+
+    # Map confidence
+    from moss.preferences import ConfidenceLevel
+
+    confidence_map = {
+        "low": ConfidenceLevel.LOW,
+        "medium": ConfidenceLevel.MEDIUM,
+        "high": ConfidenceLevel.HIGH,
+    }
+    min_conf = confidence_map.get(min_confidence, ConfidenceLevel.LOW)
+
+    output.info(f"Extracting preferences from {len(paths)} session(s)...")
+
+    try:
+        prefs = extract_preferences(paths, log_format=log_format, min_confidence=min_conf)
+    except Exception as e:
+        output.error(f"Failed to extract preferences: {e}")
+        return 1
+
+    # Optionally synthesize with LLM
+    if synthesize:
+        output.info("Synthesizing with LLM...")
+        try:
+            from moss.preferences.synthesis import synthesize_preferences
+
+            provider = getattr(args, "provider", None)
+            model = getattr(args, "model", None)
+            result = synthesize_preferences(prefs, provider=provider, model=model)
+            prefs = result.preferences
+            output.verbose(f"Synthesis used {result.tokens_used} tokens")
+        except Exception as e:
+            output.warning(f"Synthesis failed, using raw extraction: {e}")
+
+    # Output
+    if wants_json(args):
+        output.data(prefs.to_dict())
+    else:
+        formatted = format_preferences(prefs, output_format)
+        output.print(formatted)
+
+    output.success(f"Extracted {len(prefs.preferences)} preferences")
+    return 0
+
+
+def cmd_diff_preferences(args: Namespace) -> int:
+    """Compare two preference extractions."""
+    import json
+
+    from moss.preferences import PreferenceSet, diff_preferences
+
+    output = setup_output(args)
+    old_path = Path(getattr(args, "old_path", ""))
+    new_path = Path(getattr(args, "new_path", ""))
+
+    # Validate paths
+    if not old_path.exists():
+        output.error(f"Old preferences file not found: {old_path}")
+        return 1
+    if not new_path.exists():
+        output.error(f"New preferences file not found: {new_path}")
+        return 1
+
+    try:
+        # Load preference sets from JSON
+        with open(old_path) as f:
+            old_data = json.load(f)
+        with open(new_path) as f:
+            new_data = json.load(f)
+
+        # Reconstruct PreferenceSets
+        from moss.preferences import ConfidenceLevel, Preference, PreferenceCategory
+
+        def load_prefs(data: dict) -> PreferenceSet:
+            ps = PreferenceSet(sources=data.get("sources", []))
+            for cat_name, cat_prefs in data.get("by_category", {}).items():
+                for p in cat_prefs:
+                    ps.add(
+                        Preference(
+                            category=PreferenceCategory(cat_name),
+                            rule=p["rule"],
+                            confidence=ConfidenceLevel(p["confidence"]),
+                        )
+                    )
+            return ps
+
+        old_prefs = load_prefs(old_data)
+        new_prefs = load_prefs(new_data)
+
+        diff = diff_preferences(old_prefs, new_prefs)
+
+    except Exception as e:
+        output.error(f"Failed to compare preferences: {e}")
+        return 1
+
+    # Output
+    if wants_json(args):
+        output.data(diff.to_dict())
+    else:
+        output.print(diff.to_markdown())
+
+    # Summary
+    if diff.has_changes:
+        added = len(diff.added)
+        removed = len(diff.removed)
+        changed = len(diff.changed)
+        output.info(f"Changes: +{added} added, -{removed} removed, ~{changed} modified")
+    else:
+        output.success("No changes detected")
+
+    return 0
+
+
 def cmd_git_hotspots(args: Namespace) -> int:
     """Find frequently changed files in git history."""
     from moss.git_hotspots import analyze_hotspots
@@ -3813,6 +3952,69 @@ def create_parser() -> argparse.ArgumentParser:
         help="Path to the JSONL session file",
     )
     session_parser.set_defaults(func=cmd_analyze_session)
+
+    # extract-preferences command
+    extract_prefs_parser = subparsers.add_parser(
+        "extract-preferences",
+        help="Extract user preferences from agent session logs",
+    )
+    extract_prefs_parser.add_argument(
+        "session_paths",
+        nargs="+",
+        help="Paths to session log files (supports multiple)",
+    )
+    extract_prefs_parser.add_argument(
+        "--format",
+        "-f",
+        choices=["claude", "gemini", "antigravity", "cursor", "generic", "json"],
+        default="generic",
+        help="Output format (default: generic)",
+    )
+    extract_prefs_parser.add_argument(
+        "--log-format",
+        choices=["auto", "claude", "gemini", "cline", "roo", "aider"],
+        default="auto",
+        help="Session log format (default: auto-detect)",
+    )
+    extract_prefs_parser.add_argument(
+        "--min-confidence",
+        choices=["low", "medium", "high"],
+        default="low",
+        help="Minimum confidence level to include (default: low)",
+    )
+    extract_prefs_parser.add_argument(
+        "--synthesize",
+        "-s",
+        action="store_true",
+        help="Use LLM to synthesize preferences into natural language",
+    )
+    extract_prefs_parser.add_argument(
+        "--provider",
+        help="LLM provider for synthesis (default: from env)",
+    )
+    extract_prefs_parser.add_argument(
+        "--model",
+        "-m",
+        help="LLM model for synthesis (default: provider default)",
+    )
+    extract_prefs_parser.set_defaults(func=cmd_extract_preferences)
+
+    # diff-preferences command
+    diff_prefs_parser = subparsers.add_parser(
+        "diff-preferences",
+        help="Compare two preference extractions to track drift",
+    )
+    diff_prefs_parser.add_argument(
+        "old_path",
+        type=Path,
+        help="Path to old preferences JSON file",
+    )
+    diff_prefs_parser.add_argument(
+        "new_path",
+        type=Path,
+        help="Path to new preferences JSON file",
+    )
+    diff_prefs_parser.set_defaults(func=cmd_diff_preferences)
 
     # git-hotspots command
     hotspots_parser = subparsers.add_parser(

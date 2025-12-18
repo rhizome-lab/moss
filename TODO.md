@@ -66,20 +66,29 @@ Tools we have:
 
 Potential additions:
 - [ ] Architecture diagrams from dependency graph
+- [ ] `moss weaknesses` / `moss gaps` - Identify architectural weaknesses and gaps:
+  - Hardcoded assumptions (e.g., parsing only supports one format)
+  - Missing abstractions (e.g., no plugin system where one would help)
+  - Tight coupling between components
+  - Single points of failure
+  - Missing error handling patterns
+  - Inconsistent patterns across similar code
+  - Technical debt indicators
+  - Self-analysis: moss should be able to identify its own architectural gaps
+    (eating our own dogfood, providing actionable feedback during development)
 
 ### Agent Log Analysis
 
 Manual analysis complete - see `docs/log-analysis.md` for methodology and insights.
 Basic automation: `moss analyze-session <path>` parses Claude Code JSONL logs.
+Preference extraction: `moss extract-preferences` and `moss diff-preferences` are now implemented (see Phase 31 in CHANGELOG.md).
 
-Remaining work:
+### Research: SOTA Coding Agents
 
-- [ ] `moss extract-preferences <path>` - infer user preferences from session history
-  - Coding style patterns (naming, structure, error handling)
-  - Tool usage preferences (which tools work well, which cause friction)
-  - Common corrections/refinements (what does the user keep fixing?)
-  - Generate suggested CLAUDE.md additions
-- [ ] `moss diff-preferences <old> <new>` - track preference drift over time
+Investigate and potentially learn from state-of-the-art coding agents:
+
+- [ ] [SWE-agent](https://github.com/swe-agent/swe-agent) - Princeton's autonomous agent for software engineering tasks
+- [ ] [GUIRepair](https://sites.google.com/view/guirepair) - GUI-based program repair
 
 ### Enterprise Features
 
