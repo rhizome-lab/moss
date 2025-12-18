@@ -1,3 +1,6 @@
+# Documentation build
+site/
+
 # Python
 __pycache__/
 *.py[cod]
