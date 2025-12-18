@@ -18,11 +18,37 @@ Moss implements a "Compiled Context" approach that prioritizes architectural awa
 - **Configuration DSL**: Distro-based configuration with inheritance
 - **Code Synthesis**: Plugin-based code generation with decomposition strategies and LLM integration
 
+## Quick Overview (AI-Optimized)
+
+Get a complete project snapshot in one command:
+
+```bash
+moss --compact overview
+# health: F (24%) | deps: 0 direct, 6 dev | docs: 18% | todos: 22 pending | refs: ok
+
+moss overview --preset ci    # Quick CI check (health + deps)
+moss overview --preset quick # Just health check
+moss --json overview         # Full JSON for programmatic use
+```
+
+**Token-efficient output** for AI agents:
+
+```bash
+moss --compact health        # health: B (82%) | 45 files, 12K lines | 3 issues
+moss --compact external-deps # deps: 5 direct, 2 dev | vulns: 0 | licenses: ok
+moss --jq ".stats" external-deps  # Extract specific fields via jq
+```
+
 ## Common Commands
 
 Quick reference for the most useful commands:
 
 ```bash
+# Project overview (runs all checks)
+moss overview                # Full overview with all checks
+moss --compact overview      # Single-line summary
+moss overview --preset ci    # CI-optimized (health + deps, strict)
+
 # Project health & roadmap
 moss health              # Show project health score and issues
 moss roadmap             # Show project roadmap with progress (TUI)
@@ -32,6 +58,7 @@ moss roadmap --plain     # Plain text output (better for LLMs)
 moss skeleton src/       # Extract code structure (classes, functions)
 moss deps src/moss/cli.py    # Show imports and exports
 moss cfg src/moss/cli.py     # Build control flow graphs
+moss external-deps           # Analyze PyPI/npm dependencies
 
 # Code operations
 moss run "Fix the bug"   # Submit a task
@@ -43,8 +70,9 @@ moss summarize           # Generate codebase summary
 moss health --ci         # Health check for CI (exit codes)
 ```
 
-> **Note for LLMs**: Use `--plain` or `--json` flags for machine-readable output.
-> Human users get TUI/colored output by default when at a terminal.
+> **Note for LLMs**: Use `--compact` for token-efficient single-line output,
+> `--json` for structured data, or `--jq EXPR` to extract specific fields.
+> Human users get formatted output by default.
 
 ## Architecture
 
@@ -209,6 +237,31 @@ config = (
 | `strict` | Strict mode with pytest and lower iteration limit |
 | `lenient` | Relaxed settings, higher iteration limit |
 | `fast` | Quick iterations with tight timeout |
+
+### Overview Presets
+
+The `moss overview` command supports presets for common check configurations:
+
+| Preset | Checks | Output | Strict |
+|--------|--------|--------|--------|
+| `ci` | health, deps | compact | yes |
+| `quick` | health | compact | no |
+| `full` | all checks | terminal | no |
+
+**Custom presets** can be defined in `moss.toml` or `pyproject.toml`:
+
+```toml
+# moss.toml
+[presets.mypreset]
+checks = ["health", "deps", "docs"]
+output = "compact"  # or "json", "markdown"
+strict = true       # exit non-zero on warnings
+```
+
+```bash
+moss overview --preset mypreset
+moss overview --list-presets  # Show all available presets
+```
 
 ## Programmatic Usage
 
