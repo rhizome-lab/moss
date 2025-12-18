@@ -2055,11 +2055,13 @@ def cmd_external_deps(args: Namespace) -> int:
 
     analyzer = ExternalDependencyAnalyzer(root)
     resolve = getattr(args, "resolve", False)
+    warn_weight = getattr(args, "warn_weight", 0)
+    check_vulns = getattr(args, "check_vulns", False)
 
     output.info(f"Analyzing dependencies in {root.name}...")
 
     try:
-        result = analyzer.analyze(resolve=resolve)
+        result = analyzer.analyze(resolve=resolve, check_vulns=check_vulns)
     except Exception as e:
         output.error(f"Failed to analyze dependencies: {e}")
         return 1
@@ -2070,9 +2072,17 @@ def cmd_external_deps(args: Namespace) -> int:
 
     # Output format
     if getattr(args, "json", False):
-        output.data(result.to_dict())
+        output.data(result.to_dict(weight_threshold=warn_weight))
     else:
-        output.print(result.to_markdown())
+        output.print(result.to_markdown(weight_threshold=warn_weight))
+
+    # Exit with error if heavy deps found and threshold set
+    if warn_weight > 0 and result.get_heavy_dependencies(warn_weight):
+        return 1
+
+    # Exit with error if vulnerabilities found
+    if check_vulns and result.has_vulnerabilities:
+        return 1
 
     return 0
 
@@ -3022,6 +3032,20 @@ def create_parser() -> argparse.ArgumentParser:
         "-j",
         action="store_true",
         help="Output as JSON",
+    )
+    external_deps_parser.add_argument(
+        "--warn-weight",
+        "-w",
+        type=int,
+        default=0,
+        metavar="N",
+        help="Warn and exit 1 if any dependency has weight >= N (requires --resolve)",
+    )
+    external_deps_parser.add_argument(
+        "--check-vulns",
+        "-v",
+        action="store_true",
+        help="Check for known vulnerabilities via OSV API (exit 1 if found)",
     )
     external_deps_parser.set_defaults(func=cmd_external_deps)
 

@@ -7,6 +7,7 @@ from moss.external_deps import (
     DependencyAnalysisResult,
     ExternalDependencyAnalyzer,
     ResolvedDependency,
+    Vulnerability,
     create_external_dependency_analyzer,
 )
 
@@ -92,6 +93,56 @@ class TestResolvedDependency:
         assert d["version"] == "2.31.0"
         assert d["weight"] == 1
         assert d["is_direct"] is True
+
+
+# =============================================================================
+# Vulnerability Tests
+# =============================================================================
+
+
+class TestVulnerability:
+    def test_create_vulnerability(self):
+        vuln = Vulnerability(
+            id="CVE-2023-1234",
+            package="requests",
+            severity="HIGH",
+            summary="SQL injection vulnerability",
+        )
+        assert vuln.id == "CVE-2023-1234"
+        assert vuln.package == "requests"
+        assert vuln.severity == "HIGH"
+        assert vuln.summary == "SQL injection vulnerability"
+        assert vuln.affected_versions == ""
+        assert vuln.fixed_version == ""
+        assert vuln.url == ""
+
+    def test_vulnerability_with_all_fields(self):
+        vuln = Vulnerability(
+            id="GHSA-abcd-1234",
+            package="flask",
+            severity="CRITICAL",
+            summary="Remote code execution",
+            affected_versions="<2.0",
+            fixed_version="2.0.1",
+            url="https://example.com/advisory",
+        )
+        assert vuln.fixed_version == "2.0.1"
+        assert vuln.url == "https://example.com/advisory"
+
+    def test_vulnerability_to_dict(self):
+        vuln = Vulnerability(
+            id="CVE-2023-5678",
+            package="django",
+            severity="MEDIUM",
+            summary="XSS vulnerability",
+            fixed_version="4.0",
+        )
+        d = vuln.to_dict()
+        assert d["id"] == "CVE-2023-5678"
+        assert d["package"] == "django"
+        assert d["severity"] == "MEDIUM"
+        assert d["summary"] == "XSS vulnerability"
+        assert d["fixed_version"] == "4.0"
 
 
 # =============================================================================
@@ -183,6 +234,139 @@ class TestDependencyAnalysisResult:
         assert "requests" in md
         assert "pytest" in md
         assert ">=2.0" in md
+
+    def test_get_heavy_dependencies(self):
+        result = DependencyAnalysisResult(
+            resolved_tree=[
+                ResolvedDependency(name="light", version="1.0"),  # weight 1
+                ResolvedDependency(
+                    name="heavy",
+                    version="1.0",
+                    dependencies=[
+                        ResolvedDependency(name="a", version="1.0"),
+                        ResolvedDependency(name="b", version="1.0"),
+                        ResolvedDependency(name="c", version="1.0"),
+                    ],
+                ),  # weight 4
+            ]
+        )
+        heavy = result.get_heavy_dependencies(threshold=3)
+        assert len(heavy) == 1
+        assert heavy[0].name == "heavy"
+
+    def test_get_heavy_dependencies_none(self):
+        result = DependencyAnalysisResult(
+            resolved_tree=[
+                ResolvedDependency(name="light", version="1.0"),
+            ]
+        )
+        heavy = result.get_heavy_dependencies(threshold=5)
+        assert len(heavy) == 0
+
+    def test_to_markdown_with_heavy_warning(self):
+        result = DependencyAnalysisResult(
+            sources=["pyproject.toml"],
+            resolved_tree=[
+                ResolvedDependency(
+                    name="bloated",
+                    version="1.0",
+                    dependencies=[
+                        ResolvedDependency(name=f"dep{i}", version="1.0") for i in range(10)
+                    ],
+                ),
+            ],
+        )
+        md = result.to_markdown(weight_threshold=5)
+        assert "Heavy Dependencies Warning" in md
+        assert "bloated" in md
+
+    def test_to_dict_with_heavy(self):
+        result = DependencyAnalysisResult(
+            resolved_tree=[
+                ResolvedDependency(
+                    name="heavy",
+                    version="1.0",
+                    dependencies=[
+                        ResolvedDependency(name="a", version="1.0"),
+                        ResolvedDependency(name="b", version="1.0"),
+                    ],
+                ),
+            ]
+        )
+        d = result.to_dict(weight_threshold=2)
+        assert d["stats"]["heavy_count"] == 1
+        assert len(d["heavy_dependencies"]) == 1
+
+    def test_has_vulnerabilities_false(self):
+        result = DependencyAnalysisResult()
+        assert not result.has_vulnerabilities
+
+    def test_has_vulnerabilities_true(self):
+        result = DependencyAnalysisResult(
+            vulnerabilities=[
+                Vulnerability(id="CVE-1", package="pkg", severity="LOW", summary="test"),
+            ]
+        )
+        assert result.has_vulnerabilities
+
+    def test_critical_vulns(self):
+        result = DependencyAnalysisResult(
+            vulnerabilities=[
+                Vulnerability(id="CVE-1", package="a", severity="CRITICAL", summary="crit"),
+                Vulnerability(id="CVE-2", package="b", severity="HIGH", summary="high"),
+                Vulnerability(id="CVE-3", package="c", severity="CRITICAL", summary="crit2"),
+            ]
+        )
+        assert len(result.critical_vulns) == 2
+        assert all(v.severity == "CRITICAL" for v in result.critical_vulns)
+
+    def test_high_vulns(self):
+        result = DependencyAnalysisResult(
+            vulnerabilities=[
+                Vulnerability(id="CVE-1", package="a", severity="CRITICAL", summary="crit"),
+                Vulnerability(id="CVE-2", package="b", severity="HIGH", summary="high"),
+                Vulnerability(id="CVE-3", package="c", severity="MEDIUM", summary="med"),
+            ]
+        )
+        assert len(result.high_vulns) == 1
+        assert result.high_vulns[0].id == "CVE-2"
+
+    def test_to_dict_with_vulnerabilities(self):
+        result = DependencyAnalysisResult(
+            vulnerabilities=[
+                Vulnerability(id="CVE-1", package="a", severity="CRITICAL", summary="test"),
+                Vulnerability(id="CVE-2", package="b", severity="HIGH", summary="test2"),
+            ]
+        )
+        d = result.to_dict()
+        assert d["stats"]["vulnerabilities"] == 2
+        assert d["stats"]["critical_vulns"] == 1
+        assert d["stats"]["high_vulns"] == 1
+        assert len(d["vulnerabilities"]) == 2
+
+    def test_to_markdown_with_vulnerabilities(self):
+        result = DependencyAnalysisResult(
+            sources=["pyproject.toml"],
+            vulnerabilities=[
+                Vulnerability(
+                    id="CVE-2023-1234",
+                    package="requests",
+                    severity="CRITICAL",
+                    summary="Remote code execution vulnerability",
+                ),
+                Vulnerability(
+                    id="CVE-2023-5678",
+                    package="flask",
+                    severity="HIGH",
+                    summary="SQL injection",
+                ),
+            ],
+        )
+        md = result.to_markdown()
+        assert "Security Vulnerabilities" in md
+        assert "CRITICAL" in md
+        assert "CVE-2023-1234" in md
+        assert "requests" in md
 
 
 # =============================================================================

@@ -78,6 +78,30 @@ class ResolvedDependency:
 
 
 @dataclass
+class Vulnerability:
+    """A security vulnerability affecting a package."""
+
+    id: str  # CVE or GHSA ID
+    package: str
+    severity: str  # LOW, MEDIUM, HIGH, CRITICAL
+    summary: str
+    affected_versions: str = ""
+    fixed_version: str = ""
+    url: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "package": self.package,
+            "severity": self.severity,
+            "summary": self.summary,
+            "affected_versions": self.affected_versions,
+            "fixed_version": self.fixed_version,
+            "url": self.url,
+        }
+
+
+@dataclass
 class DependencyAnalysisResult:
     """Result of dependency analysis."""
 
@@ -91,6 +115,9 @@ class DependencyAnalysisResult:
 
     # Source files found
     sources: list[str] = field(default_factory=list)
+
+    # Security vulnerabilities
+    vulnerabilities: list[Vulnerability] = field(default_factory=list)
 
     @property
     def total_direct(self) -> int:
@@ -115,13 +142,34 @@ class DependencyAnalysisResult:
         """Dependencies sorted by weight (heaviest first)."""
         return sorted(self.resolved_tree, key=lambda d: -d.weight)
 
-    def to_dict(self) -> dict[str, Any]:
+    def get_heavy_dependencies(self, threshold: int = 10) -> list[ResolvedDependency]:
+        """Get dependencies exceeding weight threshold."""
+        return [d for d in self.resolved_tree if d.weight >= threshold]
+
+    @property
+    def has_vulnerabilities(self) -> bool:
+        return bool(self.vulnerabilities)
+
+    @property
+    def critical_vulns(self) -> list[Vulnerability]:
+        return [v for v in self.vulnerabilities if v.severity == "CRITICAL"]
+
+    @property
+    def high_vulns(self) -> list[Vulnerability]:
+        return [v for v in self.vulnerabilities if v.severity == "HIGH"]
+
+    def to_dict(self, *, weight_threshold: int = 0) -> dict[str, Any]:
+        heavy = self.get_heavy_dependencies(weight_threshold) if weight_threshold > 0 else []
         return {
             "stats": {
                 "direct": self.total_direct,
                 "dev": self.total_dev,
                 "optional": self.total_optional,
                 "transitive": self.total_transitive,
+                "heavy_count": len(heavy),
+                "vulnerabilities": len(self.vulnerabilities),
+                "critical_vulns": len(self.critical_vulns),
+                "high_vulns": len(self.high_vulns),
             },
             "sources": self.sources,
             "dependencies": [d.to_dict() for d in self.dependencies],
@@ -131,10 +179,16 @@ class DependencyAnalysisResult:
                 for group, deps in self.optional_dependencies.items()
             },
             "resolved_tree": [d.to_dict() for d in self.resolved_tree],
+            "heavy_dependencies": [d.to_dict() for d in heavy],
+            "vulnerabilities": [v.to_dict() for v in self.vulnerabilities],
         }
 
-    def to_markdown(self) -> str:
-        """Format result as markdown."""
+    def to_markdown(self, *, weight_threshold: int = 0) -> str:
+        """Format result as markdown.
+
+        Args:
+            weight_threshold: If >0, warn about deps with weight >= threshold
+        """
         lines = ["# External Dependency Analysis", ""]
 
         # Stats
@@ -146,7 +200,55 @@ class DependencyAnalysisResult:
         if self.resolved_tree:
             lines.append(f"- **Transitive dependencies:** {self.total_transitive}")
         lines.append(f"- **Sources:** {', '.join(self.sources)}")
+        if self.vulnerabilities:
+            lines.append(f"- **Vulnerabilities:** {len(self.vulnerabilities)} found")
         lines.append("")
+
+        # Security vulnerabilities
+        if self.vulnerabilities:
+            lines.append("## Security Vulnerabilities")
+            lines.append("")
+            critical = self.critical_vulns
+            high = self.high_vulns
+            if critical:
+                lines.append(f"**{len(critical)} CRITICAL** vulnerabilities found!")
+                lines.append("")
+            if high:
+                lines.append(f"**{len(high)} HIGH** severity vulnerabilities found.")
+                lines.append("")
+            lines.append("| Severity | Package | ID | Summary |")
+            lines.append("|----------|---------|-----|---------|")
+            # Sort by severity (CRITICAL first)
+            severity_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+            for vuln in sorted(
+                self.vulnerabilities, key=lambda v: severity_order.get(v.severity, 4)
+            ):
+                summary = vuln.summary[:60] + "..." if len(vuln.summary) > 60 else vuln.summary
+                lines.append(f"| {vuln.severity} | {vuln.package} | {vuln.id} | {summary} |")
+            lines.append("")
+
+        # Heavy dependency warnings
+        if weight_threshold > 0 and self.resolved_tree:
+            heavy = self.get_heavy_dependencies(weight_threshold)
+            if heavy:
+                lines.append("## Heavy Dependencies Warning")
+                lines.append("")
+                lines.append(
+                    f"The following {len(heavy)} dependencies exceed the weight "
+                    f"threshold of {weight_threshold}:"
+                )
+                lines.append("")
+                lines.append("| Package | Weight | Concern |")
+                lines.append("|---------|--------|---------|")
+                for dep in sorted(heavy, key=lambda d: -d.weight):
+                    concern = "Very heavy" if dep.weight >= weight_threshold * 2 else "Heavy"
+                    lines.append(f"| {dep.name} | {dep.weight} | {concern} |")
+                lines.append("")
+                lines.append(
+                    "Consider if these dependencies are necessary, "
+                    "or look for lighter alternatives."
+                )
+                lines.append("")
 
         # Direct dependencies
         if self.dependencies:
@@ -208,11 +310,14 @@ class ExternalDependencyAnalyzer:
         """
         self.root = root.resolve()
 
-    def analyze(self, *, resolve: bool = False) -> DependencyAnalysisResult:
+    def analyze(
+        self, *, resolve: bool = False, check_vulns: bool = False
+    ) -> DependencyAnalysisResult:
         """Analyze project dependencies.
 
         Args:
             resolve: If True, resolve full transitive dependency tree
+            check_vulns: If True, check for known vulnerabilities via OSV API
 
         Returns:
             DependencyAnalysisResult with all dependency information
@@ -240,6 +345,10 @@ class ExternalDependencyAnalyzer:
         # Resolve transitive dependencies if requested
         if resolve:
             result.resolved_tree = self._resolve_dependencies(result.dependencies)
+
+        # Check for vulnerabilities if requested
+        if check_vulns:
+            result.vulnerabilities = self._check_vulnerabilities(result.dependencies)
 
         return result
 
@@ -403,6 +512,118 @@ class ExternalDependencyAnalyzer:
                 continue
 
         return resolved
+
+    def _check_vulnerabilities(self, dependencies: list[Dependency]) -> list[Vulnerability]:
+        """Check dependencies for known vulnerabilities using OSV API.
+
+        Uses the Open Source Vulnerabilities database (https://osv.dev).
+        """
+        import json
+        import urllib.error
+        import urllib.request
+
+        vulnerabilities = []
+        osv_api = "https://api.osv.dev/v1/query"
+
+        for dep in dependencies:
+            # Get installed version via pip
+            try:
+                result = subprocess.run(
+                    ["pip", "show", dep.name],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if result.returncode != 0:
+                    continue
+
+                version = ""
+                for line in result.stdout.splitlines():
+                    if line.startswith("Version:"):
+                        version = line.split(":", 1)[1].strip()
+                        break
+
+                if not version:
+                    continue
+
+                # Query OSV API
+                query = {
+                    "package": {"name": dep.normalized_name, "ecosystem": "PyPI"},
+                    "version": version,
+                }
+
+                req = urllib.request.Request(
+                    osv_api,
+                    data=json.dumps(query).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    data = json.loads(response.read().decode("utf-8"))
+
+                for vuln_data in data.get("vulns", []):
+                    # Determine severity
+                    severity = "UNKNOWN"
+                    for severity_item in vuln_data.get("severity", []):
+                        if severity_item.get("type") == "CVSS_V3":
+                            score = float(severity_item.get("score", "0").split("/")[0])
+                            if score >= 9.0:
+                                severity = "CRITICAL"
+                            elif score >= 7.0:
+                                severity = "HIGH"
+                            elif score >= 4.0:
+                                severity = "MEDIUM"
+                            else:
+                                severity = "LOW"
+                            break
+                    else:
+                        # Fallback: check database-specific severity
+                        db_specific = vuln_data.get("database_specific", {})
+                        if db_specific.get("severity"):
+                            severity = db_specific["severity"].upper()
+
+                    # Get affected version info
+                    affected_str = ""
+                    fixed_str = ""
+                    for affected in vuln_data.get("affected", []):
+                        pkg_name = affected.get("package", {}).get("name", "").lower()
+                        if pkg_name == dep.normalized_name:
+                            ranges = affected.get("ranges", [])
+                            for r in ranges:
+                                events = r.get("events", [])
+                                for event in events:
+                                    if "fixed" in event:
+                                        fixed_str = event["fixed"]
+                                        break
+
+                    # Get URL
+                    url = ""
+                    for ref in vuln_data.get("references", []):
+                        if ref.get("type") == "ADVISORY":
+                            url = ref.get("url", "")
+                            break
+                    if not url:
+                        url = f"https://osv.dev/vulnerability/{vuln_data.get('id', '')}"
+
+                    vulnerabilities.append(
+                        Vulnerability(
+                            id=vuln_data.get("id", "UNKNOWN"),
+                            package=dep.name,
+                            severity=severity,
+                            summary=vuln_data.get("summary", "No summary available"),
+                            affected_versions=affected_str,
+                            fixed_version=fixed_str,
+                            url=url,
+                        )
+                    )
+
+            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+                continue
+            except Exception:
+                continue
+
+        return vulnerabilities
 
 
 def create_external_dependency_analyzer(

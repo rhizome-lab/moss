@@ -53,8 +53,8 @@ Analyze PyPI/npm dependencies (not just internal imports):
 - [x] Parse pyproject.toml/requirements.txt for dependencies (`moss external-deps`)
 - [x] Resolve full dependency tree (transitive dependencies) (`--resolve` flag)
 - [x] Show dependency weight (how many sub-dependencies each brings)
-- [ ] Identify heavy/bloated dependencies (threshold warnings)
-- [ ] Check for known vulnerabilities (CVE integration)
+- [x] Identify heavy/bloated dependencies (`--warn-weight` threshold)
+- [x] Check for known vulnerabilities (`--check-vulns` via OSV API)
 - [ ] License compatibility checking
 - [ ] package.json/npm support
 
