@@ -305,25 +305,14 @@ Key question answered: Interface design matters more than model scaling (SWE-age
 
 ### Research Backlog (Future Sessions)
 
-Topics to explore when time permits:
-
-**Inference & Optimization:**
-- [ ] Speculative decoding for faster code generation
-- [ ] Model quantization trade-offs for code quality
-- [ ] Batching strategies for multi-file operations
-- [ ] Caching strategies for repeated queries
+Topics to explore when time permits. See also `docs/research-low-priority.md` for
+resource-intensive topics (inference optimization, fine-tuning, training).
 
 **RAG & Retrieval:**
 - [ ] RAG specifically for code (vs general RAG)
 - [ ] Graph-based retrieval (call graphs, dependency graphs)
 - [ ] Hybrid retrieval (embeddings + keyword + AST)
 - [ ] Cross-file context assembly strategies
-
-**Fine-Tuning & Adaptation:**
-- [ ] LoRA for code-specific tasks
-- [ ] Instruction tuning for coding agents
-- [ ] Domain adaptation (finance, healthcare, etc.)
-- [ ] Continual learning from user feedback
 
 **Developer Experience:**
 - [ ] Commit message generation
