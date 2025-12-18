@@ -818,6 +818,116 @@ Moss spans both:
 - Use existing skeleton view to validate generated structure
 - Consider: Figma/Sketch plugin that calls moss
 
+## Formal Verification of Synthesized Code
+
+### The Vision
+Verify that LLM-generated code matches user intent, not just "passes tests."
+
+### 2025 Research Highlights
+
+**Astrogator** (arXiv July 2025):
+- Formal specification of user intent for Ansible programs
+- Custom query language + symbolic interpreter
+- Results: 83% correct code verified, 92% incorrect code identified
+
+**PREFACE Framework** (GLSVLSI 2025):
+- Model-agnostic RL agent + LLM for Dafny code generation
+- Dafny → SMT → correctness-by-construction guarantees
+- No fine-tuning required
+
+**Proof2Silicon** (SRC TECHCON 2025):
+- Natural language → verified Dafny → HLS → RTL hardware
+- RL agent optimizes prompts for verification
+- 72% end-to-end hardware synthesis success
+
+**Vericoding Benchmark** (Sept 2025):
+- 12,504 tasks across Dafny, Lean, Verus
+- Success rates: Dafny 82%, Lean 27%
+- Rapid progress: 68% → 96% in one year
+
+**LLMs for System Verification** (HotOS 2025):
+- FSCQ file system as benchmark
+- 38% proof coverage overall, 57% for simpler theorems
+- Best-first tree search helps significantly
+
+### Moss Implementation Notes
+- Consider Dafny integration for verified synthesis
+- Could generate specs from type hints + docstrings
+- Verification as alternative to testing for critical code
+- Long-term: `moss synth --verify` flag
+
+## Interactive Program Synthesis
+
+### User-in-the-Loop Paradigm
+Interactive synthesis treats the user as an oracle, refining programs through feedback.
+
+### Key Approaches
+
+**Three Dimensions of Interactivity:**
+1. **Incremental algorithm**: Build program piece by piece
+2. **Step-based formulation**: Small specifications at a time
+3. **Feedback-based refinement**: User corrects/guides synthesis
+
+**LooPy** (OOPSLA 2021):
+- Small-Step Live PBE inside loops
+- User steps through incomplete code as oracle
+- IDE-integrated synthesis
+
+**Self-Refine** (NeurIPS 2023):
+- LLM generates → critiques itself → refines iteratively
+- No training/RL required, just prompting
+- Works for code, summarization, many tasks
+
+**Decision Flow Visualization:**
+- Show synthesized logic as finite state machine
+- Users annotate/correct visually
+- Effective for complex collaborative behaviors
+
+### Moss Implementation Notes
+- TUI could show synthesis progress interactively
+- User could approve/reject intermediate steps
+- Self-Refine pattern: generate → validate → refine loop
+- Already have: validator loop, could add user approval points
+
+## Security in AI-Generated Code
+
+### The Problem is Severe
+
+**Vulnerability Rates (2025 Research):**
+- **45%** of AI-generated code introduces security vulnerabilities (Veracode)
+- **62%** contains design flaws or known vulnerabilities
+- **Java worst**: 70%+ failure rate
+- **37.6% increase** in critical vulns after 5 iterations of "improvement"
+
+### Common Issues
+- CWE Top 25 vulnerabilities (input validation, injection, etc.)
+- Omits security unless explicitly prompted
+- Optimizes for "passes tests" not "secure"
+- Larger models don't perform significantly better (systemic issue)
+
+### "Vibe Coding" Risk
+Developers rely on AI without specifying security constraints. LLMs aren't incentivized
+to reason securely—they minimize path to passing result.
+
+### Vulnerabilities in AI Tools Themselves
+- **CVE-2025-55284** (Claude Code): DNS exfiltration of developer data
+- **CVE-2025-54135** (Cursor): Arbitrary command execution
+
+### Model-Specific Issues
+- DeepSeek-R1: 50% more vulns when prompted with politically sensitive topics
+
+### Implications for Moss
+**This is critical for moss's design:**
+- [ ] **Security validation by default**: Run security linters (bandit, semgrep) in validator loop
+- [ ] **Explicit security prompting**: Include security requirements in synthesis specs
+- [ ] **Iteration monitoring**: Track vulnerability count across refinement iterations
+- [ ] **OWASP Top 10 checks**: Built-in detection for common vulns
+- [ ] **Secure defaults**: Err on side of safer code patterns
+- [ ] **User awareness**: Warn when generating security-sensitive code (auth, crypto, input handling)
+
+**Key insight**: Moss's structural awareness could help—AST analysis can detect
+vulnerable patterns that text-based tools miss.
+
 ## Benchmarking TODO
 
 - [ ] Implement SWE-bench evaluation harness

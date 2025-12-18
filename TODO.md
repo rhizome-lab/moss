@@ -98,6 +98,21 @@ Remaining token-efficient output features:
 - [ ] `--query EXPR` flag - relaxed DWIM syntax for flexible querying (needs design work)
 - [ ] Format strings for custom output templates
 
+### Security Validation (CRITICAL - see docs/prior-art.md)
+
+**Problem**: 45% of AI-generated code has security vulnerabilities (Veracode 2025).
+Moss must not contribute to this problem.
+
+- [ ] **`moss security`** - Security analysis command:
+  - Run bandit, semgrep automatically
+  - AST-based detection of vulnerable patterns
+  - OWASP Top 10 / CWE Top 25 checks
+  - Report severity, suggest fixes
+- [ ] **Validator integration**: Run security checks in synthesis loop
+- [ ] **Iteration tracking**: Monitor vuln count across refinements (37.6% increase after 5 iterations is alarming)
+- [ ] **Security-aware prompting**: Include security requirements in synthesis specs
+- [ ] **Warn on sensitive code**: Flag auth, crypto, input handling for review
+
 ### Codebase Analysis Gaps
 
 Tools we have:
@@ -108,6 +123,7 @@ Tools we have:
 - Coverage: `coverage` (pytest-cov stats)
 - Complexity: `complexity` (cyclomatic per function)
 - Git analysis: `git-hotspots` (frequently changed files)
+- **Security**: (NEW) `security` for vulnerability detection
 
 Potential additions:
 - [ ] Architecture diagrams from dependency graph
