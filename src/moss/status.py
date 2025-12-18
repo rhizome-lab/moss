@@ -13,6 +13,7 @@ from typing import Any
 from moss.check_docs import DocChecker, DocCheckResult
 from moss.check_todos import TodoChecker, TodoCheckResult, TodoStatus
 from moss.dependency_analysis import DependencyAnalysis, DependencyAnalyzer
+from moss.structural_analysis import StructuralAnalysis, StructuralAnalyzer
 from moss.summarize import DocSummarizer, Summarizer
 
 
@@ -66,6 +67,11 @@ class ProjectStatus:
     dep_god_modules: int = 0
     dep_orphan_modules: int = 0
 
+    # Structural stats
+    struct_functions: int = 0
+    struct_classes: int = 0
+    struct_hotspots: int = 0
+
     # Issues
     weak_spots: list[WeakSpot] = field(default_factory=list)
     next_actions: list[NextAction] = field(default_factory=list)
@@ -74,6 +80,7 @@ class ProjectStatus:
     doc_check: DocCheckResult | None = None
     todo_check: TodoCheckResult | None = None
     dep_analysis: DependencyAnalysis | None = None
+    struct_analysis: StructuralAnalysis | None = None
 
     @property
     def health_score(self) -> int:
@@ -105,6 +112,10 @@ class ProjectStatus:
         # Penalize for god modules (moderate)
         if self.dep_god_modules > 3:
             score -= min(10, (self.dep_god_modules - 3) * 2)
+
+        # Penalize for structural hotspots (moderate)
+        if self.struct_hotspots > 5:
+            score -= min(15, (self.struct_hotspots - 5))
 
         return max(0, min(100, score))
 
@@ -153,6 +164,8 @@ class ProjectStatus:
             lines.append(f"| Dependencies | {self.dep_edges} edges, {self.dep_modules} modules |")
         if self.dep_circular > 0:
             lines.append(f"| Circular Deps | {self.dep_circular} |")
+        if self.struct_hotspots > 0:
+            lines.append(f"| Code Hotspots | {self.struct_hotspots} |")
         lines.append("")
 
         # Next actions
@@ -210,6 +223,11 @@ class ProjectStatus:
                     "circular": self.dep_circular,
                     "god_modules": self.dep_god_modules,
                     "orphan_modules": self.dep_orphan_modules,
+                },
+                "structural": {
+                    "functions_analyzed": self.struct_functions,
+                    "classes_analyzed": self.struct_classes,
+                    "hotspots": self.struct_hotspots,
                 },
             },
             "next_actions": [
@@ -358,6 +376,43 @@ class StatusChecker:
                         suggestion="Consider breaking into smaller modules",
                     )
                 )
+        except Exception:
+            pass
+
+        # Structural analysis
+        struct_analyzer = StructuralAnalyzer(self.root)
+        try:
+            struct_result = struct_analyzer.analyze()
+            status.struct_analysis = struct_result
+            status.struct_functions = struct_result.functions_analyzed
+            status.struct_classes = struct_result.classes_analyzed
+            status.struct_hotspots = struct_result.total_issues
+
+            # Add function hotspots as weak spots
+            for h in struct_result.function_hotspots[:5]:  # Top 5
+                for issue in h.issues[:1]:  # Most important issue
+                    status.weak_spots.append(
+                        WeakSpot(
+                            category="complexity",
+                            severity="medium",
+                            message=f"`{h.name}`: {issue}",
+                            file=h.file,
+                            suggestion="Refactor to reduce complexity",
+                        )
+                    )
+
+            # Add file hotspots as weak spots
+            for h in struct_result.file_hotspots[:3]:  # Top 3
+                for issue in h.issues[:1]:
+                    status.weak_spots.append(
+                        WeakSpot(
+                            category="complexity",
+                            severity="low",
+                            message=f"`{h.file.name}`: {issue}",
+                            file=h.file,
+                            suggestion="Consider splitting into smaller modules",
+                        )
+                    )
         except Exception:
             pass
 

@@ -683,6 +683,80 @@ class TestDogfoodingCLI:
         assert result == 0
 
 
+class TestStructuralAnalysis:
+    """Tests for StructuralAnalyzer."""
+
+    def test_detect_too_many_params(self, tmp_path: Path):
+        """Test detection of functions with too many parameters."""
+        from moss.structural_analysis import StructuralAnalyzer, StructuralThresholds
+
+        pkg_dir = tmp_path / "pkg"
+        pkg_dir.mkdir()
+        (pkg_dir / "__init__.py").write_text("")
+        (pkg_dir / "funcs.py").write_text('''"""Module."""
+
+def too_many(a, b, c, d, e, f, g):
+    """Has 7 params."""
+    pass
+
+def ok(a, b, c):
+    """Has 3 params."""
+    pass
+''')
+
+        analyzer = StructuralAnalyzer(tmp_path, StructuralThresholds(max_params=5))
+        result = analyzer.analyze()
+
+        # Should find the function with too many params
+        hotspots = [h for h in result.function_hotspots if "too_many" in h.name]
+        assert len(hotspots) >= 1
+        assert any("Too many parameters" in issue for issue in hotspots[0].issues)
+
+    def test_detect_deep_nesting(self, tmp_path: Path):
+        """Test detection of deep nesting."""
+        from moss.structural_analysis import StructuralAnalyzer, StructuralThresholds
+
+        pkg_dir = tmp_path / "pkg"
+        pkg_dir.mkdir()
+        (pkg_dir / "__init__.py").write_text("")
+        (pkg_dir / "nested.py").write_text('''"""Module."""
+
+def deeply_nested():
+    if True:
+        if True:
+            if True:
+                if True:
+                    if True:
+                        pass
+''')
+
+        analyzer = StructuralAnalyzer(tmp_path, StructuralThresholds(max_nesting_depth=3))
+        result = analyzer.analyze()
+
+        hotspots = [h for h in result.function_hotspots if "deeply_nested" in h.name]
+        assert len(hotspots) >= 1
+        assert hotspots[0].max_nesting >= 5
+
+    def test_detect_long_function(self, tmp_path: Path):
+        """Test detection of long functions."""
+        from moss.structural_analysis import StructuralAnalyzer, StructuralThresholds
+
+        pkg_dir = tmp_path / "pkg"
+        pkg_dir.mkdir()
+        (pkg_dir / "__init__.py").write_text("")
+        # Create a function with many lines
+        lines = ['"""Module."""', "", "def long_func():"]
+        lines.extend(["    x = 1"] * 60)  # 60 lines
+        (pkg_dir / "long.py").write_text("\n".join(lines))
+
+        analyzer = StructuralAnalyzer(tmp_path, StructuralThresholds(max_function_lines=50))
+        result = analyzer.analyze()
+
+        hotspots = [h for h in result.function_hotspots if "long_func" in h.name]
+        assert len(hotspots) >= 1
+        assert any("too long" in issue.lower() for issue in hotspots[0].issues)
+
+
 class TestDependencyAnalysis:
     """Tests for DependencyAnalyzer."""
 
