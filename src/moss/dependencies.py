@@ -41,6 +41,21 @@ class DependencyInfo:
     exports: list[Export] = field(default_factory=list)
     all_exports: list[str] | None = None  # __all__ if defined
 
+    def to_compact(self) -> str:
+        """Return compact format for LLM consumption."""
+        parts = []
+        if self.imports:
+            modules = sorted({i.module for i in self.imports})
+            parts.append(f"imports: {', '.join(modules[:10])}")
+            if len(modules) > 10:
+                parts[-1] += f" (+{len(modules) - 10} more)"
+        if self.exports:
+            names = [e.name for e in self.exports]
+            parts.append(f"exports: {', '.join(names[:10])}")
+            if len(names) > 10:
+                parts[-1] += f" (+{len(names) - 10} more)"
+        return " | ".join(parts) if parts else "(no imports/exports)"
+
 
 class PythonDependencyExtractor(ast.NodeVisitor):
     """Extract dependencies from Python AST."""

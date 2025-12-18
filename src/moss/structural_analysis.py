@@ -99,6 +99,26 @@ class StructuralAnalysis:
             + sum(len(h.issues) for h in self.file_hotspots)
         )
 
+    def to_compact(self) -> str:
+        """Return compact format for LLM consumption."""
+        parts = [
+            f"{self.files_analyzed} files",
+            f"{self.functions_analyzed} functions",
+            f"{self.classes_analyzed} classes",
+        ]
+        if self.has_issues:
+            hotspot_parts = []
+            if self.function_hotspots:
+                hotspot_parts.append(f"{len(self.function_hotspots)} function")
+            if self.class_hotspots:
+                hotspot_parts.append(f"{len(self.class_hotspots)} class")
+            if self.file_hotspots:
+                hotspot_parts.append(f"{len(self.file_hotspots)} file")
+            parts.append(f"hotspots: {', '.join(hotspot_parts)}")
+        else:
+            parts.append("no hotspots")
+        return " | ".join(parts)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON output."""
         return {

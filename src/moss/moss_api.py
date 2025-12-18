@@ -105,7 +105,7 @@ class TreeAPI:
         path: str | Path | None = None,
         tracked_only: bool = False,
         gitignore: bool = True,
-    ) -> dict[str, Any]:
+    ) -> Any:  # TreeResult, but avoid circular import
         """Generate a tree visualization of a directory.
 
         Args:
@@ -114,20 +114,12 @@ class TreeAPI:
             gitignore: If True, respect .gitignore when showing all files
 
         Returns:
-            Dict with root, file_count, dir_count, files list, and tree_text
+            TreeResult with tree visualization and file counts
         """
         from moss.tree import generate_tree
 
         target = self._resolve_path(path) if path else self.root
-        result = generate_tree(target, tracked_only=tracked_only, gitignore=gitignore)
-
-        return {
-            "root": str(result.root),
-            "file_count": result.file_count,
-            "dir_count": result.dir_count,
-            "files": result.files,
-            "tree_text": result.to_text(),
-        }
+        return generate_tree(target, tracked_only=tracked_only, gitignore=gitignore)
 
     def format(
         self,
@@ -1087,6 +1079,11 @@ class ToolMatchResult:
     confidence: float
     message: str | None = None
 
+    def to_compact(self) -> str:
+        """Return compact format for LLM consumption."""
+        msg = f" ({self.message})" if self.message else ""
+        return f"{self.tool} ({self.confidence:.0%} confidence){msg}"
+
 
 @dataclass
 class ToolInfoResult:
@@ -1105,6 +1102,12 @@ class ToolInfoResult:
     keywords: list[str]
     parameters: list[str]
     aliases: list[str]
+
+    def to_compact(self) -> str:
+        """Return compact format for LLM consumption."""
+        aliases = f" (aka: {', '.join(self.aliases)})" if self.aliases else ""
+        params = f" [{', '.join(self.parameters)}]" if self.parameters else ""
+        return f"{self.name}{aliases}: {self.description}{params}"
 
 
 @dataclass

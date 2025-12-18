@@ -79,6 +79,19 @@ class TestAnalysis:
     def modules_without_tests(self) -> int:
         return sum(1 for m in self.module_mappings if not m.has_tests)
 
+    def to_compact(self) -> str:
+        """Return compact format for LLM consumption."""
+        parts = [
+            f"{self.source_files} src, {self.test_files} test files",
+            f"ratio: {self.test_ratio:.1%}",
+            f"coverage: ~{self.coverage_estimate:.0%}",
+        ]
+        if self.untested_exports:
+            parts.append(f"{len(self.untested_exports)} untested exports")
+        if self.modules_without_tests:
+            parts.append(f"{self.modules_without_tests} modules without tests")
+        return " | ".join(parts)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON output."""
         return {

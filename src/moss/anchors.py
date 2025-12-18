@@ -46,6 +46,11 @@ class AnchorMatch:
         """Line span (1-indexed, inclusive)."""
         return (self.lineno, self.end_lineno)
 
+    def to_compact(self) -> str:
+        """Return compact format for LLM consumption."""
+        ctx = ".".join(self.context_chain) + "." if self.context_chain else ""
+        return f"{ctx}{self.anchor.name} @ line {self.lineno}-{self.end_lineno} ({self.score:.0%})"
+
 
 class AmbiguousAnchorError(Exception):
     """Multiple nodes match the anchor."""

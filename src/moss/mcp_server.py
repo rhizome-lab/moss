@@ -100,6 +100,42 @@ def _serialize_value(value: Any) -> Any:
     return str(value)
 
 
+def _format_list_compact(items: list[dict[str, Any]]) -> str:
+    """Format a list of dicts as compact text.
+
+    Tries to extract meaningful fields and format concisely.
+    """
+    if not items:
+        return "(empty)"
+
+    lines = []
+    for item in items:
+        # Try common field patterns
+        if "name" in item and "complexity" in item:
+            # Complexity result
+            risk = item.get("risk_level", "")
+            lines.append(f"- {item['name']}: {item['complexity']} ({risk})")
+        elif "path" in item and "changes" in item:
+            # Git hotspot
+            ago = item.get("last_changed", "")
+            lines.append(f"- {item['path']}: {item['changes']} changes ({ago})")
+        elif "name" in item and "version" in item:
+            # Dependency
+            lines.append(f"- {item['name']}=={item.get('version', '?')}")
+        elif "name" in item:
+            # Generic named item
+            lines.append(f"- {item['name']}")
+        elif "path" in item:
+            # Generic path item
+            lines.append(f"- {item['path']}")
+        else:
+            # Fallback: first few key=value pairs
+            parts = [f"{k}={v}" for k, v in list(item.items())[:3]]
+            lines.append(f"- {', '.join(parts)}")
+
+    return f"{len(items)} items:\n" + "\n".join(lines)
+
+
 def _serialize_result(result: Any) -> str | dict[str, Any]:
     """Serialize an API result to text or JSON-safe form.
 
@@ -107,7 +143,8 @@ def _serialize_result(result: Any) -> str | dict[str, Any]:
     1. Plain strings returned directly (for format functions)
     2. to_compact() if available
     3. to_markdown() as fallback
-    4. JSON for primitives and collections
+    4. Compact list formatting for list[dict]
+    5. JSON for primitives and other collections
     """
     if result is None:
         return {"result": None}
@@ -124,13 +161,25 @@ def _serialize_result(result: Any) -> str | dict[str, Any]:
     if hasattr(result, "to_markdown") and callable(result.to_markdown):
         return result.to_markdown()
 
+    # Handle lists specially - format as compact text
+    if isinstance(result, list):
+        if not result:
+            return "(empty)"
+        first = result[0]
+        # Check if items are dicts or dataclasses (which will be converted to dicts)
+        if isinstance(first, dict) or (is_dataclass(first) and not isinstance(first, type)):
+            # Convert dataclasses to dicts first
+            items = [_serialize_value(item) for item in result]
+            return _format_list_compact(items)
+        # Other lists (primitives, etc.)
+        serialized = _serialize_value(result)
+        return f"{len(serialized)} items: {', '.join(str(x) for x in serialized[:10])}"
+
     # For other types, serialize to JSON-safe form
     serialized = _serialize_value(result)
 
     if isinstance(serialized, dict):
         return serialized
-    if isinstance(serialized, list):
-        return {"items": serialized, "count": len(serialized)}
     return {"result": serialized}
 
 
@@ -187,7 +236,7 @@ def create_server() -> Any:
     async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         """Handle tool calls."""
         try:
-            result = _execute_tool(name, arguments, tools)
+            result = await _execute_tool(name, arguments, tools)
             serialized = _serialize_result(result)
             # Return text directly if already a string, otherwise compact JSON
             if isinstance(serialized, str):
@@ -325,7 +374,7 @@ def create_server() -> Any:
     return server
 
 
-def _execute_tool(name: str, arguments: dict[str, Any], tools: list) -> Any:
+async def _execute_tool(name: str, arguments: dict[str, Any], tools: list) -> Any:
     """Execute a tool by name.
 
     Args:
@@ -336,6 +385,8 @@ def _execute_tool(name: str, arguments: dict[str, Any], tools: list) -> Any:
     Returns:
         Result from the API call
     """
+    import inspect
+
     from moss import MossAPI
 
     # Find the tool
@@ -365,8 +416,11 @@ def _execute_tool(name: str, arguments: dict[str, Any], tools: list) -> Any:
     if method is None:
         raise ValueError(f"Unknown method: {method_name}")
 
-    # Call the method
-    return method(**args)
+    # Call the method, awaiting if async
+    result = method(**args)
+    if inspect.iscoroutine(result):
+        result = await result
+    return result
 
 
 # =============================================================================

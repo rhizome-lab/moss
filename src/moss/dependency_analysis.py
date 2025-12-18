@@ -108,6 +108,18 @@ class DependencyAnalysis:
         """Whether there are any dependency issues."""
         return bool(self.circular_deps) or bool(self.god_modules)
 
+    def to_compact(self) -> str:
+        """Return compact format for LLM consumption."""
+        parts = [f"{self.total_modules} modules, {self.total_edges} edges"]
+        parts.append(f"coupling: {self.coupling_density:.1%}")
+        if self.circular_deps:
+            parts.append(f"{len(self.circular_deps)} circular deps")
+        if self.god_modules:
+            parts.append(f"{len(self.god_modules)} god modules")
+        if self.orphan_modules:
+            parts.append(f"{len(self.orphan_modules)} orphans")
+        return " | ".join(parts)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON output."""
         return {

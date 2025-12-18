@@ -82,6 +82,16 @@ class ValidationResult:
     def warning_count(self) -> int:
         return len(self.warnings)
 
+    def to_compact(self) -> str:
+        """Return compact format for LLM consumption."""
+        status = "✓ valid" if self.success else "✗ invalid"
+        parts = [status]
+        if self.error_count:
+            parts.append(f"{self.error_count} errors")
+        if self.warning_count:
+            parts.append(f"{self.warning_count} warnings")
+        return " | ".join(parts)
+
 
 class Validator(ABC):
     """Abstract base for validators."""

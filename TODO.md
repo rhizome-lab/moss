@@ -381,6 +381,7 @@ See `docs/prior-art.md` for detailed research (updated Dec 2025).
 - [x] Windsurf (Codeium's IDE) - Cascade, Supercomplete, Rules system
 - [x] Google Antigravity - Agent-first IDE, Manager View, multi-agent dispatch
 - [x] VS Code Copilot - Agent Mode, MCP integration (128 tool limit), LSP→MCP lineage
+- [ ] Goose (Block) - https://github.com/block/goose - developer agent
 
 **Review with user (async, don't block):**
 - [ ] Review IDE/tool research (Warp, Zed, Windsurf, Antigravity, VS Code Copilot)

@@ -1154,7 +1154,7 @@
     },
     "/tree/generate": {
       "post": {
-        "description": "Generate a tree visualization of a directory. Dict with root, file_count, dir_count, files list, and tree_text",
+        "description": "Generate a tree visualization of a directory. TreeResult with tree visualization and file counts",
         "requestBody": {
           "content": {
             "application/json": {
