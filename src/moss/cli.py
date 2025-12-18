@@ -2273,6 +2273,42 @@ def cmd_coverage(args: Namespace) -> int:
     return 0
 
 
+def cmd_complexity(args: Namespace) -> int:
+    """Analyze cyclomatic complexity of functions."""
+    from moss.complexity import analyze_complexity
+
+    output = setup_output(args)
+    root = Path(getattr(args, "directory", ".")).resolve()
+    pattern = getattr(args, "pattern", "src/**/*.py")
+
+    if not root.exists():
+        output.error(f"Directory not found: {root}")
+        return 1
+
+    output.info(f"Analyzing complexity for {root.name}...")
+
+    try:
+        report = analyze_complexity(root, pattern=pattern)
+    except Exception as e:
+        output.error(f"Failed to analyze complexity: {e}")
+        return 1
+
+    if report.error:
+        output.error(report.error)
+        return 1
+
+    # Output format
+    compact = getattr(args, "compact", False)
+    if compact and not wants_json(args):
+        output.print(report.to_compact())
+    elif wants_json(args):
+        output.data(report.to_dict())
+    else:
+        output.print(report.to_markdown())
+
+    return 0
+
+
 def cmd_health(args: Namespace) -> int:
     """Show project health and what needs attention."""
     from moss.status import StatusChecker
@@ -3812,6 +3848,24 @@ def create_parser() -> argparse.ArgumentParser:
         help="Run pytest with coverage first",
     )
     coverage_parser.set_defaults(func=cmd_coverage)
+
+    # complexity command
+    complexity_parser = subparsers.add_parser(
+        "complexity", help="Analyze cyclomatic complexity of functions"
+    )
+    complexity_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Directory to analyze (default: current)",
+    )
+    complexity_parser.add_argument(
+        "--pattern",
+        "-p",
+        default="src/**/*.py",
+        help="Glob pattern for files (default: src/**/*.py)",
+    )
+    complexity_parser.set_defaults(func=cmd_complexity)
 
     return parser
 
