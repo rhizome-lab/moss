@@ -133,12 +133,12 @@ Tools we have:
 
 Potential additions:
 - [ ] Architecture diagrams from dependency graph
-- [ ] `moss lint` - Unified linting interface:
-  - Configure linters (ruff, mypy, etc.) from a single place
-  - Suggest linter configurations based on project structure
-  - Run all configured linters with unified output
-  - Auto-fix where possible
-  - Manage scripts/commands (list available, run, explain)
+- [x] `moss lint` - Unified linting interface (basic version implemented):
+  - [x] Run all configured linters with unified output
+  - [ ] Configure linters (ruff, mypy, etc.) from a single place
+  - [ ] Suggest linter configurations based on project structure
+  - [ ] Auto-fix where possible
+  - [ ] Manage scripts/commands (list available, run, explain)
 - [ ] `moss patterns` - Detect and analyze architectural patterns:
   - Plugin systems (Protocol + Registry + Entry Points)
   - Factory patterns, strategy patterns, adapter patterns
@@ -411,7 +411,7 @@ pattern detection, clone detection, and custom linting.
 | Side effect tracking | Purity analysis as a rule backend |
 
 **Sub-features:**
-- [ ] `moss lint` - unified linting (runs ruff, basedpyright, custom rules)
+- [x] `moss lint` - unified linting (basic: runs ruff; TODO: basedpyright, custom rules)
 - [ ] `moss patterns` - architectural pattern detection
 - [ ] `moss clones` - structural similarity via hashing
 - [ ] `moss weaknesses` - gap analysis
@@ -504,8 +504,8 @@ Multi-agent coordination, trust levels, checkpoints.
   - Each agent: system prompt, tool subset, constraints
 - Trust levels: Already designed in detail above
   - Pattern learning, scope-based, time-bounded, rollback-aware
-- Checkpoints: `moss checkpoint create/list/restore`
-  - Add `CheckpointAPI` to `MossAPI`
+- Checkpoints: `moss checkpoint create/list/diff/merge/abort` - [IMPLEMENTED]
+  - [ ] Add `CheckpointAPI` to `MossAPI` (currently CLI-only)
 - Indexing: Auto-index on project load (background)
   - Integrate with RAG
 
