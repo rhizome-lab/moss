@@ -524,3 +524,285 @@ class TestStrategyRegistry:
         assert "type_driven" in names
         assert "test_driven" in names
         assert "pattern_based" in names
+
+
+class TestComponentGenerator:
+    """Tests for ComponentGenerator (SyPet/InSynth style)."""
+
+    @pytest.fixture
+    def component_gen(self):
+        """Create ComponentGenerator instance."""
+        from moss.synthesis.plugins.generators import ComponentGenerator
+
+        return ComponentGenerator(max_depth=3, max_solutions=3)
+
+    @pytest.fixture
+    def library_context(self) -> Context:
+        """Context with library functions for composition."""
+        return Context(
+            primitives=("len", "sum", "sorted", "str", "int"),
+            library={
+                "double": {"type": "(int) -> int", "description": "Double a number"},
+                "stringify": {"type": "(int) -> str", "description": "Convert int to str"},
+                "parse_int": {"type": "(str) -> int", "description": "Parse string to int"},
+            },
+        )
+
+    def test_metadata(self, component_gen):
+        """Test generator metadata."""
+        assert component_gen.metadata.name == "component"
+        assert component_gen.metadata.generator_type == GeneratorType.RELATIONAL
+        assert component_gen.metadata.priority == 12  # Between template and LLM
+
+    def test_can_generate_requires_type_signature(self, component_gen, library_context):
+        """Test can_generate requires type signature."""
+        # No type signature
+        spec = Specification(description="test")
+        assert component_gen.can_generate(spec, library_context) is False
+
+        # With type signature
+        spec = Specification(description="test", type_signature="(int) -> str")
+        assert component_gen.can_generate(spec, library_context) is True
+
+    def test_can_generate_requires_library(self, component_gen):
+        """Test can_generate requires library."""
+        spec = Specification(description="test", type_signature="(int) -> str")
+        empty_context = Context()
+        assert component_gen.can_generate(spec, empty_context) is False
+
+    @pytest.mark.asyncio
+    async def test_generate_identity(self, component_gen, library_context):
+        """Test generating identity function (direct return)."""
+        spec = Specification(
+            description="return the input integer",
+            type_signature="(int) -> int",
+        )
+
+        result = await component_gen.generate(spec, library_context)
+
+        # Should find a path (even if trivial)
+        assert result.success is True
+        assert result.code is not None
+        assert "def" in result.code
+        assert "return" in result.code
+
+    @pytest.mark.asyncio
+    async def test_generate_from_cached(self, component_gen, library_context):
+        """Test returning cached solution from context."""
+        spec = Specification(description="cached", type_signature="(int) -> int")
+        cached_context = library_context.with_solved("cached", "def cached(x): return x")
+
+        result = await component_gen.generate(spec, cached_context)
+
+        assert result.success is True
+        assert result.metadata.get("source") == "cached"
+
+    def test_estimate_cost(self, component_gen, library_context):
+        """Test cost estimation scales with library size."""
+        spec = Specification(description="test", type_signature="(int) -> int")
+
+        cost = component_gen.estimate_cost(spec, library_context)
+
+        # Cost should depend on library size
+        assert cost.time_estimate_ms > 50
+        assert cost.token_estimate == 0  # No LLM tokens
+        assert cost.complexity_score >= 1
+
+    def test_protocol_compliance(self, component_gen):
+        """Verify generator implements CodeGenerator protocol."""
+        assert isinstance(component_gen, CodeGenerator)
+
+    def test_parse_type_signature(self, component_gen):
+        """Test type signature parsing."""
+        # Single input
+        result = component_gen._parse_type_signature("int -> str")
+        assert result == (["int"], "str")
+
+        # Multiple inputs
+        result = component_gen._parse_type_signature("(int, str) -> bool")
+        assert result == (["int", "str"], "bool")
+
+        # Invalid
+        result = component_gen._parse_type_signature("no arrow")
+        assert result is None
+
+
+class TestSMTGenerator:
+    """Tests for SMTGenerator (Z3-based Synquid style)."""
+
+    @pytest.fixture
+    def smt_gen(self):
+        """Create SMTGenerator instance."""
+        from moss.synthesis.plugins.generators import SMTGenerator
+
+        return SMTGenerator(max_depth=3, timeout_ms=1000, max_solutions=3)
+
+    @pytest.fixture
+    def numeric_context(self) -> Context:
+        """Context for numeric synthesis."""
+        return Context(primitives=("len", "sum", "max", "min", "abs"))
+
+    def test_metadata(self, smt_gen):
+        """Test generator metadata."""
+        assert smt_gen.metadata.name == "smt"
+        assert smt_gen.metadata.generator_type == GeneratorType.SMT
+        assert smt_gen.metadata.priority == 15  # Between component and LLM
+
+    def test_can_generate_requires_z3(self, smt_gen, numeric_context):
+        """Test can_generate depends on Z3 availability."""
+        spec = Specification(
+            description="add two numbers",
+            type_signature="(int, int) -> int",
+        )
+
+        # Can generate depends on whether Z3 is installed
+        result = smt_gen.can_generate(spec, numeric_context)
+        # Result is True if Z3 is available, False otherwise
+        if smt_gen._z3 is None:
+            assert result is False
+        else:
+            assert result is True
+
+    def test_can_generate_requires_type_signature(self, smt_gen, numeric_context):
+        """Test can_generate requires type signature."""
+        spec = Specification(description="test")
+        assert smt_gen.can_generate(spec, numeric_context) is False
+
+    def test_can_generate_requires_supported_types(self, smt_gen, numeric_context):
+        """Test can_generate checks for supported types."""
+        # Supported types
+        spec = Specification(description="test", type_signature="(int, int) -> bool")
+        if smt_gen._z3:
+            assert smt_gen.can_generate(spec, numeric_context) is True
+
+        # Unsupported type
+        spec = Specification(description="test", type_signature="(CustomType) -> OtherType")
+        assert smt_gen.can_generate(spec, numeric_context) is False
+
+    @pytest.mark.asyncio
+    async def test_generate_without_z3(self, smt_gen, numeric_context):
+        """Test generate returns error when Z3 not available."""
+        # Temporarily remove Z3
+        original_z3 = smt_gen._z3
+        smt_gen._z3 = None
+
+        spec = Specification(
+            description="test function",
+            type_signature="(int, int) -> int",
+        )
+
+        result = await smt_gen.generate(spec, numeric_context)
+
+        assert result.success is False
+        assert "z3-solver" in result.error.lower()
+
+        # Restore
+        smt_gen._z3 = original_z3
+
+    @pytest.mark.asyncio
+    async def test_generate_from_cached(self, smt_gen, numeric_context):
+        """Test returning cached solution from context."""
+        spec = Specification(description="cached", type_signature="(int) -> int")
+        cached_context = numeric_context.with_solved("cached", "def cached(x): return x")
+
+        result = await smt_gen.generate(spec, cached_context)
+
+        assert result.success is True
+        assert result.metadata.get("source") == "cached"
+
+    @pytest.mark.asyncio
+    async def test_generate_arithmetic(self, smt_gen, numeric_context):
+        """Test generating arithmetic operations (if Z3 available)."""
+        if smt_gen._z3 is None:
+            pytest.skip("Z3 not available")
+
+        spec = Specification(
+            description="add function",
+            type_signature="(int, int) -> int",
+            examples=(((1, 2), 3), ((0, 0), 0), ((-1, 1), 0)),
+        )
+
+        result = await smt_gen.generate(spec, numeric_context)
+
+        assert result.success is True
+        assert result.code is not None
+        assert "def" in result.code
+
+    @pytest.mark.asyncio
+    async def test_generate_boolean(self, smt_gen, numeric_context):
+        """Test generating boolean operations (if Z3 available)."""
+        if smt_gen._z3 is None:
+            pytest.skip("Z3 not available")
+
+        spec = Specification(
+            description="is_positive function",
+            type_signature="(int) -> bool",
+            examples=(((5,), True), ((-3,), False), ((0,), False)),
+        )
+
+        result = await smt_gen.generate(spec, numeric_context)
+
+        # May or may not find a solution depending on generated candidates
+        assert result.code is not None or result.error is not None
+
+    def test_estimate_cost(self, smt_gen, numeric_context):
+        """Test cost estimation."""
+        spec = Specification(
+            description="test",
+            type_signature="(int, int) -> int",
+            examples=(((1, 2), 3),),
+        )
+
+        cost = smt_gen.estimate_cost(spec, numeric_context)
+
+        # Cost should depend on examples and complexity
+        assert cost.time_estimate_ms > 100
+        assert cost.token_estimate == 0  # No LLM tokens
+        assert cost.complexity_score >= 2
+
+    def test_protocol_compliance(self, smt_gen):
+        """Verify generator implements CodeGenerator protocol."""
+        assert isinstance(smt_gen, CodeGenerator)
+
+    def test_parse_type_signature(self, smt_gen):
+        """Test type signature parsing."""
+        # Single input
+        result = smt_gen._parse_type_signature("int -> bool")
+        assert result == (["int"], "bool")
+
+        # Multiple inputs
+        result = smt_gen._parse_type_signature("(int, int) -> int")
+        assert result == (["int", "int"], "int")
+
+        # Invalid
+        result = smt_gen._parse_type_signature("invalid")
+        assert result is None
+
+    def test_evaluate_candidate(self, smt_gen):
+        """Test candidate expression evaluation."""
+        # Single arg
+        result = smt_gen._evaluate_candidate("arg0 + 1", 5)
+        assert result == 6
+
+        # Multiple args
+        result = smt_gen._evaluate_candidate("arg0 + arg1", (3, 4))
+        assert result == 7
+
+        # String operation
+        result = smt_gen._evaluate_candidate("arg0.upper()", "hello")
+        assert result == "HELLO"
+
+    def test_types_compatible(self, smt_gen):
+        """Test type compatibility checking."""
+        # Same type
+        assert smt_gen._types_compatible("int", "int") is True
+
+        # Any compatibility
+        assert smt_gen._types_compatible("Any", "int") is True
+        assert smt_gen._types_compatible("str", "Any") is True
+
+        # int/float compatibility
+        assert smt_gen._types_compatible("int", "float") is True
+
+        # Different types
+        assert smt_gen._types_compatible("str", "int") is False

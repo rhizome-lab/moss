@@ -301,7 +301,7 @@ class ComponentGenerator:
         # Find path from inputs to output
         path = graph.find_path(input_types, output_type, max_depth=self.max_depth)
 
-        if not path:
+        if path is None:
             return GenerationResult(
                 success=False,
                 error=f"No composition found from {input_types} to {output_type}",
