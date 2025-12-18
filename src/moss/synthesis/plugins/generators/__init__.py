@@ -4,8 +4,10 @@ Generators:
 - PlaceholderGenerator: Returns TODO placeholders (current behavior)
 - TemplateGenerator: User-configurable code templates
 - LLMGenerator: LLM-based code generation via LiteLLM
+- EnumerativeGenerator: Bottom-up AST enumeration for simple synthesis
 """
 
+from .enumeration import EnumerationConfig, EnumerativeGenerator
 from .llm import (
     LiteLLMProvider,
     LLMGenerator,
@@ -21,6 +23,8 @@ from .placeholder import PlaceholderGenerator
 from .template import TemplateGenerator
 
 __all__ = [
+    "EnumerationConfig",
+    "EnumerativeGenerator",
     "LLMGenerator",
     "LLMGeneratorConfig",
     "LLMProvider",

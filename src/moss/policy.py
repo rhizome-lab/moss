@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from moss.events import EventBus, EventType
+from moss.trust import Decision as TrustDecisionType
+from moss.trust import TrustDecision, TrustManager
 
 
 class PolicyDecision(Enum):
@@ -354,6 +356,107 @@ class PathPolicy(Policy):
         return PolicyResult(decision=PolicyDecision.ALLOW, policy_name=self.name)
 
 
+class TrustPolicy(Policy):
+    """Enforce trust levels from TrustManager.
+
+    Integrates the configurable trust system with the policy engine.
+    Trust rules from .moss/trust.yaml are evaluated for each tool call.
+    """
+
+    def __init__(
+        self,
+        trust_manager: TrustManager | None = None,
+        root: Path | None = None,
+    ):
+        """Initialize with a TrustManager or load from config.
+
+        Args:
+            trust_manager: Pre-configured TrustManager
+            root: Project root for loading config (if trust_manager not provided)
+        """
+        if trust_manager:
+            self._manager = trust_manager
+        elif root:
+            self._manager = TrustManager.load(root)
+        else:
+            self._manager = TrustManager()  # Default config
+
+    @property
+    def name(self) -> str:
+        return "trust"
+
+    @property
+    def priority(self) -> int:
+        return 5  # Below quarantine (20), velocity (10), but above rate limit (0)
+
+    def _map_action_to_operation(self, context: ToolCallContext) -> str:
+        """Map tool call context to trust operation type."""
+        # Use explicit action if provided
+        if context.action:
+            return context.action
+
+        # Infer from tool name
+        tool_name = context.tool_name.lower()
+
+        read_tools = {"read", "grep", "glob", "search", "find", "cat", "head", "tail"}
+        write_tools = {"write", "edit", "patch", "apply", "create", "update"}
+        delete_tools = {"delete", "remove", "rm", "unlink"}
+        bash_tools = {"bash", "shell", "exec", "run", "command"}
+
+        if any(t in tool_name for t in read_tools):
+            return "read"
+        if any(t in tool_name for t in write_tools):
+            return "write"
+        if any(t in tool_name for t in delete_tools):
+            return "delete"
+        if any(t in tool_name for t in bash_tools):
+            return "bash"
+
+        # Default to the tool name itself
+        return tool_name
+
+    def _get_target(self, context: ToolCallContext) -> str:
+        """Get target string from context."""
+        if context.target:
+            return str(context.target)
+
+        # Check parameters for common target fields
+        for key in ("path", "file", "command", "target", "cmd"):
+            if key in context.parameters:
+                return str(context.parameters[key])
+
+        return "*"
+
+    def _map_decision(self, trust_decision: TrustDecision) -> PolicyDecision:
+        """Map TrustDecision to PolicyDecision."""
+        if trust_decision.decision == TrustDecisionType.ALLOW:
+            return PolicyDecision.ALLOW
+        if trust_decision.decision == TrustDecisionType.DENY:
+            return PolicyDecision.DENY
+        # CONFIRM maps to WARN - allows but should notify
+        return PolicyDecision.WARN
+
+    async def evaluate(self, context: ToolCallContext) -> PolicyResult:
+        """Evaluate trust rules for the tool call."""
+        operation = self._map_action_to_operation(context)
+        target = self._get_target(context)
+
+        trust_decision = self._manager.check(operation, target)
+        policy_decision = self._map_decision(trust_decision)
+
+        return PolicyResult(
+            decision=policy_decision,
+            policy_name=self.name,
+            reason=trust_decision.reason,
+            metadata={
+                "trust_decision": trust_decision.decision.value,
+                "matched_rule": trust_decision.matched_rule,
+                "operation": operation,
+                "target": target,
+            },
+        )
+
+
 @dataclass
 class PolicyEngineResult:
     """Result of evaluating all policies."""
@@ -463,14 +566,27 @@ class PolicyEngine:
 
 def create_default_policy_engine(
     event_bus: EventBus | None = None,
+    root: Path | None = None,
+    include_trust: bool = True,
 ) -> PolicyEngine:
-    """Create a policy engine with sensible defaults."""
-    return PolicyEngine(
-        policies=[
-            QuarantinePolicy(),
-            VelocityPolicy(),
-            RateLimitPolicy(),
-            PathPolicy(),
-        ],
-        event_bus=event_bus,
-    )
+    """Create a policy engine with sensible defaults.
+
+    Args:
+        event_bus: Event bus for emitting policy events
+        root: Project root for loading trust config
+        include_trust: Whether to include TrustPolicy (default: True)
+
+    Returns:
+        Configured PolicyEngine
+    """
+    policies: list[Policy] = [
+        QuarantinePolicy(),
+        VelocityPolicy(),
+        RateLimitPolicy(),
+        PathPolicy(),
+    ]
+
+    if include_trust:
+        policies.append(TrustPolicy(root=root))
+
+    return PolicyEngine(policies=policies, event_bus=event_bus)

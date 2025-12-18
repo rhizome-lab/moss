@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from moss.summarize import ProjectSummary
     from moss.test_analysis import TestAnalysis
     from moss.validators import ValidationResult, ValidatorChain
+    from moss.weaknesses import WeaknessAnalysis
 
 
 @dataclass
@@ -863,6 +864,52 @@ class ExternalDepsAPI:
 
 
 @dataclass
+class WeaknessesAPI:
+    """API for architectural weakness analysis.
+
+    Identifies potential issues in codebase architecture:
+    - Tight coupling between components
+    - Missing abstractions
+    - Inconsistent patterns
+    - Technical debt indicators
+    """
+
+    root: Path
+
+    def analyze(
+        self,
+        categories: list[str] | None = None,
+    ) -> WeaknessAnalysis:
+        """Analyze codebase for architectural weaknesses.
+
+        Args:
+            categories: Categories to check (None = all)
+                Valid categories: coupling, abstraction, pattern,
+                hardcoded, error_handling, complexity, duplication
+
+        Returns:
+            WeaknessAnalysis with detected weaknesses
+        """
+        from moss.weaknesses import WeaknessAnalyzer
+
+        analyzer = WeaknessAnalyzer(self.root, categories=categories)
+        return analyzer.analyze()
+
+    def format(self, analysis: WeaknessAnalysis) -> str:
+        """Format weakness analysis as markdown.
+
+        Args:
+            analysis: WeaknessAnalysis to format
+
+        Returns:
+            Markdown-formatted report
+        """
+        from moss.weaknesses import format_weakness_analysis
+
+        return format_weakness_analysis(analysis)
+
+
+@dataclass
 class ToolMatchResult:
     """Result of matching a query to a tool.
 
@@ -1043,6 +1090,7 @@ class MossAPI:
     _ref_check: RefCheckAPI | None = None
     _git_hotspots: GitHotspotsAPI | None = None
     _external_deps: ExternalDepsAPI | None = None
+    _weaknesses: WeaknessesAPI | None = None
 
     @classmethod
     def for_project(cls, path: str | Path) -> MossAPI:
@@ -1167,6 +1215,13 @@ class MossAPI:
         if self._external_deps is None:
             self._external_deps = ExternalDepsAPI(root=self.root)
         return self._external_deps
+
+    @property
+    def weaknesses(self) -> WeaknessesAPI:
+        """Access architectural weakness analysis functionality."""
+        if self._weaknesses is None:
+            self._weaknesses = WeaknessesAPI(root=self.root)
+        return self._weaknesses
 
 
 # Convenience alias

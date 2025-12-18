@@ -13,9 +13,11 @@ from moss.policy import (
     QuarantinePolicy,
     RateLimitPolicy,
     ToolCallContext,
+    TrustPolicy,
     VelocityPolicy,
     create_default_policy_engine,
 )
+from moss.trust import Decision, TrustLevel, TrustManager, TrustRule
 
 
 class TestPolicyResult:
@@ -334,6 +336,96 @@ class TestPolicyEngine:
         assert missing is None
 
 
+class TestTrustPolicy:
+    """Tests for TrustPolicy."""
+
+    @pytest.fixture
+    def manager(self) -> TrustManager:
+        """Create a TrustManager with custom rules."""
+        custom_level = TrustLevel(
+            name="custom",
+            allow_rules=[
+                TrustRule("read:*", Decision.ALLOW),
+                TrustRule("bash:ruff *", Decision.ALLOW),
+            ],
+            deny_rules=[
+                TrustRule("write:*.env", Decision.DENY),
+                TrustRule("bash:rm -rf *", Decision.DENY),
+            ],
+            confirm_rules=[
+                TrustRule("write:*", Decision.CONFIRM),
+            ],
+        )
+        return TrustManager(levels={"custom": custom_level}, default_level="custom")
+
+    @pytest.fixture
+    def policy(self, manager: TrustManager) -> TrustPolicy:
+        return TrustPolicy(trust_manager=manager)
+
+    async def test_allows_read_operations(self, policy: TrustPolicy, tmp_path: Path):
+        ctx = ToolCallContext(tool_name="read_file", target=tmp_path / "test.py")
+        result = await policy.evaluate(ctx)
+        assert result.decision == PolicyDecision.ALLOW
+
+    async def test_denies_env_writes(self, policy: TrustPolicy, tmp_path: Path):
+        ctx = ToolCallContext(
+            tool_name="write_file",
+            target=tmp_path / ".env",
+            action="write",
+        )
+        result = await policy.evaluate(ctx)
+        assert result.decision == PolicyDecision.DENY
+
+    async def test_warns_for_confirm_operations(self, policy: TrustPolicy, tmp_path: Path):
+        ctx = ToolCallContext(
+            tool_name="write_file",
+            target=tmp_path / "normal.py",
+            action="write",
+        )
+        result = await policy.evaluate(ctx)
+        assert result.decision == PolicyDecision.WARN  # CONFIRM maps to WARN
+
+    async def test_allows_trusted_bash_commands(self, policy: TrustPolicy):
+        ctx = ToolCallContext(
+            tool_name="bash",
+            parameters={"command": "ruff check src/"},
+        )
+        result = await policy.evaluate(ctx)
+        assert result.decision == PolicyDecision.ALLOW
+
+    async def test_denies_dangerous_bash_commands(self, policy: TrustPolicy):
+        ctx = ToolCallContext(
+            tool_name="bash",
+            parameters={"command": "rm -rf /"},
+        )
+        result = await policy.evaluate(ctx)
+        assert result.decision == PolicyDecision.DENY
+
+    async def test_infers_operation_from_tool_name(self, policy: TrustPolicy):
+        # Tool name contains "grep" -> operation = "read"
+        ctx = ToolCallContext(tool_name="grep_search")
+        result = await policy.evaluate(ctx)
+        assert result.metadata["operation"] == "read"
+
+    async def test_uses_explicit_action(self, policy: TrustPolicy):
+        ctx = ToolCallContext(tool_name="some_tool", action="write")
+        result = await policy.evaluate(ctx)
+        assert result.metadata["operation"] == "write"
+
+    async def test_metadata_contains_decision_info(self, policy: TrustPolicy, tmp_path: Path):
+        ctx = ToolCallContext(tool_name="read_file", target=tmp_path / "test.py")
+        result = await policy.evaluate(ctx)
+
+        assert "trust_decision" in result.metadata
+        assert "operation" in result.metadata
+        assert "target" in result.metadata
+
+    def test_loads_from_root(self, tmp_path: Path):
+        # TrustPolicy can load config from root (even if no config exists)
+        policy = TrustPolicy(root=tmp_path)
+        assert policy._manager is not None
+
+
 class TestCreateDefaultPolicyEngine:
     """Tests for create_default_policy_engine."""
 
@@ -345,6 +437,20 @@ class TestCreateDefaultPolicyEngine:
         assert "velocity" in names
         assert "rate_limit" in names
         assert "path" in names
+        assert "trust" in names  # Now included by default
+
+    def test_creates_engine_without_trust(self):
+        engine = create_default_policy_engine(include_trust=False)
+        names = [p.name for p in engine.policies]
+
+        assert "quarantine" in names
+        assert "trust" not in names
+
+    def test_creates_engine_with_root(self, tmp_path: Path):
+        engine = create_default_policy_engine(root=tmp_path)
+        trust_policy = engine.get_policy("trust")
+
+        assert trust_policy is not None
 
     async def test_default_engine_works(self, tmp_path: Path):
         engine = create_default_policy_engine()

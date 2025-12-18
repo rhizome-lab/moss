@@ -3015,6 +3015,48 @@ def cmd_patterns(args: Namespace) -> int:
     return 0
 
 
+def cmd_weaknesses(args: Namespace) -> int:
+    """Identify architectural weaknesses and gaps in the codebase."""
+    from moss.weaknesses import analyze_weaknesses, format_weakness_analysis
+
+    output = setup_output(args)
+    root = Path(getattr(args, "directory", ".")).resolve()
+    categories_arg = getattr(args, "categories", None)
+
+    if categories_arg:
+        categories = [c.strip() for c in categories_arg.split(",")]
+    else:
+        categories = None
+
+    if not root.exists():
+        output.error(f"Directory not found: {root}")
+        return 1
+
+    output.info(f"Analyzing architectural weaknesses in {root.name}...")
+
+    try:
+        analysis = analyze_weaknesses(root, categories=categories)
+    except Exception as e:
+        output.error(f"Weakness analysis failed: {e}")
+        return 1
+
+    if wants_json(args):
+        output.data(analysis.to_dict())
+    else:
+        output.print(format_weakness_analysis(analysis))
+
+    # Return non-zero if high severity issues found
+    high_count = len(
+        analysis.by_severity.get(
+            __import__("moss.weaknesses", fromlist=["Severity"]).Severity.HIGH, []
+        )
+    )
+    if high_count > 0:
+        return 1
+
+    return 0
+
+
 def cmd_rag(args: Namespace) -> int:
     """Semantic search with RAG indexing."""
     import asyncio
@@ -5027,6 +5069,24 @@ def create_parser() -> argparse.ArgumentParser:
         help="Comma-separated patterns to detect (plugin,factory,singleton,coupling)",
     )
     patterns_parser.set_defaults(func=cmd_patterns)
+
+    # weaknesses command
+    weaknesses_parser = subparsers.add_parser(
+        "weaknesses", help="Identify architectural weaknesses and gaps"
+    )
+    weaknesses_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Directory to analyze (default: current)",
+    )
+    weaknesses_parser.add_argument(
+        "--categories",
+        "-c",
+        help="Comma-separated categories (coupling,abstraction,pattern,hardcoded,"
+        "error_handling,complexity,duplication)",
+    )
+    weaknesses_parser.set_defaults(func=cmd_weaknesses)
 
     # eval command
     eval_parser = subparsers.add_parser("eval", help="Run evaluation benchmarks (SWE-bench, etc.)")

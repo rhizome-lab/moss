@@ -37,7 +37,10 @@ import sys
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from moss import MossAPI
 
 logger = logging.getLogger(__name__)
 
@@ -318,56 +321,239 @@ class ACPServer:
     async def _process_prompt(self, session: Session, prompt: str) -> None:
         """Process a prompt using moss capabilities.
 
-        This is where we integrate moss's structural analysis tools
-        to provide intelligent responses.
+        Uses semantic routing to match prompts to moss tools:
+        - skeleton: Extract code structure
+        - deps/dependencies: Analyze imports
+        - complexity: Cyclomatic complexity
+        - health: Project health check
+        - patterns: Architectural patterns
+        - weaknesses: Architectural gaps
+        - security: Security analysis
         """
-        # Send a thinking update
+        import re
+
+        from moss import MossAPI
+
         await self.send_update(
             session.id,
             thought=f"Analyzing request in {session.working_directory}...",
         )
 
-        # For now, provide a basic response
-        # TODO: Integrate with moss API for full functionality
         try:
-            from moss import MossAPI
-
             api = MossAPI(root=session.working_directory)
+            prompt_lower = prompt.lower()
 
-            # Check if the prompt is asking about the codebase
-            if any(
-                word in prompt.lower() for word in ["structure", "overview", "what is", "describe"]
-            ):
-                # Get codebase overview
-                overview = api.overview()
-                await self.send_update(
-                    session.id,
-                    content=f"Here's an overview of the codebase:\n\n{overview}",
-                )
-            elif "skeleton" in prompt.lower():
-                # Try to extract a file path and get its skeleton
-                await self.send_update(
-                    session.id,
-                    content="I can show you the skeleton of files. Please specify a file path.",
-                )
+            # Extract file paths from prompt (e.g., "skeleton of src/main.py")
+            file_pattern = r"(?:of|for|in)\s+([^\s\"']+\.py)"
+            file_match = re.search(file_pattern, prompt)
+            target_file = file_match.group(1) if file_match else None
+
+            # Route based on prompt content
+            if any(word in prompt_lower for word in ["overview", "structure", "describe"]):
+                await self._handle_overview(session, api)
+
+            elif "skeleton" in prompt_lower:
+                await self._handle_skeleton(session, api, target_file)
+
+            elif any(word in prompt_lower for word in ["depend", "import", "deps"]):
+                await self._handle_dependencies(session, api, target_file)
+
+            elif "complex" in prompt_lower:
+                await self._handle_complexity(session, api, target_file)
+
+            elif "health" in prompt_lower:
+                await self._handle_health(session, api)
+
+            elif "pattern" in prompt_lower:
+                await self._handle_patterns(session, api)
+
+            elif any(word in prompt_lower for word in ["weakness", "gap", "issue", "problem"]):
+                await self._handle_weaknesses(session, api)
+
+            elif any(word in prompt_lower for word in ["security", "vulnerab", "safe"]):
+                await self._handle_security(session, api)
+
             else:
-                # Generic response
-                await self.send_update(
-                    session.id,
-                    content=f"I received your prompt: '{prompt[:100]}...'\n\n"
-                    "I'm moss, a structural code analysis tool. "
-                    "I can help you understand code structure, dependencies, and more.\n\n"
-                    "Try asking about:\n"
-                    "- 'Show me the structure of this project'\n"
-                    "- 'What are the dependencies?'\n"
-                    "- 'Analyze the complexity of this code'",
-                )
+                # Use DWIM for semantic routing
+                await self._handle_semantic(session, api, prompt)
+
         except Exception as e:
             logger.error("Error processing prompt: %s", e)
+            await self.send_update(session.id, content=f"Error: {e}")
+
+    async def _handle_overview(self, session: Session, api: MossAPI) -> None:
+        """Handle overview/structure requests."""
+        await self.send_update(session.id, thought="Getting project overview...")
+        try:
+            summary = api.health.summarize()
+            content = "## Project Overview\n\n"
+            content += f"**{summary.root.name}**\n\n"
+            content += f"- Modules: {len(summary.modules)}\n"
+            for mod in list(summary.modules.values())[:10]:
+                content += f"  - `{mod.path}` ({len(mod.functions)} functions)\n"
+            if len(summary.modules) > 10:
+                content += f"  - ... and {len(summary.modules) - 10} more\n"
+            await self.send_update(session.id, content=content)
+        except Exception as e:
+            await self.send_update(session.id, content=f"Overview unavailable: {e}")
+
+    async def _handle_skeleton(
+        self, session: Session, api: MossAPI, target_file: str | None
+    ) -> None:
+        """Handle skeleton extraction requests."""
+        if not target_file:
             await self.send_update(
                 session.id,
-                content=f"Error processing request: {e}",
+                content="Please specify a file, e.g., 'Show skeleton of src/main.py'",
             )
+            return
+
+        await self.send_update(session.id, thought=f"Extracting skeleton of {target_file}...")
+        try:
+            skeleton = api.skeleton.extract(target_file)
+            content = f"## Skeleton: {target_file}\n\n```python\n{skeleton}\n```"
+            await self.send_update(session.id, content=content)
+        except Exception as e:
+            await self.send_update(session.id, content=f"Skeleton failed: {e}")
+
+    async def _handle_dependencies(
+        self, session: Session, api: MossAPI, target_file: str | None
+    ) -> None:
+        """Handle dependency analysis requests."""
+        await self.send_update(session.id, thought="Analyzing dependencies...")
+        try:
+            if target_file:
+                deps = api.dependencies.analyze(target_file)
+                content = f"## Dependencies: {target_file}\n\n"
+                content += f"**Imports:** {', '.join(deps.imports[:10])}\n"
+                if len(deps.imports) > 10:
+                    content += f"  ... and {len(deps.imports) - 10} more\n"
+            else:
+                # Get external deps summary
+                result = api.external_deps.list_direct()
+                content = "## Dependencies\n\n"
+                for dep in result[:15]:
+                    content += f"- {dep.get('name', 'unknown')}: {dep.get('version', '?')}\n"
+                if len(result) > 15:
+                    content += f"\n... and {len(result) - 15} more"
+            await self.send_update(session.id, content=content)
+        except Exception as e:
+            await self.send_update(session.id, content=f"Dependency analysis failed: {e}")
+
+    async def _handle_complexity(
+        self, session: Session, api: MossAPI, target_file: str | None
+    ) -> None:
+        """Handle complexity analysis requests."""
+        await self.send_update(session.id, thought="Analyzing complexity...")
+        try:
+            if target_file:
+                result = api.complexity.analyze_file(target_file)
+            else:
+                result = api.complexity.analyze_directory(".")
+
+            content = "## Complexity Analysis\n\n"
+            # Sort by complexity descending
+            sorted_funcs = sorted(result.functions, key=lambda f: f.complexity, reverse=True)
+            for func in sorted_funcs[:10]:
+                content += f"- `{func.name}`: {func.complexity} (line {func.line})\n"
+            if len(sorted_funcs) > 10:
+                content += f"\n... and {len(sorted_funcs) - 10} more functions"
+            await self.send_update(session.id, content=content)
+        except Exception as e:
+            await self.send_update(session.id, content=f"Complexity analysis failed: {e}")
+
+    async def _handle_health(self, session: Session, api: MossAPI) -> None:
+        """Handle health check requests."""
+        await self.send_update(session.id, thought="Checking project health...")
+        try:
+            status = api.health.check()
+            content = "## Project Health\n\n"
+            content += f"**Grade:** {status.health_grade}\n"
+            content += f"**Score:** {status.health_score}/100\n\n"
+            content += f"- Python files: {status.file_count}\n"
+            content += f"- Total lines: {status.line_count:,}\n"
+            content += f"- Has tests: {'Yes' if status.has_tests else 'No'}\n"
+            await self.send_update(session.id, content=content)
+        except Exception as e:
+            await self.send_update(session.id, content=f"Health check failed: {e}")
+
+    async def _handle_patterns(self, session: Session, api: MossAPI) -> None:
+        """Handle pattern detection requests."""
+        from moss.patterns import analyze_patterns
+
+        await self.send_update(session.id, thought="Detecting architectural patterns...")
+        try:
+            analysis = analyze_patterns(session.working_directory)
+            content = "## Architectural Patterns\n\n"
+            content += f"- Plugin systems: {len(analysis.plugin_systems)}\n"
+            content += f"- Factories: {len(analysis.factories)}\n"
+            content += f"- Strategies: {len(analysis.strategies)}\n"
+            content += f"- Total: {len(analysis.patterns)}\n"
+            await self.send_update(session.id, content=content)
+        except Exception as e:
+            await self.send_update(session.id, content=f"Pattern detection failed: {e}")
+
+    async def _handle_weaknesses(self, session: Session, api: MossAPI) -> None:
+        """Handle weakness detection requests."""
+        await self.send_update(session.id, thought="Analyzing architectural weaknesses...")
+        try:
+            analysis = api.weaknesses.analyze()
+            content = "## Architectural Weaknesses\n\n"
+            content += f"**Total:** {len(analysis.weaknesses)}\n\n"
+            by_sev = analysis.by_severity
+            from moss.weaknesses import Severity
+
+            content += f"- High: {len(by_sev.get(Severity.HIGH, []))}\n"
+            content += f"- Medium: {len(by_sev.get(Severity.MEDIUM, []))}\n"
+            content += f"- Low: {len(by_sev.get(Severity.LOW, []))}\n"
+            await self.send_update(session.id, content=content)
+        except Exception as e:
+            await self.send_update(session.id, content=f"Weakness analysis failed: {e}")
+
+    async def _handle_security(self, session: Session, api: MossAPI) -> None:
+        """Handle security analysis requests."""
+        await self.send_update(session.id, thought="Running security analysis...")
+        try:
+            analysis = api.security.analyze()
+            content = "## Security Analysis\n\n"
+            content += f"**Total findings:** {analysis.total_count}\n"
+            content += f"- Critical: {analysis.critical_count}\n"
+            content += f"- High: {analysis.high_count}\n"
+            content += f"- Medium: {analysis.medium_count}\n"
+            content += f"- Low: {analysis.low_count}\n"
+            await self.send_update(session.id, content=content)
+        except Exception as e:
+            await self.send_update(session.id, content=f"Security analysis failed: {e}")
+
+    async def _handle_semantic(self, session: Session, api: MossAPI, prompt: str) -> None:
+        """Use DWIM for semantic tool routing."""
+        from moss.dwim import analyze_intent
+
+        await self.send_update(session.id, thought="Understanding your request...")
+
+        try:
+            matches = analyze_intent(prompt)
+            if matches and matches[0].confidence > 0.5:
+                best = matches[0]
+                content = f"Based on your request, I suggest using `moss {best.tool}`.\n\n"
+                content += f"Confidence: {best.confidence:.0%}\n"
+                if best.message:
+                    content += f"\n{best.message}"
+            else:
+                content = (
+                    "I'm moss, a structural code analysis agent. I can help with:\n\n"
+                    "- **overview** - Project structure and summary\n"
+                    "- **skeleton <file>** - Extract code structure\n"
+                    "- **dependencies** - Analyze imports\n"
+                    "- **complexity** - Cyclomatic complexity\n"
+                    "- **health** - Project health check\n"
+                    "- **patterns** - Architectural patterns\n"
+                    "- **weaknesses** - Architectural gaps\n"
+                    "- **security** - Security analysis\n"
+                )
+            await self.send_update(session.id, content=content)
+        except Exception as e:
+            await self.send_update(session.id, content=f"Could not route request: {e}")
 
     # -------------------------------------------------------------------------
     # JSON-RPC Transport

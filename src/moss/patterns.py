@@ -284,6 +284,136 @@ class SingletonDetector(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+class StrategyDetector(ast.NodeVisitor):
+    """Detect strategy patterns - interface with multiple swappable implementations.
+
+    Strategy pattern indicators:
+    - A Protocol/ABC with 2+ implementations
+    - Classes that hold a reference to the interface (composition)
+    - Methods that swap/set the strategy at runtime
+    """
+
+    def __init__(self, source: str, file_path: str) -> None:
+        self.source = source
+        self.file_path = file_path
+        self.interfaces: list[dict[str, Any]] = []  # Protocols/ABCs
+        self.implementations: dict[str, list[dict[str, Any]]] = {}  # interface -> impls
+        self.strategy_holders: list[dict[str, Any]] = []  # Classes holding strategies
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        # Check if this is an interface (Protocol or ABC)
+        is_interface = False
+        interface_type = None
+
+        for base in node.bases:
+            base_name = self._get_base_name(base)
+            if base_name == "Protocol":
+                is_interface = True
+                interface_type = "Protocol"
+            elif base_name == "ABC":
+                is_interface = True
+                interface_type = "ABC"
+
+        if is_interface:
+            methods = self._get_abstract_methods(node)
+            self.interfaces.append(
+                {
+                    "name": node.name,
+                    "type": interface_type,
+                    "line": node.lineno,
+                    "end_line": node.end_lineno,
+                    "methods": methods,
+                }
+            )
+        else:
+            # Check if it implements any known interface
+            for base in node.bases:
+                base_name = self._get_base_name(base)
+                if base_name not in self.implementations:
+                    self.implementations[base_name] = []
+                self.implementations[base_name].append(
+                    {
+                        "name": node.name,
+                        "line": node.lineno,
+                        "interface": base_name,
+                    }
+                )
+
+            # Check if this class holds a strategy reference
+            strategy_fields = self._find_strategy_fields(node)
+            if strategy_fields:
+                self.strategy_holders.append(
+                    {
+                        "name": node.name,
+                        "line": node.lineno,
+                        "end_line": node.end_lineno,
+                        "strategy_fields": strategy_fields,
+                    }
+                )
+
+        self.generic_visit(node)
+
+    def _get_base_name(self, node: ast.expr) -> str:
+        """Get the name from a base class expression."""
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            return node.attr
+        if isinstance(node, ast.Subscript):
+            return self._get_base_name(node.value)
+        return ""
+
+    def _get_abstract_methods(self, node: ast.ClassDef) -> list[str]:
+        """Get abstract method names from a class."""
+        methods = []
+        for item in node.body:
+            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                # Check for @abstractmethod decorator
+                is_abstract = any(
+                    self._get_decorator_name(d) == "abstractmethod" for d in item.decorator_list
+                )
+                # Or just public methods in Protocol
+                if is_abstract or not item.name.startswith("_"):
+                    methods.append(item.name)
+        return methods
+
+    def _get_decorator_name(self, node: ast.expr) -> str:
+        """Get decorator name."""
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            return node.attr
+        return ""
+
+    def _find_strategy_fields(self, node: ast.ClassDef) -> list[str]:
+        """Find fields that likely hold strategy references."""
+        strategy_fields = []
+        strategy_hints = ["strategy", "handler", "processor", "provider", "policy", "algorithm"]
+
+        for stmt in node.body:
+            # Check annotated assignments
+            if isinstance(stmt, ast.AnnAssign) and stmt.target:
+                if isinstance(stmt.target, ast.Name):
+                    name = stmt.target.id.lower()
+                    if any(hint in name for hint in strategy_hints):
+                        strategy_fields.append(stmt.target.id)
+
+            # Check __init__ assignments
+            if isinstance(stmt, ast.FunctionDef) and stmt.name == "__init__":
+                for init_stmt in ast.walk(stmt):
+                    if isinstance(init_stmt, ast.Assign):
+                        for target in init_stmt.targets:
+                            if isinstance(target, ast.Attribute) and isinstance(
+                                target.value, ast.Name
+                            ):
+                                if target.value.id == "self":
+                                    attr_name = target.attr.lower()
+                                    if any(hint in attr_name for hint in strategy_hints):
+                                        strategy_fields.append(target.attr)
+
+        return strategy_fields
+
+
 class CouplingAnalyzer(ast.NodeVisitor):
     """Analyze module coupling via imports."""
 
@@ -321,7 +451,13 @@ class PatternAnalyzer:
             patterns: List of patterns to detect (None = all)
         """
         self.root = Path(root).resolve()
-        self.requested_patterns = patterns or ["plugin", "factory", "singleton", "coupling"]
+        self.requested_patterns = patterns or [
+            "plugin",
+            "factory",
+            "singleton",
+            "strategy",
+            "coupling",
+        ]
 
     def analyze(self) -> PatternAnalysis:
         """Run pattern analysis on the codebase."""
@@ -334,18 +470,37 @@ class PatternAnalyzer:
             f for f in python_files if not any(part in str(f) for part in exclude_parts)
         ]
 
-        # First pass: collect all protocols
+        # First pass: collect all protocols and interfaces for cross-file analysis
         all_protocols: list[dict[str, Any]] = []
+        all_interfaces: dict[str, dict[str, Any]] = {}  # name -> interface info
+        all_implementations: dict[str, list[dict[str, Any]]] = {}  # interface -> impls
 
         for file_path in python_files:
             try:
                 source = file_path.read_text()
                 tree = ast.parse(source)
+                rel_path = str(file_path.relative_to(self.root))
 
                 if "plugin" in self.requested_patterns:
                     detector = ProtocolDetector(source, str(file_path))
                     detector.visit(tree)
                     all_protocols.extend(detector.protocols)
+
+                if "strategy" in self.requested_patterns:
+                    detector = StrategyDetector(source, rel_path)
+                    detector.visit(tree)
+
+                    # Collect interfaces
+                    for iface in detector.interfaces:
+                        all_interfaces[iface["name"]] = {**iface, "file": rel_path}
+
+                    # Collect implementations
+                    for iface_name, impls in detector.implementations.items():
+                        if iface_name not in all_implementations:
+                            all_implementations[iface_name] = []
+                        for impl in impls:
+                            all_implementations[iface_name].append({**impl, "file": rel_path})
+
             except Exception as e:
                 logger.debug("Failed to parse %s: %s", file_path, e)
 
@@ -422,6 +577,25 @@ class PatternAnalyzer:
                             )
                         )
 
+                # Strategy holder detection (classes that use strategies)
+                if "strategy" in self.requested_patterns:
+                    detector = StrategyDetector(source, rel_path)
+                    detector.visit(tree)
+
+                    for holder in detector.strategy_holders:
+                        result.patterns.append(
+                            PatternInstance(
+                                pattern_type="strategy",
+                                name=holder["name"],
+                                file_path=rel_path,
+                                line_start=holder["line"],
+                                line_end=holder.get("end_line"),
+                                components=holder.get("strategy_fields", []),
+                                description=f"Strategy holder with fields: "
+                                f"{', '.join(holder.get('strategy_fields', []))}",
+                            )
+                        )
+
                 # Coupling analysis
                 if "coupling" in self.requested_patterns:
                     module_name = rel_path.replace("/", ".").replace(".py", "")
@@ -459,6 +633,28 @@ class PatternAnalyzer:
                         "may have too many dependencies"
                     )
 
+        # Strategy pattern detection: interface + 2+ implementations
+        if "strategy" in self.requested_patterns:
+            for iface_name, iface_info in all_interfaces.items():
+                impls = all_implementations.get(iface_name, [])
+                if len(impls) >= 2:
+                    # This is a strategy pattern: interface with multiple implementations
+                    impl_names = [impl["name"] for impl in impls]
+                    result.patterns.append(
+                        PatternInstance(
+                            pattern_type="strategy",
+                            name=iface_name,
+                            file_path=iface_info["file"],
+                            line_start=iface_info["line"],
+                            line_end=iface_info.get("end_line"),
+                            components=impl_names,
+                            description=f"{iface_info.get('type', 'Interface')} with "
+                            f"{len(impls)} implementations: {', '.join(impl_names[:5])}"
+                            + ("..." if len(impl_names) > 5 else ""),
+                            confidence=0.9,  # High confidence when we find explicit pattern
+                        )
+                    )
+
         return result
 
 
@@ -493,6 +689,18 @@ def format_pattern_analysis(analysis: PatternAnalysis) -> str:
                 lines.append(f"  {p.description}")
             if p.components:
                 lines.append(f"  Returns: {', '.join(p.components)}")
+        lines.append("")
+
+    if analysis.strategies:
+        lines.append("### Strategy Patterns")
+        for p in analysis.strategies:
+            lines.append(f"- **{p.name}** (`{p.file_path}:{p.line_start}`)")
+            if p.description:
+                lines.append(f"  {p.description}")
+            if p.components:
+                lines.append(f"  Implementations: {', '.join(p.components[:5])}")
+                if len(p.components) > 5:
+                    lines.append(f"  ... and {len(p.components) - 5} more")
         lines.append("")
 
     # Suggestions
