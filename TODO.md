@@ -104,10 +104,16 @@ Remaining token-efficient output features:
 Moss must not contribute to this problem.
 
 - [ ] **`moss security`** - Security analysis command:
-  - Run bandit, semgrep automatically
-  - AST-based detection of vulnerable patterns
-  - OWASP Top 10 / CWE Top 25 checks
-  - Report severity, suggest fixes
+  - **Multi-tool orchestration** (don't reinvent, aggregate):
+    - semgrep: SAST pattern matching, large community rule registry
+    - Snyk: SCA (dependency vulnerabilities), AI-driven
+    - bandit: Python-specific security checks
+    - CodeQL: deep semantic/dataflow (optional, GitHub Enterprise)
+    - ast-grep: custom structural security rules
+  - Plugin architecture: tools configured in `.moss/security.yaml`
+  - Unified output: aggregate findings from all tools
+  - OWASP Top 10 / CWE Top 25 coverage via tool combination
+  - Report severity, suggest fixes, dedupe overlapping findings
 - [ ] **Validator integration**: Run security checks in synthesis loop
 - [ ] **Iteration tracking**: Monitor vuln count across refinements (37.6% increase after 5 iterations is alarming)
 - [ ] **Security-aware prompting**: Include security requirements in synthesis specs
@@ -150,6 +156,39 @@ Potential additions:
   - Technical debt indicators
   - Self-analysis: moss should be able to identify its own architectural gaps
     (eating our own dogfood, providing actionable feedback during development)
+- [ ] `moss rules` - Custom structural analysis framework:
+  - User-defined rules as Python files (LLM-writable, type-checkable)
+  - Pre-filters for performance (don't run every rule on every AST node)
+  - Pattern: `@rule(backend="ast-grep")` decorator + check function
+  - Example rules: naming conventions, structural smells, project-specific checks
+  - Key insight: "code smell detection with LLMs" is backwards - build discoverability
+    tools so LLMs can *query* for smells, not scan every token
+  - Rules are testable, importable Python - not a novel DSL
+  - **Multi-backend architecture** (ast-grep isn't enough for everything):
+    - `ast-grep` plugin: structural patterns (wrap existing tool)
+    - `pyright` plugin: type-aware rules
+    - `deps` plugin: cross-file analysis (uses moss deps/call graph)
+    - `dataflow` plugin: taint tracking (maybe wrap Pysa?)
+    - `python` plugin: escape hatch for arbitrary checks
+  - **Multi-backend composition**: rules can require multiple backends
+    - `@rule(backend=["ast-grep", "pyright"])` for combined analysis
+    - Each backend contributes to shared context, rule combines them
+  - **Context detection**: auto-classify code context (test, example, CLI, library)
+    - Structural detection: imports pytest → test context
+    - Path heuristics: `/tests/` → test context
+    - User-extensible: define what "test context" means per-project
+    - Rule scoping: `@rule(context="not:test")` skips test code
+- [ ] `moss clones` - Structural similarity via hashing:
+  - Normalize AST subtrees: replace variable names with positional placeholders ($1, $2, $3)
+  - Hash normalized structure → same hash = same structure
+  - Elision levels for different granularity:
+    - Level 0: names only (exact clones)
+    - Level 1: + literals (same structure, different strings/numbers)
+    - Level 2: + call targets (same pattern, different functions called)
+    - Level 3: + expressions (control flow skeleton only)
+  - Use case: "These 5 functions share structure at level 2 → potential abstraction"
+  - Feeds into `moss patterns` for abstraction suggestions
+  - No LLM for detection; LLM optional for suggesting *which* abstraction fits
 
 ### RAG / Semantic Search
 
@@ -321,10 +360,15 @@ resource-intensive topics (inference optimization, fine-tuning, training).
 - [ ] Code review comment templates
 
 **Code Quality:**
-- [ ] Code smell detection with LLMs
 - [ ] Technical debt estimation
 - [ ] Merge conflict resolution
-- [ ] Code deduplication / clone detection
+- [ ] Code deduplication / clone detection (see `moss clones` below)
+- [ ] Side effect tracking / purity analysis:
+  - Detect pure vs impure functions
+  - Track IO operations (file, network, env vars)
+  - Mutation tracking (what does this modify?)
+  - Use cases: safe refactoring, parallelization hints, smell detection
+    ("this pure function calls impure function")
 
 **Specialized Domains:**
 - [ ] Natural language to SQL/queries
@@ -344,47 +388,205 @@ resource-intensive topics (inference optimization, fine-tuning, training).
 - [ ] Cross-language evaluation
 - [ ] Long-context code understanding
 
-### Distilled Learnings → Implementation Plan
+### Distilled Learnings → Consolidated Development Phases
 
-From the competitor analysis, refined with project-specific insights:
+**The research in `docs/prior-art.md` (23+ topics) consolidates into ~6 coherent phases.**
+Not 23 phases of work - many topics overlap or are extensions of each other.
 
-**1. Multi-Agent Hierarchies (inspired by Aider's Architect/Editor)**
-Don't limit to two-level splits - support N-level agent hierarchies:
-- Configurable agent delegation, not hardcoded Architect→Editor
-- Example: Planner → Subtask Agents → Executors (3+ levels)
-- Each level can use different models/prompts/tool subsets
-- Implementation: Generalize `moss.agents` to support arbitrary delegation graphs
+---
 
-**2. Configurable Agent Roles (inspired by OpenHands' Micro-Agents)**
-Task-specialized agents, but user-configurable rather than fixed:
-- Define agents via config (system prompt, tool subset, constraints)
-- Not hardcoded "DocAgent", "TestAgent" - user defines their own
-- Share: context loading, tool execution, validation infrastructure
-- Implementation: Agent config schema in `moss.agents`, load from `.moss/agents/`
+#### Phase A: Code Quality Framework
 
-**3. Non-LLM Auto-Fix Integration (from SWE-agent guardrails)**
-**Already implemented**: `moss/autofix.py` has FixEngine with safety classification.
-Still needed for patch flow integration:
-- [ ] Run `ruff check --fix` automatically on validation failures
-- [ ] Report what was auto-fixed (diff of deterministic changes)
-- [ ] Only escalate to LLM if auto-fix fails or changes are NEEDS_REVIEW/UNSAFE
-- [ ] Integrate `autofix.FixEngine` into `PatchAPI.apply()` flow
-- Key insight: Deterministic fixes first, LLM only for what tools can't fix
+**Core feature: `moss rules`** - see Codebase Analysis Gaps section above.
 
-**4. Checkpoint/Rollback UX (from Claude Code)**
-Make Shadow Git's rollback capability user-visible:
-- `moss checkpoint create <name>` - named snapshot
-- `moss checkpoint list` - show available checkpoints
-- `moss checkpoint restore <name>` - rollback to checkpoint
-- Currently: Shadow Git exists but users don't know about it
-- Implementation: Add `CheckpointAPI` to `MossAPI`, CLI commands
+This phase unifies: code smells, refactoring detection, automated review, naming conventions,
+pattern detection, clone detection, and custom linting.
 
-**5. Codebase Indexing (from Cursor)**
-Proactive embedding for semantic search:
-- Auto-index on project load (background task)
-- Chunk by function/class, not fixed tokens
-- Enable queries like "where is authentication handled?"
-- Implementation: Enhance `RAGTool` with auto-indexing, integrate with `context_memory.py`
+| Research Topic | How It Fits |
+|----------------|-------------|
+| Automated Code Refactoring | Rules detect refactoring opportunities; `RefactoringMirror` pattern |
+| Automated Code Review | Rules + context = review comments; integrate as `moss review` |
+| Code smell detection | Structural rules, not LLM scanning (discoverability, not reading) |
+| Clone detection | `moss clones` feeds into pattern detection |
+| Side effect tracking | Purity analysis as a rule backend |
+
+**Sub-features:**
+- [ ] `moss lint` - unified linting (runs ruff, basedpyright, custom rules)
+- [ ] `moss patterns` - architectural pattern detection
+- [ ] `moss clones` - structural similarity via hashing
+- [ ] `moss weaknesses` - gap analysis
+- [ ] `moss review` - PR analysis using rules + LLM for suggestions
+- [ ] `moss refactor` - detect opportunities, apply with rope/libcst
+  - Extract method, rename, inline, move
+  - Mine project history for anti-patterns (ECO approach)
+  - Validate: tests pass before/after
+
+**From prior-art:** MANTRA (multi-agent refactoring), ECO (Google's pattern mining),
+RefactoringMiner (for validation), ast-grep/semgrep/CodeQL as backends.
+
+---
+
+#### Phase B: LLM-Assisted Code Operations
+
+Operations that benefit from LLM understanding but should integrate with structural tools.
+
+| Feature | Description | Prior Art |
+|---------|-------------|-----------|
+| `moss gen-tests` | Generate tests for uncovered code | TestGen-LLM (Meta), mutation-guided |
+| `moss document` | Generate/update docstrings | doc-comments-ai, RepoAgent |
+| `moss explain <symbol>` | Explain any code construct | Use skeleton as context |
+| `moss localize <test>` | Find buggy code from failing test | MemFL, AgentFL, FaR-Loc |
+| `moss migrate --to <lang>` | Cross-language translation | AST-to-AST preferred |
+
+**Implementation notes:**
+- `gen-tests`: Extend `moss coverage` with `--generate` flag
+  - Use existing tests as few-shot examples
+  - Mutation testing integration (mutmut) to validate quality
+  - Target: functions with low coverage
+- `document`: Use skeleton view for context; update docstrings in place
+- `explain`: Dynamic docs in TUI/LSP (hover for explanation)
+- `localize`: Integrate with validator loop (on test failure, localize first)
+  - Iterative narrowing with each attempt
+- `migrate`: Function-by-function, not whole-file
+  - Generate type mappings between languages
+  - Tests as equivalence oracles
+
+**From prior-art:** Meta's 75% build rate for gen-tests, 66% of debug time on localization,
+47.3% best-case translation pass rate (set expectations appropriately).
+
+---
+
+#### Phase C: Context & Memory
+
+Managing context across sessions, enabling semantic search, learning from mistakes.
+
+| Feature | Description | Prior Art |
+|---------|-------------|-----------|
+| RAG / Semantic Search | Vector search over codebase | Greptile insights, code embeddings |
+| Token Budget Management | Auto-compact when context grows | Speculative context masking |
+| Agent Learning | Record mistakes, avoid repeating | Lessons file, learning triggers |
+| Sessions | Resumable, observable units of work | See Sessions section below |
+
+**Implementation notes:**
+- RAG: Already in TODO; use skeleton as natural language descriptions
+  - Per-function chunking, not per-file
+  - Code embedding models: CodeBERT, StarEncoder, Jina-code
+  - Hybrid search: embeddings + keyword + AST structure
+- Token budgets: `context_memory.py` exists; add auto-compact trigger
+- Learning: `.moss/lessons.md` for per-repo memory
+  - Triggers: validation failures, rollbacks, user corrections
+- Sessions: Store in `.moss/sessions/<name>/`
+  - JSONL events + markdown summaries
+  - Integrate with checkpoints
+
+**Key insight from Greptile:** Simple semantic search fails on code because meaning
+depends on context (imports, types, call sites). Must translate to NL first or
+use structural chunking.
+
+---
+
+#### Phase D: Agent Infrastructure
+
+Multi-agent coordination, trust levels, checkpoints.
+
+| Feature | Description | Prior Art |
+|---------|-------------|-----------|
+| Architect/Editor Split | Separate reasoning from editing | Aider (85% benchmark) |
+| Configurable Agent Roles | User-defined micro-agents | OpenHands |
+| Trust Levels | Fine-grained, composable permissions | Warp's Dispatch mode |
+| Checkpoint/Rollback UX | Expose Shadow Git to users | Claude Code |
+| Codebase Indexing | Proactive embedding | Cursor |
+
+**Implementation notes:**
+- Architect/Editor: Planner agent uses reasoning model, Executor uses fast model
+  - Generalize to N-level hierarchies
+- Agent roles: Config in `.moss/agents/`, schema-validated
+  - Each agent: system prompt, tool subset, constraints
+- Trust levels: Already designed in detail above
+  - Pattern learning, scope-based, time-bounded, rollback-aware
+- Checkpoints: `moss checkpoint create/list/restore`
+  - Add `CheckpointAPI` to `MossAPI`
+- Indexing: Auto-index on project load (background)
+  - Integrate with RAG
+
+**From prior-art:** SWE-agent proves interface design > model scaling.
+Moss's structural awareness is the differentiator.
+
+**Already implemented:**
+- [x] `moss/autofix.py` - FixEngine with safety classification
+- [ ] Integrate autofix into PatchAPI.apply() flow
+- [ ] Run `ruff check --fix` on validation failures automatically
+
+---
+
+#### Phase E: Protocols & Integrations
+
+External integrations and protocol support.
+
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| ACP Server | Zed/JetBrains integration via Agent Client Protocol | HIGH |
+| MCP Improvements | Resource providers, prompt templates | MEDIUM |
+| GitHub Integration | `moss review` as GitHub Action | MEDIUM |
+| Browser Automation | Playwright/Selenium for UI testing | LOW |
+| Remote Agent Management | Web dashboard for monitoring | LOW |
+
+**Implementation notes:**
+- ACP: `moss.acp_server` module, JSON-RPC 2.0 over stdio
+  - Map moss tools to ACP capabilities
+- MCP: Already works; add resource providers (file summaries, overview)
+- GitHub: SARIF output for CodeQL/security findings integration
+- Browser: Only if screenshot-to-code (`moss ui-to-code`) becomes priority
+
+---
+
+#### Phase F: Evaluation & Validation
+
+Prove that moss's approach actually works.
+
+| Task | Purpose |
+|------|---------|
+| SWE-bench harness | Standard benchmark for code agents |
+| Anchor patching comparison | vs search/replace vs unified diff |
+| Skeleton value measurement | Does structural context improve accuracy? |
+| Security iteration tracking | Monitor vuln count across refinements |
+
+**Implementation notes:**
+- Install SWE-bench: `pip install swebench`
+- Start with Lite subset (faster iteration)
+- Measure: Does skeleton context improve patch accuracy?
+- Measure: Does anchor-based patching reduce failed applies?
+
+**From prior-art:** 12.47% pass@1 for SWE-agent. Moss should aim to match or beat
+by leveraging structural awareness.
+
+---
+
+#### What's NOT a phase (config/extensions):
+
+These are configuration options or small extensions, not separate phases:
+
+- **Local LLM support**: Config option in existing LLM layer (Ollama integration)
+- **FIM code completion**: Use in SketchGenerator, not standalone feature
+- **Prompt engineering**: Improve existing prompts, not new feature
+- **Multi-modal (UI-to-code)**: Nice-to-have, not core
+- **Formal verification**: Long-term research, not near-term phase
+
+---
+
+#### Summary: 23 Topics → 6 Phases + Config
+
+| Phase | Main Features | Est. Scope |
+|-------|---------------|------------|
+| A: Code Quality | `rules`, `security`, `lint`, `patterns`, `clones`, `review`, `refactor` | Large |
+| B: LLM Operations | `gen-tests`, `document`, `explain`, `localize`, `migrate` | Medium |
+| C: Context & Memory | RAG, token budgets, learning, sessions | Medium |
+| D: Agent Infrastructure | Architect/Editor, roles, trust, checkpoints, indexing | Large |
+| E: Protocols | ACP, MCP improvements, GitHub, browser | Small-Medium |
+| F: Evaluation | SWE-bench, benchmarks, measurements | Small |
+
+Many features within each phase share infrastructure. Build the phase foundation
+first, then features become incremental.
 
 ### Agent Learning / Memory
 

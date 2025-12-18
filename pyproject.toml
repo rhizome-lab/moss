@@ -51,7 +51,7 @@ dev = [
     "pytest-asyncio>=0.24",
     "pytest-cov>=7.0.0",
     "ruff>=0.8.0",
-    "mypy>=1.19.1",
+    "basedpyright>=1.22.0",
     "mutmut>=3.0.0",
 ]
 docs = [
@@ -142,4 +142,10 @@ filterwarnings = [
     # Ignore pytest collection warning for PytestValidator (not a test class)
     "ignore:cannot collect test class 'PytestValidator':pytest.PytestCollectionWarning",
 ]
+
+[tool.basedpyright]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+include = ["src"]
+reportMissingTypeStubs = false
 
