@@ -3017,11 +3017,19 @@ def cmd_patterns(args: Namespace) -> int:
 
 def cmd_weaknesses(args: Namespace) -> int:
     """Identify architectural weaknesses and gaps in the codebase."""
-    from moss.weaknesses import analyze_weaknesses, format_weakness_analysis
+    from moss.weaknesses import (
+        analyze_weaknesses,
+        format_weakness_analysis,
+        format_weakness_fixes,
+        get_fixable_weaknesses,
+        weaknesses_to_sarif,
+    )
 
     output = setup_output(args)
     root = Path(getattr(args, "directory", ".")).resolve()
     categories_arg = getattr(args, "categories", None)
+    sarif_output = getattr(args, "sarif", None)
+    show_fixes = getattr(args, "fix", False)
 
     if categories_arg:
         categories = [c.strip() for c in categories_arg.split(",")]
@@ -3040,6 +3048,44 @@ def cmd_weaknesses(args: Namespace) -> int:
         output.error(f"Weakness analysis failed: {e}")
         return 1
 
+    # Output SARIF if requested
+    if sarif_output:
+        sarif_path = Path(sarif_output)
+        weaknesses_to_sarif(analysis, output_path=sarif_path)
+        output.info(f"SARIF output written to {sarif_path}")
+        if wants_json(args):
+            output.data({"sarif_path": str(sarif_path), "weaknesses": len(analysis.weaknesses)})
+        return 0
+
+    # Show fix suggestions if requested
+    if show_fixes:
+        fixes = get_fixable_weaknesses(analysis)
+        if wants_json(args):
+            output.data(
+                {
+                    "total_weaknesses": len(analysis.weaknesses),
+                    "fixable": len(fixes),
+                    "fixes": [
+                        {
+                            "weakness": f.weakness.title,
+                            "file": f.weakness.file_path,
+                            "line": f.weakness.line_start,
+                            "fix_type": f.fix_type,
+                            "description": f.description,
+                            "commands": f.commands,
+                            "code_changes": f.code_changes,
+                        }
+                        for f in fixes
+                    ],
+                }
+            )
+        else:
+            output.print(format_weakness_analysis(analysis))
+            output.print("")
+            output.print(format_weakness_fixes(fixes))
+        return 0
+
+    # Standard output
     if wants_json(args):
         output.data(analysis.to_dict())
     else:
@@ -5085,6 +5131,16 @@ def create_parser() -> argparse.ArgumentParser:
         "-c",
         help="Comma-separated categories (coupling,abstraction,pattern,hardcoded,"
         "error_handling,complexity,duplication)",
+    )
+    weaknesses_parser.add_argument(
+        "--sarif",
+        metavar="FILE",
+        help="Output results in SARIF format to FILE (for CI integration)",
+    )
+    weaknesses_parser.add_argument(
+        "--fix",
+        action="store_true",
+        help="Show fix suggestions for auto-correctable issues",
     )
     weaknesses_parser.set_defaults(func=cmd_weaknesses)
 

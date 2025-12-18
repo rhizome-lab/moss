@@ -628,3 +628,365 @@ def analyze_weaknesses(
     """
     analyzer = WeaknessAnalyzer(Path(root), categories=categories)
     return analyzer.analyze()
+
+
+# =============================================================================
+# SARIF Output Support
+# =============================================================================
+
+
+def generate_sarif_from_weaknesses(
+    analysis: WeaknessAnalysis,
+    tool_name: str = "moss-weaknesses",
+    tool_version: str = "0.1.0",
+) -> dict[str, Any]:
+    """Generate SARIF output from weakness analysis.
+
+    SARIF (Static Analysis Results Interchange Format) is a standard
+    for static analysis results supported by GitHub, Azure DevOps, etc.
+
+    Args:
+        analysis: Weakness analysis result
+        tool_name: Name for the tool component
+        tool_version: Tool version string
+
+    Returns:
+        SARIF document as dictionary
+    """
+    from datetime import UTC, datetime
+
+    # SARIF schema info
+    sarif_schema = (
+        "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/"
+        "Schemata/sarif-schema-2.1.0.json"
+    )
+
+    # Build rules dictionary
+    rules_dict: dict[str, dict[str, Any]] = {}
+    for weakness in analysis.weaknesses:
+        rule_id = _weakness_to_rule_id(weakness)
+        if rule_id not in rules_dict:
+            rules_dict[rule_id] = _build_weakness_rule_descriptor(weakness)
+
+    # Build results
+    results = [_build_weakness_result(w, analysis.root) for w in analysis.weaknesses]
+
+    return {
+        "$schema": sarif_schema,
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": tool_name,
+                        "version": tool_version,
+                        "rules": list(rules_dict.values()),
+                    }
+                },
+                "results": results,
+                "invocations": [
+                    {
+                        "executionSuccessful": True,
+                        "endTimeUtc": datetime.now(UTC).isoformat(),
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def _weakness_to_rule_id(weakness: Weakness) -> str:
+    """Generate a stable rule ID for a weakness type."""
+    # Create a consistent rule ID from category and title pattern
+    title_slug = weakness.title.split(":")[0].strip().lower().replace(" ", "-")
+    return f"moss-weakness/{weakness.category.value}/{title_slug}"
+
+
+def _build_weakness_rule_descriptor(weakness: Weakness) -> dict[str, Any]:
+    """Build a SARIF rule descriptor from a weakness."""
+    severity_map = {
+        Severity.HIGH: "error",
+        Severity.MEDIUM: "warning",
+        Severity.LOW: "note",
+        Severity.INFO: "note",
+    }
+
+    descriptor: dict[str, Any] = {
+        "id": _weakness_to_rule_id(weakness),
+        "name": weakness.title.split(":")[0].strip(),
+        "shortDescription": {"text": weakness.description[:200]},
+        "defaultConfiguration": {
+            "level": severity_map.get(weakness.severity, "warning"),
+        },
+        "properties": {
+            "category": weakness.category.value,
+            "severity": weakness.severity.value,
+        },
+    }
+
+    if weakness.suggestion:
+        descriptor["help"] = {"text": weakness.suggestion}
+
+    return descriptor
+
+
+def _build_weakness_result(weakness: Weakness, root: Path) -> dict[str, Any]:
+    """Build a SARIF result from a weakness."""
+    severity_map = {
+        Severity.HIGH: "error",
+        Severity.MEDIUM: "warning",
+        Severity.LOW: "note",
+        Severity.INFO: "note",
+    }
+
+    result: dict[str, Any] = {
+        "ruleId": _weakness_to_rule_id(weakness),
+        "level": severity_map.get(weakness.severity, "warning"),
+        "message": {"text": f"{weakness.title}: {weakness.description}"},
+    }
+
+    # Add location if available
+    if weakness.file_path:
+        result["locations"] = [
+            {
+                "physicalLocation": {
+                    "artifactLocation": {"uri": weakness.file_path},
+                    "region": {
+                        "startLine": weakness.line_start or 1,
+                        "startColumn": 1,
+                    },
+                }
+            }
+        ]
+
+        # Add end line if available
+        if weakness.line_end:
+            result["locations"][0]["physicalLocation"]["region"]["endLine"] = weakness.line_end
+
+    # Add fingerprint for deduplication
+    loc_str = f"{weakness.file_path}:{weakness.line_start}" if weakness.file_path else "project"
+    fingerprint = f"{_weakness_to_rule_id(weakness)}:{loc_str}"
+    result["fingerprints"] = {"primaryLocationLineHash": fingerprint}
+
+    # Add fix suggestion if available
+    if weakness.suggestion:
+        result["fixes"] = [
+            {
+                "description": {"text": weakness.suggestion},
+            }
+        ]
+
+    # Add related locations if there are related files
+    if weakness.related_files:
+        result["relatedLocations"] = [
+            {
+                "physicalLocation": {
+                    "artifactLocation": {"uri": f},
+                },
+                "message": {"text": "Related file"},
+            }
+            for f in weakness.related_files[:5]  # Limit to 5
+        ]
+
+    return result
+
+
+def weaknesses_to_sarif(
+    analysis: WeaknessAnalysis,
+    output_path: Path | None = None,
+    tool_name: str = "moss-weaknesses",
+    tool_version: str = "0.1.0",
+) -> str:
+    """Generate SARIF JSON from weakness analysis.
+
+    Args:
+        analysis: Weakness analysis result
+        output_path: Optional path to write SARIF file
+        tool_name: Name for the tool component
+        tool_version: Tool version string
+
+    Returns:
+        SARIF JSON string
+    """
+    import json
+
+    sarif = generate_sarif_from_weaknesses(analysis, tool_name, tool_version)
+    sarif_json = json.dumps(sarif, indent=2)
+
+    if output_path:
+        output_path.write_text(sarif_json)
+
+    return sarif_json
+
+
+# =============================================================================
+# Auto-Fix Support
+# =============================================================================
+
+
+@dataclass
+class WeaknessFix:
+    """A suggested fix for a weakness."""
+
+    weakness: Weakness
+    fix_type: str  # "auto", "semi-auto", "manual"
+    description: str
+    commands: list[str] = field(default_factory=list)  # CLI commands to run
+    code_changes: list[dict[str, Any]] = field(default_factory=list)  # Structured changes
+
+
+def get_fixable_weaknesses(analysis: WeaknessAnalysis) -> list[WeaknessFix]:
+    """Get weaknesses that have automated or semi-automated fixes.
+
+    Returns:
+        List of WeaknessFix objects for fixable weaknesses
+    """
+    fixes = []
+
+    for weakness in analysis.weaknesses:
+        fix = _get_weakness_fix(weakness)
+        if fix:
+            fixes.append(fix)
+
+    return fixes
+
+
+def _get_weakness_fix(weakness: Weakness) -> WeaknessFix | None:
+    """Generate a fix suggestion for a weakness if possible."""
+    # Bare except can be auto-fixed
+    if weakness.category == WeaknessCategory.ERROR_HANDLING:
+        if "bare except" in weakness.title.lower():
+            return WeaknessFix(
+                weakness=weakness,
+                fix_type="semi-auto",
+                description="Replace bare except with specific exception type",
+                code_changes=[
+                    {
+                        "file": weakness.file_path,
+                        "line": weakness.line_start,
+                        "old": "except:",
+                        "new": "except Exception:  # TODO: specify exception type",
+                    }
+                ],
+            )
+        if "swallowed" in weakness.title.lower():
+            return WeaknessFix(
+                weakness=weakness,
+                fix_type="semi-auto",
+                description="Add logging to swallowed exception",
+                code_changes=[
+                    {
+                        "file": weakness.file_path,
+                        "line": weakness.line_start,
+                        "suggestion": "Add: logger.exception('Error occurred') or re-raise",
+                    }
+                ],
+            )
+
+    # Hardcoded values can sometimes be auto-fixed
+    if weakness.category == WeaknessCategory.HARDCODED:
+        if weakness.file_path and weakness.line_start:
+            # Suggest environment variable
+            return WeaknessFix(
+                weakness=weakness,
+                fix_type="semi-auto",
+                description="Extract hardcoded value to configuration",
+                code_changes=[
+                    {
+                        "file": weakness.file_path,
+                        "line": weakness.line_start,
+                        "suggestion": "Replace with os.environ.get('CONFIG_VAR') or config file",
+                    }
+                ],
+            )
+
+    # Long functions / god classes - suggest extraction
+    if weakness.category == WeaknessCategory.ABSTRACTION:
+        if "long function" in weakness.title.lower():
+            return WeaknessFix(
+                weakness=weakness,
+                fix_type="manual",
+                description="Consider extracting helper functions",
+                commands=[
+                    f"moss skeleton {weakness.file_path}",  # View structure
+                    f"moss complexity {weakness.file_path}",  # Find complex parts
+                ],
+            )
+        if "god class" in weakness.title.lower():
+            return WeaknessFix(
+                weakness=weakness,
+                fix_type="manual",
+                description="Consider splitting into smaller, focused classes",
+                commands=[
+                    f"moss skeleton {weakness.file_path}",  # View structure
+                    f"moss deps {weakness.file_path}",  # See dependencies
+                ],
+            )
+        if "long param" in weakness.title.lower():
+            return WeaknessFix(
+                weakness=weakness,
+                fix_type="semi-auto",
+                description="Group parameters into a dataclass",
+                code_changes=[
+                    {
+                        "file": weakness.file_path,
+                        "line": weakness.line_start,
+                        "suggestion": "Create @dataclass with related parameters",
+                    }
+                ],
+            )
+
+    return None
+
+
+def format_weakness_fixes(fixes: list[WeaknessFix]) -> str:
+    """Format weakness fixes as markdown."""
+    if not fixes:
+        return "No auto-fixable weaknesses found."
+
+    lines = ["## Suggested Fixes", ""]
+
+    # Group by fix type
+    auto_fixes = [f for f in fixes if f.fix_type == "auto"]
+    semi_fixes = [f for f in fixes if f.fix_type == "semi-auto"]
+    manual_fixes = [f for f in fixes if f.fix_type == "manual"]
+
+    if auto_fixes:
+        lines.append("### Auto-fixable")
+        for fix in auto_fixes:
+            loc = f"{fix.weakness.file_path}:{fix.weakness.line_start}"
+            lines.append(f"- **{fix.weakness.title}** ({loc})")
+            lines.append(f"  {fix.description}")
+            for change in fix.code_changes:
+                if "old" in change and "new" in change:
+                    lines.append(f"  Replace: `{change['old']}` → `{change['new']}`")
+        lines.append("")
+
+    if semi_fixes:
+        lines.append("### Semi-automated (review required)")
+        for fix in semi_fixes:
+            if fix.weakness.file_path:
+                loc = f"{fix.weakness.file_path}:{fix.weakness.line_start}"
+            else:
+                loc = "N/A"
+            lines.append(f"- **{fix.weakness.title}** ({loc})")
+            lines.append(f"  {fix.description}")
+            for change in fix.code_changes:
+                if "suggestion" in change:
+                    lines.append(f"  💡 {change['suggestion']}")
+        lines.append("")
+
+    if manual_fixes:
+        lines.append("### Manual fixes (guidance)")
+        for fix in manual_fixes:
+            if fix.weakness.file_path:
+                loc = f"{fix.weakness.file_path}:{fix.weakness.line_start}"
+            else:
+                loc = "N/A"
+            lines.append(f"- **{fix.weakness.title}** ({loc})")
+            lines.append(f"  {fix.description}")
+            for cmd in fix.commands:
+                lines.append(f"  Run: `{cmd}`")
+        lines.append("")
+
+    return "\n".join(lines)

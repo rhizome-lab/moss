@@ -74,6 +74,7 @@ Still needed:
 **CI/Automation:**
 - [x] Drift detection script (`scripts/check_gen_drift.py`) - compares generated OpenAPI/MCP specs to committed versions
 - [x] Add drift check to CI workflow (GitHub Actions)
+- [ ] Add drift auto-update to pre-commit hook (prevents CI failures from forgetting to update specs)
 
 ### Non-LLM Code Generators
 
