@@ -1251,6 +1251,54 @@ def cmd_gen(args: Namespace) -> int:
             else:
                 print(content)
 
+        elif target == "grpc":
+            from moss.gen.grpc import GRPCGenerator
+
+            generator = GRPCGenerator()
+            if show_list:
+                rpcs = generator.generate_rpcs()
+                result = [
+                    {
+                        "name": rpc.name,
+                        "request": rpc.request_type,
+                        "response": rpc.response_type,
+                    }
+                    for rpc in rpcs
+                ]
+                output.data(result)
+            else:
+                content = generator.generate_proto()
+                if out_file:
+                    Path(out_file).write_text(content)
+                    output.success(f"Generated proto file to {out_file}")
+                else:
+                    print(content)
+
+        elif target == "lsp":
+            from moss.gen.lsp import LSPGenerator
+
+            generator = LSPGenerator()
+            if show_list:
+                commands = generator.generate_commands()
+                result = [
+                    {
+                        "command": cmd.command,
+                        "title": cmd.title,
+                        "description": cmd.description,
+                    }
+                    for cmd in commands
+                ]
+                output.data(result)
+            else:
+                # Output command list as JSON
+                commands = generator.generate_command_list()
+                content = json_mod.dumps(commands, indent=2)
+                if out_file:
+                    Path(out_file).write_text(content)
+                    output.success(f"Generated {len(commands)} LSP commands to {out_file}")
+                else:
+                    print(content)
+
         else:
             output.error(f"Unknown target: {target}")
             return 1
@@ -3391,7 +3439,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--target",
         "-t",
         default="mcp",
-        choices=["mcp", "http", "cli", "openapi"],
+        choices=["mcp", "http", "cli", "openapi", "grpc", "lsp"],
         help="Generation target (default: mcp)",
     )
     gen_parser.add_argument(

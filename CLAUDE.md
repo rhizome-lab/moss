@@ -104,7 +104,12 @@ Don't wait to be asked - if it's worth remembering, write it down.
 
 **Plan the session.** Propose a work queue - a prioritized list of items to tackle this session, ordered sensibly (dependencies first, quick wins vs. deep work balanced, etc.). Get a quick confirmation, then work through the queue autonomously.
 
-**Agentic by default.** Prefer an indefinite agentic loop - continue working through tasks autonomously, including committing work, unless instructed otherwise.
+**Agentic by default.** Prefer an indefinite agentic loop - continue working through tasks autonomously, including committing work, unless instructed otherwise. **Do NOT stop to ask for input** unless:
+- You're genuinely blocked and need clarification
+- A decision has significant irreversible consequences
+- The user explicitly asked to be consulted
+
+When finishing one task, immediately pick up the next from TODO.md. Keep the momentum going.
 
 **Bail out early.** If you hit repeated failures or get stuck in a loop, stop and ask for guidance rather than burning tokens on increasingly unlikely fixes.
 

@@ -99,6 +99,10 @@ local-llm = [
 tui = [
     "textual>=0.89.0",
 ]
+grpc = [
+    "grpcio>=1.60.0",
+    "grpcio-tools>=1.60.0",
+]
 # Meta-group: install all optional features
 all = [
     "moss[server,mcp,lsp,llm,anthropic,openai,tree-sitter,chroma,tui]",
