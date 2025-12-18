@@ -53,18 +53,6 @@ Remaining token-efficient output features:
 - [ ] `--query EXPR` flag - relaxed DWIM syntax for flexible querying (needs design work)
 - [ ] Format strings for custom output templates
 
-### Overview Comprehensiveness
-
-Current `moss overview` output is minimal. Enhance to include:
-
-- [ ] Pull metrics into overview (LOC, file count, symbols)
-- [ ] Show top issues from health check (not just grade)
-- [ ] Show next action items from roadmap
-- [ ] Include skeleton summary (top-level modules/classes)
-- [ ] Show critical vulnerabilities inline (not just count)
-
-Design principle: `--compact` should still be token-efficient but *informative*. Current output like `health: F (23%)` tells you there's a problem but not what. Better: `health: F (23%) - 18% docs, no tests`.
-
 ### Codebase Analysis Gaps
 
 Tools we have:
@@ -72,24 +60,20 @@ Tools we have:
 - Structure: `skeleton`, `summarize`, `deps`
 - Dependencies: `external-deps` (vulns, licenses, weight)
 - Quality: `check-docs`, `check-todos`, `check-refs`
+- Coverage: `coverage` (pytest-cov stats)
+- Complexity: `complexity` (cyclomatic per function)
+- Git analysis: `git-hotspots` (frequently changed files)
 
 Potential additions:
-- [ ] Test coverage integration (pytest-cov stats)
-- [ ] Cyclomatic complexity per function
-- [ ] Git hot spots (frequently changed files)
 - [ ] Architecture diagrams from dependency graph
 
 ### Agent Log Analysis
 
 Manual analysis complete - see `docs/log-analysis.md` for methodology and insights.
+Basic automation: `moss analyze-session <path>` parses Claude Code JSONL logs.
 
-Next: Build tooling to automate this and extract actionable improvements:
+Remaining work:
 
-- [ ] `moss analyze-session <path>` - parse Claude Code JSONL logs
-  - Tool call frequency/success rates
-  - Error patterns and retry loops
-  - Token usage and context growth
-  - Parallelization opportunities
 - [ ] `moss extract-preferences <path>` - infer user preferences from session history
   - Coding style patterns (naming, structure, error handling)
   - Tool usage preferences (which tools work well, which cause friction)

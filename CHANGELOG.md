@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.6.1
+
+### Phase 30: Codebase Analysis Tools
+
+New analysis commands for comprehensive codebase insight:
+
+**Session Analysis**
+- `moss analyze-session <path>` - parse Claude Code JSONL logs
+- Tool call frequency and success rates
+- Token usage with proper context calculation
+- Message type distribution
+- Error pattern categorization
+
+**Git Analysis**
+- `moss git-hotspots` - identify frequently changed files
+- Configurable time window (--days)
+- Author count per file
+- Last-changed timestamps
+
+**Test Coverage**
+- `moss coverage` - show pytest-cov statistics
+- Per-file coverage breakdown
+- Low coverage file highlighting
+- Optional test run with --run flag
+
+**Cyclomatic Complexity**
+- `moss complexity` - analyze function complexity
+- McCabe cyclomatic complexity per function
+- Risk level categorization (low/moderate/high/very-high)
+- Configurable file patterns
+
+**Overview Enhancements**
+- Added symbol counts (classes, functions) to `moss overview`
+- Critical vulnerabilities shown inline with package and ID
+- Skeleton summary showing top packages by size
+- Updated both compact and markdown output formats
+
 ## v0.6.0
 
 ### Phase 29: Library-First Architecture
