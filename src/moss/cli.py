@@ -1826,14 +1826,35 @@ def cmd_diff(args: Namespace) -> int:
 
 def cmd_summarize(args: Namespace) -> int:
     """Generate hierarchical codebase summary."""
-    from moss.summarize import Summarizer
-
     output = setup_output(args)
     root = Path(getattr(args, "directory", ".")).resolve()
 
     if not root.exists():
         output.error(f"Directory not found: {root}")
         return 1
+
+    # Check if --docs mode
+    if getattr(args, "docs", False):
+        from moss.summarize import DocSummarizer
+
+        output.info(f"Summarizing documentation in {root.name}...")
+        summarizer = DocSummarizer()
+
+        try:
+            summary = summarizer.summarize_docs(root)
+        except Exception as e:
+            output.error(f"Failed to summarize docs: {e}")
+            return 1
+
+        if getattr(args, "json", False):
+            output.data(summary.to_dict())
+        else:
+            output.print(summary.to_markdown())
+
+        return 0
+
+    # Default: summarize code
+    from moss.summarize import Summarizer
 
     output.info(f"Summarizing {root.name}...")
 
@@ -2530,6 +2551,12 @@ def create_parser() -> argparse.ArgumentParser:
         "-j",
         action="store_true",
         help="Output as JSON",
+    )
+    summarize_parser.add_argument(
+        "--docs",
+        "-d",
+        action="store_true",
+        help="Summarize documentation files instead of code",
     )
     summarize_parser.set_defaults(func=cmd_summarize)
 

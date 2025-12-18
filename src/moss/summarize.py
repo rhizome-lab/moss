@@ -10,6 +10,7 @@ Provides hierarchical summaries of codebases:
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -388,3 +389,200 @@ class Summarizer:
                 module = node.module or ""
                 imports.append(module)
         return imports
+
+
+# =============================================================================
+# Documentation Summarizer
+# =============================================================================
+
+
+@dataclass
+class DocSection:
+    """A section in a documentation file."""
+
+    title: str
+    level: int  # 1 = h1, 2 = h2, etc.
+    line: int
+    word_count: int
+    subsections: list[DocSection] = field(default_factory=list)
+
+
+@dataclass
+class DocFileSummary:
+    """Summary of a single documentation file."""
+
+    path: Path
+    title: str | None
+    sections: list[DocSection]
+    word_count: int
+    line_count: int
+    links: list[str]  # Internal and external links
+
+    def to_markdown(self) -> str:
+        """Render as markdown."""
+        lines = [f"### `{self.path.name}`"]
+        if self.title:
+            lines.append(f"\n{self.title}")
+        lines.append(f"\n*{self.word_count} words, {self.line_count} lines*")
+
+        if self.sections:
+            lines.append("\n**Sections:**")
+            for sec in self.sections:
+                indent = "  " * (sec.level - 1)
+                lines.append(f"{indent}- {sec.title}")
+
+        return "\n".join(lines)
+
+
+@dataclass
+class DocSummary:
+    """Summary of all documentation in a project."""
+
+    root: Path
+    files: list[DocFileSummary]
+    total_words: int = 0
+    total_lines: int = 0
+
+    def __post_init__(self):
+        self.total_words = sum(f.word_count for f in self.files)
+        self.total_lines = sum(f.line_count for f in self.files)
+
+    def to_markdown(self) -> str:
+        """Render as markdown."""
+        lines = [f"# Documentation Summary: {self.root.name}", ""]
+        lines.append(
+            f"**{len(self.files)} files** | "
+            f"**{self.total_words} words** | "
+            f"**{self.total_lines} lines**"
+        )
+        lines.append("")
+
+        # Group by directory
+        by_dir: dict[str, list[DocFileSummary]] = {}
+        for f in self.files:
+            rel = f.path.relative_to(self.root)
+            dir_name = str(rel.parent) if rel.parent != Path(".") else "(root)"
+            by_dir.setdefault(dir_name, []).append(f)
+
+        for dir_name, files in sorted(by_dir.items()):
+            lines.append(f"## {dir_name}/")
+            lines.append("")
+            for f in sorted(files, key=lambda x: x.path.name):
+                lines.append(f.to_markdown())
+                lines.append("")
+
+        return "\n".join(lines)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON output."""
+        return {
+            "root": str(self.root),
+            "stats": {
+                "total_files": len(self.files),
+                "total_words": self.total_words,
+                "total_lines": self.total_lines,
+            },
+            "files": [
+                {
+                    "path": str(f.path.relative_to(self.root)),
+                    "title": f.title,
+                    "word_count": f.word_count,
+                    "line_count": f.line_count,
+                    "sections": [{"title": s.title, "level": s.level} for s in f.sections],
+                    "links": f.links,
+                }
+                for f in self.files
+            ],
+        }
+
+
+class DocSummarizer:
+    """Summarizes documentation files in a project."""
+
+    # Patterns for markdown headings
+    HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.+)$")
+    LINK_PATTERN = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+
+    def __init__(self):
+        self.heading_re = re.compile(r"^(#{1,6})\s+(.+)$")
+        self.link_re = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+
+    def summarize_docs(self, root: Path) -> DocSummary:
+        """Summarize all documentation in a project."""
+        root = root.resolve()
+        files: list[DocFileSummary] = []
+
+        # Find documentation files
+        doc_files = self._find_doc_files(root)
+
+        for doc_file in doc_files:
+            summary = self._summarize_doc_file(doc_file, root)
+            if summary:
+                files.append(summary)
+
+        return DocSummary(root=root, files=files)
+
+    def _find_doc_files(self, root: Path) -> list[Path]:
+        """Find all documentation files."""
+        files: list[Path] = []
+
+        # Root-level docs
+        for pattern in ["*.md", "*.rst", "*.txt"]:
+            for f in root.glob(pattern):
+                if f.is_file() and not f.name.startswith("."):
+                    files.append(f)
+
+        # docs/ directory
+        docs_dir = root / "docs"
+        if docs_dir.exists():
+            for pattern in ["**/*.md", "**/*.rst"]:
+                for f in docs_dir.glob(pattern):
+                    if f.is_file():
+                        files.append(f)
+
+        return files
+
+    def _summarize_doc_file(self, path: Path, root: Path) -> DocFileSummary | None:
+        """Summarize a single documentation file."""
+        try:
+            content = path.read_text()
+        except Exception:
+            return None
+
+        lines = content.splitlines()
+        sections: list[DocSection] = []
+        links: list[str] = []
+        title: str | None = None
+
+        for i, line in enumerate(lines, 1):
+            # Extract headings
+            match = self.heading_re.match(line)
+            if match:
+                level = len(match.group(1))
+                heading_text = match.group(2).strip()
+                if title is None and level == 1:
+                    title = heading_text
+                sections.append(
+                    DocSection(
+                        title=heading_text,
+                        level=level,
+                        line=i,
+                        word_count=0,  # Could count words in section
+                    )
+                )
+
+            # Extract links
+            for link_match in self.link_re.finditer(line):
+                links.append(link_match.group(2))
+
+        # Count words (simple whitespace split)
+        word_count = len(content.split())
+
+        return DocFileSummary(
+            path=path,
+            title=title,
+            sections=sections,
+            word_count=word_count,
+            line_count=len(lines),
+            links=links,
+        )
