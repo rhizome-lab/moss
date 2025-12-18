@@ -7,6 +7,7 @@ Generators:
 - EnumerativeGenerator: Bottom-up AST enumeration for simple synthesis
 - ComponentGenerator: Type-directed library composition (SyPet/InSynth style)
 - SMTGenerator: Z3-based type-driven synthesis (Synquid style)
+- PBEGenerator: Programming by Example (FlashFill/PROSE style)
 """
 
 from .component import ComponentGenerator
@@ -22,6 +23,7 @@ from .llm import (
     create_llm_generator,
     create_mock_generator,
 )
+from .pbe import PBEGenerator
 from .placeholder import PlaceholderGenerator
 from .smt import SMTGenerator
 from .template import TemplateGenerator
@@ -36,6 +38,7 @@ __all__ = [
     "LLMResponse",
     "LiteLLMProvider",
     "MockLLMProvider",
+    "PBEGenerator",
     "PlaceholderGenerator",
     "SMTGenerator",
     "TemplateGenerator",

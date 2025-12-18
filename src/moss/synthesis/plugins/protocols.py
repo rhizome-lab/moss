@@ -33,6 +33,8 @@ class GeneratorType(Enum):
     LLM = "llm"
     SMT = "smt"  # Z3-based (Synquid-style)
     RELATIONAL = "relational"  # miniKanren-style
+    ENUMERATION = "enumeration"  # Bottom-up AST enumeration
+    PBE = "pbe"  # Programming by Example (FlashFill/PROSE)
 
 
 class ValidatorType(Enum):
