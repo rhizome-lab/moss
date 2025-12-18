@@ -354,6 +354,14 @@ class SynthesisRegistry:
         except ImportError:
             logger.debug("PBEGenerator not available")
 
+        try:
+            from moss.synthesis.plugins.generators import SketchGenerator
+
+            if "sketch" not in [g.metadata.name for g in self.generators.get_all()]:
+                self.generators.register(SketchGenerator())
+        except ImportError:
+            logger.debug("SketchGenerator not available")
+
         # Import built-in validators
         try:
             from moss.synthesis.plugins.validators import PytestValidator

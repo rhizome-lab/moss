@@ -8,6 +8,7 @@ Generators:
 - ComponentGenerator: Type-directed library composition (SyPet/InSynth style)
 - SMTGenerator: Z3-based type-driven synthesis (Synquid style)
 - PBEGenerator: Programming by Example (FlashFill/PROSE style)
+- SketchGenerator: Fill holes in user templates (Sketch/Rosette style)
 """
 
 from .component import ComponentGenerator
@@ -25,6 +26,7 @@ from .llm import (
 )
 from .pbe import PBEGenerator
 from .placeholder import PlaceholderGenerator
+from .sketch import SketchGenerator
 from .smt import SMTGenerator
 from .template import TemplateGenerator
 
@@ -41,6 +43,7 @@ __all__ = [
     "PBEGenerator",
     "PlaceholderGenerator",
     "SMTGenerator",
+    "SketchGenerator",
     "TemplateGenerator",
     "TokenUsage",
     "create_llm_generator",

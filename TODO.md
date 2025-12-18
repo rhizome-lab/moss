@@ -8,16 +8,14 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 Candidates for the next session, roughly by size:
 
-- [ ] **PBEGenerator** (medium) - Programming by Example synthesis (FlashFill/PROSE)
-  - Input/output examples → synthesize string transformations
-  - DSL for common patterns (substring, concat, conditionals)
-  - See `docs/prior-art.md` for PROSE/FlashFill background
-- [ ] **SketchGenerator** (medium) - Fill holes in user templates (Sketch/Rosette)
-  - User provides code with `??` holes
-  - Enumerate candidates and check against examples
-- [ ] **Test ComponentGenerator/SMTGenerator** (small) - Add tests for new generators
-  - Unit tests with mock context/specs
-  - Integration tests with actual library composition
+- [x] **PBEGenerator** (medium) - Programming by Example synthesis (FlashFill/PROSE)
+  - DSL-based string transformations (Concat, SubStr, Upper, Lower, etc.)
+  - See `src/moss/synthesis/plugins/generators/pbe.py`
+- [x] **SketchGenerator** (medium) - Fill holes in user templates (Sketch/Rosette)
+  - User provides code with `??` holes for operators, constants, expressions
+  - See `src/moss/synthesis/plugins/generators/sketch.py`
+- [x] **Test ComponentGenerator/SMTGenerator** (small) - Add tests for new generators
+  - Added to `tests/test_synthesis_plugins.py`
 - [x] **Drift auto-update in pre-commit** (small) - Run check_gen_drift.py --update automatically
   - Added to scripts/pre-commit hook
 - [x] **CheckpointAPI to MossAPI** (small) - Expose checkpoint commands via library API
@@ -93,8 +91,12 @@ Alternative synthesis approaches that don't rely on LLMs. See `docs/synthesis-ge
   - See `src/moss/synthesis/plugins/generators/smt.py`
 
 #### Medium Priority
-- [ ] `PBEGenerator` - Programming by Example (FlashFill/PROSE)
-- [ ] `SketchGenerator` - fill holes in user templates (Sketch/Rosette)
+- [x] `PBEGenerator` - Programming by Example (FlashFill/PROSE)
+  - DSL-based string transformations
+  - See `src/moss/synthesis/plugins/generators/pbe.py`
+- [x] `SketchGenerator` - fill holes in user templates (Sketch/Rosette)
+  - Fill `??` holes with operators, constants, expressions
+  - See `src/moss/synthesis/plugins/generators/sketch.py`
 - [ ] `RelationalGenerator` - miniKanren-style logic programming
 
 #### Research/Experimental
