@@ -423,5 +423,136 @@
       "type": "object"
     },
     "name": "dwim_resolve_tool"
+  },
+  {
+    "description": "Analyze cyclomatic complexity of all Python files. ComplexityReport with complexity metrics for all functions",
+    "inputSchema": {
+      "properties": {
+        "pattern": {
+          "default": "**/*.py",
+          "description": "Glob pattern for files to analyze (default: all Python files)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "complexity_analyze"
+  },
+  {
+    "description": "Get functions exceeding a complexity threshold. List of function details for high-complexity functions",
+    "inputSchema": {
+      "properties": {
+        "threshold": {
+          "default": 10,
+          "description": "Complexity threshold (default: 10)",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "complexity_get_high_risk"
+  },
+  {
+    "description": "Run bidirectional reference check. RefCheckResult with valid, broken, and stale references",
+    "inputSchema": {
+      "properties": {
+        "staleness_days": {
+          "default": 30,
+          "description": "Warn if target modified more than N days after source",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "ref_check_check"
+  },
+  {
+    "description": "Check only code-to-documentation references. List of broken code->doc references",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "ref_check_check_code_to_docs"
+  },
+  {
+    "description": "Check only documentation-to-code references. List of broken doc->code references",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "ref_check_check_docs_to_code"
+  },
+  {
+    "description": "Analyze git history for hot spots. GitHotspotAnalysis with frequently changed files",
+    "inputSchema": {
+      "properties": {
+        "days": {
+          "default": 90,
+          "description": "Number of days to analyze (default: 90)",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "git_hotspots_analyze"
+  },
+  {
+    "description": "Get the top N most frequently changed files. List of hotspot details for most frequently changed files",
+    "inputSchema": {
+      "properties": {
+        "days": {
+          "default": 90,
+          "description": "Number of days to analyze",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 10,
+          "description": "Maximum number of files to return",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "git_hotspots_get_top_hotspots"
+  },
+  {
+    "description": "Analyze project dependencies. DependencyAnalysisResult with dependency information",
+    "inputSchema": {
+      "properties": {
+        "check_licenses": {
+          "default": false,
+          "description": "If True, check license compatibility",
+          "type": "boolean"
+        },
+        "check_vulns": {
+          "default": false,
+          "description": "If True, check for known vulnerabilities via OSV API",
+          "type": "boolean"
+        },
+        "resolve": {
+          "default": false,
+          "description": "If True, resolve full transitive dependency tree",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "name": "external_deps_analyze"
+  },
+  {
+    "description": "Check for security vulnerabilities. List of vulnerability details",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "external_deps_check_security"
+  },
+  {
+    "description": "List direct dependencies. List of direct dependency details",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "external_deps_list_direct"
   }
 ]

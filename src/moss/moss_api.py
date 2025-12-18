@@ -25,10 +25,14 @@ if TYPE_CHECKING:
     from moss.anchors import AnchorMatch
     from moss.cfg import ControlFlowGraph
     from moss.check_docs import DocCheckResult
+    from moss.check_refs import RefCheckResult
     from moss.check_todos import TodoCheckResult
+    from moss.complexity import ComplexityReport
     from moss.context import CompiledContext, ContextHost
     from moss.dependencies import DependencyInfo
     from moss.dependency_analysis import DependencyAnalysis
+    from moss.external_deps import DependencyAnalysisResult
+    from moss.git_hotspots import GitHotspotAnalysis
     from moss.patches import Patch, PatchResult
     from moss.shadow_git import CommitHandle, ShadowGit
     from moss.skeleton import Symbol
@@ -604,6 +608,177 @@ class HealthAPI:
 
 
 @dataclass
+class ComplexityAPI:
+    """API for cyclomatic complexity analysis.
+
+    Calculates McCabe cyclomatic complexity for Python functions,
+    helping identify code that may be difficult to test or maintain.
+    """
+
+    root: Path
+
+    def analyze(self, pattern: str = "**/*.py") -> ComplexityReport:
+        """Analyze cyclomatic complexity of all Python files.
+
+        Args:
+            pattern: Glob pattern for files to analyze (default: all Python files)
+
+        Returns:
+            ComplexityReport with complexity metrics for all functions
+        """
+        from moss.complexity import analyze_complexity
+
+        return analyze_complexity(self.root, pattern=pattern)
+
+    def get_high_risk(self, threshold: int = 10) -> list[dict[str, Any]]:
+        """Get functions exceeding a complexity threshold.
+
+        Args:
+            threshold: Complexity threshold (default: 10)
+
+        Returns:
+            List of function details for high-complexity functions
+        """
+        report = self.analyze()
+        return [f.to_dict() for f in report.functions if f.complexity > threshold]
+
+
+@dataclass
+class RefCheckAPI:
+    """API for bidirectional reference checking.
+
+    Validates that code files reference their documentation and
+    documentation references implementation files. Detects stale
+    references where targets have been modified after sources.
+    """
+
+    root: Path
+
+    def check(self, staleness_days: int = 30) -> RefCheckResult:
+        """Run bidirectional reference check.
+
+        Args:
+            staleness_days: Warn if target modified more than N days after source
+
+        Returns:
+            RefCheckResult with valid, broken, and stale references
+        """
+        from moss.check_refs import RefChecker
+
+        checker = RefChecker(self.root, staleness_days=staleness_days)
+        return checker.check()
+
+    def check_code_to_docs(self) -> list[dict[str, Any]]:
+        """Check only code-to-documentation references.
+
+        Returns:
+            List of broken code->doc references
+        """
+        result = self.check()
+        return [r.to_dict() for r in result.code_to_docs_broken]
+
+    def check_docs_to_code(self) -> list[dict[str, Any]]:
+        """Check only documentation-to-code references.
+
+        Returns:
+            List of broken doc->code references
+        """
+        result = self.check()
+        return [r.to_dict() for r in result.docs_to_code_broken]
+
+
+@dataclass
+class GitHotspotsAPI:
+    """API for git hotspot analysis.
+
+    Identifies frequently changed files in the git repository.
+    High churn areas may indicate code that needs refactoring.
+    """
+
+    root: Path
+
+    def analyze(self, days: int = 90) -> GitHotspotAnalysis:
+        """Analyze git history for hot spots.
+
+        Args:
+            days: Number of days to analyze (default: 90)
+
+        Returns:
+            GitHotspotAnalysis with frequently changed files
+        """
+        from moss.git_hotspots import analyze_hotspots
+
+        return analyze_hotspots(self.root, days=days)
+
+    def get_top_hotspots(self, days: int = 90, limit: int = 10) -> list[dict[str, Any]]:
+        """Get the top N most frequently changed files.
+
+        Args:
+            days: Number of days to analyze
+            limit: Maximum number of files to return
+
+        Returns:
+            List of hotspot details for most frequently changed files
+        """
+        result = self.analyze(days=days)
+        return [h.to_dict() for h in result.hotspots[:limit]]
+
+
+@dataclass
+class ExternalDepsAPI:
+    """API for external dependency analysis.
+
+    Analyzes PyPI/npm dependencies including transitive dependencies,
+    security vulnerabilities, and license compatibility.
+    """
+
+    root: Path
+
+    def analyze(
+        self,
+        resolve: bool = False,
+        check_vulns: bool = False,
+        check_licenses: bool = False,
+    ) -> DependencyAnalysisResult:
+        """Analyze project dependencies.
+
+        Args:
+            resolve: If True, resolve full transitive dependency tree
+            check_vulns: If True, check for known vulnerabilities via OSV API
+            check_licenses: If True, check license compatibility
+
+        Returns:
+            DependencyAnalysisResult with dependency information
+        """
+        from moss.external_deps import ExternalDependencyAnalyzer
+
+        analyzer = ExternalDependencyAnalyzer(self.root)
+        return analyzer.analyze(
+            resolve=resolve,
+            check_vulns=check_vulns,
+            check_licenses=check_licenses,
+        )
+
+    def list_direct(self) -> list[dict[str, Any]]:
+        """List direct dependencies.
+
+        Returns:
+            List of direct dependency details
+        """
+        result = self.analyze()
+        return [d.to_dict() for d in result.dependencies]
+
+    def check_security(self) -> list[dict[str, Any]]:
+        """Check for security vulnerabilities.
+
+        Returns:
+            List of vulnerability details
+        """
+        result = self.analyze(check_vulns=True)
+        return [v.to_dict() for v in result.vulnerabilities]
+
+
+@dataclass
 class ToolMatchResult:
     """Result of matching a query to a tool.
 
@@ -778,6 +953,10 @@ class MossAPI:
     _context: ContextAPI | None = None
     _health: HealthAPI | None = None
     _dwim: DWIMAPI | None = None
+    _complexity: ComplexityAPI | None = None
+    _ref_check: RefCheckAPI | None = None
+    _git_hotspots: GitHotspotsAPI | None = None
+    _external_deps: ExternalDepsAPI | None = None
 
     @classmethod
     def for_project(cls, path: str | Path) -> MossAPI:
@@ -860,6 +1039,34 @@ class MossAPI:
         if self._dwim is None:
             self._dwim = DWIMAPI()
         return self._dwim
+
+    @property
+    def complexity(self) -> ComplexityAPI:
+        """Access cyclomatic complexity analysis functionality."""
+        if self._complexity is None:
+            self._complexity = ComplexityAPI(root=self.root)
+        return self._complexity
+
+    @property
+    def ref_check(self) -> RefCheckAPI:
+        """Access bidirectional reference checking functionality."""
+        if self._ref_check is None:
+            self._ref_check = RefCheckAPI(root=self.root)
+        return self._ref_check
+
+    @property
+    def git_hotspots(self) -> GitHotspotsAPI:
+        """Access git hotspot analysis functionality."""
+        if self._git_hotspots is None:
+            self._git_hotspots = GitHotspotsAPI(root=self.root)
+        return self._git_hotspots
+
+    @property
+    def external_deps(self) -> ExternalDepsAPI:
+        """Access external dependency analysis functionality."""
+        if self._external_deps is None:
+            self._external_deps = ExternalDepsAPI(root=self.root)
+        return self._external_deps
 
 
 # Convenience alias

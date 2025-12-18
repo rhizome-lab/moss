@@ -233,11 +233,15 @@ def introspect_api() -> list[SubAPI]:
         CFGAPI,
         DWIMAPI,
         AnchorAPI,
+        ComplexityAPI,
         ContextAPI,
         DependencyAPI,
+        ExternalDepsAPI,
         GitAPI,
+        GitHotspotsAPI,
         HealthAPI,
         PatchAPI,
+        RefCheckAPI,
         SkeletonAPI,
         ValidationAPI,
     )
@@ -254,6 +258,10 @@ def introspect_api() -> list[SubAPI]:
         "context": ContextAPI,
         "health": HealthAPI,
         "dwim": DWIMAPI,
+        "complexity": ComplexityAPI,
+        "ref_check": RefCheckAPI,
+        "git_hotspots": GitHotspotsAPI,
+        "external_deps": ExternalDepsAPI,
     }
 
     results = []

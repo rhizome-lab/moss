@@ -15,8 +15,8 @@ See `~/git/prose/moss/` for full synthesis design documents.
 **Why aren't we using it?** Need to actually configure Claude Code to use it.
 
 Still needed:
-- [ ] Documentation: how to add to Claude Code's MCP config
-- [ ] Add missing tools: `complexity`, `check-refs`, `git-hotspots`, `external-deps`
+- [x] Documentation: how to add to Claude Code's MCP config (see `docs/getting-started/mcp-integration.md`)
+- [x] Add missing tools: `complexity`, `check-refs`, `git-hotspots`, `external-deps`
 - [ ] Resource providers: file summaries, codebase overview
 - [ ] Prompt templates: "understand this file", "prepare for refactor"
 - [ ] Test it works end-to-end with Claude Code
@@ -34,7 +34,7 @@ Still needed:
 **CLI:** `moss gen --target=<mcp|http|cli|openapi> [--output FILE] [--list]`
 
 **Completed:**
-- [x] MCP server now uses generated tools (28 tools from MossAPI introspection)
+- [x] MCP server now uses generated tools (38 tools from MossAPI introspection)
 - [x] DWIMAPI added to MossAPI (analyze_intent, resolve_tool, list_tools, get_tool_info)
 - [x] `moss gen` CLI command for regenerating interfaces
 - [x] HTTP server (`server/app.py`) now uses generated routes via HTTPGenerator
@@ -52,7 +52,7 @@ Still needed:
 
 **CI/Automation:**
 - [x] Drift detection script (`scripts/check_gen_drift.py`) - compares generated OpenAPI/MCP specs to committed versions
-- [ ] Add drift check to CI workflow (GitHub Actions)
+- [x] Add drift check to CI workflow (GitHub Actions)
 
 ### Non-LLM Code Generators
 
@@ -177,6 +177,46 @@ See `docs/prior-art.md` for detailed research (updated Dec 2025).
 - [ ] Measure structural context (skeleton) value vs raw file context
 
 Key question answered: Interface design matters more than model scaling (SWE-agent proves this). Moss's structural-awareness approach is differentiated but unproven - needs benchmark validation.
+
+### Distilled Learnings → Implementation Plan
+
+From the competitor analysis, here are the most actionable patterns with implementation sketches:
+
+**1. Architect/Editor Split (from Aider)**
+Separate "reasoning about what to change" from "making the change":
+- Phase 1: Planner generates high-level plan using reasoning model (o1, DeepSeek R1)
+- Phase 2: Executor applies changes using cheaper model with moss's anchor-based patching
+- Benefits: Better reasoning + reliable edits + cost savings
+- Implementation: Add `moss.synthesis.strategies.ArchitectEditorStrategy`
+
+**2. Edit-Time Guardrails (from SWE-agent)**
+Validate changes before they're committed, not after:
+- Integrate `ruff check` and type checking into patch application
+- If syntax/lint errors, force corrective edit before proceeding
+- Shadow Git already provides rollback; add validation gate before commit
+- Implementation: Extend `ValidationAPI` to support pre-commit hooks in patch flow
+
+**3. Checkpoint/Rollback UX (from Claude Code)**
+Make Shadow Git's rollback capability user-visible:
+- `moss checkpoint create <name>` - named snapshot
+- `moss checkpoint list` - show available checkpoints
+- `moss checkpoint restore <name>` - rollback to checkpoint
+- Currently: Shadow Git exists but users don't know about it
+- Implementation: Add `CheckpointAPI` to `MossAPI`, CLI commands
+
+**4. Micro-Agents (from OpenHands)**
+Task-specialized agents that share infrastructure:
+- Define micro-agent protocol: just override system prompt + tool subset
+- Examples: "DocAgent" (writes docstrings), "TestAgent" (writes tests), "RefactorAgent"
+- Share: context loading, tool execution, validation
+- Implementation: `moss.agents.micro` module with MicroAgent base class
+
+**5. Codebase Indexing (from Cursor)**
+Proactive embedding for semantic search:
+- Auto-index on project load (background task)
+- Chunk by function/class, not fixed tokens
+- Enable queries like "where is authentication handled?"
+- Implementation: Enhance `RAGTool` with auto-indexing, integrate with `context_memory.py`
 
 ### Agent Learning / Memory
 

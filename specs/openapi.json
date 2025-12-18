@@ -125,6 +125,56 @@
         ]
       }
     },
+    "/complexity/analyze": {
+      "get": {
+        "description": "Analyze cyclomatic complexity of all Python files. ComplexityReport with complexity metrics for all functions",
+        "parameters": [
+          {
+            "description": "Glob pattern for files to analyze (default: all Python files)",
+            "in": "query",
+            "name": "pattern",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Analyze cyclomatic complexity of all Python files",
+        "tags": [
+          "complexity"
+        ]
+      }
+    },
+    "/complexity/get-high-risk": {
+      "get": {
+        "description": "Get functions exceeding a complexity threshold. List of function details for high-complexity functions",
+        "parameters": [
+          {
+            "description": "Complexity threshold (default: 10)",
+            "in": "query",
+            "name": "threshold",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Get functions exceeding a complexity threshold",
+        "tags": [
+          "complexity"
+        ]
+      }
+    },
     "/context/compile": {
       "post": {
         "description": "Compile context for the given files. CompiledContext with rendered views",
@@ -354,6 +404,77 @@
         ]
       }
     },
+    "/external_deps/analyze": {
+      "get": {
+        "description": "Analyze project dependencies. DependencyAnalysisResult with dependency information",
+        "parameters": [
+          {
+            "description": "If True, resolve full transitive dependency tree",
+            "in": "query",
+            "name": "resolve",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "If True, check for known vulnerabilities via OSV API",
+            "in": "query",
+            "name": "check_vulns",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "If True, check license compatibility",
+            "in": "query",
+            "name": "check_licenses",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Analyze project dependencies",
+        "tags": [
+          "external_deps"
+        ]
+      }
+    },
+    "/external_deps/check-security": {
+      "get": {
+        "description": "Check for security vulnerabilities. List of vulnerability details",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Check for security vulnerabilities",
+        "tags": [
+          "external_deps"
+        ]
+      }
+    },
+    "/external_deps/list-direct": {
+      "get": {
+        "description": "List direct dependencies. List of direct dependency details",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "List direct dependencies",
+        "tags": [
+          "external_deps"
+        ]
+      }
+    },
     "/git/commit": {
       "post": {
         "description": "Create a commit on the current shadow branch. CommitHandle referencing the new commit",
@@ -429,6 +550,65 @@
         "summary": "Initialize shadow git for the project",
         "tags": [
           "git"
+        ]
+      }
+    },
+    "/git_hotspots/analyze": {
+      "get": {
+        "description": "Analyze git history for hot spots. GitHotspotAnalysis with frequently changed files",
+        "parameters": [
+          {
+            "description": "Number of days to analyze (default: 90)",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Analyze git history for hot spots",
+        "tags": [
+          "git_hotspots"
+        ]
+      }
+    },
+    "/git_hotspots/get-top-hotspots": {
+      "get": {
+        "description": "Get the top N most frequently changed files. List of hotspot details for most frequently changed files",
+        "parameters": [
+          {
+            "description": "Number of days to analyze",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of files to return",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Get the top N most frequently changed files",
+        "tags": [
+          "git_hotspots"
         ]
       }
     },
@@ -650,6 +830,59 @@
         ]
       }
     },
+    "/ref_check/check": {
+      "get": {
+        "description": "Run bidirectional reference check. RefCheckResult with valid, broken, and stale references",
+        "parameters": [
+          {
+            "description": "Warn if target modified more than N days after source",
+            "in": "query",
+            "name": "staleness_days",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Run bidirectional reference check",
+        "tags": [
+          "ref_check"
+        ]
+      }
+    },
+    "/ref_check/check-code-to-docs": {
+      "get": {
+        "description": "Check only code-to-documentation references. List of broken code->doc references",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Check only code-to-documentation references",
+        "tags": [
+          "ref_check"
+        ]
+      }
+    },
+    "/ref_check/check-docs-to-code": {
+      "get": {
+        "description": "Check only documentation-to-code references. List of broken doc->code references",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Check only documentation-to-code references",
+        "tags": [
+          "ref_check"
+        ]
+      }
+    },
     "/skeleton/extract": {
       "post": {
         "description": "Extract skeleton from a Python file. List of Symbol objects representing the code structure",
@@ -809,6 +1042,22 @@
     {
       "description": "API for semantic tool routing and discovery. Provides fuzzy matching and semantic routing for tool discovery, making Moss interfaces robust against minor variations in how tools are invoked. Features: - Semantic aliases: map conceptual names to canonical tools - Fuzzy matching: handle typos and variations - TF-IDF cosine similarity: smarter semantic matching - Confidence scoring: know when to auto-correct vs suggest",
       "name": "dwim"
+    },
+    {
+      "description": "API for cyclomatic complexity analysis. Calculates McCabe cyclomatic complexity for Python functions, helping identify code that may be difficult to test or maintain.",
+      "name": "complexity"
+    },
+    {
+      "description": "API for bidirectional reference checking. Validates that code files reference their documentation and documentation references implementation files. Detects stale references where targets have been modified after sources.",
+      "name": "ref_check"
+    },
+    {
+      "description": "API for git hotspot analysis. Identifies frequently changed files in the git repository. High churn areas may indicate code that needs refactoring.",
+      "name": "git_hotspots"
+    },
+    {
+      "description": "API for external dependency analysis. Analyzes PyPI/npm dependencies including transitive dependencies, security vulnerabilities, and license compatibility.",
+      "name": "external_deps"
     }
   ]
 }
