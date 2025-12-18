@@ -151,10 +151,10 @@ Use moss to analyze itself and keep documentation current.
 Expand `moss health` into a comprehensive but concise project analysis. Rename current verbose output to `moss report` if needed.
 
 ##### 28a: Dependency Analysis
-- [ ] Circular dependency detection (use existing `extract_dependencies()`)
-- [ ] "God modules" - modules with high fan-in (everything depends on them)
-- [ ] Orphan modules - modules nothing imports
-- [ ] Coupling metrics - inter-module dependency density
+- [x] Circular dependency detection (use existing `extract_dependencies()`)
+- [x] "God modules" - modules with high fan-in (everything depends on them)
+- [x] Orphan modules - modules nothing imports
+- [x] Coupling metrics - inter-module dependency density
 - [ ] Layer violation detection (if Architecture.md defines layers)
 - [ ] Dependency graph visualization (optional `--graph` output)
 
