@@ -34,13 +34,13 @@ if TYPE_CHECKING:
     from moss.external_deps import DependencyAnalysisResult
     from moss.git_hotspots import GitHotspotAnalysis
     from moss.patches import Patch, PatchResult
-    from moss.shadow_git import CommitHandle, ShadowGit
+    from moss.shadow_git import CommitHandle, ShadowBranch, ShadowGit
     from moss.skeleton import Symbol
     from moss.status import ProjectStatus
     from moss.structural_analysis import StructuralAnalysis
     from moss.summarize import ProjectSummary
     from moss.test_analysis import TestAnalysis
-    from moss.validators import ValidationResult, Validator
+    from moss.validators import ValidationResult, ValidatorChain
 
 
 @dataclass
@@ -206,7 +206,7 @@ class PatchAPI:
         result = apply_patch(source, patch)
 
         if write and result.success:
-            path.write_text(result.content)
+            path.write_text(result.patched)
 
         return result
 
@@ -236,7 +236,7 @@ class PatchAPI:
         result = apply_patch_with_fallback(source, patch)
 
         if write and result.success:
-            path.write_text(result.content)
+            path.write_text(result.patched)
 
         return result
 
@@ -250,22 +250,22 @@ class PatchAPI:
         """Create a Patch object.
 
         Args:
-            patch_type: Type of patch - "insert", "replace", "delete", "wrap"
+            patch_type: Type of patch - "insert_before", "insert_after", "replace", "delete"
             anchor_name: Name of the anchor to target
             content: New content for the patch
-            **kwargs: Additional patch options (position, anchor_type, etc.)
+            **kwargs: Additional patch options (anchor_type for anchor construction)
 
         Returns:
             Patch object ready for application
         """
-        from moss.anchors import AnchorType
+        from moss.anchors import Anchor, AnchorType
         from moss.patches import Patch, PatchType
 
         type_map = {
-            "insert": PatchType.INSERT,
+            "insert_before": PatchType.INSERT_BEFORE,
+            "insert_after": PatchType.INSERT_AFTER,
             "replace": PatchType.REPLACE,
             "delete": PatchType.DELETE,
-            "wrap": PatchType.WRAP,
         }
 
         anchor_type_map = {
@@ -276,14 +276,15 @@ class PatchAPI:
             "import": AnchorType.IMPORT,
         }
 
+        anchor_type = anchor_type_map.get(
+            kwargs.get("anchor_type", "function"), AnchorType.FUNCTION
+        )
+        anchor = Anchor(type=anchor_type, name=anchor_name)
+
         return Patch(
-            type=type_map[patch_type],
-            anchor_name=anchor_name,
+            anchor=anchor,
+            patch_type=type_map.get(patch_type, PatchType.REPLACE),
             content=content,
-            anchor_type=anchor_type_map.get(
-                kwargs.get("anchor_type", "function"), AnchorType.FUNCTION
-            ),
-            position=kwargs.get("position"),
         )
 
     def _resolve_path(self, file_path: str | Path) -> Path:
@@ -390,7 +391,7 @@ class ValidationAPI:
 
     root: Path
 
-    def create_chain(self) -> Validator:
+    def create_chain(self) -> ValidatorChain:
         """Create a standard Python validator chain.
 
         Returns:
@@ -400,7 +401,7 @@ class ValidationAPI:
 
         return create_python_validator_chain()
 
-    def validate(self, file_path: str | Path) -> ValidationResult:
+    async def validate(self, file_path: str | Path) -> ValidationResult:
         """Validate a Python file with the default chain.
 
         Args:
@@ -411,8 +412,7 @@ class ValidationAPI:
         """
         chain = self.create_chain()
         path = self._resolve_path(file_path)
-        source = path.read_text()
-        return chain.validate(source, context={"file": str(path), "root": str(self.root)})
+        return await chain.validate(path)
 
     def _resolve_path(self, file_path: str | Path) -> Path:
         path = Path(file_path)
@@ -443,29 +443,30 @@ class GitAPI:
             self._shadow_git = ShadowGit(self.root)
         return self._shadow_git
 
-    def create_branch(self, name: str | None = None) -> Any:
+    async def create_branch(self, name: str | None = None) -> ShadowBranch:
         """Create an isolated shadow branch for agent work.
 
         Args:
             name: Optional branch name (auto-generated if not provided)
 
         Returns:
-            ShadowBranch context manager
+            ShadowBranch for managing the branch
         """
         git = self.init()
-        return git.create_branch(name)
+        return await git.create_shadow_branch(name)
 
-    def commit(self, message: str) -> CommitHandle:
-        """Create a commit on the current shadow branch.
+    async def commit(self, branch: ShadowBranch, message: str) -> CommitHandle:
+        """Create a commit on the specified shadow branch.
 
         Args:
+            branch: ShadowBranch to commit on
             message: Commit message
 
         Returns:
             CommitHandle referencing the new commit
         """
         git = self.init()
-        return git.commit(message)
+        return await git.commit(branch, message)
 
 
 @dataclass
@@ -493,7 +494,7 @@ class ContextAPI:
             self._host = ContextHost(registry)
         return self._host
 
-    def compile(
+    async def compile(
         self,
         file_paths: list[str | Path],
         view_types: list[str] | None = None,
@@ -502,12 +503,12 @@ class ContextAPI:
 
         Args:
             file_paths: Files to include in context
-            view_types: View types to generate (default: skeleton, dependencies)
+            view_types: View types to generate (default: skeleton, dependency)
 
         Returns:
             CompiledContext with rendered views
         """
-        from moss.views import Intent, ViewTarget, ViewType
+        from moss.views import ViewTarget, ViewType
 
         host = self.init()
 
@@ -518,17 +519,17 @@ class ContextAPI:
                 p = self.root / p
             targets.append(ViewTarget(path=p))
 
-        types = view_types or ["skeleton", "dependencies"]
+        types = view_types or ["skeleton", "dependency"]
         type_map = {
             "skeleton": ViewType.SKELETON,
-            "dependencies": ViewType.DEPENDENCIES,
+            "dependency": ViewType.DEPENDENCY,
             "cfg": ViewType.CFG,
             "raw": ViewType.RAW,
+            "elided": ViewType.ELIDED,
         }
         view_type_enums = [type_map.get(t, ViewType.SKELETON) for t in types]
 
-        intent = Intent(targets=targets, view_types=view_type_enums)
-        return host.compile(intent)
+        return await host.compile(targets, view_types=view_type_enums)
 
 
 @dataclass

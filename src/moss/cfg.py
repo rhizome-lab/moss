@@ -12,11 +12,12 @@ Usage:
 
     # Build CFG from source
     builder = CFGBuilder()
-    cfg = builder.build_from_source(source, "my_function")
+    cfgs = builder.build_from_source(source, "my_function")
 
     # Or use the view provider
+    from pathlib import Path
     provider = CFGViewProvider()
-    view = provider.provide(file_handle, ViewOptions())
+    view = provider.provide(Path("myfile.py"))
 """
 
 from __future__ import annotations
@@ -28,7 +29,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from moss.handles import Handle
     from moss.plugins import PluginMetadata
     from moss.views import View, ViewOptions, ViewTarget
 
@@ -602,7 +602,11 @@ class CFGBuilder:
 
 
 class CFGViewProvider:
-    """View provider that generates Control Flow Graph views."""
+    """View provider that generates Control Flow Graph views.
+
+    Note: This is a legacy interface. For the plugin-based architecture,
+    use PythonCFGPlugin instead.
+    """
 
     def __init__(self) -> None:
         self._builder = CFGBuilder()
@@ -611,23 +615,22 @@ class CFGViewProvider:
     def name(self) -> str:
         return "cfg"
 
-    def provide(self, handle: Handle, options: ViewOptions) -> View:
+    def provide(self, path: Path, options: ViewOptions | None = None) -> View:
         """Provide a CFG view for a file.
 
         Args:
-            handle: File handle
-            options: View options (may include "function" to specify which function)
+            path: Path to the source file
+            options: View options (may include "function" in extra dict)
 
         Returns:
             View containing CFG information
         """
-        from moss.views import View, ViewType
+        from moss.views import View, ViewTarget, ViewType
 
-        content = handle.read()
-        if isinstance(content, bytes):
-            content = content.decode("utf-8")
+        opts = options or ViewOptions()
+        content = path.read_text()
 
-        function_name = options.metadata.get("function") if options.metadata else None
+        function_name = opts.extra.get("function") if opts.extra else None
         cfgs = self._builder.build_from_source(content, function_name)
 
         # Format output
@@ -637,28 +640,26 @@ class CFGViewProvider:
             output_lines.append("")
 
         return View(
+            target=ViewTarget(path=path),
+            view_type=ViewType.CFG,
             content="\n".join(output_lines),
-            view_type=ViewType.STRUCTURAL,
-            source_file=handle.path if hasattr(handle, "path") else None,
             metadata={
                 "function_count": len(cfgs),
                 "functions": [c.name for c in cfgs],
             },
         )
 
-    def provide_dot(self, handle: Handle, function_name: str | None = None) -> str:
+    def provide_dot(self, path: Path, function_name: str | None = None) -> str:
         """Generate DOT format CFG for visualization.
 
         Args:
-            handle: File handle
+            path: Path to the source file
             function_name: Specific function (None for all)
 
         Returns:
             DOT format string (can be rendered with Graphviz)
         """
-        content = handle.read()
-        if isinstance(content, bytes):
-            content = content.decode("utf-8")
+        content = path.read_text()
 
         cfgs = self._builder.build_from_source(content, function_name)
 

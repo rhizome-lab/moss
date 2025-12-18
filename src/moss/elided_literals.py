@@ -10,11 +10,12 @@ Usage:
     from moss.elided_literals import elide_literals, ElidedLiteralsProvider
 
     # Elide literals in source code
-    elided = elide_literals(source)
+    elided, stats = elide_literals(source)
 
     # Or use the view provider
+    from pathlib import Path
     provider = ElidedLiteralsProvider()
-    view = provider.provide(file_handle, ViewOptions())
+    view = provider.provide(Path("myfile.py"))
 """
 
 from __future__ import annotations
@@ -22,10 +23,10 @@ from __future__ import annotations
 import ast
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from moss.handles import Handle
     from moss.views import View, ViewOptions
 
 
@@ -378,7 +379,11 @@ def elide_literals_regex(source: str) -> str:
 
 
 class ElidedLiteralsProvider:
-    """View provider that generates elided literals views."""
+    """View provider that generates elided literals views.
+
+    Note: This is a legacy interface. For the plugin-based architecture,
+    use the appropriate plugin instead.
+    """
 
     def __init__(self, config: ElisionConfig | None = None) -> None:
         self.config = config or ElisionConfig()
@@ -387,28 +392,26 @@ class ElidedLiteralsProvider:
     def name(self) -> str:
         return "elided"
 
-    def provide(self, handle: Handle, options: ViewOptions) -> View:
+    def provide(self, path: Path, options: ViewOptions | None = None) -> View:
         """Provide an elided literals view.
 
         Args:
-            handle: File handle
-            options: View options
+            path: Path to the source file
+            options: View options (unused, for API compatibility)
 
         Returns:
             View with literals elided
         """
-        from moss.views import View, ViewType
+        from moss.views import View, ViewTarget, ViewType
 
-        content = handle.read()
-        if isinstance(content, bytes):
-            content = content.decode("utf-8")
+        content = path.read_text()
 
         elided_content, stats = elide_literals(content, self.config)
 
         return View(
+            target=ViewTarget(path=path),
+            view_type=ViewType.ELIDED,
             content=elided_content,
-            view_type=ViewType.STRUCTURAL,
-            source_file=handle.path if hasattr(handle, "path") else None,
             metadata={
                 "elisions": stats.total,
                 "strings_elided": stats.strings,

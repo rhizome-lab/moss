@@ -267,7 +267,7 @@ class EventStreamManager:
 
     async def _handle_event(self, event: Event) -> None:
         """Handle events from the event bus."""
-        sse_type = self._map_event_type(event.event_type)
+        sse_type = self._map_event_type(event.type)
         if sse_type:
             sse_event = SSEEvent(
                 event_type=sse_type,

@@ -20,6 +20,7 @@ Example:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 from moss.preferences.extractors import (
@@ -42,7 +43,7 @@ from moss.preferences.parsing import LogFormat, ParsedSession, parse_session, pa
 
 
 def extract_preferences(
-    paths: list[str | Path],
+    paths: Sequence[str | Path],
     *,
     log_format: LogFormat = LogFormat.AUTO,
     min_confidence: ConfidenceLevel = ConfidenceLevel.LOW,

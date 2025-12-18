@@ -112,7 +112,7 @@ class LlamaCppProvider:
                 parts.append(f"{prefix}: {msg['content']}")
             parts.append("Assistant:")
             prompt = "\n\n".join(parts)
-            return self._complete_library(prompt, **kwargs)
+            return self._complete_library(prompt, system=system)
 
     def _complete_server(
         self,

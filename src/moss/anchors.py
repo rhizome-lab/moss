@@ -122,13 +122,16 @@ class AnchorResolver(ast.NodeVisitor):
         score = self._match_score(name, context)
 
         if score >= self.min_score:
+            # All nodes passed to _create_match have location info
+            lineno = getattr(node, "lineno", 0)
+            col_offset = getattr(node, "col_offset", 0)
             return AnchorMatch(
                 anchor=self._target_anchor,
                 node=node,
-                lineno=node.lineno,
-                end_lineno=getattr(node, "end_lineno", node.lineno),
-                col_offset=node.col_offset,
-                end_col_offset=getattr(node, "end_col_offset", node.col_offset),
+                lineno=lineno,
+                end_lineno=getattr(node, "end_lineno", lineno),
+                col_offset=col_offset,
+                end_col_offset=getattr(node, "end_col_offset", col_offset),
                 score=score,
                 context_chain=context,
             )

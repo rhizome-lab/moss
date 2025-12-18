@@ -26,6 +26,11 @@ from typing import Any
 
 # Lazy import MCP to allow module to load without mcp installed
 _mcp_available = False
+Server: type = type(None)  # Placeholder
+Tool: type = type(None)  # Placeholder
+TextContent: type = type(None)  # Placeholder
+stdio_server: Any = None  # Placeholder
+
 try:
     from mcp.server import Server
     from mcp.server.stdio import stdio_server

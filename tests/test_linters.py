@@ -1,5 +1,6 @@
 """Tests for the linter plugin architecture."""
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,9 @@ from moss.plugins.linters import (
     get_linter_registry,
     reset_linter_registry,
 )
+
+# Check if mypy is available for conditional skipping
+HAS_MYPY = shutil.which("mypy") is not None
 
 # =============================================================================
 # Severity Tests
@@ -276,6 +280,7 @@ class TestRuffPlugin:
 # =============================================================================
 
 
+@pytest.mark.skipif(not HAS_MYPY, reason="mypy not installed")
 class TestMypyPlugin:
     @pytest.fixture
     def plugin(self):
@@ -478,8 +483,9 @@ class TestLinterRegistry:
         registry.register_builtins()
 
         available = registry.get_available()
-        # Both ruff and mypy should be available in our dev env
-        assert len(available) >= 2
+        # At least ruff should be available (mypy is optional)
+        assert len(available) >= 1
+        assert any(p.metadata.name == "ruff" for p in available)
 
     def test_register_builtins(self, registry: LinterRegistry):
         registry.register_builtins()

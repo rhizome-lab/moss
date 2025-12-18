@@ -58,21 +58,21 @@ class StructuredFormatter(logging.Formatter):
             log_data["exception"] = self.formatException(record.exc_info)
 
         # Add context fields if present
-        if hasattr(record, "context"):
-            ctx = record.context
-            if isinstance(ctx, LogContext):
-                if ctx.component:
-                    log_data["component"] = ctx.component
-                if ctx.operation:
-                    log_data["operation"] = ctx.operation
-                if ctx.request_id:
-                    log_data["request_id"] = ctx.request_id
-                if ctx.extra:
-                    log_data.update(ctx.extra)
+        ctx = getattr(record, "context", None)
+        if ctx is not None and isinstance(ctx, LogContext):
+            if ctx.component:
+                log_data["component"] = ctx.component
+            if ctx.operation:
+                log_data["operation"] = ctx.operation
+            if ctx.request_id:
+                log_data["request_id"] = ctx.request_id
+            if ctx.extra:
+                log_data.update(ctx.extra)
 
         # Add any extra fields passed directly
-        if hasattr(record, "extra_fields"):
-            log_data.update(record.extra_fields)
+        extra_fields = getattr(record, "extra_fields", None)
+        if extra_fields is not None:
+            log_data.update(extra_fields)
 
         return json.dumps(log_data)
 
@@ -85,15 +85,14 @@ class TextFormatter(logging.Formatter):
         # Build prefix from context
         prefix_parts = []
 
-        if hasattr(record, "context"):
-            ctx = record.context
-            if isinstance(ctx, LogContext):
-                if ctx.component:
-                    prefix_parts.append(f"[{ctx.component}]")
-                if ctx.operation:
-                    prefix_parts.append(f"({ctx.operation})")
-                if ctx.request_id:
-                    prefix_parts.append(f"req:{ctx.request_id[:8]}")
+        ctx = getattr(record, "context", None)
+        if ctx is not None and isinstance(ctx, LogContext):
+            if ctx.component:
+                prefix_parts.append(f"[{ctx.component}]")
+            if ctx.operation:
+                prefix_parts.append(f"({ctx.operation})")
+            if ctx.request_id:
+                prefix_parts.append(f"req:{ctx.request_id[:8]}")
 
         prefix = " ".join(prefix_parts)
         if prefix:
@@ -104,9 +103,8 @@ class TextFormatter(logging.Formatter):
 
         # Add extra fields if present
         extra_str = ""
-        if hasattr(record, "context") and isinstance(record.context, LogContext):
-            if record.context.extra:
-                extra_str = " " + " ".join(f"{k}={v}" for k, v in record.context.extra.items())
+        if ctx is not None and isinstance(ctx, LogContext) and ctx.extra:
+            extra_str = " " + " ".join(f"{k}={v}" for k, v in ctx.extra.items())
 
         return f"{prefix}{base}{extra_str}"
 

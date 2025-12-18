@@ -476,11 +476,11 @@ class PatternMatcher:
                 continue
 
             # Calculate confidence based on consistency of error messages
+            from collections import Counter  # Import here to avoid optional dependency issues
+
             error_messages = [ep.error_message for ep in episodes if ep.error_message]
             if error_messages:
                 # Simple confidence: ratio of most common error
-                from collections import Counter
-
                 counts = Counter(error_messages)
                 most_common_count = counts.most_common(1)[0][1]
                 confidence = most_common_count / len(episodes)

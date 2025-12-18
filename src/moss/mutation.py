@@ -410,6 +410,7 @@ class MutationAnalyzer:
         # Typically shows diffs or mutation descriptions
         current_file: Path | None = None
         current_line: int = 0
+        original: str = ""
 
         for line in output.strip().split("\n"):
             # Look for file paths
@@ -439,17 +440,17 @@ class MutationAnalyzer:
             if line.startswith("+") and not line.startswith("+++"):
                 mutated = line[1:].strip()
                 if current_file:
-                    orig = original if "original" in dir() else ""
-                    mutation_type = self._classify_mutation(orig, mutated)
+                    mutation_type = self._classify_mutation(original, mutated)
                     survivors.append(
                         SurvivingMutant(
                             file=current_file,
                             line=current_line,
-                            original=orig if orig else "?",
+                            original=original if original else "?",
                             mutated=mutated,
                             mutation_type=mutation_type,
                         )
                     )
+                    original = ""  # Reset for next mutation
 
         return survivors
 

@@ -309,6 +309,13 @@ class Output:
         """Output a debug message (only in debug mode)."""
         self.write(message, "debug", Verbosity.DEBUG)
 
+    def debug_traceback(self) -> None:
+        """Output current exception traceback in debug mode."""
+        import traceback
+
+        if self.verbosity >= Verbosity.DEBUG:
+            self.write(traceback.format_exc(), "debug", Verbosity.DEBUG)
+
     def step(self, message: str) -> None:
         """Output a step/progress message."""
         self.write(message, "step", Verbosity.NORMAL)
@@ -346,6 +353,9 @@ class Output:
 
         if not shutil.which("jq"):
             self.error("jq not found - install jq or omit --jq flag")
+            return None
+
+        if self._jq_expr is None:
             return None
 
         try:

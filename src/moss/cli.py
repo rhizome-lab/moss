@@ -617,10 +617,10 @@ def cmd_query(args: Namespace) -> int:
     else:
         if getattr(args, "group_by", None) == "file":
             # Group results by file for text output
-            grouped: dict[str, list] = {}
+            grouped_text: dict[str, list] = {}
             for r in results:
-                grouped.setdefault(r["file"], []).append(r)
-            for file_path_str, file_results in grouped.items():
+                grouped_text.setdefault(r["file"], []).append(r)
+            for file_path_str, file_results in grouped_text.items():
                 output.header(file_path_str)
                 for r in file_results:
                     ctx = f" (in {r['context']})" if r.get("context") else ""
@@ -749,8 +749,8 @@ def cmd_cfg(args: Namespace) -> int:
             source = path.read_text()
             mermaid_parts = []
             for cfg_data in cfgs:
-                cfg = builder.build_from_source(source, cfg_data["name"])
-                if cfg:
+                cfg_list = builder.build_from_source(source, cfg_data["name"])
+                for cfg in cfg_list:
                     mermaid_parts.append(cfg.to_mermaid())
             mermaid_lines = "\n\n".join(mermaid_parts)
 
@@ -1684,6 +1684,7 @@ def cmd_synthesize(args: Namespace) -> int:
         TestDrivenDecomposition,
         TypeDrivenDecomposition,
     )
+    from moss.synthesis.strategy import DecompositionStrategy
 
     output = setup_output(args)
 
@@ -1706,7 +1707,7 @@ def cmd_synthesize(args: Namespace) -> int:
     )
 
     # Set up strategies
-    strategies = []
+    strategies: list[DecompositionStrategy] = []
     strategy_name = getattr(args, "strategy", "auto")
 
     if strategy_name == "auto":
