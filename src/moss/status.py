@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from moss.api_surface_analysis import APISurfaceAnalysis, APISurfaceAnalyzer
 from moss.check_docs import DocChecker, DocCheckResult
 from moss.check_todos import TodoChecker, TodoCheckResult, TodoStatus
 from moss.dependency_analysis import DependencyAnalysis, DependencyAnalyzer
@@ -80,6 +81,14 @@ class ProjectStatus:
     modules_without_tests: int = 0
     untested_exports: int = 0
 
+    # API surface stats
+    api_public: int = 0
+    api_private: int = 0
+    api_documented: int = 0
+    api_undocumented: int = 0
+    api_naming_issues: int = 0
+    api_high_risk: int = 0
+
     # Issues
     weak_spots: list[WeakSpot] = field(default_factory=list)
     next_actions: list[NextAction] = field(default_factory=list)
@@ -90,6 +99,7 @@ class ProjectStatus:
     dep_analysis: DependencyAnalysis | None = None
     struct_analysis: StructuralAnalysis | None = None
     test_analysis: TestAnalysis | None = None
+    api_analysis: APISurfaceAnalysis | None = None
 
     @property
     def health_score(self) -> int:
@@ -133,6 +143,14 @@ class ProjectStatus:
         # Penalize for many untested modules
         if self.modules_without_tests > 10:
             score -= min(10, (self.modules_without_tests - 10))
+
+        # Penalize for many undocumented APIs
+        if self.api_undocumented > 20:
+            score -= min(10, (self.api_undocumented - 20) // 5)
+
+        # Penalize for naming issues
+        if self.api_naming_issues > 5:
+            score -= min(5, (self.api_naming_issues - 5))
 
         return max(0, min(100, score))
 
@@ -189,6 +207,11 @@ class ProjectStatus:
             total = self.modules_with_tests + self.modules_without_tests
             if total > 0:
                 lines.append(f"| Modules Tested | {tested}/{total} ({tested * 100 // total}%) |")
+        if self.api_public > 0:
+            doc_pct = self.api_documented * 100 // self.api_public if self.api_public else 0
+            lines.append(f"| API Surface | {self.api_public} public, {doc_pct}% documented |")
+        if self.api_high_risk > 0:
+            lines.append(f"| High-Risk APIs | {self.api_high_risk} widely-imported |")
         lines.append("")
 
         # Next actions
@@ -258,6 +281,14 @@ class ProjectStatus:
                     "modules_with_tests": self.modules_with_tests,
                     "modules_without_tests": self.modules_without_tests,
                     "untested_exports": self.untested_exports,
+                },
+                "api_surface": {
+                    "public": self.api_public,
+                    "private": self.api_private,
+                    "documented": self.api_documented,
+                    "undocumented": self.api_undocumented,
+                    "naming_issues": self.api_naming_issues,
+                    "high_risk": self.api_high_risk,
                 },
             },
             "next_actions": [
@@ -477,6 +508,54 @@ class StatusChecker:
                         severity="low",
                         message=f"{len(untested_modules)} modules without tests",
                         suggestion="Add tests for untested modules",
+                    )
+                )
+        except Exception:
+            pass
+
+        # API surface analysis
+        api_analyzer = APISurfaceAnalyzer(self.root)
+        try:
+            api_result = api_analyzer.analyze()
+            status.api_analysis = api_result
+            status.api_public = api_result.total_public
+            status.api_private = api_result.total_private
+            status.api_documented = api_result.total_documented
+            status.api_undocumented = len(api_result.undocumented)
+            status.api_naming_issues = len(api_result.naming_issues)
+            status.api_high_risk = len(api_result.high_risk_exports)
+
+            # Add undocumented APIs as weak spots
+            if len(api_result.undocumented) > 20:
+                status.weak_spots.append(
+                    WeakSpot(
+                        category="api",
+                        severity="medium",
+                        message=f"{len(api_result.undocumented)} undocumented public APIs",
+                        suggestion="Add docstrings to public functions and classes",
+                    )
+                )
+
+            # Add naming issues as weak spots
+            if api_result.naming_issues:
+                status.weak_spots.append(
+                    WeakSpot(
+                        category="api",
+                        severity="low",
+                        message=f"{len(api_result.naming_issues)} naming convention issues",
+                        suggestion="Follow PEP 8 naming conventions",
+                    )
+                )
+
+            # Add high-risk exports as weak spots
+            for export in api_result.high_risk_exports[:3]:  # Top 3
+                msg = f"`{export.name}` imported by {export.import_count} modules"
+                status.weak_spots.append(
+                    WeakSpot(
+                        category="api",
+                        severity="low",
+                        message=f"{msg} (breaking change risk)",
+                        suggestion="Consider stability guarantees for widely-used exports",
                     )
                 )
         except Exception:

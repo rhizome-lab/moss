@@ -842,6 +842,102 @@ class TestDependencyAnalysis:
         assert metrics["spoke1"].fan_out == 1
 
 
+class TestAPISurfaceAnalysis:
+    """Tests for APISurfaceAnalyzer."""
+
+    def test_public_export_detection(self, tmp_path: Path):
+        """Test that public exports are detected."""
+        from moss.api_surface_analysis import APISurfaceAnalyzer
+
+        # Create a minimal project
+        src = tmp_path / "src"
+        src.mkdir()
+        pkg = src / "pkg"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("")
+        (pkg / "core.py").write_text('''"""Core module."""
+
+def public_func():
+    """A public function."""
+    pass
+
+def _private_func():
+    pass
+
+class PublicClass:
+    """A public class."""
+    pass
+
+class _PrivateClass:
+    pass
+''')
+
+        analyzer = APISurfaceAnalyzer(tmp_path)
+        result = analyzer.analyze()
+
+        # Should find public_func, PublicClass as public
+        public_names = {e.name for e in result.exports}
+        assert "public_func" in public_names
+        assert "PublicClass" in public_names
+        assert "_private_func" not in public_names
+        assert "_PrivateClass" not in public_names
+
+    def test_undocumented_detection(self, tmp_path: Path):
+        """Test that undocumented exports are flagged."""
+        from moss.api_surface_analysis import APISurfaceAnalyzer
+
+        src = tmp_path / "src"
+        src.mkdir()
+        pkg = src / "pkg"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("")
+        (pkg / "core.py").write_text('''def documented():
+    """Has a docstring."""
+    pass
+
+def undocumented():
+    pass
+''')
+
+        analyzer = APISurfaceAnalyzer(tmp_path)
+        result = analyzer.analyze()
+
+        undoc_names = {e.name for e in result.undocumented}
+        assert "undocumented" in undoc_names
+        assert "documented" not in undoc_names
+
+    def test_naming_convention_detection(self, tmp_path: Path):
+        """Test that naming issues are detected."""
+        from moss.api_surface_analysis import APISurfaceAnalyzer
+
+        src = tmp_path / "src"
+        src.mkdir()
+        pkg = src / "pkg"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("")
+        (pkg / "core.py").write_text("""def camelCaseFunc():  # Bad: should be snake_case
+    pass
+
+class lowercase_class:  # Bad: should be PascalCase
+    pass
+
+def good_function():
+    pass
+
+class GoodClass:
+    pass
+""")
+
+        analyzer = APISurfaceAnalyzer(tmp_path)
+        result = analyzer.analyze()
+
+        bad_names = {i.name for i in result.naming_issues}
+        assert "camelCaseFunc" in bad_names
+        assert "lowercase_class" in bad_names
+        assert "good_function" not in bad_names
+        assert "GoodClass" not in bad_names
+
+
 class TestStatusChecker:
     """Tests for StatusChecker."""
 
