@@ -84,6 +84,22 @@ Potential additions:
   - Self-analysis: moss should be able to identify its own architectural gaps
     (eating our own dogfood, providing actionable feedback during development)
 
+### RAG / Semantic Search
+
+Instead of reading entire files (like TODO.md) every session, use semantic search:
+
+- [ ] `moss rag index <path>` - build vector index of documents/code
+- [ ] `moss rag search <query>` - semantic search across indexed content
+- [ ] Auto-index project docs (README, TODO, CLAUDE.md, docs/)
+- [ ] Integration with context_memory.py summaries
+- [ ] Could use local embeddings (sentence-transformers) or API (OpenAI, Voyage)
+- [ ] Chunk strategy: by section/function, not fixed token windows
+
+Use cases:
+- "What did we decide about X?" → search TODO.md, docs/, past session logs
+- "Where is Y implemented?" → search codebase with semantic understanding
+- Agent context loading: retrieve relevant context for current task
+
 ### Agent Log Analysis
 
 Manual analysis complete - see `docs/log-analysis.md` for methodology and insights.
@@ -136,6 +152,27 @@ Core philosophy: programming is essentially recursive abstraction - we build abs
   - Iterative refinement: start coarse, drill down on request
   - Semantic: "show me the public API" vs "show me the implementation"
 
+**Implementation: Merkle tree structure** (partially implemented in `context_memory.py`)
+- Already have: `DocumentSummary` with `merkle_hash`, `ContentHash`, `SummaryStore`
+- Each node (expression, block, function, file, directory) has a content hash
+- Parent nodes contain hashes of children → content-addressable tree
+- Each node also has a **summary** (compressed representation) at multiple detail levels
+- Navigation: start at root, see summary, drill into any subtree
+- Benefits:
+  - Efficient change detection (hash changes propagate up)
+  - Cacheable at any level (hash = cache key)
+  - Natural for incremental updates
+  - Can verify integrity (useful for distributed/cached views)
+- Structure mirrors git's object model but for AST, not files
+- Could integrate with actual git: each commit = snapshot of Merkle tree
+- **Still needed**: extend from documents to AST nodes, integrate with skeleton/CFG views
+
+**Rendering strategies**:
+- **Budget allocation**: given N tokens, allocate to subtrees by importance (size, complexity, relevance to query)
+- **Progressive disclosure**: render depth-1 first, expand on request
+- **Diff-aware**: if comparing versions, show only changed subtrees in detail
+- **Query-focused**: given a question, rank subtrees by relevance, show most relevant in detail
+
 Research directions:
 - [ ] Can Moss analyze its own abstraction layers? (`moss abstractions` command)
 - [ ] Automatic abstraction discovery (find repeated patterns that could be factored out)
@@ -143,6 +180,8 @@ Research directions:
 - [ ] Tools for refactoring concrete code into abstract plugins
 - [ ] Token-budgeted codebase views: render codebase to fit N tokens
 - [ ] Question-driven views: "show me enough to understand how X works"
+- [ ] Merkle tree codebase representation with multi-level summaries
+- [ ] Integration with git object model for versioned views
 
 ### PyPI Naming Collision
 
