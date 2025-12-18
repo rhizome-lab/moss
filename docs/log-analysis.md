@@ -161,21 +161,35 @@ This would help users understand their agent interaction patterns.
 
 | Metric | Count |
 |--------|-------|
-| Unique API Calls | 3,694 |
+| Unique API Calls | 3,716 |
 | New Input Tokens | 33K |
 | Cache Creation | 7.4M |
 | Cache Read | 362M |
 | Output Tokens | 1.45M |
+| Total Context Processed | 372M |
 
-**Key insight**: 98% of input comes from cache reads, showing effective use of context caching.
+### Context Size Distribution
 
-Effective input: ~369M tokens
-- Cache read (362M) at ~$0.30/M = $109
-- Cache creation (7.4M) at ~$3.75/M = $28
-- New input (33K) at ~$15/M = $0.50
-- Output (1.45M) at ~$75/M = $109
+| Metric | Tokens |
+|--------|--------|
+| Minimum context | 19K |
+| Maximum context | 156K |
+| Average context | 100K |
 
-**Estimated session cost**: ~$250 for 3,694 API calls over 2 days of development.
+Context grew from ~19K to ~156K tokens as the session progressed over 31 hours.
+
+### Cost Estimate (Opus 4.5 API rates)
+
+| Component | Tokens | Rate | Cost |
+|-----------|--------|------|------|
+| Cache read | 362M | $1.50/M | $543 |
+| Cache create | 7.4M | $18.75/M | $139 |
+| New input | 33K | $15/M | $0.50 |
+| Output | 1.45M | $75/M | $109 |
+| **Total** | | | **~$791** |
+
+*Note: Claude Code Pro subscription ($100-200/mo) provides unlimited usage, so actual user cost
+depends on subscription tier, not raw API rates.*
 
 ### Data Deduplication Note
 
