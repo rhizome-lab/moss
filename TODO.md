@@ -24,6 +24,11 @@ Candidates for the next session, roughly by size:
   - Add `to_compact()` to all result types (dependencies, etc.)
   - Consider a lint rule or test to enforce this convention
   - Pattern: every result class should have `to_markdown()`, `to_compact()`, `to_dict()`
+- [ ] **Live TODO tracking** (medium) - Like Claude Code's task display
+  - Show agent's task list being processed in real-time
+  - Session persistence (resume where you left off)
+  - Progress indicators, time estimates
+  - Our differentiation: persisted across sessions, context-aware
 - [ ] **RAG / Semantic Search** (medium) - Higher priority than other medium items
   - See Future Work section for full design
   - Start with: `moss rag index` + `moss rag search`
@@ -34,8 +39,8 @@ Candidates for the next session, roughly by size:
 - [x] **`moss tree`** (small) - Git-aware tree visualization (DONE)
   - Pure Python implementation, `--tracked`, `--all` flags
   - MCP: `tree_generate`, `tree_format`
-- [ ] **Test PBEGenerator/SketchGenerator** (small) - Add tests for new generators
-  - Similar to ComponentGenerator/SMTGenerator tests
+- [x] **Test PBEGenerator/SketchGenerator** (small) - Add tests for new generators (DONE)
+  - 25 new tests covering PBE, Sketch generators and their internals
 - [ ] **`moss explore` REPL** (medium) - Interactive codebase exploration
   - Tab completions, history
   - Commands: skeleton, calls, callers, deps
