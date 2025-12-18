@@ -928,6 +928,123 @@ to reason securely—they minimize path to passing result.
 **Key insight**: Moss's structural awareness could help—AST analysis can detect
 vulnerable patterns that text-based tools miss.
 
+## Prompt Engineering for Code Generation
+
+### Core Best Practices (2025)
+
+| Practice | Description |
+|----------|-------------|
+| **Role Definition** | Frame LLM as software engineering agent with clear responsibilities |
+| **Structured Tool Use** | Provide examples of expected tool calls and outputs |
+| **Context Depth** | Quality correlates with accuracy—provide relevant context |
+| **Few-Shot Examples** | Show expected input/output pairs, especially for structured output |
+| **Self-Review** | Request model cross-check its own generated code |
+| **Format Specification** | Define exact output format to reduce hallucinations |
+| **Testing Instructions** | Explicitly instruct to write tests and validate patches |
+
+### Advanced Techniques
+
+**Chain-of-Thought (CoT):**
+- Newer models (o1-preview, o1-mini) use inference-time reasoning tokens
+- Prompting style differs significantly from non-reasoning models
+
+**Self-Review Prompting:**
+- Request systematic evaluation of generated code
+- "Review this code for bugs, edge cases, and security issues"
+
+**Iteration & Evals:**
+- Build evals that measure prompt performance
+- Monitor as you iterate and upgrade models
+
+### Moss Implementation Notes
+- Prompt templates in `moss.prompts` module
+- Few-shot examples from codebase (use existing similar code)
+- Self-review in validator loop (LLM reviews its own output)
+- Consider: `moss prompt --template <name>` for standardized prompts
+
+## Automated Test Generation
+
+### The State of the Art (2025)
+
+**Meta's ACH (Automated Compliance Hardening):**
+- Mutation-guided, LLM-based test generation
+- Combines mutant generation + test generation
+- First deployment at large-scale industrial systems
+
+**TestGen-LLM Results:**
+- 75% of test cases built correctly
+- 57% passed reliably
+- 25% increased coverage
+- 73% recommendations accepted for production at Meta
+
+**TestLoter Framework:**
+- 83.6% line coverage, 78% branch coverage
+- +8.5% line coverage vs ChatUniTest
+- +10% line coverage vs EvoSuite
+- Logic-driven framework with error repair
+
+**RUG (Rust Unit Generation):**
+- Type-aware caching: 51.3% token reduction
+- +10.4% coverage improvement
+
+### Key Techniques
+
+| Technique | Benefit |
+|-----------|---------|
+| **Chain-of-Thought** | Explicit reasoning about coverage objectives |
+| **RAG** | Higher quality tests with more context |
+| **Mutation Testing** | Generate tests that catch real bugs |
+| **Context-Aware Prompting** | LLM tests match or exceed human-written |
+
+### Model Performance Varies by Language
+- Gemini better for Java
+- All models better for Python
+- Less-benchmarked languages (Go, Kotlin) worse
+
+### Moss Implementation Notes
+- Already have: `moss coverage` for pytest-cov stats
+- Needed: `moss gen-tests <file>` command
+- Use existing tests as few-shot examples
+- Target: Improve coverage for uncovered functions
+- Consider: Mutation testing integration (mutmut)
+
+## Code Explanation & Documentation Generation
+
+### Tools Landscape
+
+| Tool | Features |
+|------|----------|
+| **doc-comments-ai** | Treesitter + LLM, local models (Ollama) |
+| **Autodoc** | Depth-first traversal, folder-level docs |
+| **RepoAgent** | Repository-level docs, auto-maintenance |
+| **lmdocs** | Context-aware, references imported libraries |
+| **llmdocgen** | Multi-language support |
+
+### Approaches
+
+**Static Generation:**
+- Generate docstrings during development
+- Iterate with LLM, commit as permanent docs
+- Best for overview docs, API documentation
+
+**Dynamic Generation:**
+- Generate explanations on-the-fly for readers
+- No permanent storage, always up-to-date
+- Best for function/line-level comments
+
+### Technical Patterns
+- **AST Analysis**: Parse code structure, identify undocumented functions
+- **Dependency Tracking**: Map imports to provide context
+- **Fine-Tuning**: CodeLlama + LoRA for domain-specific docs
+- **Cost Control**: Use open-source models (Llama, Gemma) for free generation
+
+### Moss Implementation Notes
+- Already have: AST parsing, skeleton view
+- Could add: `moss explain <symbol>` - explain any code
+- Could add: `moss document <file>` - generate missing docstrings
+- Use skeleton as context for explanations
+- Consider: Dynamic docs in TUI/LSP (hover for explanation)
+
 ## Benchmarking TODO
 
 - [ ] Implement SWE-bench evaluation harness
