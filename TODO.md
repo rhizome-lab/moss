@@ -182,12 +182,12 @@ Expand `moss health` into a comprehensive but concise project analysis. Rename c
 - [x] Inconsistent naming patterns
 
 ##### 28e: Health Command Refactor
-- [ ] Concise single-screen output (no scrolling for healthy projects)
-- [ ] Severity-based filtering (show only issues above threshold)
-- [ ] `moss report` for full verbose output
-- [ ] `moss health --focus=deps|tests|complexity|api` for targeted analysis
-- [ ] Machine-readable `--json` with all metrics
-- [ ] Exit codes for CI integration (0=healthy, 1=warnings, 2=critical)
+- [x] Concise single-screen output (no scrolling for healthy projects)
+- [x] Severity-based filtering (show only issues above threshold)
+- [x] `moss report` for full verbose output
+- [x] `moss health --focus=deps|tests|complexity|api` for targeted analysis
+- [x] Machine-readable `--json` with all metrics
+- [x] Exit codes for CI integration (0=healthy, 1=warnings, 2=critical)
 
 #### Phase 29: Library-First Architecture
 
