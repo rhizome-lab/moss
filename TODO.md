@@ -101,6 +101,20 @@ Potential additions:
 - [ ] Git hot spots (frequently changed files)
 - [ ] Architecture diagrams from dependency graph
 
+### Agent Log Analysis
+
+Analyze Claude Code session logs to identify inefficiencies and patterns:
+- Logs at `~/.claude/projects/<project>/` (sessions are UUIDs, subagents are `agent-*`)
+- Could use jq to extract patterns from JSON logs
+
+Potential analysis:
+- [ ] Tool call frequency and success rates
+- [ ] Common retry patterns (what fails and why)
+- [ ] Context efficiency (token usage per task)
+- [ ] Subagent spawn patterns (when/why)
+- [ ] Time spent in different phases (planning, editing, testing)
+- [ ] Error categories and resolution patterns
+
 ### Enterprise Features
 
 - [ ] Team collaboration (shared caches)
