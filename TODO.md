@@ -66,6 +66,13 @@ Tools we have:
 
 Potential additions:
 - [ ] Architecture diagrams from dependency graph
+- [ ] `moss patterns` - Detect and analyze architectural patterns:
+  - Plugin systems (Protocol + Registry + Entry Points)
+  - Factory patterns, strategy patterns, adapter patterns
+  - Inconsistent patterns (e.g., some registries use entry points, others don't)
+  - Hardcoded implementations that could be plugins
+  - Coupling analysis (which modules know about each other)
+  - Report: "X uses plugin pattern, Y could benefit from it"
 - [ ] `moss weaknesses` / `moss gaps` - Identify architectural weaknesses and gaps:
   - Hardcoded assumptions (e.g., parsing only supports one format)
   - Missing abstractions (e.g., no plugin system where one would help)
