@@ -155,13 +155,28 @@ This is dogfooding at the meta level - using moss to understand moss.
 
 ### Competitor Analysis
 
-See `docs/prior-art.md` for research references.
+See `docs/prior-art.md` for detailed research (updated Dec 2025).
 
-- [ ] **Investigate SWE-agent**: How does it work? What's their ACI? Performance on SWE-bench?
-- [ ] **Investigate Aider**: Edit format, multi-file handling, git integration patterns
-- [ ] **Investigate OpenHands**: Sandbox/runtime approach, architecture
+**Completed Research:**
+- [x] SWE-agent: ACI design, guardrails, 12.47% pass@1 on SWE-bench
+- [x] Aider: Architect/Editor split, edit formats, PageRank repo mapping
+- [x] OpenHands: Event stream, multi-agent delegation, micro-agents
+- [x] Claude Code: Hooks, checkpoints, MCP integration, Agent SDK
+- [x] Cursor: Codebase indexing, agent mode, $9.9B validation
 
-Key question: Do they do something moss should adopt, or is moss's structural-awareness approach better?
+**Patterns to Adopt from Competitors:**
+- [ ] **Architect/Editor split** (Aider) - separate reasoning from editing with two LLM calls
+- [ ] **Guardrails at edit time** (SWE-agent) - integrate linting before changes commit
+- [ ] **Checkpoint/rollback UX** (Claude Code) - expose Shadow Git more explicitly to users
+- [ ] **Micro-agents** (OpenHands) - task-specialized agents using shared infrastructure
+- [ ] **Codebase indexing** (Cursor) - enhance RAG with proactive embedding
+
+**Benchmarking TODO:**
+- [ ] Implement SWE-bench evaluation harness
+- [ ] Compare anchor-based patching vs search/replace vs diff formats
+- [ ] Measure structural context (skeleton) value vs raw file context
+
+Key question answered: Interface design matters more than model scaling (SWE-agent proves this). Moss's structural-awareness approach is differentiated but unproven - needs benchmark validation.
 
 ### Agent Learning / Memory
 
