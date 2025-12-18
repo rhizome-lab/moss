@@ -2198,6 +2198,42 @@ def cmd_analyze_session(args: Namespace) -> int:
     return 0
 
 
+def cmd_git_hotspots(args: Namespace) -> int:
+    """Find frequently changed files in git history."""
+    from moss.git_hotspots import analyze_hotspots
+
+    output = setup_output(args)
+    root = Path(getattr(args, "directory", ".")).resolve()
+    days = getattr(args, "days", 90)
+
+    if not root.exists():
+        output.error(f"Directory not found: {root}")
+        return 1
+
+    output.info(f"Analyzing git history for {root.name} (last {days} days)...")
+
+    try:
+        analysis = analyze_hotspots(root, days=days)
+    except Exception as e:
+        output.error(f"Failed to analyze git history: {e}")
+        return 1
+
+    if analysis.error:
+        output.error(analysis.error)
+        return 1
+
+    # Output format
+    compact = getattr(args, "compact", False)
+    if compact and not wants_json(args):
+        output.print(analysis.to_compact())
+    elif wants_json(args):
+        output.data(analysis.to_dict())
+    else:
+        output.print(analysis.to_markdown())
+
+    return 0
+
+
 def cmd_health(args: Namespace) -> int:
     """Show project health and what needs attention."""
     from moss.status import StatusChecker
@@ -3702,6 +3738,25 @@ def create_parser() -> argparse.ArgumentParser:
         help="Path to the JSONL session file",
     )
     session_parser.set_defaults(func=cmd_analyze_session)
+
+    # git-hotspots command
+    hotspots_parser = subparsers.add_parser(
+        "git-hotspots", help="Find frequently changed files in git history"
+    )
+    hotspots_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Directory to analyze (default: current)",
+    )
+    hotspots_parser.add_argument(
+        "--days",
+        "-d",
+        type=int,
+        default=90,
+        help="Number of days to analyze (default: 90)",
+    )
+    hotspots_parser.set_defaults(func=cmd_git_hotspots)
 
     return parser
 

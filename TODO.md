@@ -124,3 +124,17 @@ There's an existing `moss` package on PyPI (a data science tool requiring numpy/
 - Rename the package (e.g., `moss-tools`, `moss-orchestrate`, `toolmoss`)
 - Check if the existing package is abandoned and claim the name
 - Use a different registry
+
+### Remote Agent Management
+
+Web interface for monitoring and controlling agents remotely:
+
+- [ ] Agent manager web server (`moss serve --web`)
+  - Real-time status dashboard
+  - View running tasks and progress
+  - Approve/reject checkpoints from mobile
+  - Send commands to running agents
+  - View session logs and metrics
+- [ ] Mobile-friendly responsive UI
+- [ ] WebSocket for live updates
+- [ ] Authentication for remote access
