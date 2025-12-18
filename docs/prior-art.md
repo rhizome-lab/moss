@@ -528,6 +528,122 @@ See `docs/synthesis-generators.md` for how these map to moss generator plugins.
 - Use predictions to weight enumeration (not replace it)
 - Could fine-tune on repo-specific style
 
+### λ² (Lambda Squared) - Bidirectional Synthesis
+- **Paper**: "Type-and-Example-Directed Program Synthesis" (PLDI 2015)
+- **What it is**: Combines type-directed and example-directed synthesis bidirectionally
+
+**Technical Approach:**
+- Guarantees simplest program that fits examples
+- Three techniques combined:
+  1. **Inductive generalization**: I/O examples → hypotheses about program structure
+  2. **Deduction**: Infer new I/O examples for subexpressions
+  3. **Best-first enumeration**: Search for hypothesis that works
+- Each hypothesis leads to subproblems for subexpressions
+
+**Results**: Synthesized programs for lists, trees, nested structures. Notably synthesized a program believed to be the world's earliest functional pearl.
+
+**Moss Implementation Notes:**
+- `BidirectionalStrategy` should combine type hints + tests
+- Generate hypotheses about function structure from signature
+- Use test cases to constrain subexpression synthesis
+- Best-first search with deduction for pruning
+
+### PushGP (Genetic Programming)
+- **Site**: http://faculty.hampshire.edu/lspector/push.html
+- **Python**: https://github.com/erp12/pyshgp (`pip install pyshgp`)
+- **Clojure**: https://github.com/lspector/Clojush
+- **What it is**: Evolutionary search over programs in the Push language
+
+**The Push Language:**
+- Stack-based with separate stack per type
+- Syntactically minimal: only rule is balanced parentheses
+- Trivial to generate valid programs (important for evolution)
+- Supports runtime code manipulation and novel control structures
+
+**Key Capabilities:**
+- One of most powerful "general program synthesis" frameworks
+- Handles multiple data types, control structures naturally
+- **Autoconstructive evolution**: Programs evolve their own evolutionary mechanisms
+- Applications: intelligent agents, quantum computing, etc.
+
+**Tradeoffs:**
+- Very high runtime (evolutionary search is expensive)
+- Can solve problems other PBE systems cannot
+- Good for exploration, less good for quick synthesis
+
+**Moss Implementation Notes:**
+- `GeneticGenerator` could use pyshgp as backend
+- Best for problems where other methods fail
+- Could use as "last resort" synthesizer
+- Runtime concerns limit practical use
+
+### DreamCoder (Abstraction Learning)
+- **Paper**: "DreamCoder: Growing Generalizable, Interpretable Knowledge" (PLDI 2021)
+- **ArXiv**: https://arxiv.org/abs/2006.08381
+- **What it is**: Learns domain-specific languages through wake-sleep cycles
+
+**Wake-Sleep Architecture:**
+1. **Wake**: Synthesize programs for tasks using neural guidance
+2. **Abstraction Sleep**: Extract common patterns into library (declarative knowledge)
+3. **Dreaming Sleep**: Train neural net on replays + fantasies (procedural knowledge)
+
+**Key Innovation: Library Learning**
+- Automatic refactoring extracts reusable components
+- E-graph matching identifies rewrites exposing patterns
+- Library grows with experience, making future synthesis faster
+
+**Results:**
+- Rediscovers modern functional programming concepts
+- Rediscovers vector algebra, classical physics (Newton's, Coulomb's laws)
+- Solves creative tasks (drawing, scene building)
+- Mean solve time: 54.1s, median: 15.0s
+
+**Related: Stitch**
+- 3-4 orders of magnitude faster than DreamCoder's library learning
+- 2 orders of magnitude less memory
+- Comparable library quality
+
+**Moss Implementation Notes:**
+- Core idea: moss should learn abstractions from synthesized code
+- After each synthesis, check if pattern should join library
+- Could use Stitch for efficient library extraction
+- Long-term: moss learns project-specific idioms
+
+## Code Generation Benchmarks
+
+### Beyond HumanEval/MBPP/SWE-bench
+
+The field is shifting from "Can the model code?" to "Can the model engineer?"
+
+**Benchmark Evolution:**
+| Benchmark | Focus | Tasks |
+|-----------|-------|-------|
+| HumanEval | Function synthesis | 164 problems |
+| MBPP | Simple functions | 974 problems |
+| EvalPlus (HumanEval+/MBPP+) | 80x/35x more tests | Reduces overfitting |
+| HumanEval Pro/MBPP Pro | Self-invoking code | Progressive reasoning |
+| MultiPL-E | 18 languages | Paradigm coverage |
+| SWE-bench | Real GitHub issues | ~2000 problems |
+| LiveCodeBench | Production code changes | Ongoing |
+| RepoBench | Multi-file completion | Repository-level |
+| BigCodeBench | Complex tasks | 76 tasks unsolved by all models |
+| BFCL-v3 | Function/tool calling | Agent capabilities |
+| DS-1000 | Data science (NumPy, Pandas) | 1000 problems |
+
+**2025 SOTA Performance:**
+- HumanEval: Claude 3.5 Sonnet 92%, GPT-4o 90.2%
+- SWE-bench Verified: GPT-5 74.9%, Claude 3.7 Sonnet 70.3%
+- Aider Polyglot: GPT-5 88%
+- LiveCodeBench v5: Gemini 2.5 Pro 70.4%
+
+**Key Insight**: Real-world engineering benchmarks (SWE-bench, RepoBench) matter more than toy problems. Models that ace HumanEval may fail on actual codebases.
+
+**Moss Evaluation Strategy:**
+- [ ] Start with SWE-bench Lite (manageable size)
+- [ ] Add RepoBench for multi-file context evaluation
+- [ ] Use EvalPlus to avoid false positives
+- [ ] Track LiveCodeBench for ongoing comparison
+
 ## SWE-bench Evaluation
 
 ### Overview

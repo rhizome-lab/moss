@@ -218,7 +218,9 @@ See `docs/prior-art.md` for detailed research (updated Dec 2025).
 Most IDEs use basic "approve X command?" prompts - safe but interrupts the agentic loop.
 We want *smarter* security that's still robust but doesn't ask yes/no for everything.
 
-Levels (configurable, with maximally useful defaults):
+**Core Principle**: Fine-grained, composable trust. Not just 4 levels - users define their own.
+
+**Built-in Presets** (as starting points):
 1. **Full Trust** (dispatch mode): No confirmations, agent runs freely
 2. **High Trust** (default for known codebases):
    - Auto-approve: read, search, lint, test, git status/diff/log
@@ -228,6 +230,48 @@ Levels (configurable, with maximally useful defaults):
    - Confirm: write, delete, any command execution
 4. **Low Trust** (sandbox mode): Confirm everything, useful for demos/untrusted
 
+**Custom Trust Levels** (user-defined):
+```yaml
+# .moss/trust.yaml
+levels:
+  my-dev-level:
+    inherit: high  # Start from a preset
+    allow:
+      - "bash:ruff *"      # Allow any ruff command
+      - "bash:pytest *"    # Allow any pytest command
+      - "write:src/**"     # Allow writes to src/
+    deny:
+      - "write:*.env"      # Never auto-approve .env writes
+      - "bash:rm -rf *"    # Always confirm destructive deletes
+    confirm:
+      - "write:config/*"   # Ask for config changes
+```
+
+**Composable Trust** (combine levels with merge strategies):
+```yaml
+# Combine multiple levels with different merge strategies
+levels:
+  prod-deploy:
+    compose: [high, ci-safe, team-rules]
+    merge: intersection   # Options below
+
+# Merge strategies:
+# - intersection: Must be allowed by ALL levels (most restrictive)
+# - union: Allowed by ANY level (most permissive)
+# - first: First level that has an opinion wins
+# - last: Last level that has an opinion wins (overrides)
+# - max: Most permissive decision wins (allow > confirm > deny)
+# - min: Least permissive decision wins (deny > confirm > allow)
+```
+
+Example use cases:
+- `intersection`: Production - must pass team + security + compliance
+- `union`: Development - allow anything any role permits
+- `first`: Layered defaults (user → project → global)
+- `last`: Override chain (base → extensions → local)
+- `max`: "If anyone trusts it, trust it"
+- `min`: "If anyone denies it, deny it"
+
 Smart features beyond basic approve/deny:
 - [ ] **Pattern learning**: "You approved `ruff check` 10 times, auto-approve it?"
 - [ ] **Scope-based**: "Trust writes to `src/` but confirm for `config/`"
@@ -235,6 +279,8 @@ Smart features beyond basic approve/deny:
 - [ ] **Rollback-aware**: "This can be undone via Shadow Git" (lower risk = less friction)
 - [ ] **Batch approval**: "Approve all 5 pending writes at once?"
 - [ ] **Explain risk**: Show what command does, why it's flagged, what could go wrong
+- [ ] **Glob patterns**: `write:src/**/*.py` for fine-grained path matching
+- [ ] **Command patterns**: `bash:git *` to trust all git commands
 
 Key insight: The goal isn't "maximum safety" - it's *appropriate* safety that doesn't
 destroy the productivity gains of agentic coding.
