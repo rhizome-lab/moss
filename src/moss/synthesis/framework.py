@@ -258,9 +258,16 @@ class SynthesisFramework:
         state.depth += 1
 
         try:
-            # Select strategy
-            strategy = await self.router.select_strategy(spec, context)
-            state.strategies_tried.append(strategy.name)
+            # Select strategy - if no strategy matches, treat as atomic
+            try:
+                strategy = await self.router.select_strategy(spec, context)
+                state.strategies_tried.append(strategy.name)
+            except NoStrategyError:
+                # No decomposition strategy - solve atomically
+                logger.debug("No strategy for %s, solving atomically", spec.summary())
+                solution = await self._solve_atomic(spec, context, validator, state)
+                state.subproblems_solved += 1
+                return solution
 
             await self._emit_event(
                 SynthesisEventType.STRATEGY_SELECTED,

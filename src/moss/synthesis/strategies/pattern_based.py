@@ -26,10 +26,13 @@ class Pattern:
     def match_score(self, spec: Specification) -> float:
         """Compute how well this pattern matches the specification."""
         desc_lower = spec.description.lower()
+        desc_words = set(desc_lower.split())
         score = 0.0
 
-        # Keyword matching
-        keyword_matches = sum(1 for kw in self.keywords if kw in desc_lower)
+        # Keyword matching - use whole word matching to prevent subproblems
+        # from re-matching parent patterns (e.g., "authentication response"
+        # should not match "auth" keyword via substring)
+        keyword_matches = sum(1 for kw in self.keywords if kw in desc_words)
         score += 0.6 * (keyword_matches / len(self.keywords))
 
         # Description similarity (simple word overlap)

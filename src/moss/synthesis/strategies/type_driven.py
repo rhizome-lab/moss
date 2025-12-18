@@ -280,6 +280,16 @@ class TypeDrivenDecomposition(DecompositionStrategy):
         input_type = type_info.input_types[0] if type_info.input_types else ""
         output_type = type_info.output_type
 
+        # Don't decompose if already using placeholder intermediate types
+        placeholder_types = {"intermediate", "any", "object", "unknown"}
+        if input_type.lower() in placeholder_types or output_type.lower() in placeholder_types:
+            return False
+
+        # Don't decompose simple primitive conversions
+        primitive_types = {"int", "str", "bool", "float", "bytes", "none"}
+        if input_type.lower() in primitive_types and output_type.lower() in primitive_types:
+            return False
+
         # Simple heuristic: different types suggest intermediate steps
         return input_type != output_type and not is_collection_type(output_type)
 

@@ -125,7 +125,8 @@ class TestTypeDrivenDecomposition:
         descs = [s.specification.description for s in subproblems]
         assert any("transform" in d.lower() or "element" in d.lower() for d in descs)
 
-    def test_decompose_via_intermediate(self):
+    def test_no_decompose_primitive_conversion(self):
+        """Primitive type conversions should NOT decompose to avoid infinite recursion."""
         strategy = TypeDrivenDecomposition()
         spec = Specification(
             description="Convert string to int",
@@ -134,7 +135,20 @@ class TestTypeDrivenDecomposition:
         ctx = Context()
         subproblems = strategy.decompose(spec, ctx)
 
-        # Should decompose into intermediate steps
+        # Primitive conversions should NOT decompose (prevents infinite recursion)
+        assert len(subproblems) == 0
+
+    def test_decompose_via_intermediate_complex_types(self):
+        """Complex types (non-primitive) should decompose via intermediate steps."""
+        strategy = TypeDrivenDecomposition()
+        spec = Specification(
+            description="Convert User to UserDTO",
+            type_signature="User -> UserDTO",
+        )
+        ctx = Context()
+        subproblems = strategy.decompose(spec, ctx)
+
+        # Non-primitive types should decompose into intermediate steps
         assert len(subproblems) >= 2
 
     def test_estimate_success_with_generic(self):

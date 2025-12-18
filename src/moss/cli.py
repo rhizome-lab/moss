@@ -1647,22 +1647,24 @@ def cmd_synthesize(args: Namespace) -> int:
         output_result(
             {
                 "success": result.success,
-                "code": result.code,
-                "confidence": result.confidence,
+                "code": result.solution,
+                "iterations": result.iterations,
+                "strategy": result.strategy_used,
                 "metadata": result.metadata,
             },
             args,
         )
     else:
-        if result.success:
-            output.success(f"Synthesis complete (confidence: {result.confidence:.2f})")
+        if result.success and result.solution:
+            output.success(f"Synthesis complete ({result.iterations} iterations)")
+            if result.strategy_used:
+                output.info(f"Strategy: {result.strategy_used}")
             output.blank()
-            if result.code:
-                output.print(result.code)
+            output.print(result.solution)
         else:
             output.error("Synthesis did not produce a result")
-            if result.metadata.get("error"):
-                output.error(f"Error: {result.metadata['error']}")
+            if result.error:
+                output.error(f"Error: {result.error}")
             return 1
 
     return 0
