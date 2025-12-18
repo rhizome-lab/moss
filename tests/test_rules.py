@@ -18,6 +18,12 @@ from moss.rules import (
     pattern_rule,
     rule,
 )
+from moss.rules.backends import get_backend, list_backends
+from moss.rules.backends.deps import (
+    DepsBackend,
+    check_layer_violation,
+    find_circular_dependencies,
+)
 
 
 class TestViolation:
@@ -468,3 +474,232 @@ class TestRuleDecorator:
         assert another_rule.severity == Severity.ERROR
         assert another_rule.category == "security"
         assert another_rule.exclude_contexts == [CodeContext.TEST]
+
+
+class TestDepsBackend:
+    """Tests for the deps backend."""
+
+    def test_backend_registered(self):
+        """Deps backend should be auto-registered."""
+        assert "deps" in list_backends()
+        backend = get_backend("deps")
+        assert backend.name == "deps"
+
+    def test_analyze_basic_imports(self, tmp_path: Path):
+        """Test extracting basic imports from a file."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+import os
+import sys
+from pathlib import Path
+from typing import Any, Optional
+""")
+
+        backend = DepsBackend()
+        result = backend.analyze(test_file)
+
+        assert result.backend_name == "deps"
+        assert len(result.errors) == 0
+
+        imports = result.metadata.get("imports", [])
+        assert len(imports) == 4
+
+        import_modules = result.metadata.get("import_modules", set())
+        assert "os" in import_modules
+        assert "sys" in import_modules
+        assert "pathlib" in import_modules
+        assert "typing" in import_modules
+
+    def test_analyze_exports(self, tmp_path: Path):
+        """Test extracting exported symbols."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+class MyClass:
+    pass
+
+def my_function():
+    pass
+
+PUBLIC_VAR = 42
+_private_var = 10
+""")
+
+        backend = DepsBackend()
+        result = backend.analyze(test_file)
+
+        exports = result.metadata.get("exports", [])
+        export_names = {e["name"] for e in exports}
+
+        assert "MyClass" in export_names
+        assert "my_function" in export_names
+        assert "PUBLIC_VAR" in export_names
+        assert "_private_var" not in export_names  # Private
+
+    def test_analyze_with_imports_pattern(self, tmp_path: Path):
+        """Test pattern-based import matching."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+import os
+from pathlib import Path
+from moss.skeleton import get_skeleton
+""")
+
+        backend = DepsBackend()
+        result = backend.analyze(test_file, pattern="imports:moss")
+
+        assert len(result.matches) == 1
+        assert result.matches[0].metadata["import"] == "moss.skeleton"
+
+    def test_analyze_with_imports_from_pattern(self, tmp_path: Path):
+        """Test pattern for 'from X import Y' style."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+import os
+from pathlib import Path
+from moss.skeleton import get_skeleton, SkeletonOptions
+""")
+
+        backend = DepsBackend()
+        result = backend.analyze(test_file, pattern="imports_from:moss.skeleton")
+
+        assert len(result.matches) == 1
+        assert "get_skeleton" in result.matches[0].metadata["names"]
+        assert "SkeletonOptions" in result.matches[0].metadata["names"]
+
+    def test_analyze_with_layer_map(self, tmp_path: Path):
+        """Test layer classification."""
+        # Create file structure
+        ui_dir = tmp_path / "src" / "ui"
+        ui_dir.mkdir(parents=True)
+        ui_file = ui_dir / "views.py"
+        ui_file.write_text("""
+from src.infrastructure import db
+""")
+
+        backend = DepsBackend()
+        layer_map = {
+            "ui": ["**/ui/**"],
+            "infrastructure": ["**/infrastructure/**"],
+        }
+        result = backend.analyze(ui_file, layer_map=layer_map)
+
+        assert result.metadata.get("layer") == "ui"
+
+    def test_analyze_syntax_error(self, tmp_path: Path):
+        """Test handling of syntax errors."""
+        test_file = tmp_path / "bad.py"
+        test_file.write_text("def broken(:\n  pass\n")
+
+        backend = DepsBackend()
+        result = backend.analyze(test_file)
+
+        assert len(result.errors) > 0
+        assert "Parse error" in result.errors[0]
+
+    def test_supports_pattern(self):
+        """Test pattern validation."""
+        backend = DepsBackend()
+
+        assert backend.supports_pattern("imports:os") is True
+        assert backend.supports_pattern("imports_from:pathlib") is True
+        assert backend.supports_pattern("layer:ui") is True
+        assert backend.supports_pattern("invalid:pattern") is False
+
+
+class TestDepsBackendHelpers:
+    """Tests for deps backend helper functions."""
+
+    def test_check_layer_violation(self):
+        """Test layer violation detection."""
+        metadata = {
+            "imports": [
+                {"module": "src.infrastructure.db", "lineno": 5},
+                {"module": "src.domain.models", "lineno": 6},
+            ],
+            "import_layers": {
+                "src.infrastructure.db": "infrastructure",
+                "src.domain.models": "domain",
+            },
+        }
+
+        violations = check_layer_violation(metadata, forbidden_layers=["infrastructure"])
+
+        assert len(violations) == 1
+        assert violations[0][0] == "src.infrastructure.db"
+        assert violations[0][1] == 5
+
+    def test_find_circular_dependencies_simple(self):
+        """Test detecting simple circular dependencies."""
+        graph = {
+            "a": ["b"],
+            "b": ["c"],
+            "c": ["a"],  # Cycle: a -> b -> c -> a
+        }
+
+        cycles = find_circular_dependencies(graph)
+
+        assert len(cycles) == 1
+        # Cycle should be normalized (start from smallest)
+        assert cycles[0][0] == "a"
+
+    def test_find_circular_dependencies_multiple(self):
+        """Test detecting multiple cycles."""
+        graph = {
+            "a": ["b"],
+            "b": ["a"],  # Cycle 1: a <-> b
+            "x": ["y"],
+            "y": ["z"],
+            "z": ["x"],  # Cycle 2: x -> y -> z -> x
+        }
+
+        cycles = find_circular_dependencies(graph)
+
+        assert len(cycles) == 2
+
+    def test_find_circular_dependencies_none(self):
+        """Test graph with no cycles."""
+        graph = {
+            "a": ["b"],
+            "b": ["c"],
+            "c": [],
+        }
+
+        cycles = find_circular_dependencies(graph)
+
+        assert len(cycles) == 0
+
+
+class TestDepsBackendWithRules:
+    """Tests for using deps backend with rules."""
+
+    def test_rule_with_deps_backend(self, tmp_path: Path):
+        """Test defining and running a rule that uses deps backend."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("""
+import os
+import sys
+from moss.skeleton import get_skeleton
+""")
+
+        @rule(backend="deps")
+        def no_moss_imports(ctx: RuleContext) -> list[Violation]:
+            """Disallow importing from moss package."""
+            result = ctx.backend("deps")
+            violations = []
+            for imp in result.metadata.get("imports", []):
+                if imp["module"].startswith("moss"):
+                    violations.append(
+                        ctx.violation(
+                            f"Import from moss not allowed: {imp['module']}",
+                            ctx.location(imp["lineno"]),
+                        )
+                    )
+            return violations
+
+        engine = RuleEngine()
+        engine.add_rule(no_moss_imports)
+
+        result = engine.check_file(test_file)
+
+        assert len(result.violations) == 1
+        assert "moss.skeleton" in result.violations[0].message

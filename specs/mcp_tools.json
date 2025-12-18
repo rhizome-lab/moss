@@ -156,7 +156,7 @@
           "type": "string"
         },
         "patch_type": {
-          "description": "Type of patch - \"insert\", \"replace\", \"delete\", \"wrap\"",
+          "description": "Type of patch - \"insert_before\", \"insert_after\", \"replace\", \"delete\"",
           "type": "string"
         }
       },
@@ -251,15 +251,20 @@
     "name": "validation_validate"
   },
   {
-    "description": "Create a commit on the current shadow branch. CommitHandle referencing the new commit",
+    "description": "Create a commit on the specified shadow branch. CommitHandle referencing the new commit",
     "inputSchema": {
       "properties": {
+        "branch": {
+          "description": "ShadowBranch to commit on",
+          "type": "string"
+        },
         "message": {
           "description": "Commit message",
           "type": "string"
         }
       },
       "required": [
+        "branch",
         "message"
       ],
       "type": "object"
@@ -267,7 +272,7 @@
     "name": "git_commit"
   },
   {
-    "description": "Create an isolated shadow branch for agent work. ShadowBranch context manager",
+    "description": "Create an isolated shadow branch for agent work. ShadowBranch for managing the branch",
     "inputSchema": {
       "properties": {
         "name": {
@@ -296,7 +301,7 @@
           "type": "string"
         },
         "view_types": {
-          "description": "View types to generate (default: skeleton, dependencies)",
+          "description": "View types to generate (default: skeleton, dependency)",
           "type": "string"
         }
       },

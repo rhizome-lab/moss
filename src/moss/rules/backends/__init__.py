@@ -48,6 +48,7 @@ def list_backends() -> list[str]:
 
 # Import backends to trigger registration (must be after registry definition)
 from . import ast_grep as _ast_grep  # noqa: E402, F401
+from . import deps as _deps  # noqa: E402, F401
 from . import python as _python  # noqa: E402, F401
 from . import regex as _regex  # noqa: E402, F401
 
