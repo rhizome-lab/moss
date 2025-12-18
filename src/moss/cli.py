@@ -42,9 +42,15 @@ def setup_output(args: Namespace) -> Output:
         json_format=getattr(args, "json", False),
         compact=getattr(args, "compact", False),
         no_color=getattr(args, "no_color", False),
+        jq_expr=getattr(args, "jq", None),
     )
 
     return output
+
+
+def wants_json(args: Namespace) -> bool:
+    """Check if JSON output is requested (via --json or --jq)."""
+    return getattr(args, "json", False) or getattr(args, "jq", None) is not None
 
 
 def output_result(data: Any, args: Namespace) -> None:
@@ -1851,9 +1857,9 @@ def cmd_summarize(args: Namespace) -> int:
             return 1
 
         compact = getattr(args, "compact", False)
-        if compact and not getattr(args, "json", False):
+        if compact and not wants_json(args):
             output.print(summary.to_compact())
-        elif getattr(args, "json", False):
+        elif wants_json(args):
             output.data(summary.to_dict())
         else:
             output.print(summary.to_markdown())
@@ -1878,9 +1884,9 @@ def cmd_summarize(args: Namespace) -> int:
 
     # Output format
     compact = getattr(args, "compact", False)
-    if compact and not getattr(args, "json", False):
+    if compact and not wants_json(args):
         output.print(summary.to_compact())
-    elif getattr(args, "json", False):
+    elif wants_json(args):
         output.data(summary.to_dict())
     else:
         output.print(summary.to_markdown())
@@ -1911,9 +1917,9 @@ def cmd_check_docs(args: Namespace) -> int:
 
     # Output format
     compact = getattr(args, "compact", False)
-    if compact and not getattr(args, "json", False):
+    if compact and not wants_json(args):
         output.print(result.to_compact())
-    elif getattr(args, "json", False):
+    elif wants_json(args):
         output.data(result.to_dict())
     else:
         output.print(result.to_markdown())
@@ -1950,9 +1956,9 @@ def cmd_check_todos(args: Namespace) -> int:
 
     # Output format
     compact = getattr(args, "compact", False)
-    if compact and not getattr(args, "json", False):
+    if compact and not wants_json(args):
         output.print(result.to_compact())
-    elif getattr(args, "json", False):
+    elif wants_json(args):
         output.data(result.to_dict())
     else:
         output.print(result.to_markdown())
@@ -2005,9 +2011,9 @@ def cmd_mutate(args: Namespace) -> int:
 
     # Output format
     compact = getattr(args, "compact", False)
-    if compact and not getattr(args, "json", False):
+    if compact and not wants_json(args):
         output.print(result.to_compact())
-    elif getattr(args, "json", False):
+    elif wants_json(args):
         output.data(result.to_dict())
     else:
         output.print(result.to_markdown())
@@ -2045,9 +2051,9 @@ def cmd_check_refs(args: Namespace) -> int:
 
     # Output format
     compact = getattr(args, "compact", False)
-    if compact and not getattr(args, "json", False):
+    if compact and not wants_json(args):
         output.print(result.to_compact())
-    elif getattr(args, "json", False):
+    elif wants_json(args):
         output.data(result.to_dict())
     else:
         output.print(result.to_markdown())
@@ -2094,9 +2100,9 @@ def cmd_external_deps(args: Namespace) -> int:
 
     # Output format
     compact = getattr(args, "compact", False)
-    if compact and not getattr(args, "json", False):
+    if compact and not wants_json(args):
         output.print(result.to_compact())
-    elif getattr(args, "json", False):
+    elif wants_json(args):
         output.data(result.to_dict(weight_threshold=warn_weight))
     else:
         output.print(result.to_markdown(weight_threshold=warn_weight))
@@ -2204,9 +2210,9 @@ def cmd_health(args: Namespace) -> int:
 
     # Output format
     compact = getattr(args, "compact", False)
-    if compact and not getattr(args, "json", False):
+    if compact and not wants_json(args):
         output.print(status.to_compact())
-    elif getattr(args, "json", False):
+    elif wants_json(args):
         output.data(status.to_dict())
     else:
         output.print(_format_concise_health(status))
@@ -2304,6 +2310,204 @@ def cmd_report(args: Namespace) -> int:
     return 0
 
 
+def cmd_overview(args: Namespace) -> int:
+    """Run multiple checks and output combined results.
+
+    Runs: health, external-deps, check-docs, check-todos, check-refs
+    Outputs either a combined compact line or aggregated JSON.
+    """
+    from moss.check_docs import DocChecker
+    from moss.check_refs import RefChecker
+    from moss.check_todos import TodoChecker
+    from moss.external_deps import ExternalDependencyAnalyzer
+    from moss.status import StatusChecker
+
+    output = setup_output(args)
+    root = Path(getattr(args, "directory", ".")).resolve()
+
+    if not root.exists():
+        output.error(f"Directory not found: {root}")
+        return 1
+
+    output.info(f"Running checks on {root.name}...")
+
+    results: dict = {}
+    exit_code = 0
+
+    # Health check
+    try:
+        checker = StatusChecker(root)
+        status = checker.check()
+        results["health"] = {
+            "grade": status.health_grade,
+            "score": status.health_score,
+            "files": status.total_files,
+            "lines": status.total_lines,
+            "issues": len(status.weak_spots),
+        }
+    except Exception as e:
+        results["health"] = {"error": str(e)}
+        exit_code = 1
+
+    # External deps
+    try:
+        analyzer = ExternalDependencyAnalyzer(root)
+        deps = analyzer.analyze()
+        results["deps"] = {
+            "direct": deps.total_direct,
+            "dev": deps.total_dev,
+            "vulns": len(deps.vulnerabilities),
+            "license_issues": len(deps.license_issues),
+        }
+    except Exception as e:
+        results["deps"] = {"error": str(e)}
+
+    # Check docs
+    try:
+        checker = DocChecker(root)
+        docs = checker.check()
+        results["docs"] = {
+            "coverage": docs.coverage,
+            "errors": docs.error_count,
+            "warnings": docs.warning_count,
+        }
+    except Exception as e:
+        results["docs"] = {"error": str(e)}
+
+    # Check TODOs
+    try:
+        checker = TodoChecker(root)
+        todos = checker.check()
+        results["todos"] = {
+            "pending": todos.pending_count,
+            "done": todos.done_count,
+            "orphan": todos.orphan_count,
+        }
+    except Exception as e:
+        results["todos"] = {"error": str(e)}
+
+    # Check refs
+    try:
+        checker = RefChecker(root)
+        refs = checker.check()
+        results["refs"] = {
+            "valid": len(refs.code_to_docs) + len(refs.docs_to_code),
+            "broken": refs.error_count,
+            "stale": len(refs.stale_references),
+        }
+    except Exception as e:
+        results["refs"] = {"error": str(e)}
+
+    # Output format
+    compact = getattr(args, "compact", False)
+    if compact and not wants_json(args):
+        output.print(_format_overview_compact(results))
+    elif wants_json(args):
+        output.data(results)
+    else:
+        output.print(_format_overview_markdown(results))
+
+    return exit_code
+
+
+def _format_overview_compact(results: dict) -> str:
+    """Format overview results as compact single line."""
+    parts = []
+
+    # Health
+    if "error" not in results.get("health", {}):
+        h = results["health"]
+        parts.append(f"{h['grade']} ({h['score']:.0f}%)")
+    else:
+        parts.append("health: error")
+
+    # Deps
+    if "error" not in results.get("deps", {}):
+        d = results["deps"]
+        deps_str = f"{d['direct']}+{d['dev']} deps"
+        if d["vulns"]:
+            deps_str += f", {d['vulns']} vulns"
+        parts.append(deps_str)
+
+    # Docs
+    if "error" not in results.get("docs", {}):
+        doc = results["docs"]
+        parts.append(f"{doc['coverage']:.0%} docs")
+
+    # TODOs
+    if "error" not in results.get("todos", {}):
+        t = results["todos"]
+        parts.append(f"{t['pending']} todos")
+
+    # Refs
+    if "error" not in results.get("refs", {}):
+        r = results["refs"]
+        if r["broken"]:
+            parts.append(f"{r['broken']} broken refs")
+
+    return " | ".join(parts)
+
+
+def _format_overview_markdown(results: dict) -> str:
+    """Format overview results as markdown."""
+    lines = ["# Project Overview", ""]
+
+    # Health
+    if "error" not in results.get("health", {}):
+        h = results["health"]
+        lines.append(f"**Health:** {h['grade']} ({h['score']:.0f}/100)")
+        lines.append(f"  - {h['files']} files, {h['lines']} lines")
+        if h["issues"]:
+            lines.append(f"  - {h['issues']} issues found")
+    else:
+        lines.append(f"**Health:** Error - {results['health']['error']}")
+    lines.append("")
+
+    # Deps
+    if "error" not in results.get("deps", {}):
+        d = results["deps"]
+        lines.append(f"**Dependencies:** {d['direct']} direct, {d['dev']} dev")
+        if d["vulns"]:
+            lines.append(f"  - [!] {d['vulns']} vulnerabilities")
+        if d["license_issues"]:
+            lines.append(f"  - [!] {d['license_issues']} license issues")
+    else:
+        lines.append(f"**Dependencies:** Error - {results['deps']['error']}")
+    lines.append("")
+
+    # Docs
+    if "error" not in results.get("docs", {}):
+        doc = results["docs"]
+        lines.append(f"**Documentation:** {doc['coverage']:.0%} coverage")
+        if doc["errors"] or doc["warnings"]:
+            lines.append(f"  - {doc['errors']} errors, {doc['warnings']} warnings")
+    else:
+        lines.append(f"**Documentation:** Error - {results['docs']['error']}")
+    lines.append("")
+
+    # TODOs
+    if "error" not in results.get("todos", {}):
+        t = results["todos"]
+        lines.append(f"**TODOs:** {t['pending']} pending, {t['done']} done")
+        if t["orphan"]:
+            lines.append(f"  - {t['orphan']} orphaned")
+    else:
+        lines.append(f"**TODOs:** Error - {results['todos']['error']}")
+    lines.append("")
+
+    # Refs
+    if "error" not in results.get("refs", {}):
+        r = results["refs"]
+        status = "OK" if not r["broken"] else f"{r['broken']} broken"
+        lines.append(f"**References:** {status} ({r['valid']} valid)")
+        if r["stale"]:
+            lines.append(f"  - {r['stale']} stale")
+    else:
+        lines.append(f"**References:** Error - {results['refs']['error']}")
+
+    return "\n".join(lines)
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser."""
     parser = argparse.ArgumentParser(
@@ -2319,6 +2523,11 @@ def create_parser() -> argparse.ArgumentParser:
         "-c",
         action="store_true",
         help="Compact output (token-efficient for AI agents)",
+    )
+    parser.add_argument(
+        "--jq",
+        metavar="EXPR",
+        help="Filter JSON output with jq expression (e.g., '.stats', '.dependencies[0]')",
     )
     parser.add_argument("--quiet", "-q", action="store_true", help="Quiet mode (errors only)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
@@ -3147,6 +3356,18 @@ def create_parser() -> argparse.ArgumentParser:
         help="Output as JSON",
     )
     report_parser.set_defaults(func=cmd_report)
+
+    # overview command (multi-check aggregation)
+    overview_parser = subparsers.add_parser(
+        "overview", help="Run all checks and show aggregated results"
+    )
+    overview_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Directory to analyze (default: current)",
+    )
+    overview_parser.set_defaults(func=cmd_overview)
 
     # roadmap command
     roadmap_parser = subparsers.add_parser(

@@ -63,10 +63,16 @@ Analyze PyPI/npm dependencies (not just internal imports):
 Token-efficient output modes for AI agent consumption:
 
 - [x] `--compact` flag for single-line summaries (e.g., `deps: 5 direct | vulns: 0 | licenses: ok`)
-- [ ] `--jq EXPR` flag - pipe JSON output through jq for field extraction
+- [x] `--jq EXPR` flag - pipe JSON output through jq for field extraction
 - [ ] `--query EXPR` flag - relaxed DWIM syntax for flexible querying (needs design work)
 
 The `--jq` option is straightforward (shell out to jq). The `--query` variant would allow more natural queries like `"direct deps"` or `"high vulns"` but requires careful design to handle fuzzy matching.
+
+Multi-command aggregation:
+
+- [x] `moss overview` - run all checks (health, deps, docs, todos, refs) and output combined results
+- [ ] `--preset NAME` flag - named presets for command combinations (e.g., `--preset ci`)
+- [ ] Format strings for custom output templates
 
 ### Enterprise Features
 

@@ -19,6 +19,7 @@
             uv
             ruff
             ripgrep
+            jq
             # VS Code extension development
             nodejs_22
             nodePackages.npm

@@ -205,6 +205,7 @@ class Output:
         self.stdout = stdout or sys.stdout
         self.stderr = stderr or sys.stderr
         self._indent_level = 0
+        self._jq_expr: str | None = None
 
     # -------------------------------------------------------------------------
     # Configuration
@@ -235,6 +236,14 @@ class Output:
     def use_compact(self) -> None:
         """Switch to compact output format."""
         self.formatter = CompactFormatter()
+
+    def set_jq(self, expr: str) -> None:
+        """Set jq expression for filtering JSON output.
+
+        Args:
+            expr: jq filter expression (e.g., '.stats', '.dependencies[0].name')
+        """
+        self._jq_expr = expr
 
     # -------------------------------------------------------------------------
     # Indentation
@@ -315,9 +324,49 @@ class Output:
         if self.verbosity < min_verbosity:
             return
 
+        # Apply jq filter if set
+        if self._jq_expr and isinstance(data, (dict, list)):
+            result = self._apply_jq(data)
+            if result is not None:
+                self.stdout.write(f"{result}\n")
+                self.stdout.flush()
+                return
+
         formatted = self.formatter.format_data(data, self.style)
         self.stdout.write(f"{formatted}\n")
         self.stdout.flush()
+
+    def _apply_jq(self, data: Any) -> str | None:
+        """Apply jq filter to data.
+
+        Returns filtered output string, or None if jq failed.
+        """
+        import shutil
+        import subprocess
+
+        if not shutil.which("jq"):
+            self.error("jq not found - install jq or omit --jq flag")
+            return None
+
+        try:
+            json_input = json.dumps(data)
+            result = subprocess.run(
+                ["jq", "-c", self._jq_expr],
+                input=json_input,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode != 0:
+                self.error(f"jq error: {result.stderr.strip()}")
+                return None
+            return result.stdout.strip()
+        except subprocess.TimeoutExpired:
+            self.error("jq timed out")
+            return None
+        except Exception as e:
+            self.error(f"jq failed: {e}")
+            return None
 
     # -------------------------------------------------------------------------
     # Convenience Methods
@@ -390,6 +439,7 @@ def configure_output(
     json_format: bool = False,
     compact: bool = False,
     no_color: bool = False,
+    jq_expr: str | None = None,
 ) -> Output:
     """Configure the global output instance.
 
@@ -398,6 +448,7 @@ def configure_output(
         json_format: Use JSON output format
         compact: Use compact output format (token-efficient for AI agents)
         no_color: Disable colors
+        jq_expr: jq filter expression for JSON output
 
     Returns:
         Configured Output instance
@@ -414,6 +465,11 @@ def configure_output(
 
     if no_color:
         output.style.use_colors = False
+
+    if jq_expr:
+        output.set_jq(jq_expr)
+        # jq implies JSON mode
+        output.use_json()
 
     return output
 
