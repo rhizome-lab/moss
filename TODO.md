@@ -6,36 +6,42 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 ## Next Up
 
-**For this session (re-prioritized):**
+**For next session:**
 
-1. **Composable Loop primitives** (medium) - Foundation for agent work
-   - LoopStep, Loop, LoopRunner dataclasses
-   - One working loop (simple_edit) as proof of concept
-   - Wire existing tools: skeleton → patch → validate
+1. **Test composable loops end-to-end** (medium) - Prove the architecture
+   - Run a real edit task through simple_loop
+   - Measure actual token savings vs baseline
+   - Document findings
 
-2. **Loop benchmarking** (small) - Measure what matters
-   - Token counter wrapper around tool calls
-   - Simple benchmark: run loop N times, report stats
-   - Baseline: compare vs "just ask Claude Code"
+2. **Add LLM executor** (medium) - Complete the loop system
+   - LLMToolExecutor that wraps API calls
+   - Track tokens from actual LLM responses
+   - Wire into critic_loop
 
-3. **`moss dwim` CLI command** (small) - Quick win
-   - Makes DWIM usable without Python
-   - Prepares for CLI generator
+3. **Research A2A protocol** (small) - Agent interoperability
+   - Read Google's blog post on A2A
+   - Evaluate fit with our ticket-based model
+   - Notes in docs/prior-art.md
 
 **Deferred:**
 - Add missing CLI APIs → after loop work validates architecture
-- Refactor cmd_query → after CLI generator exists
-- CLI from MossAPI → large, wait for more API stability
+- CLI from MossAPI (large) → wait for more API stability
 
 ---
 
-**Completed recently:**
+**Completed this session:**
+- [x] **Composable Loop primitives** - ✅ LoopStep, AgentLoop, AgentLoopRunner, LoopMetrics
+- [x] **Loop benchmarking** - ✅ BenchmarkTask, BenchmarkResult, LoopBenchmark
+- [x] **MossToolExecutor** - ✅ Wires loops to MossAPI (skeleton, patch, validation, etc.)
+- [x] **`moss dwim` CLI** - ✅ Natural language tool discovery
 - [x] **Todo output truncation** - ✅ 180 items → 5 sections × 5 items
-- [x] **`moss todo` command** - ✅ TodoAPI: list(), search(), sections()
-- [x] **DWIM auto-registration** - ✅ 7→65 tools, word form matching
-- [x] **DWIM confidence tuning** - ✅ Query expansion, 0.22→0.31
-- [x] **CLI audit** - ✅ Found 3 missing APIs, documented gaps
-- [x] **Bootstrap exploration** - ✅ 86.9% token savings with skeleton
+- [x] **Online integrations backlog** - ✅ GitHub, GitLab, Jira, Trello, etc.
+- [x] **Agent interoperability backlog** - ✅ A2A protocol research, MCP client
+
+**Previously completed:**
+- [x] **`moss todo` command** - TodoAPI: list(), search(), sections()
+- [x] **DWIM auto-registration** - 7→65 tools, word form matching
+- [x] **Bootstrap exploration** - 86.9% token savings with skeleton
 
 **Remaining large tasks:**
 - [ ] **CLI from MossAPI** (large) - Migrate 5389-line manual cli.py to gen/cli.py
