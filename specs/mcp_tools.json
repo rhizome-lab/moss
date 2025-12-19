@@ -20,12 +20,12 @@
     "inputSchema": {
       "properties": {
         "file_path": {
-          "description": "Path to the Python file",
+          "description": "Path to the file",
           "type": "string"
         },
         "include_docstrings": {
           "default": true,
-          "description": "Whether to include docstrings in output",
+          "description": "Whether to include docstrings in output (Python only)",
           "type": "boolean"
         }
       },

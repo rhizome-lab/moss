@@ -50,7 +50,7 @@ class SkeletonAPI:
     """API for code skeleton extraction.
 
     Extracts structural summaries of code (classes, functions, signatures)
-    without implementation details.
+    without implementation details. Supports multiple languages via plugin system.
     """
 
     root: Path
@@ -63,6 +63,9 @@ class SkeletonAPI:
 
         Returns:
             List of Symbol objects representing the code structure
+
+        Note:
+            For non-Python files, use format() which routes through the plugin system.
         """
         from moss.skeleton import extract_python_skeleton
 
@@ -73,17 +76,50 @@ class SkeletonAPI:
     def format(self, file_path: str | Path, include_docstrings: bool = True) -> str:
         """Extract and format skeleton as readable text.
 
+        Uses the plugin registry to support multiple file types (Python, Markdown, etc.).
+
         Args:
-            file_path: Path to the Python file
-            include_docstrings: Whether to include docstrings in output
+            file_path: Path to the file
+            include_docstrings: Whether to include docstrings in output (Python only)
 
         Returns:
             Formatted string representation of the skeleton
         """
-        from moss.skeleton import format_skeleton
+        import asyncio
+        import concurrent.futures
 
-        symbols = self.extract(file_path)
-        return format_skeleton(symbols, include_docstrings=include_docstrings)
+        from moss.plugins import get_registry
+        from moss.views import ViewOptions, ViewTarget
+
+        path = self._resolve_path(file_path)
+        target = ViewTarget(path=path)
+        registry = get_registry()
+        plugin = registry.find_plugin(target, "skeleton")
+
+        if plugin is None:
+            return f"No skeleton plugin found for: {path.suffix}"
+
+        options = ViewOptions(include_private=True)
+
+        async def render() -> str:
+            view = await plugin.render(target, options)
+            if "error" in view.metadata:
+                return f"Error: {view.metadata['error']}"
+            return view.content
+
+        def run_in_new_loop() -> str:
+            return asyncio.run(render())
+
+        # Check if we're already in an async context
+        try:
+            asyncio.get_running_loop()
+            # Already in async context - run in a thread with its own loop
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(run_in_new_loop)
+                return future.result()
+        except RuntimeError:
+            # No running loop - just use asyncio.run
+            return asyncio.run(render())
 
     def _resolve_path(self, file_path: str | Path) -> Path:
         path = Path(file_path)

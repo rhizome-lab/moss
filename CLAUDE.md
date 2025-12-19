@@ -55,6 +55,8 @@ Multi-agent model: Ticket-based (not shared chat history). Agents are isolated m
 4. Run `moss gen --target=mcp` to regenerate the MCP server
 5. The tool will automatically appear with proper descriptions from docstrings
 
+**MCP server caching:** The MCP server (when used via Claude Code) loads code at startup. After editing `moss_api.py` or related files, the MCP server must be reloaded to pick up changes. Test changes directly via Python (`uv run python -c "..."`) before expecting MCP tools to reflect updates.
+
 **Everything is a plugin.** Where possible, use plugin protocols instead of hardcoded implementations. Even "native" integrations should implement the same plugin interface as third-party ones.
 
 **Library is the API.** The library is the canonical API surface. CLI, TUI, HTTP server, MCP, and LSP are all frontends to the library. The server adds optional benefits (concurrent clients, persistent state, network access) but isn't required.

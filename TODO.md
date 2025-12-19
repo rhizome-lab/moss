@@ -11,6 +11,8 @@ Candidates for the next session:
 - [ ] **Unix socket transport** (small) - Add Unix socket option for local MCP connections
 - [ ] **Generator documentation** (small) - Document how the generation pipeline works
 - [ ] **Drift auto-update hook** (small) - Add pre-commit hook to auto-update specs
+- [ ] **`moss todo` command** (small) - Read/search TODOs, not just count them (dogfooding discovery)
+- [ ] **Complexity hotspots** (medium) - 60 functions ≥15 complexity, worst: `_generate_candidates` (47), `cmd_query` (46)
 
 **Recently completed:**
 - [x] RAG to MossAPI/MCP - `rag_index`, `rag_search`, `rag_stats`, `rag_clear` tools exposed

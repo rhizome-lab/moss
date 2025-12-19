@@ -1157,7 +1157,7 @@
     },
     "/skeleton/extract": {
       "post": {
-        "description": "Extract skeleton from a Python file. List of Symbol objects representing the code structure",
+        "description": "Extract skeleton from a Python file. List of Symbol objects representing the code structure Note: For non-Python files, use format() which routes through the plugin system.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1190,19 +1190,19 @@
     },
     "/skeleton/format": {
       "post": {
-        "description": "Extract and format skeleton as readable text. Formatted string representation of the skeleton",
+        "description": "Extract and format skeleton as readable text. Uses the plugin registry to support multiple file types (Python, Markdown, etc.). Formatted string representation of the skeleton",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "properties": {
                   "file_path": {
-                    "description": "Path to the Python file",
+                    "description": "Path to the file",
                     "type": "string"
                   },
                   "include_docstrings": {
                     "default": true,
-                    "description": "Whether to include docstrings in output",
+                    "description": "Whether to include docstrings in output (Python only)",
                     "type": "boolean"
                   }
                 },
@@ -1358,7 +1358,7 @@
   },
   "tags": [
     {
-      "description": "API for code skeleton extraction. Extracts structural summaries of code (classes, functions, signatures) without implementation details.",
+      "description": "API for code skeleton extraction. Extracts structural summaries of code (classes, functions, signatures) without implementation details. Supports multiple languages via plugin system.",
       "name": "skeleton"
     },
     {
