@@ -412,10 +412,27 @@ def cmd_skeleton(args: Namespace) -> int:
 
 def cmd_path(args: Namespace) -> int:
     """Resolve a fuzzy path to exact location(s)."""
-    from moss.codebase import resolve_path
+    from moss.rust_shim import rust_available, rust_path
 
     output = setup_output(args)
     query = args.query
+
+    # Try Rust CLI first for speed
+    if rust_available():
+        matches = rust_path(query)
+        if matches is not None:
+            if not matches:
+                output.error(f"No matches for: {query}")
+                return 1
+            if wants_json(args):
+                output.data(matches)
+            else:
+                for m in matches:
+                    output.print(f"{m['path']} ({m['kind']})")
+            return 0
+
+    # Fall back to Python implementation
+    from moss.codebase import resolve_path
 
     matches = resolve_path(query)
 
