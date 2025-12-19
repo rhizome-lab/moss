@@ -8,42 +8,37 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 **For next session:**
 
-1. **MCP client for loops** (medium) - Let loops call external MCP servers
-   - Would enable loops to use filesystem, git, browser tools
-   - Research: mcp client SDK
-   - Start with minimal implementation
-
-2. **Token-efficient web search** (small) - Reduce tokens when doing research
+1. **Token-efficient web search** (small) - Reduce tokens when doing research
    - Current approach burns context on search results
    - Consider: summarize in smaller chunks, cache results, extract key facts only
 
-3. **Test docstring_apply_loop E2E** (small) - Verify the full workflow
-   - Run with real LLM against a test file
-   - Verify docstrings are correctly inserted
+2. **CompositeToolExecutor** (small) - Combine multiple executors
+   - Route tools to appropriate executor (MossAPI, MCP, LLM)
+   - Enable hybrid loops that use both local and external tools
+
+3. **Loop serialization** (small) - Save/load loops as YAML/JSON
+   - Enable sharing loop definitions
+   - Allow loops to be version controlled
 
 **Continue autonomously** - Keep picking up tasks from Backlog.
 
 **Backlog (small):**
 - [x] ~~**Switch LLM executor to litellm**~~ ✅ - Now uses litellm for all providers
 - [x] ~~**Fix skeleton MCP tool**~~ ✅ - Works after MCP reload (Dec 2025)
-  - Was returning "No skeleton plugin found for: .py"
-  - Fixed by MCP server reload - plugins now load correctly
+- [x] ~~**MCP client for loops**~~ ✅ - MCPToolExecutor can connect to any MCP server
+  - MCPServerConfig for server configuration
+  - Tested E2E with moss MCP server (58 tools accessible)
+- [x] ~~**Multi-LLM rotation to reduce bias**~~ ✅ - Implemented in LLMConfig
+  - `models: list[str]` + `rotation: "round_robin" | "random" | None`
 - [ ] **Token-efficient web search** - Reduce tokens when doing research
   - Current approach burns context on search results
   - Consider: summarize in smaller chunks, cache results, extract key facts only
-- [ ] **MCP client for moss agent** - Let loops call external MCP servers
-  - Agent already calls moss tools recursively (skeleton, patch, validation)
-  - MCP client would add external tools (filesystem, git, browser, etc.)
-  - Would enable moss loops to be fully autonomous agents
 - [ ] **Recursive self-improvement for moss workflows** - Loops that improve other loops
   - Not just CLAUDE.md - any workflow can be a target
   - Critic loop reviewing loop definitions for inefficiencies
   - Subagents proposing step reordering, tool substitutions
   - Works for LLM-heavy and tool-heavy workflows alike
   - Requires careful human review to avoid runaway changes
-- [x] ~~**Multi-LLM rotation to reduce bias**~~ ✅ - Implemented in LLMConfig
-  - `models: list[str]` + `rotation: "round_robin" | "random" | None`
-  - 5 tests covering rotation strategies
 
 **Deferred:**
 - Add missing CLI APIs → after loop work validates architecture
@@ -52,7 +47,7 @@ See `~/git/prose/moss/` for full synthesis design documents.
 ---
 
 **Completed this session (Dec 19, 2025):**
-- [x] **Loop tests** - 64 tests in `tests/test_agent_loop.py`
+- [x] **Loop tests** - 69 tests in `tests/test_agent_loop.py`
 - [x] **CLI integration** - `moss loop list/run/benchmark` commands
 - [x] **E2E loops** - analysis + docstring loops working with real Gemini
 - [x] **litellm unified** - All providers now use litellm (removed Gemini special-casing)
@@ -64,7 +59,13 @@ See `~/git/prose/moss/` for full synthesis design documents.
 - [x] **docstring_apply_loop** - Full workflow: skeleton → LLM → parse → patch
   - parse.docstrings tool for FUNC:name|docstring format
   - patch.docstrings tool for applying docstrings with proper indentation
-  - 17 new tests for parsing and patching
+- [x] **MCPToolExecutor** - Connect to external MCP servers from loops
+  - MCPServerConfig for server configuration
+  - Tested E2E with moss MCP server
+- [x] **Philosophy updates** - Added new design tenets
+  - Low Barrier to Entry
+  - Works on Messy Codebases
+  - Accelerate Vibe Coding (token efficiency, parallelism)
 
 **Previously completed:**
 - [x] **Fix loop data flow** - Added LoopContext for context passing
