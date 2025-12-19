@@ -140,7 +140,6 @@ def create_server() -> Any:
                 inputSchema={
                     "type": "object",
                     "properties": {"command": {"type": "string"}},
-                    "required": ["command"],
                 },
             )
         ]
