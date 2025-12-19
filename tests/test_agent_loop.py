@@ -15,7 +15,9 @@ from moss.agent_loop import (
     LoopStatus,
     LoopStep,
     StepType,
+    analysis_loop,
     critic_loop,
+    docstring_loop,
     incremental_loop,
     simple_loop,
 )
@@ -449,6 +451,23 @@ class TestLoopTemplates:
         loop = incremental_loop()
         assert loop.name == "incremental"
         assert any(s.name == "decide" for s in loop.steps)
+
+    def test_analysis_loop_structure(self):
+        loop = analysis_loop()
+        assert loop.name == "analysis"
+        assert len(loop.steps) == 2
+        assert loop.steps[0].name == "skeleton"
+        assert loop.steps[1].name == "analyze"
+        assert loop.steps[1].step_type == StepType.LLM
+        assert "analyze.success" in loop.exit_conditions
+
+    def test_docstring_loop_structure(self):
+        loop = docstring_loop()
+        assert loop.name == "docstring"
+        assert len(loop.steps) == 2
+        assert loop.steps[0].name == "skeleton"
+        assert loop.steps[1].name == "identify"
+        assert loop.steps[1].step_type == StepType.LLM
 
 
 class TestLLMConfig:

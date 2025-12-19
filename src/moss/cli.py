@@ -3302,7 +3302,9 @@ def cmd_loop(args: Namespace) -> int:
         LLMConfig,
         LLMToolExecutor,
         LoopBenchmark,
+        analysis_loop,
         critic_loop,
+        docstring_loop,
         incremental_loop,
         simple_loop,
     )
@@ -3315,6 +3317,8 @@ def cmd_loop(args: Namespace) -> int:
         "simple": simple_loop,
         "critic": critic_loop,
         "incremental": incremental_loop,
+        "analysis": analysis_loop,
+        "docstring": docstring_loop,
     }
 
     if action == "list":

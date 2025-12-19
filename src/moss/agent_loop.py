@@ -510,6 +510,48 @@ def critic_loop(name: str = "critic") -> AgentLoop:
     )
 
 
+def analysis_loop(name: str = "analysis") -> AgentLoop:
+    """Simple analysis loop: skeleton → LLM analyze → done.
+
+    This is the simplest E2E loop that uses real LLM calls.
+    Good for testing the infrastructure works.
+    """
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep("skeleton", "skeleton.format", step_type=StepType.TOOL),
+            LoopStep(
+                "analyze",
+                "llm.analyze",
+                input_from="skeleton",
+                step_type=StepType.LLM,
+            ),
+        ],
+        exit_conditions=["analyze.success"],
+    )
+
+
+def docstring_loop(name: str = "docstring") -> AgentLoop:
+    """Docstring generation loop: skeleton → LLM identify missing → done.
+
+    Identifies functions missing docstrings. The output can be used
+    to generate patches in a follow-up step.
+    """
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep("skeleton", "skeleton.format", step_type=StepType.TOOL),
+            LoopStep(
+                "identify",
+                "llm.add_docstrings",
+                input_from="skeleton",
+                step_type=StepType.LLM,
+            ),
+        ],
+        exit_conditions=["identify.success"],
+    )
+
+
 def incremental_loop(name: str = "incremental") -> AgentLoop:
     """Incremental context loading: skeleton → targeted → full (if needed)."""
     return AgentLoop(
@@ -944,6 +986,17 @@ class LLMToolExecutor:
                 f"{task_context}Given this code skeleton, do you need to see "
                 f"the full implementation to make changes? "
                 f"Answer YES or NO with brief explanation:\n\n{focus_str}"
+            ),
+            "add_docstrings": (
+                f"Given this code skeleton, identify functions without docstrings. "
+                f"For EACH function missing a docstring, output a line in this format:\n"
+                f"FUNC:function_name|One-line description of what the function does\n\n"
+                f"Only output functions that are MISSING docstrings. "
+                f"Be concise - one short sentence per function.\n\n"
+                f"Skeleton:\n{focus_str}"
+            ),
+            "analyze": (
+                f"{task_context}Analyze the following and provide insights:\n\n{focus_str}"
             ),
         }
 
