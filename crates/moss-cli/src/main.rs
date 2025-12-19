@@ -5,6 +5,7 @@ mod daemon;
 mod index;
 mod path_resolve;
 mod symbols;
+mod tree;
 
 #[derive(Parser)]
 #[command(name = "moss")]
@@ -112,6 +113,25 @@ enum Commands {
         #[arg(short, long)]
         root: Option<PathBuf>,
     },
+
+    /// Show directory tree structure
+    Tree {
+        /// Directory to show (defaults to root)
+        #[arg(default_value = ".")]
+        path: String,
+
+        /// Root directory (defaults to current directory)
+        #[arg(short, long)]
+        root: Option<PathBuf>,
+
+        /// Maximum depth to display
+        #[arg(short, long)]
+        depth: Option<usize>,
+
+        /// Show only directories
+        #[arg(short = 'D', long)]
+        dirs_only: bool,
+    },
 }
 
 fn main() {
@@ -134,6 +154,9 @@ fn main() {
             cmd_callees(&symbol, &file, root.as_deref(), cli.json)
         }
         Commands::Callers { symbol, root } => cmd_callers(&symbol, root.as_deref(), cli.json),
+        Commands::Tree { path, root, depth, dirs_only } => {
+            cmd_tree(&path, root.as_deref(), depth, dirs_only, cli.json)
+        }
     };
 
     std::process::exit(exit_code);
@@ -487,6 +510,54 @@ fn cmd_callers(symbol: &str, root: Option<&Path>, json: bool) -> i32 {
         for (file, sym) in &callers {
             println!("  {}:{}", file, sym);
         }
+    }
+
+    0
+}
+
+fn cmd_tree(path: &str, root: Option<&Path>, depth: Option<usize>, dirs_only: bool, json: bool) -> i32 {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    // Resolve the path if it's not "."
+    let target_dir = if path == "." {
+        root.clone()
+    } else {
+        let matches = path_resolve::resolve(path, &root);
+        match matches.iter().find(|m| m.kind == "directory") {
+            Some(m) => root.join(&m.path),
+            None => {
+                // Maybe it's an exact path
+                let exact = root.join(path);
+                if exact.is_dir() {
+                    exact
+                } else {
+                    eprintln!("Directory not found: {}", path);
+                    return 1;
+                }
+            }
+        }
+    };
+
+    let result = tree::generate_tree(&target_dir, depth, dirs_only);
+
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "root": result.root_name,
+                "file_count": result.file_count,
+                "dir_count": result.dir_count,
+                "tree": result.lines
+            })
+        );
+    } else {
+        for line in &result.lines {
+            println!("{}", line);
+        }
+        println!();
+        println!("{} directories, {} files", result.dir_count, result.file_count);
     }
 
     0

@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. **Rust CLI infrastructure** - Fast startup for hot paths
+1. **Rust CLI polish** - Complete the fast path
    - [x] Create `crates/moss-cli/` with Cargo workspace
    - [x] Implement `moss path` in Rust with fuzzy matching (~4ms with LIKE pre-filter)
    - [x] Add SQLite index for file caching
@@ -13,16 +13,38 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
    - [x] Add `symbols`, `expand`, `callers`, `callees` commands
    - [x] Fix `callers` to search all files (not just fuzzy matches)
    - [x] Fix SQLite TEXT→INTEGER conversions (CAST)
-2. **Daemon + index architecture** - Complete
-   - `mossd` daemon: keeps index hot, watches filesystem (inotify)
-   - SQLite index: files (path, mtime), symbols (name, kind, line, parent)
-   - Smart invalidation: mtime check on query, proactive via watcher
-   - Unix socket IPC, auto-start/shutdown
-3. **Migrate tree commands to Rust**
-   - `path`, `view`, `search-tree`, `expand`, `callers`, `callees`
-   - tree-sitter for parsing (Rust-native)
-   - Python CLI shells to Rust for these commands
-4. **Proper reference tracing** - AST-based callers/callees (in Rust with tree-sitter)
+   - [x] Add `tree` command to Rust (directory tree view)
+   - [ ] Add `skeleton` command to Rust (AST-based)
+   - [ ] Add `anchors` command to Rust (identify code anchors)
+   - [ ] Add `deps` command to Rust (module dependencies)
+   - [ ] Add `cfg` command to Rust (control flow graph)
+   - [ ] Add `complexity` command to Rust
+
+2. **Daemon improvements**
+   - [x] Basic daemon scaffold with Unix socket IPC
+   - [x] SQLite symbol index with file watching
+   - [ ] CLI auto-start daemon on first query if not running
+   - [ ] Daemon auto-shutdown after idle timeout (10 min)
+   - [ ] Handle large query responses (streaming/chunking)
+   - [ ] Add daemon `status`/`shutdown` subcommands to CLI
+
+3. **Reference tracing** - AST-based callers/callees
+   - [ ] Store call graph in SQLite (caller_symbol, callee_name, file, line)
+   - [ ] Query call graph from daemon for fast lookups
+   - [ ] Cross-file reference resolution (import tracking)
+   - [ ] Handle method calls (obj.method() → Class.method)
+   - [ ] Handle qualified names (module.func vs func)
+
+4. **MCP improvements**
+   - [ ] Add `nucleo` fuzzy plugin for SQLite (research)
+   - [ ] Investigate CodeQL-style queries over moss index
+   - [ ] Add data flow tracking (basic taint analysis)
+
+5. **Performance & reliability**
+   - [ ] Benchmark suite for CLI commands
+   - [ ] Add `--profile` flag to CLI for timing breakdown
+   - [ ] Error recovery when index is corrupted
+   - [ ] Graceful degradation when daemon unavailable
 
 ## Active Backlog
 
