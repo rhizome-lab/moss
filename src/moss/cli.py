@@ -3398,6 +3398,69 @@ def _format_concise_health(status) -> str:
     return "\n".join(lines)
 
 
+def cmd_dwim(args: Namespace) -> int:
+    """Find the right moss tool using natural language.
+
+    DWIM = Do What I Mean. Describe what you want to do and get tool suggestions.
+    """
+    from moss.dwim import analyze_intent, get_tool_info
+
+    output = setup_output(args)
+    query = getattr(args, "query", None)
+    tool_name = getattr(args, "tool", None)
+    top_k = getattr(args, "top", 5)
+
+    # Info mode: show details about a specific tool
+    if tool_name:
+        info = get_tool_info(tool_name)
+        if info is None:
+            output.error(f"Tool not found: {tool_name}")
+            return 1
+        output.info(f"Tool: {info['name']}")
+        output.info(f"Description: {info['description']}")
+        if info.get("keywords"):
+            output.info(f"Keywords: {', '.join(info['keywords'])}")
+        if info.get("aliases"):
+            output.info(f"Aliases: {', '.join(info['aliases'])}")
+        if info.get("parameters"):
+            output.info("Parameters:")
+            for p in info["parameters"]:
+                output.info(f"  - {p}")
+        return 0
+
+    # Query mode: find tools matching query
+    if not query:
+        output.error("Usage: moss dwim <query> or moss dwim --tool <name>")
+        output.info("Examples:")
+        output.info("  moss dwim 'summarize the codebase'")
+        output.info("  moss dwim 'find complex functions'")
+        output.info("  moss dwim --tool skeleton")
+        return 1
+
+    results = analyze_intent(query)[:top_k]
+
+    if not results:
+        output.warning(f"No tools match: {query}")
+        return 1
+
+    output.info(f"Tools matching '{query}':\n")
+    for r in results:
+        confidence_bar = "█" * int(r.confidence * 10) + "░" * (10 - int(r.confidence * 10))
+        output.info(f"  {r.tool:<25} [{confidence_bar}] {r.confidence:.0%}")
+        if r.message:
+            # Truncate long messages
+            msg = r.message[:60] + "..." if len(r.message) > 60 else r.message
+            output.info(f"    {msg}")
+        output.info("")
+
+    # Show usage hint for top result
+    if results:
+        top = results[0]
+        output.info(f"Try: moss {top.tool.replace('.', ' ').replace('_', '-')} ...")
+
+    return 0
+
+
 def cmd_report(args: Namespace) -> int:
     """Generate comprehensive project report (verbose health)."""
     from moss.status import StatusChecker
@@ -5355,6 +5418,29 @@ def create_parser() -> argparse.ArgumentParser:
         help="Maximum agent iterations per instance (default: 10)",
     )
     eval_parser.set_defaults(func=cmd_eval)
+
+    # dwim command (find the right tool)
+    dwim_parser = subparsers.add_parser(
+        "dwim", help="Find the right moss tool using natural language"
+    )
+    dwim_parser.add_argument(
+        "query",
+        nargs="?",
+        help="Natural language description of what you want to do",
+    )
+    dwim_parser.add_argument(
+        "--tool",
+        "-t",
+        help="Get info about a specific tool",
+    )
+    dwim_parser.add_argument(
+        "--top",
+        "-n",
+        type=int,
+        default=5,
+        help="Number of results to show (default: 5)",
+    )
+    dwim_parser.set_defaults(func=cmd_dwim)
 
     # help command (with examples and categories)
     help_parser = subparsers.add_parser(
