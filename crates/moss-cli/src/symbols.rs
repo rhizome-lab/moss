@@ -1,5 +1,5 @@
 use std::path::Path;
-use tree_sitter::{Language, Parser, Query, QueryCursor};
+use tree_sitter::Parser;
 
 #[derive(Debug, Clone)]
 pub struct Symbol {
@@ -248,6 +248,158 @@ impl SymbolParser {
         let start = symbol.start_line.saturating_sub(1);
         let end = symbol.end_line.min(lines.len());
         Some(lines[start..end].join("\n"))
+    }
+
+    /// Find callees (functions/methods called) within a symbol
+    pub fn find_callees(&mut self, path: &Path, content: &str, symbol_name: &str) -> Vec<String> {
+        let symbol = match self.find_symbol(path, content, symbol_name) {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+
+        // Extract symbol source
+        let lines: Vec<&str> = content.lines().collect();
+        let start = symbol.start_line.saturating_sub(1);
+        let end = symbol.end_line.min(lines.len());
+        let source = lines[start..end].join("\n");
+
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        match ext {
+            "py" => self.find_python_calls(&source),
+            "rs" => self.find_rust_calls(&source),
+            _ => Vec::new(),
+        }
+    }
+
+    fn find_python_calls(&mut self, source: &str) -> Vec<String> {
+        let tree = match self.python_parser.parse(source, None) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+
+        let mut calls = std::collections::HashSet::new();
+        let mut cursor = tree.root_node().walk();
+        self.collect_python_calls(&mut cursor, source, &mut calls);
+
+        let mut result: Vec<_> = calls.into_iter().collect();
+        result.sort();
+        result
+    }
+
+    fn collect_python_calls(
+        &self,
+        cursor: &mut tree_sitter::TreeCursor,
+        content: &str,
+        calls: &mut std::collections::HashSet<String>,
+    ) {
+        loop {
+            let node = cursor.node();
+
+            if node.kind() == "call" {
+                // Get the function being called
+                if let Some(func_node) = node.child_by_field_name("function") {
+                    let func_text = &content[func_node.byte_range()];
+                    // Extract just the function name (last part if dotted)
+                    let name = func_text.split('.').last().unwrap_or(func_text);
+                    calls.insert(name.to_string());
+                }
+            }
+
+            if cursor.goto_first_child() {
+                self.collect_python_calls(cursor, content, calls);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    fn find_rust_calls(&mut self, source: &str) -> Vec<String> {
+        let tree = match self.rust_parser.parse(source, None) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+
+        let mut calls = std::collections::HashSet::new();
+        let mut cursor = tree.root_node().walk();
+        self.collect_rust_calls(&mut cursor, source, &mut calls);
+
+        let mut result: Vec<_> = calls.into_iter().collect();
+        result.sort();
+        result
+    }
+
+    fn collect_rust_calls(
+        &self,
+        cursor: &mut tree_sitter::TreeCursor,
+        content: &str,
+        calls: &mut std::collections::HashSet<String>,
+    ) {
+        loop {
+            let node = cursor.node();
+
+            if node.kind() == "call_expression" {
+                // Get the function being called
+                if let Some(func_node) = node.child_by_field_name("function") {
+                    let func_text = &content[func_node.byte_range()];
+                    // Extract just the function name
+                    let name = func_text
+                        .split("::")
+                        .last()
+                        .unwrap_or(func_text)
+                        .split('.')
+                        .last()
+                        .unwrap_or(func_text);
+                    calls.insert(name.to_string());
+                }
+            }
+
+            if cursor.goto_first_child() {
+                self.collect_rust_calls(cursor, content, calls);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    /// Find callers (symbols that call a given function) across all files
+    pub fn find_callers(
+        &mut self,
+        root: &Path,
+        files: &[(String, bool)],
+        symbol_name: &str,
+    ) -> Vec<(String, String)> {
+        let mut callers = Vec::new();
+
+        for (path, is_dir) in files {
+            if *is_dir {
+                continue;
+            }
+            if !path.ends_with(".py") && !path.ends_with(".rs") {
+                continue;
+            }
+
+            let full_path = root.join(path);
+            let content = match std::fs::read_to_string(&full_path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let symbols = self.parse_file(&full_path, &content);
+            for symbol in symbols {
+                let callees = self.find_callees(&full_path, &content, &symbol.name);
+                if callees.contains(&symbol_name.to_string()) {
+                    callers.push((path.clone(), symbol.name.clone()));
+                }
+            }
+        }
+
+        callers
     }
 }
 

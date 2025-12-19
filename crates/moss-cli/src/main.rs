@@ -87,6 +87,30 @@ enum Commands {
         #[arg(short, long)]
         root: Option<PathBuf>,
     },
+
+    /// Find what a symbol calls
+    Callees {
+        /// Symbol name to analyze
+        symbol: String,
+
+        /// File containing the symbol
+        #[arg(short, long)]
+        file: String,
+
+        /// Root directory (defaults to current directory)
+        #[arg(short, long)]
+        root: Option<PathBuf>,
+    },
+
+    /// Find symbols that call a given symbol
+    Callers {
+        /// Symbol name to find callers for
+        symbol: String,
+
+        /// Root directory (defaults to current directory)
+        #[arg(short, long)]
+        root: Option<PathBuf>,
+    },
 }
 
 fn main() {
@@ -105,6 +129,10 @@ fn main() {
             cmd_expand(&symbol, file.as_deref(), root.as_deref(), cli.json)
         }
         Commands::Symbols { file, root } => cmd_symbols(&file, root.as_deref(), cli.json),
+        Commands::Callees { symbol, file, root } => {
+            cmd_callees(&symbol, &file, root.as_deref(), cli.json)
+        }
+        Commands::Callers { symbol, root } => cmd_callers(&symbol, root.as_deref(), cli.json),
     };
 
     std::process::exit(exit_code);
@@ -352,6 +380,83 @@ fn cmd_symbols(file: &str, root: Option<&Path>, json: bool) -> i32 {
                 s.name,
                 parent_str
             );
+        }
+    }
+
+    0
+}
+
+fn cmd_callees(symbol: &str, file: &str, root: Option<&Path>, json: bool) -> i32 {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    // Resolve the file
+    let matches = path_resolve::resolve(file, &root);
+    let file_match = match matches.iter().find(|m| m.kind == "file") {
+        Some(m) => m,
+        None => {
+            eprintln!("File not found: {}", file);
+            return 1;
+        }
+    };
+
+    let file_path = root.join(&file_match.path);
+    let content = match std::fs::read_to_string(&file_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Error reading file: {}", e);
+            return 1;
+        }
+    };
+
+    let mut parser = symbols::SymbolParser::new();
+    let callees = parser.find_callees(&file_path, &content, symbol);
+
+    if callees.is_empty() {
+        eprintln!("No callees found for: {}", symbol);
+        return 1;
+    }
+
+    if json {
+        println!("{}", serde_json::to_string(&callees).unwrap());
+    } else {
+        println!("Callees of {}:", symbol);
+        for callee in &callees {
+            println!("  {}", callee);
+        }
+    }
+
+    0
+}
+
+fn cmd_callers(symbol: &str, root: Option<&Path>, json: bool) -> i32 {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    // Get all files
+    let all_paths = path_resolve::resolve("", &root);
+    let files: Vec<_> = all_paths.into_iter().map(|m| (m.path, m.kind == "directory")).collect();
+
+    let mut parser = symbols::SymbolParser::new();
+    let callers = parser.find_callers(&root, &files, symbol);
+
+    if callers.is_empty() {
+        eprintln!("No callers found for: {}", symbol);
+        return 1;
+    }
+
+    if json {
+        let output: Vec<_> = callers
+            .iter()
+            .map(|(file, sym)| serde_json::json!({"file": file, "symbol": sym}))
+            .collect();
+        println!("{}", serde_json::to_string(&output).unwrap());
+    } else {
+        println!("Callers of {}:", symbol);
+        for (file, sym) in &callers {
+            println!("  {}:{}", file, sym);
         }
     }
 
