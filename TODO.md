@@ -25,7 +25,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
    - [x] SQLite symbol index with file watching
    - [x] CLI auto-start daemon on first query if not running
    - [x] Add daemon `status`/`shutdown`/`start` subcommands to CLI
-   - [ ] Daemon auto-shutdown after idle timeout (10 min)
+   - [x] Daemon auto-shutdown after idle timeout (default 10 min)
    - [ ] Handle large query responses (streaming/chunking)
 
 3. **Reference tracing** - AST-based callers/callees

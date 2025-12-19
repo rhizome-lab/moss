@@ -53,6 +53,7 @@ class ServerState:
     - Cached parse results (skeletons, CFGs, etc.)
     - Active MossAPI instances
     - File watchers for cache invalidation
+    - Idle timeout tracking for daemon auto-shutdown
     """
 
     root: Path
@@ -60,10 +61,28 @@ class ServerState:
     _locks: dict[str, asyncio.Lock] = field(default_factory=dict)
     _api: Any = None  # MossAPI instance
     _default_ttl: float = 300.0  # 5 minutes
+    _start_time: float = field(default_factory=time.time)
+    _last_activity: float = field(default_factory=time.time)
+    _query_count: int = 0
 
     def __post_init__(self):
         """Initialize the state."""
         self.root = Path(self.root).resolve()
+        self._start_time = time.time()
+        self._last_activity = time.time()
+
+    def touch(self) -> None:
+        """Update last activity time. Call on each request."""
+        self._last_activity = time.time()
+        self._query_count += 1
+
+    def idle_seconds(self) -> float:
+        """Get seconds since last activity."""
+        return time.time() - self._last_activity
+
+    def uptime_seconds(self) -> float:
+        """Get server uptime in seconds."""
+        return time.time() - self._start_time
 
     @property
     def api(self) -> Any:
@@ -252,6 +271,9 @@ class ServerState:
             "expired": expired,
             "avg_age_seconds": total_age / len(self._cache) if self._cache else 0,
             "root": str(self.root),
+            "uptime_seconds": self.uptime_seconds(),
+            "idle_seconds": self.idle_seconds(),
+            "query_count": self._query_count,
         }
 
 
