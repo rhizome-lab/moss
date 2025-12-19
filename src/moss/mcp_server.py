@@ -66,6 +66,12 @@ _CLI_COMMANDS = {
     "distros",
     "skeleton",
     "tree",
+    "path",
+    "view",
+    "search-tree",
+    "expand",
+    "callers",
+    "callees",
     "anchors",
     "query",
     "cfg",
@@ -145,6 +151,13 @@ _TOOL_TO_CLI: dict[str, str] = {
     "query": "query",
     "cfg": "cfg",
     "context": "context",
+    # Tree navigation commands
+    "path": "path",
+    "view": "view",
+    "search-tree": "search-tree",
+    "cli_expand": "expand",
+    "callers": "callers",
+    "callees": "callees",
 }
 
 

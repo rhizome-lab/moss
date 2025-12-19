@@ -418,6 +418,43 @@ def _register_builtin_tools() -> None:
             keywords=["edit", "modify", "change", "patch", "update", "fix", "replace"],
             parameters=["file_path", "anchor", "new_content", "edit_type"],
         ),
+        # Tree navigation commands
+        ToolInfo(
+            name="path",
+            description="Resolve fuzzy path or symbol to exact file location",
+            keywords=["resolve", "find", "where", "location", "file", "fuzzy", "match"],
+            parameters=["query"],
+        ),
+        ToolInfo(
+            name="view",
+            description="View a node in the codebase tree with structure",
+            keywords=["show", "display", "look", "see", "node", "symbol", "class", "function"],
+            parameters=["target"],
+        ),
+        ToolInfo(
+            name="search-tree",
+            description="Search for symbols in the codebase tree",
+            keywords=["search", "find", "symbols", "tree", "grep", "match", "lookup"],
+            parameters=["query", "scope"],
+        ),
+        ToolInfo(
+            name="cli_expand",
+            description="Show full source code of a symbol",
+            keywords=["expand", "source", "code", "full", "body", "implementation", "read"],
+            parameters=["target"],
+        ),
+        ToolInfo(
+            name="callers",
+            description="Find all callers of a function or method",
+            keywords=["callers", "references", "usages", "who", "calls", "uses", "invokes"],
+            parameters=["target"],
+        ),
+        ToolInfo(
+            name="callees",
+            description="Find what functions a symbol calls",
+            keywords=["callees", "calls", "invokes", "uses", "dependencies", "outgoing"],
+            parameters=["target"],
+        ),
     ]
     for tool in builtin_tools:
         register_tool(tool)
@@ -511,10 +548,10 @@ TOOL_ALIASES: dict[str, str] = {
     "outline": "skeleton",
     "tree": "skeleton",
     "hierarchy": "skeleton",
-    # skeleton_expand
-    "expand": "skeleton_expand",
-    "fullsource": "skeleton_expand",
-    "source": "skeleton_expand",
+    # cli_expand (show full source of a symbol)
+    "expand": "cli_expand",
+    "fullsource": "cli_expand",
+    "source": "cli_expand",
     # skeleton_get_enum_values
     "enum": "skeleton_get_enum_values",
     "enumvalues": "skeleton_get_enum_values",

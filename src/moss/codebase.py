@@ -97,6 +97,7 @@ class CodebaseTree:
         self.root_path = root.resolve()
         self._root = Node(NodeKind.ROOT, root.name, root)
         self._cache: dict[Path, Node] = {}
+        self._parsed: set[Path] = set()  # Track which files have been parsed
 
     @property
     def root(self) -> Node:
@@ -167,6 +168,11 @@ class CodebaseTree:
 
     def _parse_python_file(self, file_node: Node) -> None:
         """Parse a Python file and add symbol children."""
+        # Skip if already parsed
+        if file_node.path in self._parsed:
+            return
+        self._parsed.add(file_node.path)
+
         try:
             source = file_node.path.read_text()
             tree = ast.parse(source)
@@ -286,15 +292,62 @@ class CodebaseTree:
                 return node
         return None
 
+    def _scan_file_structure(self) -> None:
+        """Scan filesystem structure without parsing (fast).
+
+        Uses os.walk with in-place pruning for speed.
+        """
+        import os
+
+        skip_dirs = {"__pycache__", "node_modules", ".venv", "venv", ".git"}
+        for dirpath, dirnames, filenames in os.walk(self.root_path):
+            # Prune excluded directories in-place (prevents descent)
+            dirnames[:] = [d for d in dirnames if not d.startswith(".") and d not in skip_dirs]
+
+            # Add this directory and its files
+            dir_path = Path(dirpath)
+            if dir_path != self.root_path:
+                self._add_file_node_fast(dir_path)
+            for name in filenames:
+                self._add_file_node_fast(dir_path / name)
+
+    def _add_file_node_fast(self, path: Path) -> Node | None:
+        """Add a file/dir node without parsing contents."""
+        if path in self._cache:
+            return self._cache[path]
+
+        try:
+            rel = path.relative_to(self.root_path)
+        except ValueError:
+            return None
+
+        current = self._root
+        current_path = self.root_path
+
+        for part in rel.parts:
+            current_path = current_path / part
+            child = current.find(part)
+            if not child:
+                kind = NodeKind.DIRECTORY if current_path.is_dir() else NodeKind.FILE
+                child = current.add_child(Node(kind, part, current_path))
+                self._cache[current_path] = child
+                # NO parsing here - just structure
+            current = child
+
+        return current
+
     def _scan_all_files(self) -> None:
-        """Scan all Python files in the codebase."""
-        for py_file in self.root_path.rglob("*.py"):
-            # Skip hidden dirs and common excludes
-            parts = py_file.relative_to(self.root_path).parts
-            skip_dirs = ("__pycache__", "node_modules", ".venv", "venv")
-            if any(p.startswith(".") or p in skip_dirs for p in parts):
-                continue
-            self._get_file_node(py_file)
+        """Parse all Python files in the codebase for symbols.
+
+        If files are already in cache (from fast scan), just parse them.
+        """
+        # First ensure file structure is scanned
+        self._scan_file_structure()
+
+        # Now parse all Python files
+        for node in self._root.walk():
+            if node.kind == NodeKind.FILE and node.path.suffix == ".py":
+                self._parse_python_file(node)
 
     def resolve(self, query: str, scan_all: bool = True) -> list[Node]:
         """Resolve a fuzzy query to matching nodes.
@@ -325,13 +378,12 @@ class CodebaseTree:
         if exact:
             return [exact]
 
-        # Scan all files if needed for fuzzy matching
-        if scan_all:
-            self._scan_all_files()
-
         query_lower = query.lower()
 
-        # Match by filename/dirname
+        # Fast scan filesystem structure (no parsing)
+        self._scan_file_structure()
+
+        # Match by filename/dirname first
         for node in self._root.walk():
             if node.kind in (NodeKind.FILE, NodeKind.DIRECTORY):
                 name_lower = node.name.lower()
@@ -339,8 +391,9 @@ class CodebaseTree:
                 if name_lower == query_lower or stem_lower == query_lower:
                     matches.append(node)
 
-        # If no file matches, try symbol names
-        if not matches:
+        # If no file matches, try symbol names (requires parsing)
+        if not matches and scan_all:
+            self._scan_all_files()
             for node in self._root.walk():
                 if node.kind in (NodeKind.CLASS, NodeKind.FUNCTION, NodeKind.METHOD):
                     if node.name.lower() == query_lower:
