@@ -8,21 +8,20 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 **For next session:**
 
-1. **Add LLM executor** (medium) - ✅ Done
-   - LLMConfig with provider support (gemini, anthropic, openai, mock)
-   - LLMToolExecutor that routes to moss tools OR LLM
-   - Token tracking from actual API responses
-   - Default provider: Gemini 3 Flash (free tier available)
+1. **Fix loop data flow** (medium) - Enable simple_loop/critic_loop to work
+   - Steps need access to both initial_input AND previous outputs
+   - Consider: context dict passed through all steps
+   - Test with real Gemini calls (API key in .env)
 
-2. **Research A2A protocol** (small) - ✅ Done
-   - See `docs/prior-art.md` for full notes
-   - Verdict: Good fit with ticket-based model, complements MCP
-   - Priority: Medium (not blocking)
+2. **Add loop tests with mock LLM** (small) - Ensure loops work
+   - Unit tests for AgentLoopRunner with mock executor
+   - Test LLM/tool routing in LLMToolExecutor
+   - Test token tracking
 
-3. **Fix agent_loop bugs** (small) - ✅ Done
-   - Renamed `max_iterations` → `max_steps` with clear docstring
-   - Marked `simple_loop` as requiring LLM executor
-   - Added example of tool-only loop in docstring
+3. **CLI integration for loops** (medium) - Make loops accessible
+   - `moss loop run <loop-name> --file <path>`
+   - `moss loop list` to show available loops
+   - `moss loop benchmark` for comparisons
 
 **Deferred:**
 - Add missing CLI APIs → after loop work validates architecture
