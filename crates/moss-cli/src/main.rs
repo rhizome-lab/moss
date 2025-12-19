@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
 
+mod anchors;
 mod daemon;
 mod index;
 mod path_resolve;
@@ -147,6 +148,20 @@ enum Commands {
         #[arg(short = 'd', long, default_value = "true")]
         docstrings: bool,
     },
+
+    /// List code anchors (named code locations)
+    Anchors {
+        /// File to extract anchors from
+        file: String,
+
+        /// Root directory (defaults to current directory)
+        #[arg(short, long)]
+        root: Option<PathBuf>,
+
+        /// Filter anchors by name (fuzzy match)
+        #[arg(short, long)]
+        query: Option<String>,
+    },
 }
 
 fn main() {
@@ -174,6 +189,9 @@ fn main() {
         }
         Commands::Skeleton { file, root, docstrings } => {
             cmd_skeleton(&file, root.as_deref(), docstrings, cli.json)
+        }
+        Commands::Anchors { file, root, query } => {
+            cmd_anchors(&file, root.as_deref(), query.as_deref(), cli.json)
         }
     };
 
@@ -636,6 +654,87 @@ fn cmd_skeleton(file: &str, root: Option<&Path>, include_docstrings: bool, json:
         } else {
             println!("# {}", file_match.path);
             println!("{}", formatted);
+        }
+    }
+
+    0
+}
+
+fn cmd_anchors(file: &str, root: Option<&Path>, query: Option<&str>, json: bool) -> i32 {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    // Resolve the file
+    let matches = path_resolve::resolve(file, &root);
+    let file_match = match matches.iter().find(|m| m.kind == "file") {
+        Some(m) => m,
+        None => {
+            eprintln!("File not found: {}", file);
+            return 1;
+        }
+    };
+
+    let file_path = root.join(&file_match.path);
+    let content = match std::fs::read_to_string(&file_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Error reading file: {}", e);
+            return 1;
+        }
+    };
+
+    let mut extractor = anchors::AnchorExtractor::new();
+
+    let anchors_list = if let Some(q) = query {
+        extractor.find_anchor(&file_path, &content, q)
+    } else {
+        extractor.extract(&file_path, &content).anchors
+    };
+
+    if json {
+        let output: Vec<_> = anchors_list
+            .iter()
+            .map(|a| {
+                serde_json::json!({
+                    "name": a.name,
+                    "type": a.anchor_type.as_str(),
+                    "reference": a.reference(),
+                    "context": a.context,
+                    "start_line": a.start_line,
+                    "end_line": a.end_line,
+                    "signature": a.signature
+                })
+            })
+            .collect();
+        println!(
+            "{}",
+            serde_json::json!({
+                "file": file_match.path,
+                "anchors": output
+            })
+        );
+    } else {
+        if anchors_list.is_empty() {
+            println!("# {} (no anchors)", file_match.path);
+        } else {
+            println!("# {} ({} anchors)", file_match.path, anchors_list.len());
+            for a in &anchors_list {
+                let ctx = if let Some(c) = &a.context {
+                    format!(" (in {})", c)
+                } else {
+                    String::new()
+                };
+                println!(
+                    "  {}:{}-{} {} {}{}",
+                    a.anchor_type.as_str(),
+                    a.start_line,
+                    a.end_line,
+                    a.name,
+                    a.signature.as_deref().unwrap_or(""),
+                    ctx
+                );
+            }
         }
     }
 
