@@ -17,11 +17,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] Revisit CLAUDE.md dogfooding section - tools should be self-evident, not need instructions
 
 **Medium:**
-- [ ] Single-tool MCP server for LLM efficiency
-  - Rename current `moss-mcp` → `moss-mcp-full` (keep for IDEs, programmatic use)
-  - New `moss-mcp` with single `moss(command: str)` tool
-  - 99% token reduction (~8K → ~50 tokens)
-  - See `docs/prior-art.md` and [Anthropic's code execution approach](https://www.anthropic.com/engineering/code-execution-with-mcp)
 - [ ] Compact tool encoding for moss agent - bypass JSON Schema overhead
   - For moss loop, we control both sides - can use terse function signatures
 - [ ] Study Goose's context revision (`crates/goose/src/`)

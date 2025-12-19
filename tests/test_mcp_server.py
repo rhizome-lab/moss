@@ -6,7 +6,7 @@ from typing import ClassVar
 import pytest
 
 from moss.gen.mcp import MCPGenerator
-from moss.mcp_server import _execute_tool, _serialize_result
+from moss.mcp_server_full import _execute_tool, _serialize_result
 
 
 @pytest.fixture

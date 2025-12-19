@@ -1000,7 +1000,10 @@ def cmd_mcp_server(args: Namespace) -> int:
     """Start the MCP server for LLM tool access."""
     output = setup_output(args)
     try:
-        from moss.mcp_server import main as mcp_main
+        if getattr(args, "full", False):
+            from moss.mcp_server_full import main as mcp_main
+        else:
+            from moss.mcp_server import main as mcp_main
 
         mcp_main()
         return 0
@@ -4276,6 +4279,11 @@ def create_parser() -> argparse.ArgumentParser:
 
     # mcp-server command
     mcp_parser = subparsers.add_parser("mcp-server", help="Start MCP server for LLM tool access")
+    mcp_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Use full multi-tool server (more tokens, better for IDEs)",
+    )
     mcp_parser.set_defaults(func=cmd_mcp_server)
 
     # acp-server command

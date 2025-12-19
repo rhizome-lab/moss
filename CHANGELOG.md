@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.6.7
+
+### Single-Tool MCP Server
+
+**Token Efficiency**
+- New single-tool MCP server: `moss(command: str)` - 99% token reduction (~8K → ~50 tokens)
+- Original multi-tool server preserved as `moss-mcp-full` for IDEs
+- CLI: `moss mcp-server` (single-tool, default) or `moss mcp-server --full` (multi-tool)
+- Entry points: `moss-mcp` (single) and `moss-mcp-full` (full)
+
 ## v0.6.6
 
 ### Phase 36: query/search CLI Migration, Agent Learning

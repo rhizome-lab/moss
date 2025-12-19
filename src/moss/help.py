@@ -456,9 +456,10 @@ COMMANDS: dict[str, CommandHelp] = {
     "mcp-server": CommandHelp(
         name="mcp-server",
         summary="Start MCP server for LLM tool access",
-        description="Run the Model Context Protocol server for AI assistants.",
+        description="Run the MCP server. Default: single-tool. Use --full for multi-tool.",
         examples=[
-            CommandExample("moss mcp-server", "Start MCP server"),
+            CommandExample("moss mcp-server", "Start single-tool MCP server (token-efficient)"),
+            CommandExample("moss mcp-server --full", "Start multi-tool MCP server (for IDEs)"),
         ],
         see_also=["acp-server", "lsp"],
     ),

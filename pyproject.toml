@@ -10,6 +10,7 @@ dependencies = []
 moss = "moss.cli:main"
 moss-server = "moss.server.app:main"
 moss-mcp = "moss.mcp_server:main"
+moss-mcp-full = "moss.mcp_server_full:main"
 
 [project.entry-points."moss.plugins"]
 python-skeleton = "moss.skeleton:PythonSkeletonPlugin"
