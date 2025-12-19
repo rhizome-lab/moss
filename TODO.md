@@ -4,14 +4,18 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. **Recursive self-improvement** - Loops that improve other loops
+1. **Async task documentation** - Document how to manage background tasks
+   - Terminals, shells, agents running in background
+   - Waiting for completion, handling hangs, when to join
+
+2. **Recursive self-improvement** - Loops that improve other loops
    - Critic loop reviewing loop definitions
    - Start with: optimize a docstring loop
 
-2. **Codebase search API** - Dogfood moss search instead of raw grep/glob
+3. **Codebase search API** - Dogfood moss search instead of raw grep/glob
    - Semantic search via RAG, structural via skeleton/anchors
 
-3. **Guessability metrics** - Evaluate codebase structure quality
+4. **Guessability metrics** - Evaluate codebase structure quality
    - Can you guess module names from functionality?
 
 ## Active Backlog
@@ -19,7 +23,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 **Small:**
 - [ ] Module name DWIM - fuzzy matching for file/module names
 - [ ] Model-agnostic naming - don't over-fit to specific LLM conventions
-- [ ] Add more DWIM aliases for discoverability
+- [ ] Multiple agents concurrently - no requirement to join back to main stream
+- [ ] Async task lifecycle - spawn, wait, timeout, cancel patterns
 
 **Medium:**
 - [ ] Complexity hotspots - 60 functions with complexity ≥15
