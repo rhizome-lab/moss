@@ -282,7 +282,6 @@ def _register_builtin_tools() -> None:
             name="skeleton",
             description="Extract code structure showing classes, functions, and methods",
             keywords=[
-                "structure",
                 "outline",
                 "hierarchy",
                 "overview",
@@ -508,7 +507,6 @@ TOOL_REGISTRY = _TOOLS
 # Semantic aliases: alternative names that map to canonical tools
 TOOL_ALIASES: dict[str, str] = {
     # skeleton
-    "structure": "skeleton",
     "symbols": "skeleton",
     "outline": "skeleton",
     "tree": "skeleton",
@@ -548,6 +546,9 @@ TOOL_ALIASES: dict[str, str] = {
     "summary": "context",
     "overview": "context",
     "info": "context",
+    # search_summarize_module
+    "structure": "search_summarize_module",
+    "module": "search_summarize_module",
     # apply_patch
     "edit": "apply_patch",
     "modify": "apply_patch",

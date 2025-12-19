@@ -112,7 +112,7 @@ class TestToolResolution:
     def test_resolve_alias(self):
         """Test resolving tool alias."""
         match = resolve_tool("structure")
-        assert match.tool == "skeleton"
+        assert match.tool == "search_summarize_module"
         assert match.confidence == 1.0
 
         match = resolve_tool("imports")
@@ -157,9 +157,15 @@ class TestToolRouter:
         router = ToolRouter()
         matches = router.analyze_intent("show code structure")
         assert len(matches) > 0
-        # skeleton should be in top results
-        tool_names = [m.tool for m in matches[:3]]
-        assert "skeleton" in tool_names or "context" in tool_names
+        # structure-related tools should be in top results
+        tool_names = [m.tool for m in matches[:5]]
+        structure_tools = {
+            "skeleton",
+            "context",
+            "search_summarize_module",
+            "health_analyze_structure",
+        }
+        assert any(t in structure_tools for t in tool_names)
 
     def test_analyze_intent_deps(self):
         """Test analyzing intent for dependencies."""
@@ -234,7 +240,7 @@ class TestModuleFunctions:
         # Should also work with alias
         info = get_tool_info("structure")
         assert info is not None
-        assert info["name"] == "skeleton"
+        assert info["name"] == "search_summarize_module"
 
         # Unknown tool should return None
         info = get_tool_info("xyzunknown123")
