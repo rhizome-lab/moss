@@ -311,6 +311,47 @@
         ]
       }
     },
+    "/dependencies/build-graph": {
+      "post": {
+        "description": "Build a dependency graph for the project. Dict mapping module names to their dependencies",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "internal_only": {
+                    "default": true,
+                    "description": "Only include internal module dependencies",
+                    "type": "boolean"
+                  },
+                  "path": {
+                    "description": "Directory to analyze (defaults to project root)",
+                    "type": "string"
+                  },
+                  "pattern": {
+                    "default": "**/*.py",
+                    "description": "Glob pattern for files to include",
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Build a dependency graph for the project",
+        "tags": [
+          "dependencies"
+        ]
+      }
+    },
     "/dependencies/extract": {
       "post": {
         "description": "Extract imports and exports from a file. DependencyInfo with imports and exports",
@@ -344,6 +385,48 @@
         ]
       }
     },
+    "/dependencies/find-reverse": {
+      "get": {
+        "description": "Find files that import a given module. List of ReverseDependency objects",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "pattern": {
+                    "default": "**/*.py",
+                    "description": "Glob pattern for files to search",
+                    "type": "string"
+                  },
+                  "search_path": {
+                    "description": "Directory to search in (defaults to project root)",
+                    "type": "string"
+                  },
+                  "target_module": {
+                    "description": "Module name to search for",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "target_module"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Find files that import a given module",
+        "tags": [
+          "dependencies"
+        ]
+      }
+    },
     "/dependencies/format": {
       "post": {
         "description": "Extract and format dependencies as readable text. Formatted string with imports and exports",
@@ -372,6 +455,44 @@
           }
         },
         "summary": "Extract and format dependencies as readable text",
+        "tags": [
+          "dependencies"
+        ]
+      }
+    },
+    "/dependencies/graph-to-dot": {
+      "post": {
+        "description": "Convert a dependency graph to DOT format. DOT-formatted string for visualization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "graph": {
+                    "description": "Dependency graph from build_graph()",
+                    "type": "string"
+                  },
+                  "title": {
+                    "default": "Dependencies",
+                    "description": "Title for the graph",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "graph"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Convert a dependency graph to DOT format",
         "tags": [
           "dependencies"
         ]
@@ -1406,6 +1527,44 @@
         ]
       }
     },
+    "/search/find-related-files": {
+      "get": {
+        "description": "Find files related to the given file through imports. Analyzes both: - Files that the given file imports from - Files that import the given file RelatedFilesResult with imports_from and imported_by lists",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "file_path": {
+                    "description": "Path to the file to analyze",
+                    "type": "string"
+                  },
+                  "pattern": {
+                    "default": "**/*.py",
+                    "description": "Glob pattern for files to search for reverse dependencies",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file_path"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Find files related to the given file through imports",
+        "tags": [
+          "search"
+        ]
+      }
+    },
     "/search/find-symbols": {
       "get": {
         "description": "Find symbols by name across the codebase. Searches all Python files for functions, classes, methods, and variables matching the given name. List of SymbolMatch objects sorted by relevance",
@@ -1584,6 +1743,39 @@
           }
         },
         "summary": "Resolve a file name with DWIM (Do What I Mean)",
+        "tags": [
+          "search"
+        ]
+      }
+    },
+    "/search/summarize-module": {
+      "get": {
+        "description": "Summarize what a Python module does. Extracts: - Module docstring - Public classes with their docstrings - Public functions with their docstrings - Public constants - Basic metrics (line count, import count) ModuleSummary with module information",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "file_path": {
+                    "description": "Path to the Python file",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file_path"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Summarize what a Python module does",
         "tags": [
           "search"
         ]

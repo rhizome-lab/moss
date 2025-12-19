@@ -2,25 +2,32 @@
 
 ## v0.6.5
 
-### Phase 34: Module DWIM, CLI Migration, explain_symbol
+### Phase 35: find_related_files, summarize_module, CLI Migration
 
 **SearchAPI** (Dec 2025)
+- `search_find_related_files` - Find files that import/are imported by a given file
+- `search_summarize_module` - "What does this module do?" with docstrings, public exports
 - `search_resolve_file` - DWIM for file names with fuzzy matching
 - `search_explain_symbol` - Show callers/callees for any symbol
 - `search_find_symbols` - Now recursively finds methods inside classes
-- Handles: typos, missing extensions, partial paths, case-insensitive
-- Prefers non-test files and shorter paths
+
+**DependencyAPI**
+- `dependencies_build_graph` - Build module dependency graph
+- `dependencies_graph_to_dot` - Convert graph to DOT format for visualization
+- `dependencies_find_reverse` - Find files that import a given module
+
+**CLI Migration to MossAPI**
+- 16 commands now use MossAPI (was 12)
+- Newly migrated: anchors, cfg, deps, context
+- Pattern: Replace direct imports with `MossAPI.for_project()`
+- Reduces duplication, enables generated CLI
+
+### Phase 34: Module DWIM, CLI Migration, explain_symbol
 
 **HealthAPI Filtering**
 - `health_check(focus=..., severity=...)` - Filter weak spots in API
 - Moved filtering logic from CLI into HealthAPI
 - Enables targeted health checks (e.g., only high-severity deps issues)
-
-**CLI Migration to MossAPI**
-- 12 commands now use MossAPI (was 3)
-- Newly migrated: skeleton, clones, security, check_refs, git_hotspots, external_deps, weaknesses, rag, dwim
-- Pattern: Replace direct imports with `MossAPI.for_project()`
-- Reduces duplication, enables generated CLI
 
 **Working Style Convention**
 - Added CLAUDE.md guidance: work through ALL "Next Up" items by default

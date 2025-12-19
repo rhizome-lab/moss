@@ -6,14 +6,12 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 1. **Continue CLI Migration** - Migrate remaining CLI commands to MossAPI
    - Pattern: Replace `from moss.X import Y` with `MossAPI.for_project()`
-   - 12 done (tree, complexity, health, skeleton, clones, security, check_refs, git_hotspots, external_deps, weaknesses, rag, dwim)
-   - Priority next: anchors, cfg, deps, context
+   - 16 done (tree, complexity, health, skeleton, clones, security, check_refs, git_hotspots, external_deps, weaknesses, rag, dwim, anchors, cfg, deps, context)
+   - Priority next: query, search
 
-2. **find_related_files** - What files does a given file interact with?
-   - Use dependency graph + imports to find related modules
-
-3. **Module summary** - "What does this module do?"
-   - Extract docstrings, public exports, key classes/functions
+2. **Agent learning** - Record mistakes in `.moss/lessons.md`
+   - Capture patterns from session failures
+   - Surface relevant lessons during similar operations
 
 ## Active Backlog
 
@@ -87,9 +85,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - `guessability_score` - evaluate codebase structure quality
 
 **Missing/wanted:**
-- `find_related_files` - what files does this file interact with?
 - `search_by_keyword` - semantic search across functions, not just name matching
-- Module-level summary - "what does this module do?"
+
+**Recently added:**
+- `search_find_related_files` - files that import/are imported by a given file
+- `search_summarize_module` - "what does this module do?"
 
 **Friction:**
 - Error messages should be specific ("File not found: X" not "No plugin for .py")

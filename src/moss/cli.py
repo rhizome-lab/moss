@@ -437,7 +437,7 @@ def cmd_anchors(args: Namespace) -> int:
     """Find anchors (functions, classes, methods) in code."""
     import re
 
-    from moss.skeleton import extract_python_skeleton
+    from moss import MossAPI
 
     output = setup_output(args)
     path = Path(args.path).resolve()
@@ -445,6 +445,8 @@ def cmd_anchors(args: Namespace) -> int:
     if not path.exists():
         output.error(f"Path {path} does not exist")
         return 1
+
+    api = MossAPI.for_project(path if path.is_dir() else path.parent)
 
     # Filter types
     type_filter = args.type if args.type != "all" else None
@@ -501,8 +503,7 @@ def cmd_anchors(args: Namespace) -> int:
 
     for file_path in files:
         try:
-            source = file_path.read_text()
-            symbols = extract_python_skeleton(source)
+            symbols = api.skeleton.extract(file_path)
             collect_symbols(symbols, file_path)
         except SyntaxError as e:
             output.verbose(f"Syntax error in {file_path}: {e}")
@@ -647,8 +648,7 @@ def cmd_query(args: Namespace) -> int:
 
 def cmd_cfg(args: Namespace) -> int:
     """Build and display control flow graph."""
-    from moss.plugins import get_registry
-    from moss.views import ViewOptions, ViewTarget
+    from moss import MossAPI
 
     output = setup_output(args)
     path = Path(args.path).resolve()
@@ -672,28 +672,19 @@ def cmd_cfg(args: Namespace) -> int:
         )
         return 0
 
-    registry = get_registry()
-    target = ViewTarget(path=path)
-    plugin = registry.find_plugin(target, "cfg")
+    api = MossAPI.for_project(path.parent)
 
-    if plugin is None:
-        output.error("No CFG plugin available for this file type")
+    try:
+        cfg_objects = api.cfg.build(path)
+    except Exception as e:
+        output.error(f"Failed to build CFG: {e}")
         return 1
 
-    options = ViewOptions(extra={"function_name": args.function})
+    # Filter by function name if specified
+    if args.function:
+        cfg_objects = [cfg for cfg in cfg_objects if cfg.name == args.function]
 
-    async def render_cfg():
-        return await plugin.render(target, options)
-
-    view = asyncio.run(render_cfg())
-
-    if "error" in view.metadata:
-        output.error(view.metadata["error"])
-        return 1
-
-    cfgs = view.metadata.get("cfgs", [])
-
-    if not cfgs:
+    if not cfg_objects:
         output.warning("No functions found")
         return 1
 
@@ -707,33 +698,30 @@ def cmd_cfg(args: Namespace) -> int:
 
     if getattr(args, "json", False):
         results = []
-        for cfg_data in cfgs:
+        for cfg in cfg_objects:
             result = {
-                "name": cfg_data["name"],
-                "node_count": cfg_data["node_count"],
-                "edge_count": cfg_data["edge_count"],
-                "cyclomatic_complexity": cfg_data["cyclomatic_complexity"],
+                "name": cfg.name,
+                "node_count": cfg.node_count,
+                "edge_count": cfg.edge_count,
+                "cyclomatic_complexity": cfg.cyclomatic_complexity,
             }
             # Include full graph details unless --summary
             if not args.summary:
-                result["entry"] = cfg_data.get("entry")
-                result["exit"] = cfg_data.get("exit")
-                result["nodes"] = cfg_data.get("nodes", {})
-                result["edges"] = cfg_data.get("edges", [])
+                result["entry"] = cfg.entry
+                result["exit"] = cfg.exit
+                result["nodes"] = {
+                    nid: {"type": n.node_type.name, "label": n.label, "lineno": n.lineno}
+                    for nid, n in cfg.nodes.items()
+                }
+                result["edges"] = [
+                    {"source": e.source, "target": e.target, "type": e.edge_type.name}
+                    for e in cfg.edges
+                ]
             results.append(result)
         output_result(results, args)
     elif args.html or output_format == "html":
         # HTML output with embedded Mermaid
-        from moss.cfg import CFGBuilder
         from moss.visualization import visualize_cfgs
-
-        builder = CFGBuilder()
-        cfg_objects = []
-        source = path.read_text()
-        for cfg_data in cfgs:
-            cfg = builder.build_from_source(source, cfg_data["name"])
-            if cfg:
-                cfg_objects.append(cfg)
 
         content = visualize_cfgs(cfg_objects, format="html")
         if args.output:
@@ -743,19 +731,8 @@ def cmd_cfg(args: Namespace) -> int:
             output.print(content)
     elif args.mermaid or output_format == "mermaid":
         # Mermaid output
-        mermaid_lines = view.metadata.get("mermaid", "")
-        if not mermaid_lines:
-            # Generate from CFGs
-            from moss.cfg import CFGBuilder
-
-            builder = CFGBuilder()
-            source = path.read_text()
-            mermaid_parts = []
-            for cfg_data in cfgs:
-                cfg_list = builder.build_from_source(source, cfg_data["name"])
-                for cfg in cfg_list:
-                    mermaid_parts.append(cfg.to_mermaid())
-            mermaid_lines = "\n\n".join(mermaid_parts)
+        mermaid_parts = [cfg.to_mermaid() for cfg in cfg_objects]
+        mermaid_lines = "\n\n".join(mermaid_parts)
 
         if args.output:
             Path(args.output).write_text(mermaid_lines)
@@ -764,15 +741,16 @@ def cmd_cfg(args: Namespace) -> int:
             output.print(mermaid_lines)
     elif args.summary:
         # Summary mode: just show counts and complexity
-        for cfg_data in cfgs:
+        for cfg in cfg_objects:
             output.info(
-                f"{cfg_data['name']}: {cfg_data['node_count']} nodes, "
-                f"{cfg_data['edge_count']} edges, "
-                f"complexity {cfg_data['cyclomatic_complexity']}"
+                f"{cfg.name}: {cfg.node_count} nodes, "
+                f"{cfg.edge_count} edges, "
+                f"complexity {cfg.cyclomatic_complexity}"
             )
     elif args.dot or output_format == "dot":
-        # DOT output - use raw content from view
-        dot_content = view.metadata.get("dot", view.content)
+        # DOT output
+        dot_parts = [cfg.to_dot() for cfg in cfg_objects]
+        dot_content = "\n\n".join(dot_parts)
         if args.output:
             Path(args.output).write_text(dot_content)
             output.success(f"Saved to {args.output}")
@@ -781,7 +759,8 @@ def cmd_cfg(args: Namespace) -> int:
     elif output_format == "svg":
         from moss.visualization import render_dot_to_svg
 
-        dot_content = view.metadata.get("dot", "")
+        dot_parts = [cfg.to_dot() for cfg in cfg_objects]
+        dot_content = "\n\n".join(dot_parts)
         if dot_content:
             svg = render_dot_to_svg(dot_content)
             Path(args.output).write_text(svg)
@@ -792,7 +771,8 @@ def cmd_cfg(args: Namespace) -> int:
     elif output_format == "png":
         from moss.visualization import render_dot_to_png
 
-        dot_content = view.metadata.get("dot", "")
+        dot_parts = [cfg.to_dot() for cfg in cfg_objects]
+        dot_content = "\n\n".join(dot_parts)
         if dot_content:
             png = render_dot_to_png(dot_content)
             Path(args.output).write_bytes(png)
@@ -801,20 +781,16 @@ def cmd_cfg(args: Namespace) -> int:
             output.error("No DOT content available for PNG rendering")
             return 1
     else:
-        output.print(view.content)
+        # Default: text output
+        for cfg in cfg_objects:
+            output.print(cfg.to_text())
 
     return 0
 
 
 def cmd_deps(args: Namespace) -> int:
     """Extract dependencies (imports/exports) from code."""
-    from moss.dependencies import (
-        build_dependency_graph,
-        dependency_graph_to_dot,
-        find_reverse_dependencies,
-    )
-    from moss.plugins import get_registry
-    from moss.views import ViewTarget
+    from moss import MossAPI
 
     output = setup_output(args)
     path = Path(args.path).resolve()
@@ -823,6 +799,8 @@ def cmd_deps(args: Namespace) -> int:
         output.error(f"Path {path} does not exist")
         return 1
 
+    api = MossAPI.for_project(path if path.is_dir() else path.parent)
+
     # Handle --dot mode: generate dependency graph visualization
     if getattr(args, "dot", False):
         if not path.is_dir():
@@ -830,13 +808,13 @@ def cmd_deps(args: Namespace) -> int:
             return 1
 
         pattern = args.pattern or "**/*.py"
-        graph = build_dependency_graph(str(path), pattern)
+        graph = api.dependencies.build_graph(path, pattern)
 
         if not graph:
             output.warning("No internal dependencies found")
             return 1
 
-        dot_output = dependency_graph_to_dot(graph, title=path.name)
+        dot_output = api.dependencies.graph_to_dot(graph, title=path.name)
         output.print(dot_output)
         return 0
 
@@ -844,7 +822,7 @@ def cmd_deps(args: Namespace) -> int:
     if args.reverse:
         search_dir = args.search_dir or "."
         pattern = args.pattern or "**/*.py"
-        reverse_deps = find_reverse_dependencies(args.reverse, search_dir, pattern)
+        reverse_deps = api.dependencies.find_reverse(args.reverse, search_dir, pattern)
 
         if getattr(args, "json", False):
             results = [
@@ -868,9 +846,8 @@ def cmd_deps(args: Namespace) -> int:
 
         return 0
 
-    # Normal mode: show dependencies of file(s) using plugin registry
+    # Normal mode: show dependencies of file(s)
     results = []
-    registry = get_registry()
 
     if path.is_file():
         files = [path]
@@ -878,56 +855,34 @@ def cmd_deps(args: Namespace) -> int:
         pattern = args.pattern or "**/*.py"
         files = list(path.glob(pattern))
 
-    async def render_file(file_path: Path) -> dict | None:
-        """Render dependencies for a single file."""
-        target = ViewTarget(path=file_path)
-        plugin = registry.find_plugin(target, "dependency")
+    for file_path in files:
+        try:
+            info = api.dependencies.extract(file_path)
+            content = api.dependencies.format(file_path)
 
-        if plugin is None:
-            return {"file": str(file_path), "error": "No plugin found for this file type"}
-
-        view = await plugin.render(target)
-
-        if "error" in view.metadata:
-            return {"file": str(file_path), "error": view.metadata["error"]}
-
-        return {
-            "file": str(file_path),
-            "content": view.content,
-            "imports": view.metadata.get("imports", []),
-            "exports": view.metadata.get("exports", []),
-        }
-
-    async def render_all() -> list[dict]:
-        render_results = []
-        for file_path in files:
-            result = await render_file(file_path)
-            if result:
-                render_results.append(result)
-        return render_results
-
-    rendered = asyncio.run(render_all())
-
-    for result in rendered:
-        if "error" in result:
-            output.verbose(f"Error in {result['file']}: {result['error']}")
-            if getattr(args, "json", False):
-                results.append({"file": result["file"], "error": result["error"]})
-        else:
             if getattr(args, "json", False):
                 results.append(
                     {
-                        "file": result["file"],
-                        "imports": result["imports"],
-                        "exports": result["exports"],
+                        "file": str(file_path),
+                        "imports": [
+                            {"module": imp.module, "names": imp.names, "line": imp.lineno}
+                            for imp in info.imports
+                        ],
+                        "exports": [
+                            {"name": exp.name, "type": exp.export_type, "line": exp.lineno}
+                            for exp in info.exports
+                        ],
                     }
                 )
             else:
                 if len(files) > 1:
-                    output.header(result["file"])
-                content = result["content"]
+                    output.header(str(file_path))
                 if content:
                     output.print(content)
+        except Exception as e:
+            output.verbose(f"Error in {file_path}: {e}")
+            if getattr(args, "json", False):
+                results.append({"file": str(file_path), "error": str(e)})
 
     if getattr(args, "json", False):
         output_result(results if len(results) > 1 else results[0] if results else {}, args)
@@ -937,8 +892,7 @@ def cmd_deps(args: Namespace) -> int:
 
 def cmd_context(args: Namespace) -> int:
     """Generate compiled context for a file (skeleton + deps + summary)."""
-    from moss.plugins import get_registry
-    from moss.views import ViewTarget
+    from moss import MossAPI
 
     output = setup_output(args)
     path = Path(args.path).resolve()
@@ -951,60 +905,36 @@ def cmd_context(args: Namespace) -> int:
         output.error(f"{path} must be a file")
         return 1
 
-    registry = get_registry()
-    target = ViewTarget(path=path)
+    api = MossAPI.for_project(path.parent)
 
-    # Find plugins for skeleton and dependency
-    skeleton_plugin = registry.find_plugin(target, "skeleton")
-    deps_plugin = registry.find_plugin(target, "dependency")
-
-    if skeleton_plugin is None and deps_plugin is None:
-        output.error("No plugins available for this file type")
+    # Get skeleton and dependencies
+    try:
+        symbols = api.skeleton.extract(path)
+        skeleton_content = api.skeleton.format(path)
+    except Exception as e:
+        output.error(f"Failed to extract skeleton: {e}")
         return 1
 
-    async def render_views():
-        skeleton_view = None
-        deps_view = None
-
-        if skeleton_plugin:
-            skeleton_view = await skeleton_plugin.render(target)
-        if deps_plugin:
-            deps_view = await deps_plugin.render(target)
-
-        return skeleton_view, deps_view
-
-    skeleton_view, deps_view = asyncio.run(render_views())
-
-    # Check for errors
-    if skeleton_view and "error" in skeleton_view.metadata:
-        output.error(skeleton_view.metadata["error"])
+    try:
+        deps_info = api.dependencies.extract(path)
+        deps_content = api.dependencies.format(path)
+    except Exception as e:
+        output.error(f"Failed to extract dependencies: {e}")
         return 1
 
-    if deps_view and "error" in deps_view.metadata:
-        output.error(deps_view.metadata["error"])
-        return 1
-
-    # Get data from views
-    symbols = skeleton_view.metadata.get("symbols", []) if skeleton_view else []
-    imports = deps_view.metadata.get("imports", []) if deps_view else []
-    exports = deps_view.metadata.get("exports", []) if deps_view else []
-    skeleton_content = skeleton_view.content if skeleton_view else ""
-    deps_content = deps_view.content if deps_view else ""
-
-    # Count symbols from metadata
+    # Count symbols recursively
     def count_symbols(syms: list) -> dict:
         counts = {"classes": 0, "functions": 0, "methods": 0}
         for s in syms:
-            kind = s.get("kind", "")
+            kind = s.kind
             if kind == "class":
                 counts["classes"] += 1
             elif kind == "function":
                 counts["functions"] += 1
             elif kind == "method":
                 counts["methods"] += 1
-            children = s.get("children", [])
-            if children:
-                child_counts = count_symbols(children)
+            if s.children:
+                child_counts = count_symbols(s.children)
                 for k, v in child_counts.items():
                     counts[k] += v
         return counts
@@ -1021,12 +951,18 @@ def cmd_context(args: Namespace) -> int:
                 "classes": counts["classes"],
                 "functions": counts["functions"],
                 "methods": counts["methods"],
-                "imports": len(imports),
-                "exports": len(exports),
+                "imports": len(deps_info.imports),
+                "exports": len(deps_info.exports),
             },
-            "symbols": symbols,
-            "imports": imports,
-            "exports": exports,
+            "symbols": [s.to_dict() for s in symbols],
+            "imports": [
+                {"module": imp.module, "names": imp.names, "line": imp.lineno}
+                for imp in deps_info.imports
+            ],
+            "exports": [
+                {"name": exp.name, "type": exp.export_type, "line": exp.lineno}
+                for exp in deps_info.exports
+            ],
         }
         output_result(result, args)
     else:
@@ -1036,10 +972,10 @@ def cmd_context(args: Namespace) -> int:
             f"Classes: {counts['classes']}, "
             f"Functions: {counts['functions']}, Methods: {counts['methods']}"
         )
-        output.info(f"Imports: {len(imports)}, Exports: {len(exports)}")
+        output.info(f"Imports: {len(deps_info.imports)}, Exports: {len(deps_info.exports)}")
         output.blank()
 
-        if imports and deps_content:
+        if deps_info.imports and deps_content:
             output.step("Imports")
             # Extract just the imports section from deps content
             imports_section = deps_content.split("Exports:")[0].strip()

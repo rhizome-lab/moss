@@ -488,6 +488,62 @@ class DependencyAPI:
         info = self.extract(file_path)
         return format_dependencies(info)
 
+    def build_graph(
+        self,
+        path: str | Path | None = None,
+        pattern: str = "**/*.py",
+        internal_only: bool = True,
+    ) -> dict[str, list[str]]:
+        """Build a dependency graph for the project.
+
+        Args:
+            path: Directory to analyze (defaults to project root)
+            pattern: Glob pattern for files to include
+            internal_only: Only include internal module dependencies
+
+        Returns:
+            Dict mapping module names to their dependencies
+        """
+        from moss.dependencies import build_dependency_graph
+
+        search_path = str(path) if path else str(self.root)
+        return build_dependency_graph(search_path, pattern, internal_only)
+
+    def graph_to_dot(self, graph: dict[str, list[str]], title: str = "Dependencies") -> str:
+        """Convert a dependency graph to DOT format.
+
+        Args:
+            graph: Dependency graph from build_graph()
+            title: Title for the graph
+
+        Returns:
+            DOT-formatted string for visualization
+        """
+        from moss.dependencies import dependency_graph_to_dot
+
+        return dependency_graph_to_dot(graph, title)
+
+    def find_reverse(
+        self,
+        target_module: str,
+        search_path: str | Path | None = None,
+        pattern: str = "**/*.py",
+    ) -> list:
+        """Find files that import a given module.
+
+        Args:
+            target_module: Module name to search for
+            search_path: Directory to search in (defaults to project root)
+            pattern: Glob pattern for files to search
+
+        Returns:
+            List of ReverseDependency objects
+        """
+        from moss.dependencies import find_reverse_dependencies
+
+        path = str(search_path) if search_path else str(self.root)
+        return find_reverse_dependencies(target_module, path, pattern)
+
     def _resolve_path(self, file_path: str | Path) -> Path:
         path = Path(file_path)
         if not path.is_absolute():
@@ -1824,6 +1880,146 @@ class FileMatch:
 
 
 @dataclass
+class RelatedFile:
+    """A file related to another through imports or dependencies.
+
+    Attributes:
+        path: Path to the related file
+        relationship: How the files are related ("imports", "imported_by")
+        modules: Module names involved in the relationship
+        lines: Line numbers where the relationship occurs
+    """
+
+    path: str
+    relationship: str
+    modules: list[str] = field(default_factory=list)
+    lines: list[int] = field(default_factory=list)
+
+    def to_compact(self) -> str:
+        """Return a compact string representation."""
+        mods = f" [{', '.join(self.modules)}]" if self.modules else ""
+        return f"{self.relationship}: {self.path}{mods}"
+
+
+@dataclass
+class RelatedFilesResult:
+    """Result of finding related files.
+
+    Attributes:
+        file: The file that was analyzed
+        imports_from: Files this file imports from
+        imported_by: Files that import this file
+    """
+
+    file: str
+    imports_from: list[RelatedFile] = field(default_factory=list)
+    imported_by: list[RelatedFile] = field(default_factory=list)
+
+    def to_compact(self) -> str:
+        """Return a compact string representation."""
+        lines = [f"Related files for {self.file}:"]
+        if self.imports_from:
+            lines.append(f"  Imports from ({len(self.imports_from)}):")
+            for f in self.imports_from[:10]:
+                lines.append(f"    - {f.path}")
+            if len(self.imports_from) > 10:
+                lines.append(f"    ... and {len(self.imports_from) - 10} more")
+        if self.imported_by:
+            lines.append(f"  Imported by ({len(self.imported_by)}):")
+            for f in self.imported_by[:10]:
+                lines.append(f"    - {f.path}")
+            if len(self.imported_by) > 10:
+                lines.append(f"    ... and {len(self.imported_by) - 10} more")
+        return "\n".join(lines)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return as dictionary."""
+        return {
+            "file": self.file,
+            "imports_from": [
+                {"path": f.path, "modules": f.modules, "lines": f.lines} for f in self.imports_from
+            ],
+            "imported_by": [
+                {"path": f.path, "modules": f.modules, "lines": f.lines} for f in self.imported_by
+            ],
+        }
+
+
+@dataclass
+class ModuleSummary:
+    """Summary of a Python module.
+
+    Attributes:
+        file: Path to the module file
+        module_docstring: Module-level docstring (if any)
+        public_classes: List of public class names with docstrings
+        public_functions: List of public function names with docstrings
+        public_constants: List of public constant names
+        lines: Total line count
+        imports_count: Number of imports
+    """
+
+    file: str
+    module_docstring: str | None = None
+    public_classes: list[tuple[str, str | None]] = field(default_factory=list)
+    public_functions: list[tuple[str, str | None]] = field(default_factory=list)
+    public_constants: list[str] = field(default_factory=list)
+    lines: int = 0
+    imports_count: int = 0
+
+    def to_compact(self) -> str:
+        """Return a compact string representation."""
+        lines = [f"Module: {self.file} ({self.lines} lines)"]
+        if self.module_docstring:
+            # Truncate long docstrings
+            doc = self.module_docstring[:200]
+            if len(self.module_docstring) > 200:
+                doc += "..."
+            lines.append(f'  "{doc}"')
+        if self.public_classes:
+            lines.append(f"  Classes ({len(self.public_classes)}):")
+            for name, doc in self.public_classes[:5]:
+                if doc and len(doc) > 50:
+                    doc_preview = f' - "{doc[:50]}..."'
+                elif doc:
+                    doc_preview = f' - "{doc}"'
+                else:
+                    doc_preview = ""
+                lines.append(f"    - {name}{doc_preview}")
+            if len(self.public_classes) > 5:
+                lines.append(f"    ... and {len(self.public_classes) - 5} more")
+        if self.public_functions:
+            lines.append(f"  Functions ({len(self.public_functions)}):")
+            for name, doc in self.public_functions[:5]:
+                if doc and len(doc) > 50:
+                    doc_preview = f' - "{doc[:50]}..."'
+                elif doc:
+                    doc_preview = f' - "{doc}"'
+                else:
+                    doc_preview = ""
+                lines.append(f"    - {name}{doc_preview}")
+            if len(self.public_functions) > 5:
+                lines.append(f"    ... and {len(self.public_functions) - 5} more")
+        if self.public_constants:
+            lines.append(f"  Constants: {', '.join(self.public_constants[:10])}")
+            if len(self.public_constants) > 10:
+                lines.append(f"    ... and {len(self.public_constants) - 10} more")
+        return "\n".join(lines)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return as dictionary."""
+        return {
+            "file": self.file,
+            "module_docstring": self.module_docstring,
+            "public_classes": [{"name": n, "docstring": d} for n, d in self.public_classes],
+            "public_functions": [{"name": n, "docstring": d} for n, d in self.public_functions],
+            "public_constants": self.public_constants,
+            "lines": self.lines,
+            "imports_count": self.imports_count,
+        }
+
+
+@dataclass
 class SearchAPI:
     """API for codebase search operations.
 
@@ -2363,6 +2559,184 @@ class SearchAPI:
             docstring=docstring,
             callers=callers,
             callees=unique_callees,
+        )
+
+    def find_related_files(
+        self,
+        file_path: str | Path,
+        pattern: str = "**/*.py",
+    ) -> RelatedFilesResult:
+        """Find files related to the given file through imports.
+
+        Analyzes both:
+        - Files that the given file imports from
+        - Files that import the given file
+
+        Args:
+            file_path: Path to the file to analyze
+            pattern: Glob pattern for files to search for reverse dependencies
+
+        Returns:
+            RelatedFilesResult with imports_from and imported_by lists
+        """
+        from moss.dependencies import (
+            extract_dependencies,
+            find_reverse_dependencies,
+        )
+
+        path = self._resolve_path(file_path)
+        if not path.exists():
+            return RelatedFilesResult(file=str(file_path))
+
+        source = path.read_text()
+        deps = extract_dependencies(source)
+
+        # Find files we import from
+        imports_from: list[RelatedFile] = []
+        for imp in deps.imports:
+            # Try to resolve the module to a file
+            module_path = self._resolve_module_to_file(imp.module)
+            if module_path:
+                imports_from.append(
+                    RelatedFile(
+                        path=module_path,
+                        relationship="imports",
+                        modules=[imp.module] + (imp.names or []),
+                        lines=[imp.lineno],
+                    )
+                )
+
+        # Find files that import us
+        imported_by: list[RelatedFile] = []
+        # Derive module name from file path
+        try:
+            rel_path = path.relative_to(self.root)
+            # Convert path to module name (e.g., src/moss/api.py -> moss.api)
+            module_name = self._path_to_module(rel_path)
+            if module_name:
+                reverse_deps = find_reverse_dependencies(module_name, str(self.root), pattern)
+                for rd in reverse_deps:
+                    imported_by.append(
+                        RelatedFile(
+                            path=rd.file,
+                            relationship="imported_by",
+                            modules=rd.names or [],
+                            lines=[rd.import_line],
+                        )
+                    )
+        except ValueError:
+            pass  # File not under root
+
+        return RelatedFilesResult(
+            file=str(file_path),
+            imports_from=imports_from,
+            imported_by=imported_by,
+        )
+
+    def _resolve_module_to_file(self, module: str) -> str | None:
+        """Try to resolve a module name to a file path."""
+        # Handle relative imports and common patterns
+        parts = module.split(".")
+        possible_paths = [
+            self.root / "/".join(parts) / "__init__.py",
+            self.root / ("/".join(parts) + ".py"),
+            self.root / "src" / "/".join(parts) / "__init__.py",
+            self.root / "src" / ("/".join(parts) + ".py"),
+        ]
+        for p in possible_paths:
+            if p.exists():
+                try:
+                    return str(p.relative_to(self.root))
+                except ValueError:
+                    return str(p)
+        return None
+
+    def _path_to_module(self, rel_path: Path) -> str | None:
+        """Convert a relative file path to a module name."""
+        # Remove .py extension
+        path_str = str(rel_path)
+        if path_str.endswith(".py"):
+            path_str = path_str[:-3]
+        elif path_str.endswith("/__init__"):
+            path_str = path_str[:-9]
+
+        # Remove src/ prefix if present
+        if path_str.startswith("src/"):
+            path_str = path_str[4:]
+
+        # Convert slashes to dots
+        module = path_str.replace("/", ".").replace("\\", ".")
+        return module if module else None
+
+    def summarize_module(self, file_path: str | Path) -> ModuleSummary:
+        """Summarize what a Python module does.
+
+        Extracts:
+        - Module docstring
+        - Public classes with their docstrings
+        - Public functions with their docstrings
+        - Public constants
+        - Basic metrics (line count, import count)
+
+        Args:
+            file_path: Path to the Python file
+
+        Returns:
+            ModuleSummary with module information
+        """
+        import ast
+
+        from moss.dependencies import extract_dependencies
+
+        path = self._resolve_path(file_path)
+        if not path.exists():
+            return ModuleSummary(file=str(file_path))
+
+        source = path.read_text()
+        line_count = len(source.splitlines())
+
+        try:
+            tree = ast.parse(source)
+        except SyntaxError:
+            return ModuleSummary(file=str(file_path), lines=line_count)
+
+        # Extract module docstring
+        module_docstring = ast.get_docstring(tree)
+
+        # Extract imports count
+        deps = extract_dependencies(source)
+        imports_count = len(deps.imports)
+
+        # Extract public symbols
+        public_classes: list[tuple[str, str | None]] = []
+        public_functions: list[tuple[str, str | None]] = []
+        public_constants: list[str] = []
+
+        for node in ast.iter_child_nodes(tree):
+            if isinstance(node, ast.ClassDef):
+                if not node.name.startswith("_"):
+                    docstring = ast.get_docstring(node)
+                    public_classes.append((node.name, docstring))
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if not node.name.startswith("_"):
+                    docstring = ast.get_docstring(node)
+                    public_functions.append((node.name, docstring))
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        name = target.id
+                        # Public constants are UPPER_CASE or don't start with _
+                        if not name.startswith("_") and name.isupper():
+                            public_constants.append(name)
+
+        return ModuleSummary(
+            file=str(file_path),
+            module_docstring=module_docstring,
+            public_classes=public_classes,
+            public_functions=public_functions,
+            public_constants=public_constants,
+            lines=line_count,
+            imports_count=imports_count,
         )
 
     def _resolve_path(self, file_path: str | Path) -> Path:

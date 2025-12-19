@@ -267,6 +267,29 @@
     "name": "dependencies_analyze"
   },
   {
+    "description": "Build a dependency graph for the project. Dict mapping module names to their dependencies",
+    "inputSchema": {
+      "properties": {
+        "internal_only": {
+          "default": true,
+          "description": "Only include internal module dependencies",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "Directory to analyze (defaults to project root)",
+          "type": "string"
+        },
+        "pattern": {
+          "default": "**/*.py",
+          "description": "Glob pattern for files to include",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "dependencies_build_graph"
+  },
+  {
     "description": "Extract dependencies (imports and exports). Example: moss deps src/api.py",
     "inputSchema": {
       "properties": {
@@ -283,6 +306,31 @@
     "name": "dependencies_extract"
   },
   {
+    "description": "Find files that import a given module. List of ReverseDependency objects",
+    "inputSchema": {
+      "properties": {
+        "pattern": {
+          "default": "**/*.py",
+          "description": "Glob pattern for files to search",
+          "type": "string"
+        },
+        "search_path": {
+          "description": "Directory to search in (defaults to project root)",
+          "type": "string"
+        },
+        "target_module": {
+          "description": "Module name to search for",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_module"
+      ],
+      "type": "object"
+    },
+    "name": "dependencies_find_reverse"
+  },
+  {
     "description": "Extract dependencies (imports and exports). Example: moss deps src/api.py",
     "inputSchema": {
       "properties": {
@@ -297,6 +345,27 @@
       "type": "object"
     },
     "name": "dependencies_format"
+  },
+  {
+    "description": "Convert a dependency graph to DOT format. DOT-formatted string for visualization",
+    "inputSchema": {
+      "properties": {
+        "graph": {
+          "description": "Dependency graph from build_graph()",
+          "type": "object"
+        },
+        "title": {
+          "default": "Dependencies",
+          "description": "Title for the graph",
+          "type": "string"
+        }
+      },
+      "required": [
+        "graph"
+      ],
+      "type": "object"
+    },
+    "name": "dependencies_graph_to_dot"
   },
   {
     "description": "Build and display control flow graph. Example: moss cfg src/main.py",
@@ -1090,6 +1159,27 @@
     "name": "search_find_files"
   },
   {
+    "description": "Find files related to the given file through imports. Analyzes both: - Files that the given file imports from - Files that import the given file RelatedFilesResult with imports_from and imported_by lists",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to the file to analyze",
+          "type": "string"
+        },
+        "pattern": {
+          "default": "**/*.py",
+          "description": "Glob pattern for files to search for reverse dependencies",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "type": "object"
+    },
+    "name": "search_find_related_files"
+  },
+  {
     "description": "Find symbols by name across the codebase. Searches all Python files for functions, classes, methods, and variables matching the given name. List of SymbolMatch objects sorted by relevance",
     "inputSchema": {
       "properties": {
@@ -1203,6 +1293,22 @@
       "type": "object"
     },
     "name": "search_resolve_file"
+  },
+  {
+    "description": "Summarize what a Python module does. Extracts: - Module docstring - Public classes with their docstrings - Public functions with their docstrings - Public constants - Basic metrics (line count, import count) ModuleSummary with module information",
+    "inputSchema": {
+      "properties": {
+        "file_path": {
+          "description": "Path to the Python file",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "type": "object"
+    },
+    "name": "search_summarize_module"
   },
   {
     "description": "Analyze codebase guessability. Evaluates: - Name-content alignment: Do module names reflect their contents? - Predictability: Are similar things in similar places? - Pattern consistency: Are conventions followed? GuessabilityReport with scores and recommendations",
