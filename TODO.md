@@ -28,13 +28,24 @@ Candidates for the next session:
 
 **Goal:** Reach the point where moss can run as an agent itself, using structural awareness to reduce token usage compared to raw file dumps.
 
+**Key finding: 86.9% token reduction** using skeleton vs full file (tested on dwim.py: 3,890 vs 29,748 chars).
+
+**Minimal agent loop components (all exist!):**
+1. **Context**: `skeleton.format()` for understanding (86.9% smaller than full file)
+2. **Discovery**: `dwim.analyze_intent()` to find right tool (65 tools)
+3. **Edits**: `patch.apply()` or `patch.apply_with_fallback()` for changes
+4. **Validation**: `validation.validate()` runs syntax + ruff (async)
+5. **Rollback**: Shadow Git exists (`git.create_checkpoint()`, `git.abort_checkpoint()`)
+
 - [ ] **Minimal agent loop** - Basic planner → tool call → validator cycle using moss tools
-  - Start with: `skeleton` for context, `apply_patch` for edits, `validation_validate` for checks
+  - All components exist, need to wire them together
   - Compare token usage vs Claude Code on same task
 - [ ] **Skeleton-first context** - Always provide skeleton before full file (if needed at all)
   - Measure: How often does the LLM need full file after seeing skeleton?
+  - Hypothesis: 80%+ of tasks can use skeleton-only
 - [ ] **Incremental context loading** - Start minimal, expand on request
   - skeleton → relevant functions → full file (if truly needed)
+  - Use `anchor.find()` to get specific functions when needed
 - [ ] **Shadow Git for rollback** - Already exists, wire into agent loop
 
 **Why this matters:** Every token saved = cost reduction + faster iteration + longer context for actual work.
