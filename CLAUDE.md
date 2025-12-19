@@ -83,9 +83,19 @@ moss complexity src/moss/
 
 # After changes, validate references
 moss check-refs src/
+
+# Don't know which tool to use? Use Python to query DWIM
+uv run python -c "from moss.dwim import analyze_intent; print(analyze_intent('summarize codebase')[:3])"
 ```
 
 This isn't just about testing the tools - it's about getting better context before making changes. If a tool isn't useful, that's valuable feedback → add to TODO.md.
+
+**CLI over MCP when testing changes.** The MCP server (via Claude Code) loads code at startup and caches it. When you modify moss source code (especially `moss_api.py`, `dwim.py`, or the `gen/` module), the MCP server won't see the changes until reloaded. Instead:
+- Test via CLI: `moss <command>` or `uv run python -c "from moss..."`
+- Test via Python: Direct imports give immediate feedback
+- Only rely on MCP tools for stable, committed functionality
+
+**Discover tools with DWIM.** If you don't know which tool to use, use `dwim_analyze_intent` (MCP) or Python (`from moss.dwim import analyze_intent`) with a natural language description. DWIM now knows about all 56+ tools and handles word variations (summarize→summary). Note: `moss dwim` CLI command doesn't exist yet (see "CLI from MossAPI" in TODO.md).
 
 ## Conventions
 

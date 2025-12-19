@@ -9,9 +9,13 @@ See `~/git/prose/moss/` for full synthesis design documents.
 Candidates for the next session:
 
 - [ ] **`moss todo` command** (small) - Read/search TODOs, not just count them (uses existing `roadmap.py`)
-- [ ] **DWIM auto-registration** (medium) - Only 7 tools in DWIM, but 38+ MCP tools; auto-generate from MossAPI
+- [x] **DWIM auto-registration** (medium) - ✅ Now 56 tools registered; added word form matching (summarize→summary)
 - [ ] **CLI from MossAPI** (large) - Migrate 5389-line manual cli.py to use gen/cli.py generator; ensures MCP/CLI parity
 - [ ] **Complexity hotspots** (medium) - 60 functions with complexity ≥15 need refactoring
+- [ ] **DWIM confidence tuning** (small) - Confidence scores still low (~0.25); consider:
+  - Better weighting between TF-IDF, keyword, and fuzzy match
+  - More word form mappings (current list is small)
+  - Extract more keywords from API docstrings
 
 ## Bootstrap Priority (Token Savings)
 
