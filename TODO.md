@@ -23,6 +23,48 @@ Candidates for the next session:
 
 ## Future Work
 
+### Context Management (HIGH PRIORITY)
+
+Context revision and management is core to our vision. Study Goose's approach and improve ours.
+
+**Study Goose's Context Revision:**
+- [ ] **Analyze Goose source** - Study `crates/goose/src/` for context revision implementation
+  - How do they detect "outdated information"?
+  - What triggers removal vs summarization?
+  - How does this integrate with their provider chat loop?
+- [ ] **Compare to context_memory.py** - Our Merkle tree approach vs their algorithmic deletion
+- [ ] **Implement improvements** - Apply learnings to moss
+
+**Current state**: `context_memory.py` has Merkle tree structure for change detection, but lacks:
+- Active pruning of outdated information
+- Summarization triggers during long sessions
+- Integration with the main loop
+
+### Skills System (Plugin-Driven)
+
+Skills shouldn't just be static text - they need conditional activation with plugin-extensible triggers.
+
+**Trigger Modes** (provided by plugins, not hardcoded):
+- `constant` - Always in context (like Claude Code's project instructions)
+- `rag` - Retrieved based on semantic similarity to current query
+- `directory` - Activated when working in certain directories (e.g., `/tests/` activates testing skill)
+- `file_pattern` - Activated for matching file globs (e.g., `*.sql` activates SQL skill)
+- `context` - Activated based on detected context (test code, CLI, library, etc.)
+
+**Plugin architecture:**
+- [ ] `TriggerMode` protocol - plugins register new trigger types
+- [ ] `Skill` dataclass - content + list of triggers + priority
+- [ ] `.moss/skills/` directory for user-defined skills
+- [ ] Skill activation during context assembly
+
+**Prior art:** Goose `.goose/skills`, Claude Code slash commands (but those are static)
+
+### MCP Server Security
+
+- [ ] **Extension validation** - Scan/validate MCP servers before activation (Goose does this)
+- [ ] **Permission scoping** - Limit what tools an MCP server can access
+- [ ] **Audit logging** - Track all MCP tool invocations
+
 ### MCP Server (EXISTS - needs dogfooding)
 
 **Already implemented** in `src/moss/mcp_server.py`:
