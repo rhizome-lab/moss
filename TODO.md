@@ -4,9 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. **Test MCP dogfooding** - Use moss MCP in real tasks, note friction points
-2. **Skeleton levels** - Consider `--compact` flag or tiered output
-3. **Continue CLI Migration** - Migrate remaining CLI commands to MossAPI
+1. **Dogfood new tree commands** - Test `path`, `view`, `search-tree`, `expand`, `callers` in real work
+2. **Wire tree commands to MCP** - Add DWIM routing for new commands
+3. **Indexing for tree** - Speed up `search-tree` and `callers` with persistent index
+4. **Deprecate old commands** - Phase out `skeleton`, `summarize`, `anchors` in favor of new tree commands
 
 ## Active Backlog
 
