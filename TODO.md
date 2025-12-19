@@ -6,26 +6,31 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 ## Next Up
 
-**For next session (prioritized):**
+**For this session (re-prioritized):**
 
-1. **Wire minimal agent loop** (medium) - All components exist, just need wiring
-   - Use: skeleton.format(), dwim.analyze_intent(), patch.apply(), validation.validate()
-   - Test on simple task, measure token usage vs Claude Code
+1. **Composable Loop primitives** (medium) - Foundation for agent work
+   - LoopStep, Loop, LoopRunner dataclasses
+   - One working loop (simple_edit) as proof of concept
+   - Wire existing tools: skeleton → patch → validate
 
-2. **Add missing CLI APIs** (medium) - 10 commands without API equivalents
-   - Priority: lint, status, overview, roadmap (most useful)
-   - Pattern: move logic from cmd_* to API, keep CLI as thin wrapper
+2. **Loop benchmarking** (small) - Measure what matters
+   - Token counter wrapper around tool calls
+   - Simple benchmark: run loop N times, report stats
+   - Baseline: compare vs "just ask Claude Code"
 
-3. **Refactor cmd_query** (small) - Complexity 46, worst in CLI
-   - Extract logic to QueryAPI, simplify CLI command
-   - Good practice for CLI migration pattern
+3. **`moss dwim` CLI command** (small) - Quick win
+   - Makes DWIM usable without Python
+   - Prepares for CLI generator
 
-4. **moss dwim CLI command** (small) - DWIM works via Python but no CLI
-   - Add `moss dwim "query"` to cli.py (or wait for CLI generator)
+**Deferred:**
+- Add missing CLI APIs → after loop work validates architecture
+- Refactor cmd_query → after CLI generator exists
+- CLI from MossAPI → large, wait for more API stability
 
 ---
 
-**Completed this session:**
+**Completed recently:**
+- [x] **Todo output truncation** - ✅ 180 items → 5 sections × 5 items
 - [x] **`moss todo` command** - ✅ TodoAPI: list(), search(), sections()
 - [x] **DWIM auto-registration** - ✅ 7→65 tools, word form matching
 - [x] **DWIM confidence tuning** - ✅ Query expansion, 0.22→0.31
@@ -36,6 +41,79 @@ See `~/git/prose/moss/` for full synthesis design documents.
 - [ ] **CLI from MossAPI** (large) - Migrate 5389-line manual cli.py to gen/cli.py
   - CLI audit results: 53 commands, 20 sub-APIs, 10 missing APIs
 - [ ] **Complexity hotspots** (medium) - 60 functions ≥15 complexity
+
+## Composable Agent Loops (Design Sketch)
+
+**Principle:** Loops are data, not hardcoded control flow. The LLM (or config) constructs loops; the runtime executes them.
+
+```python
+@dataclass
+class LoopStep:
+    """Single step in an agent loop."""
+    name: str
+    tool: str                    # Tool to call (e.g., "skeleton.format")
+    input_from: str | None       # Previous step output to use as input
+    on_error: str = "abort"      # "abort" | "retry" | "skip" | "goto:step_name"
+    max_retries: int = 3
+
+@dataclass
+class Loop:
+    """Composable agent loop definition."""
+    name: str
+    steps: list[LoopStep]
+    entry: str                   # Starting step name
+    exit_conditions: list[str]   # When to stop (e.g., "validation.success")
+
+    # Performance tracking
+    token_budget: int | None = None
+    timeout_seconds: int | None = None
+
+# Example: Simple edit loop
+simple_edit = Loop(
+    name="simple_edit",
+    steps=[
+        LoopStep("understand", "skeleton.format", input_from=None),
+        LoopStep("edit", "patch.apply", input_from="understand"),
+        LoopStep("validate", "validation.validate", input_from="edit", on_error="retry"),
+    ],
+    entry="understand",
+    exit_conditions=["validate.success"],
+)
+
+# Example: Critic loop (two-pass)
+critic_loop = Loop(
+    name="critic",
+    steps=[
+        LoopStep("draft", "patch.apply", input_from=None),
+        LoopStep("review", "llm.critique", input_from="draft"),  # LLM reviews its own work
+        LoopStep("revise", "patch.apply", input_from="review", on_error="skip"),
+        LoopStep("validate", "validation.validate", input_from="revise"),
+    ],
+    entry="draft",
+    exit_conditions=["validate.success", "review.approved"],
+)
+```
+
+**Loop Library (built-in):**
+- `simple` - understand → act → validate
+- `critic` - draft → review → revise → validate
+- `parallel` - fan out to N workers, merge results
+- `incremental` - skeleton → targeted reads → full file (only if needed)
+- `exploratory` - search → read → search (for research tasks)
+
+**Performance Harness:**
+```python
+class LoopRunner:
+    def run(self, loop: Loop, task: str) -> LoopResult:
+        """Execute loop, tracking metrics."""
+        ...
+
+    def benchmark(self, loops: list[Loop], tasks: list[str]) -> BenchmarkReport:
+        """Compare loop configs on same tasks."""
+        # Returns: tokens/task, success rate, latency
+```
+
+**Mini-agents:** Lightweight loops for subtasks - same mechanism, smaller scope.
 
 ## Bootstrap Priority (Token Savings)
 
@@ -50,9 +128,12 @@ See `~/git/prose/moss/` for full synthesis design documents.
 4. **Validation**: `validation.validate()` runs syntax + ruff (async)
 5. **Rollback**: Shadow Git exists (`git.create_checkpoint()`, `git.abort_checkpoint()`)
 
-- [ ] **Minimal agent loop** - Basic planner → tool call → validator cycle using moss tools
-  - All components exist, need to wire them together
-  - Compare token usage vs Claude Code on same task
+- [ ] **Composable Loop primitives** - LoopStep, Loop, LoopRunner dataclasses
+  - Define loop as data, execute with runner
+  - Built-in loops: simple, critic, incremental
+- [ ] **Loop benchmarking** - Compare loop configs on standard tasks
+  - Measure: tokens, success rate, latency
+  - Track across runs for regression detection
 - [ ] **Skeleton-first context** - Always provide skeleton before full file (if needed at all)
   - Measure: How often does the LLM need full file after seeing skeleton?
   - Hypothesis: 80%+ of tasks can use skeleton-only
