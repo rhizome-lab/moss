@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ALWAYS NOTE THINGS DOWN.** The worst thing that can happen is forgetting. When you discover something important - a bug, a design decision, a naming collision, a future improvement - write it down immediately in the appropriate place:
 - Bugs/issues → fix them or add to TODO.md
-- Environment/compatibility issues → TODO.md (e.g., "litellm doesn't work in Nix")
+- Environment/compatibility issues → TODO.md (e.g., "X library needs native deps")
 - Design decisions → docs/ or code comments
 - Future work → TODO.md
 - Conventions → this file (CLAUDE.md)
@@ -19,13 +19,13 @@ Moss is tooling orchestration with structural awareness. It implements a "Compil
 
 ## Development Environment
 
-This project uses Nix flakes for reproducible development environments:
+**IMPORTANT: Run `uv sync --extra all` first.** Many features (MCP server, HTTP server, TUI, etc.) require optional dependencies. Without this, you'll get confusing import errors.
 
 ```bash
 # Enter dev shell (automatic with direnv, or manual)
 nix develop
 
-# Install all optional dependencies
+# REQUIRED: Install all optional dependencies
 uv sync --extra all
 
 # Tools available: Python 3.13, uv, ruff, ripgrep

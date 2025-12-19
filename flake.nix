@@ -12,7 +12,7 @@
         pkgs = nixpkgs.legacyPackages.${system};
       in
       {
-        devShells.default = pkgs.mkShell {
+        devShells.default = pkgs.mkShell rec {
           buildInputs = with pkgs; [
             stdenv.cc.cc
             python313
@@ -26,6 +26,7 @@
             nodePackages.npm
             nodePackages.typescript
           ];
+	  LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath buildInputs}:$LD_LIBRARY_PATH";
         };
       }
     );

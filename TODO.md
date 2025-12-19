@@ -26,12 +26,18 @@ See `~/git/prose/moss/` for full synthesis design documents.
    - Loop: skeleton → LLM generate docstrings → patch apply → validate
    - Test with real Gemini calls, measure tokens used
 
-4. **Fix litellm Nix compatibility** (small, optional) - Native lib issue
-   - litellm's tokenizers needs libstdc++
-   - Try: add `stdenv.cc.cc.lib` to flake.nix buildInputs
-   - Or: continue using google-genai directly for Gemini
+4. ~~**Fix litellm Nix compatibility**~~ ✅ **FIXED** (Dec 2025)
+   - litellm now works in Nix without issues
+   - See backlog: "Switch LLM executor to litellm"
+
+**Continue autonomously** - After completing the above, keep picking up tasks from Backlog. We can dogfood moss tools indefinitely, but review this log periodically to ensure we're making real progress, not going in circles with "optimizations".
 
 **Backlog (small):**
+- [ ] **Switch LLM executor to litellm** - Remove Gemini special-casing
+  - litellm Nix compatibility is fixed (Dec 2025)
+  - Currently `LLMToolExecutor` routes Gemini to google-genai directly
+  - Simplify to use litellm for all providers
+  - File: `src/moss/agent_loop.py`
 - [ ] **Fix skeleton MCP tool** - tree-sitter plugins not loading in MCP server
   - `mcp__moss__skeleton_format` returns "No skeleton plugin found for: .py"
   - Works fine via CLI: `moss skeleton <file>`
