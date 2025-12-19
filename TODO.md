@@ -8,21 +8,18 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 **For next session:**
 
-1. **Add patch-applying loop** (medium) - Complete the docstring workflow
-   - docstring loop currently only identifies missing docstrings
-   - Need loop that: skeleton → LLM generate docstrings → parse output → patch.apply
-   - Requires LLM output parsing (FUNC:name|docstring format)
-   - File: `src/moss/agent_loop.py`
-
-2. ~~**Multi-LLM rotation**~~ ✅ - Added to LLMConfig
-   - `models: list[str]` field for rotation pool
-   - `rotation: "round_robin" | "random" | None` field
-   - 5 new tests (46 total)
-
-3. **MCP client for loops** (medium) - Let loops call external MCP servers
+1. **MCP client for loops** (medium) - Let loops call external MCP servers
    - Would enable loops to use filesystem, git, browser tools
    - Research: mcp client SDK
    - Start with minimal implementation
+
+2. **Token-efficient web search** (small) - Reduce tokens when doing research
+   - Current approach burns context on search results
+   - Consider: summarize in smaller chunks, cache results, extract key facts only
+
+3. **Test docstring_apply_loop E2E** (small) - Verify the full workflow
+   - Run with real LLM against a test file
+   - Verify docstrings are correctly inserted
 
 **Continue autonomously** - Keep picking up tasks from Backlog.
 
@@ -55,7 +52,7 @@ See `~/git/prose/moss/` for full synthesis design documents.
 ---
 
 **Completed this session (Dec 19, 2025):**
-- [x] **Loop tests** - 41 tests in `tests/test_agent_loop.py`
+- [x] **Loop tests** - 64 tests in `tests/test_agent_loop.py`
 - [x] **CLI integration** - `moss loop list/run/benchmark` commands
 - [x] **E2E loops** - analysis + docstring loops working with real Gemini
 - [x] **litellm unified** - All providers now use litellm (removed Gemini special-casing)
@@ -63,6 +60,11 @@ See `~/git/prose/moss/` for full synthesis design documents.
   - Added Negative Constraints, Recipes sections
   - Moved philosophy to `docs/philosophy.md`
 - [x] **Nix litellm fix** - Added LD_LIBRARY_PATH to flake.nix
+- [x] **Multi-LLM rotation** - Added to LLMConfig (round_robin/random strategies)
+- [x] **docstring_apply_loop** - Full workflow: skeleton → LLM → parse → patch
+  - parse.docstrings tool for FUNC:name|docstring format
+  - patch.docstrings tool for applying docstrings with proper indentation
+  - 17 new tests for parsing and patching
 
 **Previously completed:**
 - [x] **Fix loop data flow** - Added LoopContext for context passing
