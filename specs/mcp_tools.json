@@ -492,6 +492,53 @@
     "name": "health_summarize"
   },
   {
+    "description": "List TODOs, optionally filtered by section. List of TodoSearchResult with matching items",
+    "inputSchema": {
+      "properties": {
+        "include_done": {
+          "default": false,
+          "description": "Include completed TODOs (default: False)",
+          "type": "boolean"
+        },
+        "section": {
+          "description": "Filter to specific section (case-insensitive partial match)",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "todo_list"
+  },
+  {
+    "description": "Search TODOs by keyword. List of TodoSearchResult with matching items, sorted by relevance",
+    "inputSchema": {
+      "properties": {
+        "include_done": {
+          "default": false,
+          "description": "Include completed TODOs (default: False)",
+          "type": "boolean"
+        },
+        "query": {
+          "description": "Search query (case-insensitive, matches text and section)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "name": "todo_search"
+  },
+  {
+    "description": "List all TODO sections with counts. List of dicts with section name, pending count, and done count",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "todo_sections"
+  },
+  {
     "description": "Find the right Moss tool for any task using natural language. USE THIS FIRST when you don't know which tool to use! Describe what you want to do and get ranked suggestions. Examples: - \"summarize the codebase\" \u2192 health_summarize - \"show file structure\" \u2192 skeleton_format - \"find TODOs\" \u2192 health_check_todos - \"check code complexity\" \u2192 complexity_analyze List of ToolMatchResult sorted by confidence (highest first)",
     "inputSchema": {
       "properties": {

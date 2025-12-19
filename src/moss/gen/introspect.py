@@ -244,6 +244,7 @@ def introspect_api() -> list[SubAPI]:
         PatchAPI,
         RefCheckAPI,
         SkeletonAPI,
+        TodoAPI,
         TreeAPI,
         ValidationAPI,
     )
@@ -261,6 +262,7 @@ def introspect_api() -> list[SubAPI]:
         "git": GitAPI,
         "context": ContextAPI,
         "health": HealthAPI,
+        "todo": TodoAPI,
         "dwim": DWIMAPI,
         "complexity": ComplexityAPI,
         "ref_check": RefCheckAPI,

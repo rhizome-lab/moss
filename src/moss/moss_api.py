@@ -803,6 +803,159 @@ class HealthAPI:
 
 
 @dataclass
+class TodoSearchResult:
+    """Result of a TODO search."""
+
+    text: str
+    status: str  # "pending" or "done"
+    section: str | None
+    line: int
+    source: str  # "todo.md" or file path for code TODOs
+
+
+@dataclass
+class TodoAPI:
+    """API for TODO management and search.
+
+    Search and browse TODOs from TODO.md. Useful for finding
+    relevant work items and understanding project priorities.
+
+    Example: "Find TODOs about authentication" → search("authentication")
+    """
+
+    root: Path
+
+    def list(
+        self, section: str | None = None, include_done: bool = False
+    ) -> list[TodoSearchResult]:
+        """List TODOs, optionally filtered by section.
+
+        Args:
+            section: Filter to specific section (case-insensitive partial match)
+            include_done: Include completed TODOs (default: False)
+
+        Returns:
+            List of TodoSearchResult with matching items
+        """
+        from moss.check_todos import TodoChecker, TodoStatus
+
+        checker = TodoChecker(self.root)
+        result = checker.check()
+
+        items = []
+        for todo in result.tracked_items:
+            # Filter by status
+            if not include_done and todo.status == TodoStatus.DONE:
+                continue
+
+            # Filter by section
+            if section and todo.category:
+                if section.lower() not in todo.category.lower():
+                    continue
+            elif section and not todo.category:
+                continue
+
+            items.append(
+                TodoSearchResult(
+                    text=todo.text,
+                    status=todo.status.value,
+                    section=todo.category,
+                    line=todo.line,
+                    source=todo.source,
+                )
+            )
+
+        return items
+
+    def search(self, query: str, include_done: bool = False) -> list[TodoSearchResult]:
+        """Search TODOs by keyword.
+
+        Args:
+            query: Search query (case-insensitive, matches text and section)
+            include_done: Include completed TODOs (default: False)
+
+        Returns:
+            List of TodoSearchResult with matching items, sorted by relevance
+        """
+        from moss.check_todos import TodoChecker, TodoStatus
+
+        checker = TodoChecker(self.root)
+        result = checker.check()
+
+        query_lower = query.lower()
+        matches = []
+
+        for todo in result.tracked_items:
+            # Filter by status
+            if not include_done and todo.status == TodoStatus.DONE:
+                continue
+
+            # Score by match quality
+            score = 0
+            text_lower = todo.text.lower()
+            section_lower = (todo.category or "").lower()
+
+            if query_lower in text_lower:
+                # Direct match in text
+                score = 2
+            elif query_lower in section_lower:
+                # Match in section name
+                score = 1
+            else:
+                # Check for word-level match
+                query_words = set(query_lower.split())
+                text_words = set(text_lower.split())
+                if query_words & text_words:
+                    score = 1
+
+            if score > 0:
+                matches.append(
+                    (
+                        score,
+                        TodoSearchResult(
+                            text=todo.text,
+                            status=todo.status.value,
+                            section=todo.category,
+                            line=todo.line,
+                            source=todo.source,
+                        ),
+                    )
+                )
+
+        # Sort by score descending, then by line number
+        matches.sort(key=lambda x: (-x[0], x[1].line))
+        return [m[1] for m in matches]
+
+    def sections(self) -> list[dict[str, Any]]:
+        """List all TODO sections with counts.
+
+        Returns:
+            List of dicts with section name, pending count, and done count
+        """
+        from collections import defaultdict
+
+        from moss.check_todos import TodoChecker, TodoStatus
+
+        checker = TodoChecker(self.root)
+        result = checker.check()
+
+        # Count by section
+        section_counts: dict[str, dict[str, int]] = defaultdict(lambda: {"pending": 0, "done": 0})
+
+        for todo in result.tracked_items:
+            section = todo.category or "Uncategorized"
+            if todo.status == TodoStatus.DONE:
+                section_counts[section]["done"] += 1
+            else:
+                section_counts[section]["pending"] += 1
+
+        return [
+            {"section": name, "pending": counts["pending"], "done": counts["done"]}
+            for name, counts in sorted(section_counts.items())
+        ]
+
+
+@dataclass
 class ComplexityAPI:
     """API for cyclomatic complexity analysis.
 
@@ -1412,6 +1565,7 @@ class MossAPI:
     _git: GitAPI | None = None
     _context: ContextAPI | None = None
     _health: HealthAPI | None = None
+    _todo: TodoAPI | None = None
     _dwim: DWIMAPI | None = None
     _complexity: ComplexityAPI | None = None
     _clones: ClonesAPI | None = None
@@ -1503,6 +1657,13 @@ class MossAPI:
         if self._health is None:
             self._health = HealthAPI(root=self.root)
         return self._health
+
+    @property
+    def todo(self) -> TodoAPI:
+        """Access TODO search and management functionality."""
+        if self._todo is None:
+            self._todo = TodoAPI(root=self.root)
+        return self._todo
 
     @property
     def dwim(self) -> DWIMAPI:

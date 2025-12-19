@@ -1226,6 +1226,94 @@
         ]
       }
     },
+    "/todo/list": {
+      "get": {
+        "description": "List TODOs, optionally filtered by section. List of TodoSearchResult with matching items",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "include_done": {
+                    "default": false,
+                    "description": "Include completed TODOs (default: False)",
+                    "type": "boolean"
+                  },
+                  "section": {
+                    "description": "Filter to specific section (case-insensitive partial match)",
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "List TODOs, optionally filtered by section",
+        "tags": [
+          "todo"
+        ]
+      }
+    },
+    "/todo/search": {
+      "post": {
+        "description": "Search TODOs by keyword. List of TodoSearchResult with matching items, sorted by relevance",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "include_done": {
+                    "default": false,
+                    "description": "Include completed TODOs (default: False)",
+                    "type": "boolean"
+                  },
+                  "query": {
+                    "description": "Search query (case-insensitive, matches text and section)",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Search TODOs by keyword",
+        "tags": [
+          "todo"
+        ]
+      }
+    },
+    "/todo/sections": {
+      "post": {
+        "description": "List all TODO sections with counts. List of dicts with section name, pending count, and done count",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "List all TODO sections with counts",
+        "tags": [
+          "todo"
+        ]
+      }
+    },
     "/tree/format": {
       "post": {
         "description": "Generate and format tree as readable text. Formatted tree visualization",
@@ -1396,6 +1484,10 @@
     {
       "description": "API for project health analysis. Provides comprehensive project health metrics and reports.",
       "name": "health"
+    },
+    {
+      "description": "API for TODO management and search. Search and browse TODOs from TODO.md. Useful for finding relevant work items and understanding project priorities.",
+      "name": "todo"
     },
     {
       "description": "START HERE - Tool discovery and routing for Moss. Don't know which Moss tool to use? Ask DWIM! This API helps you find the right tool for any task using natural language queries. Features: - Natural language queries: describe what you want, get tool suggestions - Semantic aliases: map conceptual names to canonical tools - Fuzzy matching: handle typos and variations - Confidence scoring: know when to auto-correct vs suggest",

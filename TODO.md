@@ -10,7 +10,10 @@ Candidates for the next session:
 
 - [ ] **`moss todo` command** (small) - Read/search TODOs, not just count them (uses existing `roadmap.py`)
 - [x] **DWIM auto-registration** (medium) - ✅ Now 56 tools registered; added word form matching (summarize→summary)
-- [ ] **CLI from MossAPI** (large) - Migrate 5389-line manual cli.py to use gen/cli.py generator; ensures MCP/CLI parity
+- [ ] **CLI from MossAPI** (large) - Migrate 5389-line manual cli.py to use gen/cli.py generator
+  - **CAUTION**: Don't lose functionality! Upstream all CLI-only features to MossAPI first
+  - Audit each command: does it have an API equivalent? If not, create one
+  - Ensures MCP/CLI parity and single source of truth
 - [ ] **Complexity hotspots** (medium) - 60 functions with complexity ≥15 need refactoring
 - [ ] **DWIM confidence tuning** (small) - Confidence scores still low (~0.25); consider:
   - Better weighting between TF-IDF, keyword, and fuzzy match
