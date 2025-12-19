@@ -432,7 +432,7 @@ def cmd_skeleton(args: Namespace) -> int:
 
 def cmd_tree(args: Namespace) -> int:
     """Show git-aware file tree."""
-    from moss.tree import generate_tree
+    from moss import MossAPI
 
     output = setup_output(args)
     path = Path(getattr(args, "path", ".")).resolve()
@@ -441,10 +441,11 @@ def cmd_tree(args: Namespace) -> int:
         output.error(f"Path not found: {path}")
         return 1
 
+    api = MossAPI.for_project(path)
     tracked_only = getattr(args, "tracked", False)
     gitignore = not getattr(args, "all", False)
 
-    result = generate_tree(path, tracked_only=tracked_only, gitignore=gitignore)
+    result = api.tree.generate(tracked_only=tracked_only, gitignore=gitignore)
 
     compact = getattr(args, "compact", False)
     if compact and not wants_json(args):
@@ -2984,11 +2985,11 @@ def cmd_checkpoint(args: Namespace) -> int:
 
 def cmd_complexity(args: Namespace) -> int:
     """Analyze cyclomatic complexity of functions."""
-    from moss.complexity import analyze_complexity
+    from moss import MossAPI
 
     output = setup_output(args)
     root = Path(getattr(args, "directory", ".")).resolve()
-    pattern = getattr(args, "pattern", "src/**/*.py")
+    pattern = getattr(args, "pattern", "**/*.py")
 
     if not root.exists():
         output.error(f"Directory not found: {root}")
@@ -2997,7 +2998,8 @@ def cmd_complexity(args: Namespace) -> int:
     output.info(f"Analyzing complexity for {root.name}...")
 
     try:
-        report = analyze_complexity(root, pattern=pattern)
+        api = MossAPI.for_project(root)
+        report = api.complexity.analyze(pattern=pattern)
     except Exception as e:
         output.error(f"Failed to analyze complexity: {e}")
         return 1
@@ -3460,7 +3462,7 @@ def cmd_loop(args: Namespace) -> int:
 
 def cmd_health(args: Namespace) -> int:
     """Show project health and what needs attention."""
-    from moss.status import StatusChecker
+    from moss import MossAPI
 
     output = setup_output(args)
     root = Path(getattr(args, "directory", ".")).resolve()
@@ -3471,10 +3473,9 @@ def cmd_health(args: Namespace) -> int:
 
     output.info(f"Analyzing {root.name}...")
 
-    checker = StatusChecker(root)
-
     try:
-        status = checker.check()
+        api = MossAPI.for_project(root)
+        status = api.health.check()
     except Exception as e:
         output.error(f"Failed to analyze project: {e}")
         return 1

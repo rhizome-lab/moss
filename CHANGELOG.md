@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.6.5
+
+### Phase 34: Module DWIM, CLI Migration
+
+**SearchAPI** (Dec 2025)
+- `search_resolve_file` - DWIM for file names with fuzzy matching
+- Handles: typos, missing extensions, partial paths, case-insensitive
+- Prefers non-test files and shorter paths
+
+**CLI Migration to MossAPI**
+- Started migrating CLI commands to use MossAPI
+- Migrated: `cmd_tree`, `cmd_complexity`, `cmd_health`
+- Pattern: Replace direct imports with `MossAPI.for_project()`
+- Reduces duplication, enables generated CLI
+
+**MCP Server Improvements**
+- Lists with `to_compact()` items now call it (was losing info)
+- `skeleton_format` returns "File not found" for missing files
+
+**Dogfooding Observations**
+- Updated CLAUDE.md with stronger moss-first guidance
+- Added Agent Lessons section to TODO.md
+
 ## v0.6.4
 
 ### Phase 33: Search, Async Docs, Self-Improvement, Guessability

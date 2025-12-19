@@ -92,6 +92,8 @@ class SkeletonAPI:
         from moss.views import ViewOptions, ViewTarget
 
         path = self._resolve_path(file_path)
+        if not path.exists():
+            return f"File not found: {path}"
         target = ViewTarget(path=path)
         registry = get_registry()
         plugin = registry.find_plugin(target, "skeleton")
@@ -1676,6 +1678,27 @@ class GrepResult:
 
 
 @dataclass
+class FileMatch:
+    """Result of resolving a file name with DWIM.
+
+    Attributes:
+        path: Resolved file path (relative to project root)
+        confidence: Match confidence (0.0 to 1.0)
+        message: Optional explanation of the match
+    """
+
+    path: str
+    confidence: float
+    message: str | None = None
+
+    def to_compact(self) -> str:
+        """Return a compact string representation."""
+        if self.message:
+            return f"{self.path} ({self.message})"
+        return self.path
+
+
+@dataclass
 class SearchAPI:
     """API for codebase search operations.
 
@@ -1964,6 +1987,107 @@ class SearchAPI:
             total_matches=len(filtered),
             files_searched=result.files_searched,
         )
+
+    def _get_all_files(self) -> list[str]:
+        """Get all files in the project, excluding common ignored directories."""
+        all_files: list[str] = []
+        skip_dirs = ("venv", "node_modules", "__pycache__", ".git")
+        for file_path in self.root.rglob("*"):
+            if not file_path.is_file():
+                continue
+            parts = file_path.parts
+            if any(p.startswith(".") or p in skip_dirs for p in parts):
+                continue
+            all_files.append(str(file_path.relative_to(self.root)))
+        return all_files
+
+    def _fuzzy_match_file(self, name: str, all_files: list[str]) -> tuple[str | None, float]:
+        """Find best fuzzy match for a filename."""
+        from difflib import SequenceMatcher
+
+        def similarity(a: str, b: str) -> float:
+            return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+
+        name_lower = name.lower()
+        name_no_ext = name.rsplit(".", 1)[0] if "." in name else name
+        best_match = None
+        best_score = 0.0
+
+        for f in all_files:
+            fname = f.split("/")[-1]
+            fname_no_ext = fname.rsplit(".", 1)[0] if "." in fname else fname
+
+            # Best of: full name, without extension, substring boost
+            score = max(
+                similarity(name, fname),
+                similarity(name_no_ext, fname_no_ext),
+                0.8 if name_lower in fname.lower() else 0.0,
+            )
+
+            if score > best_score:
+                best_score = score
+                best_match = f
+
+        return best_match, best_score
+
+    def resolve_file(
+        self,
+        name: str,
+        extensions: list[str] | None = None,
+    ) -> FileMatch:
+        """Resolve a file name with DWIM (Do What I Mean).
+
+        Handles typos, missing extensions, and partial paths.
+
+        Args:
+            name: File name, partial path, or module name to resolve
+            extensions: Extensions to try if name has none (default: .py, .ts, .js, .tsx, .jsx)
+
+        Returns:
+            FileMatch with resolved path and confidence
+        """
+        if extensions is None:
+            extensions = [".py", ".ts", ".js", ".tsx", ".jsx", ".go", ".rs", ".md"]
+
+        all_files = self._get_all_files()
+        name_lower = name.lower()
+
+        # 1. Exact match
+        if name in all_files:
+            return FileMatch(path=name, confidence=1.0)
+
+        # 2. Try with extensions (if no extension provided)
+        has_ext = "." in name.split("/")[-1]
+        if not has_ext:
+            for ext in extensions:
+                candidate = name + ext
+                if candidate in all_files:
+                    return FileMatch(path=candidate, confidence=1.0, message=f"added {ext}")
+                # Case-insensitive with extension
+                for f in all_files:
+                    if f.lower() == candidate.lower():
+                        return FileMatch(path=f, confidence=0.95, message="case-insensitive match")
+
+        # 3. Case-insensitive match
+        for f in all_files:
+            if f.lower() == name_lower:
+                return FileMatch(path=f, confidence=0.95, message="case-insensitive")
+
+        # 4. Partial path match (prefer non-test, shorter paths)
+        partial = [f for f in all_files if f.endswith("/" + name) or f.endswith(name)]
+        if partial:
+            partial.sort(key=lambda p: (p.startswith("tests/"), len(p)))
+            return FileMatch(path=partial[0], confidence=0.9, message="partial path")
+
+        # 5. Fuzzy match
+        best_match, best_score = self._fuzzy_match_file(name, all_files)
+        if best_match and best_score >= 0.85:
+            return FileMatch(path=best_match, confidence=best_score, message="auto-corrected")
+        if best_match and best_score >= 0.5:
+            msg = f"did you mean '{best_match}'?"
+            return FileMatch(path=best_match, confidence=best_score, message=msg)
+
+        return FileMatch(path=name, confidence=0.0, message="no match found")
 
     def _resolve_path(self, file_path: str | Path) -> Path:
         """Resolve a file path relative to the project root."""

@@ -4,17 +4,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. **Module name DWIM** - Fuzzy matching for file/module names
-   - Typo tolerance for common patterns
-   - Context-aware suggestions
+1. **Continue CLI Migration** - Migrate remaining CLI commands to MossAPI
+   - Pattern: Replace `from moss.X import Y` with `MossAPI.for_project()`
+   - Priority: commonly used commands first
+   - 3 done (tree, complexity, health), ~50 remaining
 
-2. **Complexity hotspots** - Address the 60 functions with complexity ≥15
-   - Prioritize by usage frequency
-   - Refactor or document complex code
+2. **Filtering in API** - Move CLI filtering logic into HealthAPI
+   - `check(focus=..., severity=...)` parameters
+   - Reduces CLI complexity, enables generated CLI
 
-3. **CLI from MossAPI** - Migrate cli.py to generated interface
-   - Use introspection to generate CLI commands
-   - Reduce duplication between CLI and API
+3. **explain_symbol** - Show callers/callees for a function
+   - Use dependency analysis + search to find usages
 
 ## Active Backlog
 
@@ -80,9 +80,27 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - **90.2% token savings** in composable loops E2E tests
 
 ### Dogfooding Observations (Dec 2025)
-- `skeleton_format` / `skeleton_expand` - very useful
-- New: `search_find_symbols`, `search_grep` - use instead of raw grep/glob
-- New: `guessability_score` - evaluate codebase structure quality
+- `skeleton_format` / `skeleton_expand` - very useful, genuinely saves tokens
+- `complexity_get_high_risk` - instant actionable data in one call
+- `search_find_symbols` - returns class names but misses functions with matching keywords (e.g., "fuzzy" found TestFuzzyMatching but not the fuzzy matching functions)
+- Prompting issue: CLAUDE.md dogfooding section doesn't push hard enough for moss-first approach
+- `guessability_score` - evaluate codebase structure quality
+
+**Missing/wanted:**
+- `resolve_file` - DWIM for file names (added!)
+- `explain_symbol` - show callers/callees for a function
+- `find_related_files` - what files does this file interact with?
+- `search_by_keyword` - semantic search across functions, not just name matching
+- Module-level summary - "what does this module do?"
+
+**Friction:**
+- Error messages should be specific ("File not found: X" not "No plugin for .py")
+- `to_compact()` output feels natural; raw data structures feel clunky
+
+### Agent Lessons
+- Don't assume files exist based on class names - `SearchAPI` is in `moss_api.py`, not `search.py`
+- Tools aren't perfect - when an error seems wrong, question your inputs before assuming the tool is broken
+- Tool design: return specific error messages ("File not found: X") not generic ones ("No plugin for .py")
 
 ### Design Principles
 See `docs/philosophy.md` for full tenets. Key goals:

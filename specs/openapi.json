@@ -1493,6 +1493,43 @@
         ]
       }
     },
+    "/search/resolve-file": {
+      "get": {
+        "description": "Resolve a file name with DWIM (Do What I Mean). Handles typos, missing extensions, and partial paths. FileMatch with resolved path and confidence",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "extensions": {
+                    "description": "Extensions to try if name has none (default: .py, .ts, .js, .tsx, .jsx)",
+                    "type": "array"
+                  },
+                  "name": {
+                    "description": "File name, partial path, or module name to resolve",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Resolve a file name with DWIM (Do What I Mean)",
+        "tags": [
+          "search"
+        ]
+      }
+    },
     "/security/analyze": {
       "get": {
         "description": "Run security analysis. SecurityAnalysis with findings and summary",

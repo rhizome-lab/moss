@@ -50,20 +50,25 @@ Context Reset (before `/exit`):
 
 ## Dogfooding
 
-Prefer moss MCP tools over generic tools:
+**ALWAYS try moss tools first.** Generic tools (Read, Grep, Glob) burn tokens on syntax when you need semantics.
 
 | Task | Use This | Not This |
 |------|----------|----------|
-| Understand file structure | `mcp__moss__skeleton_format` | Reading full file |
-| Get codebase overview | `mcp__moss__health_summarize` | Manual exploration |
-| Find complex code | `mcp__moss__complexity_analyze` | Grepping for patterns |
-| Check project health | `mcp__moss__health_check` | Multiple grep/read calls |
-| See file tree | `mcp__moss__tree_format` | `ls -R` or Glob |
-| Find the right tool | `mcp__moss__dwim_analyze_intent` | Guessing |
+| Understand file structure | `skeleton_format` | Reading full file |
+| Get codebase overview | `health_summarize` | Manual exploration |
+| Find complex code | `complexity_analyze` | Grepping for patterns |
+| Check project health | `health_check` | Multiple grep/read calls |
+| See file tree | `tree_format` | `ls -R` or Glob |
+| Find symbols | `search_find_symbols` | Grep for "def foo" |
+| Resolve file name | `search_resolve_file` | Guessing paths |
+| Find the right tool | `dwim_analyze_intent` | Guessing |
 
-Why: Moss tools are token-efficient (skeleton is 87% smaller than full file). Reading raw files burns context on syntax when you need semantics.
+Token savings: skeleton is 87% smaller than full file. This compounds over a session.
 
-Test via CLI (`moss <command>`) rather than MCP when modifying moss source - MCP caches code at startup.
+Only fall back to Read/Grep when:
+- You need exact line content for editing
+- Moss tool doesn't exist for the task
+- Debugging moss itself (use CLI not MCP - MCP caches code at startup)
 
 ## Conventions
 

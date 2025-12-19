@@ -1155,6 +1155,26 @@
     "name": "search_grep"
   },
   {
+    "description": "Resolve a file name with DWIM (Do What I Mean). Handles typos, missing extensions, and partial paths. FileMatch with resolved path and confidence",
+    "inputSchema": {
+      "properties": {
+        "extensions": {
+          "description": "Extensions to try if name has none (default: .py, .ts, .js, .tsx, .jsx)",
+          "type": "string"
+        },
+        "name": {
+          "description": "File name, partial path, or module name to resolve",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "search_resolve_file"
+  },
+  {
     "description": "Analyze codebase guessability. Evaluates: - Name-content alignment: Do module names reflect their contents? - Predictability: Are similar things in similar places? - Pattern consistency: Are conventions followed? GuessabilityReport with scores and recommendations",
     "inputSchema": {
       "properties": {},

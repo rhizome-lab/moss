@@ -166,6 +166,10 @@ def _serialize_result(result: Any) -> str | dict[str, Any]:
         if not result:
             return "(empty)"
         first = result[0]
+        # Prefer to_compact() on list items if available
+        if hasattr(first, "to_compact") and callable(first.to_compact):
+            lines = [item.to_compact() for item in result]
+            return f"{len(result)} items:\n" + "\n".join(f"- {line}" for line in lines)
         # Check if items are dicts or dataclasses (which will be converted to dicts)
         if isinstance(first, dict) or (is_dataclass(first) and not isinstance(first, type)):
             # Convert dataclasses to dicts first
