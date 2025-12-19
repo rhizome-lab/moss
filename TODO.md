@@ -18,7 +18,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
    - [x] Add `anchors` command to Rust (identify code anchors)
    - [x] Add `deps` command to Rust (module dependencies)
    - [ ] Add `cfg` command to Rust (control flow graph)
-   - [ ] Add `complexity` command to Rust
+   - [x] Add `complexity` command to Rust
 
 2. **Daemon improvements**
    - [x] Basic daemon scaffold with Unix socket IPC
