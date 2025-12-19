@@ -15,7 +15,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] Multiple agents concurrently - no requirement to join back to main stream
 - [ ] Graceful failure - handle errors without crashing, provide useful feedback
 - [ ] Revisit CLAUDE.md dogfooding section - tools should be self-evident, not need instructions
-- [ ] MCP DWIM: route natural language to `dwim` command, only use exact CLI syntax as fallback
+- [x] MCP DWIM: route natural language to `dwim` command, only use exact CLI syntax as fallback
+- [ ] Tune DWIM: "structure" → `summarize` first, `skeleton` for details
 
 **Medium:**
 - [ ] Compact tool encoding for moss agent - bypass JSON Schema overhead
