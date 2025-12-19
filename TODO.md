@@ -6,14 +6,26 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 ## Next Up
 
-**Session progress:**
+**For next session:**
 
-1. ~~**Add loop tests with mock LLM**~~ ✅ - 41 tests in `tests/test_agent_loop.py`
-2. ~~**CLI integration for loops**~~ ✅ - `moss loop list/run/benchmark`
-3. ~~**Build a real agentic task**~~ ✅ - analysis + docstring loops working E2E with Gemini
-4. ~~**Fix litellm Nix compatibility**~~ ✅ - Fixed via LD_LIBRARY_PATH in flake.nix
+1. **Add patch-applying loop** (medium) - Complete the docstring workflow
+   - docstring loop currently only identifies missing docstrings
+   - Need loop that: skeleton → LLM generate docstrings → parse output → patch.apply
+   - Requires LLM output parsing (FUNC:name|docstring format)
+   - File: `src/moss/agent_loop.py`
 
-**Continue autonomously** - Keep picking up tasks from Backlog. Review log periodically to ensure real progress, not circular optimizations.
+2. **Multi-LLM rotation** (small) - Add provider rotation to LLMConfig
+   - `models: list[str]` field for rotation pool
+   - `rotation: "round_robin" | "random" | None` field
+   - Implement in LLMToolExecutor._call_litellm
+   - Test with Gemini + GPT-4
+
+3. **MCP client for loops** (medium) - Let loops call external MCP servers
+   - Would enable loops to use filesystem, git, browser tools
+   - Research: mcp client SDK
+   - Start with minimal implementation
+
+**Continue autonomously** - Keep picking up tasks from Backlog.
 
 **Backlog (small):**
 - [x] ~~**Switch LLM executor to litellm**~~ ✅ - Now uses litellm for all providers
@@ -48,21 +60,19 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 ---
 
-**Completed this session:**
-- [x] **Fix loop data flow** - ✅ Added LoopContext for context passing
-  - Steps now access both initial_input AND previous step outputs
-  - `context.input` = original input, `context.steps` = all outputs
-- [x] **Test with real Gemini 3 Flash** - ✅ Working end-to-end
-  - Uses google-genai directly (litellm has Nix linking issues)
-- [x] **Prompt engineering for token efficiency** - ✅ 12x reduction in output tokens
-  - System prompt: "Be terse. No markdown. Plain text only. Max 5 bullet points."
-  - Let model determine output length (no max_tokens limit)
-  - 1421 tokens → 112 tokens, same quality insights
-- [x] **Refactor LLMToolExecutor** - ✅ Simplified config
-  - Single `model` field with litellm-style naming (e.g., "gemini/gemini-3-flash-preview")
-  - Routes Gemini to google-genai, others to litellm
-  - Mock mode via `mock=True`
-- [x] **Update CLAUDE.md** - Added MCP tools preference, note-taking practices
+**Completed this session (Dec 19, 2025):**
+- [x] **Loop tests** - 41 tests in `tests/test_agent_loop.py`
+- [x] **CLI integration** - `moss loop list/run/benchmark` commands
+- [x] **E2E loops** - analysis + docstring loops working with real Gemini
+- [x] **litellm unified** - All providers now use litellm (removed Gemini special-casing)
+- [x] **CLAUDE.md refactor** - Split into hot/cold context (107 lines, down from 213)
+  - Added Negative Constraints, Recipes sections
+  - Moved philosophy to `docs/philosophy.md`
+- [x] **Nix litellm fix** - Added LD_LIBRARY_PATH to flake.nix
+
+**Previously completed:**
+- [x] **Fix loop data flow** - Added LoopContext for context passing
+- [x] **Prompt engineering** - 12x reduction in output tokens
 
 **Previously completed:**
 - [x] **Test composable loops E2E** - ✅ Token savings 90.2% average
