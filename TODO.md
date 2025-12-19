@@ -8,20 +8,18 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 Candidates for the next session:
 
-- [ ] **Add RAG to MossAPI/MCP** (small) - Expose rag.index/search as MCP tools
-- [ ] **Persistent RAG backend** (medium) - SQLite-based vector store for Nix environments
-- [ ] **Test harness improvements** (medium) - More comprehensive integration tests
+- [ ] **Unix socket transport** (small) - Add Unix socket option for local MCP connections
+- [ ] **Generator documentation** (small) - Document how the generation pipeline works
+- [ ] **Drift auto-update hook** (small) - Add pre-commit hook to auto-update specs
 
 **Recently completed:**
+- [x] RAG to MossAPI/MCP - `rag_index`, `rag_search`, `rag_stats`, `rag_clear` tools exposed
+- [x] SQLite vector store backend - Persistent TF-IDF search for Nix environments (no binary deps)
+- [x] RAG integration tests - 18 comprehensive tests for RAG functionality
 - [x] Live TODO tracking - `moss.live_todos` with session persistence, callbacks, real-time display
 - [x] `moss explore` REPL - Tab completion, history, commands: skeleton, deps, cfg, anchors, query, search, complexity, health, tree
 - [x] RAG / Semantic Search - `moss rag index/search/stats/clear` (in-memory works, chromadb for persistence)
 - [x] CLI/MCP help improvements - `moss help` with categories, examples, and enhanced MCP descriptions
-- [x] Research Goose (Block) - added to `docs/prior-art.md`
-- [x] `moss summarize` - markdown/text summarization
-- [x] `moss tree` - git-aware tree visualization
-- [x] Test PBEGenerator/SketchGenerator - 25 new tests
-- [x] MCP compact output - all tools return strings, not JSON (TestAllToolsReturnCompact enforces this)
 
 ## Future Work
 
