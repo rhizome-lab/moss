@@ -1994,6 +1994,7 @@ all = [
     { name = "mcp" },
     { name = "openai" },
     { name = "pygls" },
+    { name = "python-dotenv" },
     { name = "textual" },
     { name = "tree-sitter" },
     { name = "tree-sitter-javascript" },
@@ -2021,6 +2022,9 @@ docs = [
     { name = "mkdocs-literate-nav" },
     { name = "mkdocs-material" },
     { name = "mkdocstrings", extra = ["python"] },
+]
+dotenv = [
+    { name = "python-dotenv" },
 ]
 eval = [
     { name = "datasets" },
@@ -2092,13 +2096,14 @@ requires-dist = [
     { name = "mkdocs-literate-nav", marker = "extra == 'docs'", specifier = ">=0.6" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.27" },
-    { name = "moss", extras = ["server", "mcp", "lsp", "llm", "anthropic", "openai", "gemini", "tree-sitter", "chroma", "tui"], marker = "extra == 'all'" },
+    { name = "moss", extras = ["server", "mcp", "lsp", "llm", "anthropic", "openai", "gemini", "dotenv", "tree-sitter", "chroma", "tui"], marker = "extra == 'all'" },
     { name = "mutmut", marker = "extra == 'dev'", specifier = ">=3.0.0" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0.0" },
     { name = "pygls", marker = "extra == 'lsp'", specifier = ">=1.3.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },
+    { name = "python-dotenv", marker = "extra == 'dotenv'", specifier = ">=1.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
     { name = "swebench", marker = "extra == 'eval'", specifier = ">=2.0.0" },
     { name = "textual", marker = "extra == 'tui'", specifier = ">=0.89.0" },
@@ -2108,7 +2113,7 @@ requires-dist = [
     { name = "tree-sitter-typescript", marker = "extra == 'tree-sitter'", specifier = ">=0.21" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.38.0" },
 ]
-provides-extras = ["dev", "docs", "tree-sitter", "chroma", "rag", "server", "mcp", "lsp", "llm", "anthropic", "openai", "gemini", "llm-lib", "local-llm", "tui", "grpc", "eval", "all"]
+provides-extras = ["dev", "docs", "tree-sitter", "chroma", "rag", "server", "mcp", "lsp", "llm", "anthropic", "openai", "gemini", "dotenv", "llm-lib", "local-llm", "tui", "grpc", "eval", "all"]
 
 [[package]]
 name = "mpmath"

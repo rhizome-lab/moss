@@ -96,6 +96,9 @@ openai = [
 gemini = [
     "google-genai>=1.0.0",
 ]
+dotenv = [
+    "python-dotenv>=1.0.0",
+]
 llm-lib = [
     "llm>=0.13.0",
 ]
@@ -115,7 +118,7 @@ eval = [
 ]
 # Meta-group: install all optional features
 all = [
-    "moss[server,mcp,lsp,llm,anthropic,openai,gemini,tree-sitter,chroma,tui]",
+    "moss[server,mcp,lsp,llm,anthropic,openai,gemini,dotenv,tree-sitter,chroma,tui]",
 ]
 
 [build-system]

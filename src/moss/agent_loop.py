@@ -615,6 +615,22 @@ class LLMConfig:
             self.model = default_models.get(self.provider, self.model)
 
 
+def _load_dotenv() -> bool:
+    """Load environment variables from .env file if python-dotenv is available.
+
+    Searches for .env in current directory and parent directories.
+
+    Returns:
+        True if .env was loaded, False otherwise
+    """
+    try:
+        from dotenv import load_dotenv
+
+        return load_dotenv()
+    except ImportError:
+        return False
+
+
 class LLMToolExecutor:
     """Execute tools including LLM-based ones with token tracking.
 
@@ -626,8 +642,11 @@ class LLMToolExecutor:
     - llm.critique: Review and critique code
     - llm.decide: Make a decision based on context
 
+    Environment variables are loaded from .env file automatically
+    (requires python-dotenv: pip install 'moss[dotenv]').
+
     Example:
-        config = LLMConfig(provider="anthropic", model="claude-sonnet-4-20250514")
+        config = LLMConfig(provider="gemini")  # Uses GOOGLE_API_KEY from .env
         executor = LLMToolExecutor(config)
 
         # Run a loop that uses both structural and LLM tools
@@ -639,11 +658,14 @@ class LLMToolExecutor:
         print(f"Tokens: {result.metrics.llm_tokens_in + result.metrics.llm_tokens_out}")
     """
 
+    _dotenv_loaded: bool = False
+
     def __init__(
         self,
         config: LLMConfig | None = None,
         moss_executor: MossToolExecutor | None = None,
         root: Any = None,
+        load_env: bool = True,
     ):
         """Initialize the executor.
 
@@ -651,7 +673,12 @@ class LLMToolExecutor:
             config: LLM configuration (uses defaults if None)
             moss_executor: Executor for structural tools (created if None)
             root: Project root for MossToolExecutor
+            load_env: Whether to load .env file (default: True)
         """
+        # Load .env once per process
+        if load_env and not LLMToolExecutor._dotenv_loaded:
+            LLMToolExecutor._dotenv_loaded = _load_dotenv()
+
         self.config = config or LLMConfig()
         self.moss_executor = moss_executor or MossToolExecutor(root)
         self._client: Any = None
