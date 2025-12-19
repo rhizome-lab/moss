@@ -8,7 +8,7 @@ See `~/git/prose/moss/` for full synthesis design documents.
 
 Candidates for the next session:
 
-- [ ] **`moss todo` command** (small) - Read/search TODOs, not just count them (uses existing `roadmap.py`)
+- [x] **`moss todo` command** (small) - ✅ TodoAPI added: list(), search(), sections() via MCP (CLI wrapper pending)
 - [x] **DWIM auto-registration** (medium) - ✅ Now 56 tools registered; added word form matching (summarize→summary)
 - [ ] **CLI from MossAPI** (large) - Migrate 5389-line manual cli.py to use gen/cli.py generator
   - **CAUTION**: Don't lose functionality! Upstream all CLI-only features to MossAPI first
