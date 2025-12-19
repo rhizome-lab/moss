@@ -595,6 +595,42 @@ def cmd_callers(args: Namespace) -> int:
     return 0
 
 
+def cmd_callees(args: Namespace) -> int:
+    """Find what a symbol calls."""
+    from moss.codebase import build_tree
+
+    output = setup_output(args)
+    target = args.target
+    root = Path.cwd()
+
+    tree = build_tree(root)
+    nodes = tree.resolve(target)
+
+    if not nodes:
+        output.error(f"No matches for: {target}")
+        return 1
+
+    node = nodes[0]
+    if node.kind.value not in ("function", "method"):
+        output.error(f"Can only find callees of functions/methods, not {node.kind.value}")
+        return 1
+
+    callees = tree.find_callees(node)
+
+    if not callees:
+        output.print(f"No callees found for: {node.name}")
+        return 0
+
+    if wants_json(args):
+        output.data(callees)
+    else:
+        output.print(f"Callees of {node.name}:")
+        for c in callees:
+            output.print(f"  {c}")
+
+    return 0
+
+
 def cmd_tree(args: Namespace) -> int:
     """Show git-aware file tree."""
     from moss import MossAPI
@@ -4363,6 +4399,11 @@ def create_parser() -> argparse.ArgumentParser:
     callers_parser = subparsers.add_parser("callers", help="Find callers of a symbol")
     callers_parser.add_argument("target", help="Symbol to find callers of (fuzzy matching)")
     callers_parser.set_defaults(func=cmd_callers)
+
+    # callees command (new codebase tree)
+    callees_parser = subparsers.add_parser("callees", help="Find what a symbol calls")
+    callees_parser.add_argument("target", help="Symbol to find callees of (fuzzy matching)")
+    callees_parser.set_defaults(func=cmd_callees)
 
     # skeleton command
     skeleton_parser = subparsers.add_parser(

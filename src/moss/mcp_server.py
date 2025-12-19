@@ -284,7 +284,11 @@ def create_server() -> Any:
         return [
             Tool(
                 name="moss",
-                description="Code intelligence. Guesses intent from natural language.",
+                description=(
+                    "Code intelligence. Guesses intent from natural language. "
+                    "Subcommands: path, view, search-tree, expand, callers, callees, "
+                    "skeleton, tree, anchors, deps, cfg, summarize, complexity, health."
+                ),
                 inputSchema={
                     "type": "object",
                     "properties": {"command": {"type": "string"}},

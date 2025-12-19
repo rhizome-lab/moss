@@ -388,6 +388,33 @@ class CodebaseTree:
 
         return matches
 
+    def find_callees(self, symbol: Node) -> list[str]:
+        """Find symbols that a function/method calls.
+
+        Returns list of symbol names (not full nodes, since they may be external).
+        """
+        if symbol.lineno == 0:
+            return []
+
+        try:
+            source = symbol.path.read_text()
+            lines = source.splitlines()
+            func_source = "\n".join(lines[symbol.lineno - 1 : symbol.end_lineno])
+
+            tree = ast.parse(func_source)
+            calls: set[str] = set()
+
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    if isinstance(node.func, ast.Name):
+                        calls.add(node.func.id)
+                    elif isinstance(node.func, ast.Attribute):
+                        calls.add(node.func.attr)
+
+            return sorted(calls)
+        except (SyntaxError, OSError):
+            return []
+
     def find_references(self, symbol_name: str, scan_all: bool = True) -> list[Node]:
         """Find nodes that reference a symbol by name.
 
