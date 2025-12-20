@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -209,6 +210,7 @@ class Session:
     file_changes: list[FileChange] = field(default_factory=list)
     checkpoints: list[Checkpoint] = field(default_factory=list)
     messages: list[Message] = field(default_factory=list)
+    access_patterns: dict[str, int] = field(default_factory=lambda: defaultdict(int))
 
     # Metrics
     llm_tokens_in: int = 0
@@ -351,6 +353,9 @@ class Session:
         after_hash: str | None = None,
     ) -> FileChange:
         """Record a file modification."""
+        # Update access patterns
+        self.access_patterns[str(path)] += 1
+
         change = FileChange(
             path=path,
             action=action,
@@ -453,6 +458,7 @@ class Session:
             "llm_tokens_in": self.llm_tokens_in,
             "llm_tokens_out": self.llm_tokens_out,
             "llm_calls": self.llm_calls,
+            "access_patterns": dict(self.access_patterns),
             "metadata": self.metadata,
             "tags": self.tags,
         }
@@ -475,6 +481,7 @@ class Session:
             llm_tokens_in=data.get("llm_tokens_in", 0),
             llm_tokens_out=data.get("llm_tokens_out", 0),
             llm_calls=data.get("llm_calls", 0),
+            access_patterns=defaultdict(int, data.get("access_patterns", {})),
             metadata=data.get("metadata", {}),
             tags=data.get("tags", []),
         )

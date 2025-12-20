@@ -170,6 +170,7 @@ ACTION_VERBS = {
     "insert": "insert",
     "revert": "revert",
     "diff": "diff",
+    "analyze": "analyze",
     # Validation
     "validate": "validate",
     "check": "validate",
@@ -289,6 +290,7 @@ def build_tool_call(intent: ParsedIntent, api: MossAPI) -> tuple[str, dict[str, 
         "insert": "edit.insert_line",
         "revert": "shadow_git.rollback_hunk",
         "diff": "shadow_git.get_diff",
+        "analyze": "telemetry.analyze_all_sessions",
     }
 
     tool_name = verb_to_tool.get(verb, verb)
@@ -437,6 +439,7 @@ Commands:
 - insert <file> <content> - append or insert line
 - diff [branch] - show changes
 - revert <file> <line> - undo change at line
+- analyze [session] - show telemetry
 - fix: <description> - describe fix
 - breakdown: <step1>, <step2>, ... - split current task
 - note: <content> - remember for this task

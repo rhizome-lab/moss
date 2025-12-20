@@ -4,17 +4,19 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Comprehensive Telemetry & Analysis**:
-  - Track all token usage, patterns, and codebase access patterns by default
-  - Store maximal metadata for every session
-  - Built-in high-quality analysis tools (CLI & visual)
-  - Easy interface for complex custom analysis (e.g. "what files do I edit most with `fix`?")
 - [ ] **Agentic TUI UX**:
   - Fluid mode switching (inspired by shift-tab in Claude Code)
   - Avoid fixed modes; allow dynamic transitions between Plan/Read/Write states
 - [ ] **Workflow Loader Abstraction**: Extract `WorkflowLoader` protocol for Python workflows
+- [ ] **Adaptive Context Control**: Dynamically adjust context window based on task complexity
 
 ## Recently Completed
+
+- **Comprehensive Telemetry & Analysis** (Dec 2025):
+  - Added `TelemetryAPI` for multi-session data analysis
+  - Enhanced `Session` tracking with codebase access patterns
+  - Integrated `analyze` command into `DWIMLoop` for real-time telemetry
+  - Unified access to token usage and tool call history
 
 - **Mistake Detection** (Dec 2025):
   - Added `detect_mistakes` operation to `LLMToolExecutor` for turn analysis

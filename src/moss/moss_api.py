@@ -17,6 +17,7 @@ Example:
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -163,6 +164,60 @@ class ShadowGitAPI:
             await git.rollback_hunks(branch, [target])
             return True
         return False
+
+
+@dataclass
+class TelemetryAPI:
+    """API for session telemetry and analysis.
+
+    Provides tools for analyzing token usage, tool patterns, and
+    codebase access patterns across sessions.
+    """
+
+    root: Path
+
+    def get_session_stats(self, session_id: str) -> dict[str, Any]:
+        """Get comprehensive statistics for a session."""
+        from moss.session import SessionManager
+
+        manager = SessionManager(self.root / ".moss" / "sessions")
+        session = manager.get(session_id)
+        if not session:
+            return {"error": f"Session {session_id} not found"}
+
+        return {
+            "id": session.id,
+            "task": session.task,
+            "tokens": session.total_tokens,
+            "llm_calls": session.llm_calls,
+            "tool_calls": len(session.tool_calls),
+            "file_changes": len(session.file_changes),
+            "duration": session.duration_seconds,
+            "access_patterns": dict(session.access_patterns),
+        }
+
+    def analyze_all_sessions(self) -> dict[str, Any]:
+        """Analyze patterns across all recorded sessions."""
+        from moss.session import SessionManager
+
+        manager = SessionManager(self.root / ".moss" / "sessions")
+        sessions = manager.list_sessions()
+
+        total_tokens = sum(s.total_tokens for s in sessions)
+        total_calls = sum(s.llm_calls for s in sessions)
+
+        # Aggregate access patterns
+        all_patterns = defaultdict(int)
+        for s in sessions:
+            for path, count in s.access_patterns.items():
+                all_patterns[path] += count
+
+        return {
+            "session_count": len(sessions),
+            "total_tokens": total_tokens,
+            "total_llm_calls": total_calls,
+            "hotspots": sorted(all_patterns.items(), key=lambda x: x[1], reverse=True)[:10],
+        }
 
 
 @dataclass
@@ -3678,6 +3733,7 @@ class MossAPI:
     _agent: AgentAPI | None = None
     _edit: EditAPI | None = None
     _shadow_git: ShadowGitAPI | None = None
+    _telemetry: TelemetryAPI | None = None
     _complexity: ComplexityAPI | None = None
     _clones: ClonesAPI | None = None
     _security: SecurityAPI | None = None
@@ -3746,6 +3802,13 @@ class MossAPI:
         if self._shadow_git is None:
             self._shadow_git = ShadowGitAPI(root=self.root)
         return self._shadow_git
+
+    @property
+    def telemetry(self) -> TelemetryAPI:
+        """Access session telemetry and analysis."""
+        if self._telemetry is None:
+            self._telemetry = TelemetryAPI(root=self.root)
+        return self._telemetry
 
     @property
     def dependencies(self) -> DependencyAPI:
