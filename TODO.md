@@ -4,9 +4,22 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- **TUI Interface**: Interactive TUI for Moss (needs careful UX planning)
+- **Mistake Detection**: Detect when an LLM *maybe* made a mistake (Critic loop enhancement)
+- **Shadow Git Access**: Give LLM first-class access to 'Shadow Git' (diffs, rollback, "what did I break?")
+- **User Feedback Story**: Improve interruptibility and feedback loops (client-side interrupts, agent "check mail" steps) to handle mid-task corrections.
+- [ ] **Comprehensive Telemetry & Analysis**:
+  - Track all token usage, patterns, and codebase access patterns by default
+  - Store maximal metadata for every session
+  - Built-in high-quality analysis tools (CLI & visual)
+  - Easy interface for complex custom analysis (e.g. "what files do I edit most with `fix`?")
 
 ## Recently Completed
+
+- **TUI Interface** (Dec 2025):
+  - Initial `MossTUI` implementation using Textual
+  - Integrated `TaskTree` visualization and Agent Log views
+  - Added `moss tui` command to CLI for interactive exploration
+  - Integrated into `MossAPI` for programmatic access
 
 - **Editing Tools** (Dec 2025):
   - Added `EditAPI` for direct file manipulation (write, replace, insert)
