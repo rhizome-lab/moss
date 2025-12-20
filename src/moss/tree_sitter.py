@@ -4,15 +4,20 @@ This module provides:
 - TreeSitterParser: Generic parser for any tree-sitter supported language
 - Language-specific skeleton extractors (TypeScript, JavaScript, Go, Rust)
 - Query-based code navigation
+- ParseResult: Result type with fallback to text window mode on parse failure
 
 Requires: pip install tree-sitter tree-sitter-python tree-sitter-typescript etc.
 
 Usage:
     parser = TreeSitterParser("typescript")
-    tree = parser.parse(source_code)
+    result = parser.parse_safe(source_code)
 
-    # Extract symbols
-    symbols = parser.extract_symbols(tree)
+    if result.is_ok:
+        tree = result.tree
+        symbols = parser.extract_symbols(tree)
+    else:
+        # Fallback: use text window around error location
+        context = result.text_window(line=10, context_lines=5)
 
     # Find specific nodes
     functions = parser.query(tree, "(function_declaration) @fn")
@@ -27,6 +32,118 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     pass
+
+
+@dataclass
+class ParseError:
+    """Error from tree-sitter parsing.
+
+    Contains error details and the original source for fallback text mode.
+    """
+
+    message: str
+    source: str
+    error_line: int | None = None
+    error_column: int | None = None
+
+    def text_window(self, line: int, context_lines: int = 5) -> str:
+        """Get a window of text around a line (fallback for failed parse).
+
+        Args:
+            line: Center line number (0-indexed)
+            context_lines: Number of lines before/after to include
+
+        Returns:
+            Text window with line numbers
+        """
+        lines = self.source.splitlines()
+        start = max(0, line - context_lines)
+        end = min(len(lines), line + context_lines + 1)
+
+        result = []
+        for i in range(start, end):
+            marker = ">" if i == line else " "
+            result.append(f"{marker}{i + 1:4d} | {lines[i]}")
+
+        return "\n".join(result)
+
+    def error_context(self, context_lines: int = 3) -> str:
+        """Get text window around the error location.
+
+        Returns:
+            Text window centered on error, or first few lines if no location
+        """
+        if self.error_line is not None:
+            return self.text_window(self.error_line, context_lines)
+        return self.text_window(0, context_lines)
+
+
+@dataclass
+class ParseResult:
+    """Result of tree-sitter parsing, with fallback to text mode.
+
+    Degraded Mode: Never block access due to parse failures.
+    On failure, provides text window fallback for basic code navigation.
+    """
+
+    tree: TreeNode | None
+    error: ParseError | None
+    source: str
+
+    @property
+    def is_ok(self) -> bool:
+        """True if parsing succeeded."""
+        return self.tree is not None
+
+    @property
+    def is_err(self) -> bool:
+        """True if parsing failed."""
+        return self.tree is None
+
+    def text_window(self, line: int, context_lines: int = 5) -> str:
+        """Get a window of text around a line (works regardless of parse status).
+
+        Args:
+            line: Center line number (0-indexed)
+            context_lines: Number of lines before/after to include
+
+        Returns:
+            Text window with line numbers
+        """
+        lines = self.source.splitlines()
+        start = max(0, line - context_lines)
+        end = min(len(lines), line + context_lines + 1)
+
+        result = []
+        for i in range(start, end):
+            marker = ">" if i == line else " "
+            result.append(f"{marker}{i + 1:4d} | {lines[i]}")
+
+        return "\n".join(result)
+
+    def unwrap(self) -> TreeNode:
+        """Get the tree, raising if parse failed.
+
+        Raises:
+            ValueError: If parsing failed
+        """
+        if self.tree is None:
+            raise ValueError(f"Parse failed: {self.error.message if self.error else 'unknown'}")
+        return self.tree
+
+    def unwrap_or_text(self, line: int, context_lines: int = 5) -> TreeNode | str:
+        """Get tree if OK, or text window fallback if failed.
+
+        Args:
+            line: Center line for text window fallback
+            context_lines: Context lines for fallback
+
+        Returns:
+            TreeNode if parse succeeded, text window string if failed
+        """
+        if self.tree is not None:
+            return self.tree
+        return self.text_window(line, context_lines)
 
 
 class LanguageType(Enum):
@@ -204,6 +321,91 @@ class TreeSitterParser:
 
         tree = self._parser.parse(source)
         return self._convert_node(tree.root_node, source)
+
+    def parse_safe(self, source: str | bytes) -> ParseResult:
+        """Parse source code, returning Result with fallback on failure.
+
+        Degraded Mode: Never blocks access due to parse failures.
+        On failure, ParseResult provides text window fallback.
+
+        Args:
+            source: Source code as string or bytes
+
+        Returns:
+            ParseResult with tree on success, or error with text fallback
+        """
+        source_str = source if isinstance(source, str) else source.decode("utf-8", errors="replace")
+
+        try:
+            self._ensure_initialized()
+
+            source_bytes = source if isinstance(source, bytes) else source.encode("utf-8")
+            tree = self._parser.parse(source_bytes)
+            tree_node = self._convert_node(tree.root_node, source_bytes)
+
+            # Check if tree has errors (tree-sitter marks error nodes)
+            if self._has_error_nodes(tree_node):
+                error_loc = self._find_first_error(tree_node)
+                return ParseResult(
+                    tree=tree_node,  # Still return tree, but with error info
+                    error=ParseError(
+                        message="Parse completed with errors",
+                        source=source_str,
+                        error_line=error_loc[0] if error_loc else None,
+                        error_column=error_loc[1] if error_loc else None,
+                    ),
+                    source=source_str,
+                )
+
+            return ParseResult(tree=tree_node, error=None, source=source_str)
+
+        except ImportError as e:
+            return ParseResult(
+                tree=None,
+                error=ParseError(message=str(e), source=source_str),
+                source=source_str,
+            )
+        except Exception as e:
+            return ParseResult(
+                tree=None,
+                error=ParseError(message=str(e), source=source_str),
+                source=source_str,
+            )
+
+    def parse_file_safe(self, path: Path) -> ParseResult:
+        """Parse a source file, returning Result with fallback on failure.
+
+        Args:
+            path: Path to source file
+
+        Returns:
+            ParseResult with tree on success, or error with text fallback
+        """
+        try:
+            source = path.read_bytes()
+            return self.parse_safe(source)
+        except OSError as e:
+            return ParseResult(
+                tree=None,
+                error=ParseError(message=f"Failed to read file: {e}", source=""),
+                source="",
+            )
+
+    def _has_error_nodes(self, tree: TreeNode) -> bool:
+        """Check if tree contains ERROR nodes."""
+        if tree.type == "ERROR":
+            return True
+        return any(self._has_error_nodes(child) for child in tree.children)
+
+    def _find_first_error(self, tree: TreeNode) -> tuple[int, int] | None:
+        """Find location of first ERROR node."""
+        if tree.type == "ERROR":
+            return (tree.start_line, tree.start_column)
+        for child in tree.children:
+            loc = self._find_first_error(child)
+            if loc:
+                return loc
+        return None
 
     def parse_file(self, path: Path) -> TreeNode:
         """Parse a source file.

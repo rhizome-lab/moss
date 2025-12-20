@@ -13,6 +13,23 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+# Syntax Repair Engine: Focused system prompt for fixing compilation errors.
+# Injected when validation fails, guiding the LLM to fix specific errors.
+REPAIR_ENGINE_PROMPT = """\
+REPAIR MODE: Previous changes caused errors. Fix them precisely.
+
+Rules:
+- Focus ONLY on fixing the reported errors
+- Do not refactor or improve unrelated code
+- Preserve the original intent of the code
+- If a fix is unclear, make the minimal safe change
+
+For each error:
+1. Identify the root cause from the error message and location
+2. Apply the smallest fix that resolves it
+3. If the error has a suggestion, prefer that fix
+"""
+
 
 class StepType(Enum):
     """Type of step - affects how we count it."""
@@ -240,11 +257,13 @@ class LoopContext:
         input: The original initial_input passed to run()
         steps: Dict mapping step names to their outputs
         last: The most recent step's output (convenience)
+        expanded_symbols: Symbols that have been fully viewed (not just skeleton)
     """
 
     input: Any = None
     steps: dict[str, Any] = field(default_factory=dict)
     last: Any = None
+    expanded_symbols: set[str] = field(default_factory=set)
 
     def get(self, step_name: str, default: Any = None) -> Any:
         """Get a specific step's output."""
@@ -254,7 +273,31 @@ class LoopContext:
         """Return new context with step output added."""
         new_steps = dict(self.steps)
         new_steps[step_name] = output
-        return LoopContext(input=self.input, steps=new_steps, last=output)
+        return LoopContext(
+            input=self.input,
+            steps=new_steps,
+            last=output,
+            expanded_symbols=set(self.expanded_symbols),
+        )
+
+    def with_expanded(self, symbol: str) -> LoopContext:
+        """Return new context with symbol marked as expanded (Peek-First Policy)."""
+        new_expanded = set(self.expanded_symbols)
+        new_expanded.add(symbol)
+        return LoopContext(
+            input=self.input,
+            steps=dict(self.steps),
+            last=self.last,
+            expanded_symbols=new_expanded,
+        )
+
+    def is_peeked(self, symbol: str) -> bool:
+        """Check if a symbol has been fully viewed (expanded).
+
+        Peek-First Policy: Symbols must be expanded before editing.
+        This prevents hallucination of function bodies from skeleton-only views.
+        """
+        return symbol in self.expanded_symbols
 
 
 class LoopStatus(Enum):
@@ -374,6 +417,11 @@ class AgentLoopRunner:
 
             if step_result.status == StepStatus.SUCCESS:
                 context = context.with_step(step.name, step_result.output)
+
+                # Peek-First Policy: Track expanded symbols
+                output = step_result.output
+                if isinstance(output, dict) and "_expanded_symbol" in output:
+                    context = context.with_expanded(output["_expanded_symbol"])
 
                 # Check exit conditions
                 for condition in loop.exit_conditions:
@@ -898,14 +946,20 @@ class MossToolExecutor:
     - context.input: Original input (typically {file_path: ..., task: ...})
     - context.steps: Previous step outputs
     - context.get(step_name): Specific step output
+
+    Peek-First Policy:
+        When enforce_peek_first=True, patch operations will fail if the target
+        symbol was only seen via skeleton, not expanded. This prevents
+        hallucination of function bodies.
     """
 
-    def __init__(self, root: Any = None):
+    def __init__(self, root: Any = None, enforce_peek_first: bool = False):
         from pathlib import Path
 
         from moss.moss_api import MossAPI
 
         self.api = MossAPI(root or Path.cwd())
+        self.enforce_peek_first = enforce_peek_first
 
     def _get_input(self, context: LoopContext, step: LoopStep) -> Any:
         """Extract the appropriate input for this step.
@@ -1064,11 +1118,26 @@ class MossToolExecutor:
             file_path = self._get_file_path(context, step)
             result = self.api.skeleton.extract(file_path)
 
+        elif tool_name == "skeleton.expand":
+            # Peek-First Policy: Track expanded symbols
+            file_path = self._get_file_path(context, step)
+            symbol_name = input_data.get("symbol") if isinstance(input_data, dict) else input_data
+            result = self.api.skeleton.expand(file_path, symbol_name)
+            # Mark symbol as expanded (return value includes tracking info)
+            if result is not None:
+                result = {"content": result, "_expanded_symbol": f"{file_path}:{symbol_name}"}
+
         elif tool_name == "validation.validate":
             file_path = self._get_file_path(context, step)
             result = self.api.validation.validate(file_path)
 
         elif tool_name == "patch.apply":
+            # Peek-First Policy: Warn if no symbols were expanded before editing
+            if self.enforce_peek_first and not context.expanded_symbols:
+                raise ValueError(
+                    "Peek-First Policy: Must expand at least one symbol before applying patches. "
+                    "Use skeleton.expand or anchor.resolve to view full implementations first."
+                )
             file_path = self._get_file_path(context, step)
             if isinstance(input_data, dict):
                 patch = input_data.get("patch", input_data)
@@ -1077,6 +1146,12 @@ class MossToolExecutor:
             result = self.api.patch.apply(file_path, patch)
 
         elif tool_name == "patch.apply_with_fallback":
+            # Peek-First Policy: Same check as patch.apply
+            if self.enforce_peek_first and not context.expanded_symbols:
+                raise ValueError(
+                    "Peek-First Policy: Must expand at least one symbol before applying patches. "
+                    "Use skeleton.expand or anchor.resolve to view full implementations first."
+                )
             file_path = self._get_file_path(context, step)
             if isinstance(input_data, dict):
                 patch = input_data.get("patch", input_data)
@@ -1090,9 +1165,12 @@ class MossToolExecutor:
             result = self.api.anchor.find(file_path, name)
 
         elif tool_name == "anchor.resolve":
+            # Peek-First Policy: anchor.resolve shows full code, counts as expand
             file_path = self._get_file_path(context, step)
             name = input_data.get("name") if isinstance(input_data, dict) else input_data
             result = self.api.anchor.resolve(file_path, name)
+            if result is not None:
+                result = {"content": result, "_expanded_symbol": f"{file_path}:{name}"}
 
         elif tool_name == "dependencies.format":
             file_path = self._get_file_path(context, step)
@@ -1657,6 +1735,9 @@ class LLMToolExecutor:
         # Build the prompt based on operation and full context
         prompt = self._build_prompt(operation, context, step)
 
+        # Extract repair context if validation errors are present
+        repair_context = self._extract_repair_context(context)
+
         # Mock mode - return placeholder
         if self.config.mock:
             mock_response = f"[MOCK {operation}]: {str(context.last)[:100]}"
@@ -1664,7 +1745,7 @@ class LLMToolExecutor:
             tokens_out = len(mock_response) // 4
             return mock_response, tokens_in, tokens_out
 
-        return await self._call_litellm(prompt)
+        return await self._call_litellm(prompt, repair_context)
 
     async def _get_memory_context(self) -> str:
         """Get automatic memory context to inject into system prompt."""
@@ -1684,7 +1765,64 @@ class LLMToolExecutor:
             # Don't let memory errors break LLM calls
             return ""
 
-    async def _call_litellm(self, prompt: str) -> tuple[str, int, int]:
+    def _extract_repair_context(self, context: LoopContext) -> str:
+        """Extract repair context from validation errors in loop context.
+
+        Checks for ValidationResult or DiagnosticSet in step outputs.
+        Returns formatted error summary for the Syntax Repair Engine.
+        """
+        errors: list[str] = []
+
+        # Check all step outputs for validation/diagnostic results
+        for _, output in context.steps.items():
+            if output is None:
+                continue
+
+            # Handle ValidationResult (from validators.py)
+            if hasattr(output, "success") and hasattr(output, "issues"):
+                if not output.success:
+                    for issue in getattr(output, "issues", []):
+                        if hasattr(issue, "severity"):
+                            sev = issue.severity
+                            # Check if it's an error severity
+                            if hasattr(sev, "name") and sev.name == "ERROR":
+                                errors.append(str(issue))
+                            elif hasattr(sev, "value") and sev.value == 1:  # ERROR = 1
+                                errors.append(str(issue))
+
+            # Handle DiagnosticSet (from diagnostics.py)
+            elif hasattr(output, "diagnostics") and hasattr(output, "error_count"):
+                if output.error_count > 0:
+                    for diag in getattr(output, "errors", []):
+                        if hasattr(diag, "to_compact"):
+                            errors.append(diag.to_compact())
+                        else:
+                            errors.append(str(diag))
+
+            # Handle dict-based results (serialized validation)
+            elif isinstance(output, dict):
+                if output.get("success") is False:
+                    for issue in output.get("issues", []):
+                        if isinstance(issue, dict):
+                            msg = issue.get("message", "")
+                            loc = issue.get("file", "")
+                            if issue.get("line"):
+                                loc += f":{issue['line']}"
+                            errors.append(f"{loc}: {msg}" if loc else msg)
+                        else:
+                            errors.append(str(issue))
+
+        if not errors:
+            return ""
+
+        # Format errors for the repair engine
+        error_list = "\n".join(f"- {e}" for e in errors[:10])  # Limit to 10
+        if len(errors) > 10:
+            error_list += f"\n... and {len(errors) - 10} more errors"
+
+        return f"Errors to fix:\n{error_list}"
+
+    async def _call_litellm(self, prompt: str, repair_context: str = "") -> tuple[str, int, int]:
         """Call LLM via litellm (unified interface for all providers)."""
         import asyncio
 
@@ -1704,10 +1842,13 @@ class LLMToolExecutor:
         def _sync_call() -> tuple[str, int, int]:
             messages: list[dict[str, str]] = []
 
-            # Build system prompt with memory context
+            # Build system prompt with memory context and repair engine
             system_prompt = self.config.system_prompt
             if memory_context:
                 system_prompt = f"{system_prompt}\n\n{memory_context}"
+            if repair_context:
+                # Inject Syntax Repair Engine when errors are present
+                system_prompt = f"{system_prompt}\n\n{REPAIR_ENGINE_PROMPT}\n\n{repair_context}"
 
             if system_prompt:
                 messages.append({"role": "system", "content": system_prompt})

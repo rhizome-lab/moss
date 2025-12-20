@@ -4,9 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Implement "Syntax Repair Engine" system prompt when errors present
-2. Add Peek-First Policy: agent cannot edit symbol only seen as skeleton
-3. Wrap tree-sitter parse in Result for degraded mode fallback
+1. Hunk-level rollback for shadow_git
+2. Expose memory.recall() as agent tool (on-demand layer)
+3. Add skeleton.expand to MCP tool definitions
 
 ## Active Backlog
 
@@ -19,17 +19,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Parse `cargo check --message-format=json` instead of raw stderr
 - [x] Extract: error code, message, file/line, suggestion - discard ASCII art
 - [x] Integrate with validation loop via `DiagnosticValidator`
-- [ ] "Syntax Repair Engine" system prompt when errors present
+- [x] "Syntax Repair Engine" system prompt when errors present (see `REPAIR_ENGINE_PROMPT` in `agent_loop.py`)
 
-**Degraded Mode (AST fallback):**
-- [ ] Wrap tree-sitter parse in Result
-- [ ] On parse failure, fallback to "Text Window" mode (raw lines around error location)
-- [ ] Never block read access due to parse failures
+**Degraded Mode (AST fallback):** (done - see `src/moss/tree_sitter.py`)
+- [x] Wrap tree-sitter parse in Result (`ParseResult`)
+- [x] On parse failure, fallback to "Text Window" mode (`text_window()`)
+- [x] Never block read access due to parse failures
 
-**Peek-First Policy:**
-- [ ] Constraint: agent cannot edit symbol only seen as skeleton
-- [ ] Must `expand` before `edit` - enforced in agent loop
-- [ ] Prevents hallucination of function bodies
+**Peek-First Policy:** (done - see `LoopContext.expanded_symbols` in `agent_loop.py`)
+- [x] Constraint: agent cannot edit symbol only seen as skeleton
+- [x] Must `expand` before `edit` - enforced in agent loop (`MossToolExecutor.enforce_peek_first`)
+- [x] Prevents hallucination of function bodies
 
 **Hunk-Level Rollback (shadow_git enhancement):**
 - [ ] Map diff hunks to AST nodes
