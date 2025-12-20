@@ -398,14 +398,18 @@ impl FileIndex {
                 )?;
                 symbol_count += 1;
 
-                // Get calls for this symbol
-                let calls = parser.find_callees_with_lines(&full_path, &content, &sym.name);
-                for (callee_name, line) in calls {
-                    tx.execute(
-                        "INSERT INTO calls (caller_file, caller_symbol, callee_name, line) VALUES (?1, ?2, ?3, ?4)",
-                        params![file_path, sym.name, callee_name, line],
-                    )?;
-                    call_count += 1;
+                // Only index calls for functions/methods, not classes
+                // Classes don't make calls - their methods do
+                let kind = sym.kind.as_str();
+                if kind == "function" || kind == "method" {
+                    let calls = parser.find_callees_with_lines(&full_path, &content, &sym.name);
+                    for (callee_name, line) in calls {
+                        tx.execute(
+                            "INSERT INTO calls (caller_file, caller_symbol, callee_name, line) VALUES (?1, ?2, ?3, ?4)",
+                            params![file_path, sym.name, callee_name, line],
+                        )?;
+                        call_count += 1;
+                    }
                 }
             }
         }

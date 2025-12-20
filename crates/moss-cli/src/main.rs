@@ -689,69 +689,97 @@ fn cmd_callees(symbol: &str, file: Option<&str>, root: Option<&Path>, json: bool
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    // Find the file containing the symbol
-    let file_path = if let Some(file) = file {
-        // File provided - resolve it
-        let matches = path_resolve::resolve(file, &root);
-        match matches.iter().find(|m| m.kind == "file") {
-            Some(m) => root.join(&m.path),
-            None => {
-                eprintln!("File not found: {}", file);
-                return 1;
-            }
-        }
-    } else {
-        // No file - search for symbol in index
-        if let Ok(idx) = index::FileIndex::open(&root) {
-            if let Ok(symbols) = idx.find_symbol(symbol) {
-                if let Some((file, _, _, _)) = symbols.first() {
-                    root.join(file)
-                } else {
-                    // Try fuzzy search
-                    let matches = path_resolve::resolve(symbol, &root);
-                    if let Some(m) = matches.iter().find(|m| m.kind == "symbol") {
-                        root.join(&m.path)
-                    } else {
-                        eprintln!("Symbol not found: {}. Specify --file or use file:symbol syntax.", symbol);
-                        return 1;
+    // Try index first (fast path)
+    if let Ok(idx) = index::FileIndex::open(&root) {
+        let (symbols, calls) = idx.call_graph_stats().unwrap_or((0, 0));
+        if calls > 0 {
+            // Determine file path
+            let file_path = if let Some(file) = file {
+                // Resolve provided file
+                let matches = path_resolve::resolve(file, &root);
+                matches.iter().find(|m| m.kind == "file").map(|m| m.path.clone())
+            } else {
+                // Find file from symbol
+                idx.find_symbol(symbol).ok().and_then(|syms| syms.first().map(|(f, _, _, _)| f.clone()))
+            };
+
+            if let Some(file_path) = file_path {
+                if let Ok(callees) = idx.find_callees(&file_path, symbol) {
+                    if !callees.is_empty() {
+                        if json {
+                            let output: Vec<_> = callees
+                                .iter()
+                                .map(|(name, line)| serde_json::json!({"name": name, "file": file_path, "line": line}))
+                                .collect();
+                            println!("{}", serde_json::to_string(&output).unwrap());
+                        } else {
+                            println!("Callees of {}:", symbol);
+                            for (name, line) in &callees {
+                                println!("  {}:{}:{}", file_path, line, name);
+                            }
+                        }
+                        return 0;
                     }
                 }
-            } else {
-                eprintln!("Failed to search index. Run: moss reindex --call-graph");
+            }
+            eprintln!("No callees found for: {} (index: {} symbols, {} calls)", symbol, symbols, calls);
+            return 1;
+        }
+    }
+
+    // Fallback to parsing (slower) - also auto-indexes like callers
+    eprintln!("Call graph not indexed. Building now (one-time)...");
+
+    if let Ok(mut idx) = index::FileIndex::open(&root) {
+        if idx.needs_refresh() {
+            if let Err(e) = idx.refresh() {
+                eprintln!("Failed to refresh file index: {}", e);
                 return 1;
             }
-        } else {
-            eprintln!("No file specified. Use --file or file:symbol syntax.");
-            return 1;
         }
-    };
+        match idx.refresh_call_graph() {
+            Ok((symbols, calls)) => {
+                eprintln!("Indexed {} symbols, {} calls", symbols, calls);
 
-    let content = match std::fs::read_to_string(&file_path) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("Error reading file: {}", e);
-            return 1;
+                // Retry with index
+                let file_path = if let Some(file) = file {
+                    let matches = path_resolve::resolve(file, &root);
+                    matches.iter().find(|m| m.kind == "file").map(|m| m.path.clone())
+                } else {
+                    idx.find_symbol(symbol).ok().and_then(|syms| syms.first().map(|(f, _, _, _)| f.clone()))
+                };
+
+                if let Some(file_path) = file_path {
+                    if let Ok(callees) = idx.find_callees(&file_path, symbol) {
+                        if !callees.is_empty() {
+                            if json {
+                                let output: Vec<_> = callees
+                                    .iter()
+                                    .map(|(name, line)| serde_json::json!({"name": name, "file": file_path, "line": line}))
+                                    .collect();
+                                println!("{}", serde_json::to_string(&output).unwrap());
+                            } else {
+                                println!("Callees of {}:", symbol);
+                                for (name, line) in &callees {
+                                    println!("  {}:{}:{}", file_path, line, name);
+                                }
+                            }
+                            return 0;
+                        }
+                    }
+                }
+                eprintln!("No callees found for: {}", symbol);
+                return 1;
+            }
+            Err(e) => {
+                eprintln!("Failed to build call graph: {}", e);
+                return 1;
+            }
         }
-    };
-
-    let mut parser = symbols::SymbolParser::new();
-    let callees = parser.find_callees(&file_path, &content, symbol);
-
-    if callees.is_empty() {
-        eprintln!("No callees found for: {}", symbol);
-        return 1;
     }
 
-    if json {
-        println!("{}", serde_json::to_string(&callees).unwrap());
-    } else {
-        println!("Callees of {}:", symbol);
-        for callee in &callees {
-            println!("  {}", callee);
-        }
-    }
-
-    0
+    eprintln!("Failed to open index");
+    1
 }
 
 fn cmd_callers(symbol: &str, root: Option<&Path>, json: bool, profiler: &mut Profiler) -> i32 {
