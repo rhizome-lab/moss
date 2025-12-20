@@ -422,3 +422,72 @@ class TestHunkLevelRollback:
             assert "modified keep" in (git_repo / "keep.txt").read_text()
             # revert.txt should be reverted
             assert "revert this" in (git_repo / "revert.txt").read_text()
+
+    async def test_rollback_on_verification_failure(self, shadow_git: ShadowGit, git_repo: Path):
+        """Integration test: roll back hunks that cause verification failure.
+
+        Scenario:
+        1. Agent makes changes to two separate files
+        2. Validation (syntax check) fails for one file
+        3. Only the failing file's hunks are rolled back
+        4. The passing changes are preserved
+        """
+        # Create two Python files on master
+        (git_repo / "good.py").write_text("x = 42\n")
+        (git_repo / "bad.py").write_text('msg = "hello"\n')
+        await shadow_git._run_git("add", "-A")
+        await shadow_git._run_git("commit", "-m", "Add files")
+
+        branch = await shadow_git.create_shadow_branch("shadow/test")
+
+        # Agent modifies both - one valid, one with syntax error
+        (git_repo / "good.py").write_text("x = 42 * 2  # Valid change\n")
+        (git_repo / "bad.py").write_text('msg = "hello  # Syntax error\n')
+        await shadow_git.commit(branch, "Modify files")
+
+        # Simulate verification: compile each file
+        bad_path = git_repo / "bad.py"
+        try:
+            compile(bad_path.read_text(), bad_path, "exec")
+            syntax_ok = True
+        except SyntaxError:
+            syntax_ok = False
+
+        assert not syntax_ok, "Expected syntax error"
+
+        # Get hunks and find the failing file's hunks
+        hunks = await shadow_git.get_hunks(branch)
+        assert len(hunks) >= 2, f"Expected 2 hunks, got {len(hunks)}"
+
+        failing_hunks = [h for h in hunks if h.file_path == "bad.py"]
+        assert len(failing_hunks) >= 1
+
+        # Roll back only the failing hunks
+        reverted = await shadow_git.rollback_hunks(branch, failing_hunks)
+        assert reverted >= 1
+
+        # Verify: bad.py should be reverted to original
+        assert 'msg = "hello"' in (git_repo / "bad.py").read_text()
+
+        # good.py should still have the valid change
+        assert "42 * 2" in (git_repo / "good.py").read_text()
+
+    async def test_map_hunks_to_symbols(self, shadow_git: ShadowGit, git_repo: Path):
+        """Test that hunks can be mapped to AST symbols."""
+        # Create Python file with function
+        (git_repo / "code.py").write_text("def my_func():\n    pass\n")
+        await shadow_git._run_git("add", "-A")
+        await shadow_git._run_git("commit", "-m", "Add function")
+
+        branch = await shadow_git.create_shadow_branch("shadow/test")
+
+        # Modify function body
+        (git_repo / "code.py").write_text("def my_func():\n    return 42\n")
+        await shadow_git.commit(branch, "Modify function")
+
+        hunks = await shadow_git.get_hunks(branch)
+        mapped = await shadow_git.map_hunks_to_symbols(hunks)
+
+        # Should have symbol info if tree-sitter is available
+        if mapped and mapped[0].symbol:
+            assert "my_func" in mapped[0].symbol

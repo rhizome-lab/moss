@@ -13,22 +13,19 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-# Syntax Repair Engine: Focused system prompt for fixing compilation errors.
-# Injected when validation fails, guiding the LLM to fix specific errors.
-REPAIR_ENGINE_PROMPT = """\
-REPAIR MODE: Previous changes caused errors. Fix them precisely.
+# Lazy-loaded prompt for syntax repair engine.
+# Loaded from src/moss/prompts/repair-engine.txt (or user override in .moss/prompts/)
+_repair_engine_prompt: str | None = None
 
-Rules:
-- Focus ONLY on fixing the reported errors
-- Do not refactor or improve unrelated code
-- Preserve the original intent of the code
-- If a fix is unclear, make the minimal safe change
 
-For each error:
-1. Identify the root cause from the error message and location
-2. Apply the smallest fix that resolves it
-3. If the error has a suggestion, prefer that fix
-"""
+def get_repair_engine_prompt() -> str:
+    """Load repair engine prompt with caching."""
+    global _repair_engine_prompt
+    if _repair_engine_prompt is None:
+        from moss.prompts import load_prompt
+
+        _repair_engine_prompt = load_prompt("repair-engine")
+    return _repair_engine_prompt
 
 
 class StepType(Enum):
@@ -1880,7 +1877,8 @@ class LLMToolExecutor:
                 system_prompt = f"{system_prompt}\n\n{memory_context}"
             if repair_context:
                 # Inject Syntax Repair Engine when errors are present
-                system_prompt = f"{system_prompt}\n\n{REPAIR_ENGINE_PROMPT}\n\n{repair_context}"
+                repair_prompt = get_repair_engine_prompt()
+                system_prompt = f"{system_prompt}\n\n{repair_prompt}\n\n{repair_context}"
 
             if system_prompt:
                 messages.append({"role": "system", "content": system_prompt})
