@@ -180,16 +180,84 @@ Context grew from ~19K to ~156K tokens as the session progressed over 31 hours.
 
 ### Cost Estimate (Opus 4.5 API rates)
 
+Opus 4.5: $5/M input, $25/M output. Cache: 90% discount read, 25% premium write.
+
 | Component | Tokens | Rate | Cost |
 |-----------|--------|------|------|
-| Cache read | 362M | $1.50/M | $543 |
-| Cache create | 7.4M | $18.75/M | $139 |
-| New input | 33K | $15/M | $0.50 |
-| Output | 1.45M | $75/M | $109 |
-| **Total** | | | **~$791** |
+| Cache read | 362M | $0.50/M | $181 |
+| Cache create | 7.4M | $6.25/M | $46 |
+| New input | 33K | $5/M | $0.17 |
+| Output | 1.45M | $25/M | $36 |
+| **Total** | | | **~$263** |
 
 *Note: Claude Code Pro subscription ($100-200/mo) provides unlimited usage, so actual user cost
 depends on subscription tier, not raw API rates.*
+
+### Cost Comparison: Alternative Models & Paradigms
+
+**Baseline numbers from this session:**
+- 3,716 API calls
+- ~370M input tokens processed (97% from cache)
+- 1.45M output tokens
+- Average context: 100K tokens/call
+
+#### a) Gemini Flash ($0.50/M input, $3/M output, 90% auto-cache)
+
+| Component | Tokens | Rate | Cost |
+|-----------|--------|------|------|
+| Cached input | 359M | $0.05/M | $18 |
+| Non-cached input | 11M | $0.50/M | $6 |
+| Output | 1.45M | $3/M | $4 |
+| **Total** | | | **~$28** |
+
+**9x cheaper** than Opus ($263 → $28) - output pricing dominates ($25/M → $3/M).
+
+#### b) Moss Paradigm (conservative 10x context reduction)
+
+Target: 10K tokens/call instead of 100K (conservative; vision is 1-5K).
+
+| Metric | Current | Moss |
+|--------|---------|------|
+| Context/call | 100K | 10K |
+| Total input | 370M | 37M |
+| Output (est. 30% reduction) | 1.45M | 1.0M |
+
+**Moss + Opus 4.5:**
+
+| Component | Tokens | Rate | Cost |
+|-----------|--------|------|------|
+| Cached input | 35.9M | $0.50/M | $18 |
+| Cache create | 740K | $6.25/M | $5 |
+| New input | 360K | $5/M | $2 |
+| Output | 1.0M | $25/M | $25 |
+| **Total** | | | **~$50** |
+
+**5x cheaper** than current ($263 → $50).
+
+**Moss + Gemini Flash:**
+
+| Component | Tokens | Rate | Cost |
+|-----------|--------|------|------|
+| Cached input | 33.3M | $0.05/M | $2 |
+| Non-cached input | 3.7M | $0.50/M | $2 |
+| Output | 1.0M | $3/M | $3 |
+| **Total** | | | **~$7** |
+
+**38x cheaper** than current Opus ($263 → $7).
+
+#### Summary
+
+| Configuration | Cost | vs Current |
+|---------------|------|------------|
+| Opus 4.5 (current) | $263 | baseline |
+| Gemini Flash (same paradigm) | $28 | 9x cheaper |
+| Opus 4.5 + Moss | $50 | 5x cheaper |
+| Gemini Flash + Moss | $7 | 38x cheaper |
+
+The moss paradigm's value compounds with cheaper models. Reduced context means:
+- Less to cache/transmit
+- More focused model attention (better quality)
+- Faster response times
 
 ### Data Deduplication Note
 
