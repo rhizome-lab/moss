@@ -186,9 +186,9 @@ Completed:
 4. ✅ Extract `LLMConfig.system_prompt` to `src/moss/prompts/terse.txt`
 5. ✅ Implement workflow loader with TOML parsing and @reference resolution
 
+6. ✅ Add CLI commands (`moss workflow list/show/run`)
+
 Remaining:
-- Wire workflow loader into agent loop runner
-- Add CLI commands for workflow management
 - Implement Python workflow protocol for complex logic
 
 ## Complex Workflows

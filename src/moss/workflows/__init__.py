@@ -11,7 +11,10 @@ Reference syntax:
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from moss.agent_loop import AgentLoop, LLMConfig, LoopResult
 
 try:
     import tomllib
@@ -413,3 +416,118 @@ def list_agents(project_root: Path | None = None) -> list[str]:
             agents.add(p.stem)
 
     return sorted(agents)
+
+
+# ============================================================================
+# Agent Loop Integration
+# ============================================================================
+
+
+def workflow_to_agent_loop(workflow: Workflow) -> "AgentLoop":
+    """Convert a TOML Workflow to an executable AgentLoop.
+
+    This bridges the declarative TOML format with the executable agent loop.
+
+    Args:
+        workflow: Workflow loaded from TOML
+
+    Returns:
+        AgentLoop ready for execution with AgentLoopRunner
+    """
+    from moss.agent_loop import AgentLoop, ErrorAction, LoopStep, StepType
+
+    steps = []
+    for wf_step in workflow.steps:
+        # Convert step type
+        if wf_step.type == "llm":
+            step_type = StepType.LLM
+        elif wf_step.type == "hybrid":
+            step_type = StepType.HYBRID
+        else:
+            step_type = StepType.TOOL
+
+        # Convert error action
+        on_error = ErrorAction.ABORT
+        goto_target = None
+        if wf_step.on_error:
+            if isinstance(wf_step.on_error, str):
+                on_error = ErrorAction[wf_step.on_error.upper()]
+            elif isinstance(wf_step.on_error, dict):
+                action = wf_step.on_error.get("action", "abort")
+                on_error = ErrorAction[action.upper()]
+                goto_target = wf_step.on_error.get("target")
+
+        steps.append(
+            LoopStep(
+                name=wf_step.name,
+                tool=wf_step.tool,
+                step_type=step_type,
+                input_from=wf_step.input_from,
+                on_error=on_error,
+                goto_target=goto_target,
+                max_retries=wf_step.max_retries,
+            )
+        )
+
+    return AgentLoop(
+        name=workflow.name,
+        steps=steps,
+        max_steps=workflow.limits.max_steps,
+        token_budget=workflow.limits.token_budget,
+        timeout_seconds=workflow.limits.timeout_seconds,
+    )
+
+
+def workflow_to_llm_config(workflow: Workflow) -> "LLMConfig":
+    """Convert workflow LLM config to LLMConfig for executor.
+
+    Args:
+        workflow: Workflow with LLM configuration
+
+    Returns:
+        LLMConfig for use with LLMToolExecutor
+    """
+    from moss.agent_loop import LLMConfig
+
+    return LLMConfig(
+        model=workflow.llm.model,
+        temperature=workflow.llm.temperature,
+        system_prompt=workflow.llm.system_prompt,
+    )
+
+
+async def run_workflow(
+    name: str | Path,
+    initial_input: Any = None,
+    project_root: Path | None = None,
+) -> "LoopResult":
+    """Load and run a workflow by name.
+
+    Convenience function that:
+    1. Loads workflow from TOML
+    2. Converts to AgentLoop
+    3. Creates appropriate executor
+    4. Runs and returns result
+
+    Args:
+        name: Workflow name (without .toml) or explicit Path
+        initial_input: Input data for the workflow
+        project_root: Project root for .moss/ lookup
+
+    Returns:
+        LoopResult with execution status and metrics
+    """
+    from moss.agent_loop import AgentLoopRunner, LLMToolExecutor
+
+    # Load workflow
+    workflow = load_workflow(name, project_root)
+
+    # Convert to executable loop
+    loop = workflow_to_agent_loop(workflow)
+    llm_config = workflow_to_llm_config(workflow)
+
+    # Create executor and run
+    executor = LLMToolExecutor(config=llm_config)
+    runner = AgentLoopRunner(executor)
+
+    return await runner.run(loop, initial_input)

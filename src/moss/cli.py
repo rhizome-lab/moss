@@ -3568,6 +3568,149 @@ def cmd_loop(args: Namespace) -> int:
         return 1
 
 
+def cmd_workflow(args: Namespace) -> int:
+    """Manage and run TOML-based workflows.
+
+    Subcommands:
+    - list: Show available workflows
+    - show: Show workflow details
+    - run: Execute a workflow on a file
+    """
+    import asyncio
+
+    from moss.workflows import (
+        list_workflows,
+        load_workflow,
+        workflow_to_agent_loop,
+    )
+
+    output = setup_output(args)
+    action = getattr(args, "action", "list")
+    project_root = Path(getattr(args, "directory", ".")).resolve()
+
+    if action == "list":
+        output.header("Available Workflows")
+        workflows = list_workflows(project_root)
+        if not workflows:
+            output.print("  (none found)")
+        for name in workflows:
+            try:
+                wf = load_workflow(name, project_root)
+                output.print(f"  {name}: {wf.description or '(no description)'}")
+            except Exception as e:
+                output.print(f"  {name}: (error loading: {e})")
+        return 0
+
+    elif action == "show":
+        name = getattr(args, "workflow_name", None)
+        if not name:
+            output.error("Workflow name required")
+            return 1
+
+        try:
+            wf = load_workflow(name, project_root)
+        except FileNotFoundError:
+            output.error(f"Workflow not found: {name}")
+            return 1
+
+        if wants_json(args):
+            output.data(wf.to_dict())
+        else:
+            output.header(f"Workflow: {wf.name}")
+            output.print(f"Description: {wf.description or '(none)'}")
+            output.print(f"Version: {wf.version}")
+            output.print(f"Max steps: {wf.limits.max_steps}")
+            output.print(f"Token budget: {wf.limits.token_budget}")
+            output.print(f"Timeout: {wf.limits.timeout_seconds}s")
+            output.print(f"Model: {wf.llm.model}")
+            output.print("")
+            output.header("Steps")
+            for i, step in enumerate(wf.steps, 1):
+                output.print(f"  {i}. {step.name} ({step.tool})")
+                if step.input_from:
+                    output.print(f"     input_from: {step.input_from}")
+                if step.on_error:
+                    output.print(f"     on_error: {step.on_error}")
+        return 0
+
+    elif action == "run":
+        name = getattr(args, "workflow_name", None)
+        file_path = getattr(args, "file", None)
+        mock = getattr(args, "mock", False)
+
+        if not name:
+            output.error("Workflow name required")
+            return 1
+
+        if not file_path:
+            output.error("File path required. Use --file <path>")
+            return 1
+
+        file_path = Path(file_path).resolve()
+        if not file_path.exists():
+            output.error(f"File not found: {file_path}")
+            return 1
+
+        try:
+            wf = load_workflow(name, project_root)
+        except FileNotFoundError:
+            output.error(f"Workflow not found: {name}")
+            return 1
+
+        output.info(f"Running workflow '{name}' on {file_path.name}...")
+
+        # Convert and run
+        from moss.agent_loop import AgentLoopRunner, LLMConfig, LLMToolExecutor
+
+        loop = workflow_to_agent_loop(wf)
+        config = LLMConfig(
+            model=wf.llm.model,
+            temperature=wf.llm.temperature,
+            system_prompt=wf.llm.system_prompt,
+            mock=mock,
+        )
+        executor = LLMToolExecutor(config=config, root=file_path.parent)
+        runner = AgentLoopRunner(executor)
+
+        async def do_run():
+            return await runner.run(loop, initial_input={"file_path": str(file_path)})
+
+        result = asyncio.run(do_run())
+
+        if wants_json(args):
+            output.data(
+                {
+                    "workflow": name,
+                    "status": result.status.name,
+                    "success": result.success,
+                    "metrics": {
+                        "llm_calls": result.metrics.llm_calls,
+                        "llm_tokens": result.metrics.llm_tokens_in + result.metrics.llm_tokens_out,
+                        "tool_calls": result.metrics.tool_calls,
+                        "wall_time": result.metrics.wall_time_seconds,
+                    },
+                    "error": result.error,
+                }
+            )
+        else:
+            status = "✓" if result.success else "✗"
+            output.print(f"{status} {result.status.name}")
+            output.print(
+                f"  LLM: {result.metrics.llm_calls} calls, "
+                f"{result.metrics.llm_tokens_in + result.metrics.llm_tokens_out} tokens"
+            )
+            output.print(f"  Tools: {result.metrics.tool_calls} calls")
+            output.print(f"  Time: {result.metrics.wall_time_seconds:.2f}s")
+            if result.error:
+                output.error(f"  Error: {result.error}")
+
+        return 0 if result.success else 1
+
+    else:
+        output.error(f"Unknown action: {action}")
+        return 1
+
+
 def cmd_health(args: Namespace) -> int:
     """Show project health and what needs attention."""
     from moss import MossAPI
@@ -5638,6 +5781,38 @@ def create_parser() -> argparse.ArgumentParser:
         help="Loops to benchmark (default: all)",
     )
     loop_parser.set_defaults(func=cmd_loop)
+
+    # workflow command
+    workflow_parser = subparsers.add_parser("workflow", help="Manage and run TOML-based workflows")
+    workflow_parser.add_argument(
+        "action",
+        nargs="?",
+        default="list",
+        choices=["list", "show", "run"],
+        help="Action: list (show workflows), show (details), run (execute)",
+    )
+    workflow_parser.add_argument(
+        "workflow_name",
+        nargs="?",
+        help="Workflow to show/run (e.g., validate-fix)",
+    )
+    workflow_parser.add_argument(
+        "--file",
+        "-f",
+        help="File to process (required for run)",
+    )
+    workflow_parser.add_argument(
+        "--directory",
+        "-d",
+        default=".",
+        help="Project directory for .moss/ lookup (default: current)",
+    )
+    workflow_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock LLM responses (for testing)",
+    )
+    workflow_parser.set_defaults(func=cmd_workflow)
 
     # security command
     security_parser = subparsers.add_parser(

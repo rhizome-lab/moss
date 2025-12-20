@@ -198,3 +198,92 @@ class TestAgentDefinition:
         assert d["name"] == "test"
         assert d["enabled_tools"] == ["skeleton", "grep"]
         assert d["peek_first"] is False
+
+
+class TestWorkflowToAgentLoop:
+    """Tests for workflow -> agent loop conversion."""
+
+    def test_converts_builtin_workflow(self):
+        """Convert validate-fix workflow to AgentLoop."""
+        from moss.workflows import workflow_to_agent_loop
+
+        wf = load_workflow("validate-fix")
+        loop = workflow_to_agent_loop(wf)
+
+        assert loop.name == "validate-fix"
+        assert len(loop.steps) == 3
+        assert loop.max_steps == 10
+        assert loop.token_budget == 50000
+
+    def test_converts_step_types(self):
+        """Step types are converted correctly."""
+        from moss.agent_loop import StepType
+        from moss.workflows import workflow_to_agent_loop
+
+        wf = load_workflow("validate-fix")
+        loop = workflow_to_agent_loop(wf)
+
+        # validate step is tool type
+        assert loop.steps[0].step_type == StepType.TOOL
+        # analyze step is llm type
+        assert loop.steps[1].step_type == StepType.LLM
+        # fix step is tool type
+        assert loop.steps[2].step_type == StepType.TOOL
+
+    def test_converts_error_actions(self):
+        """Error actions are converted correctly."""
+        from moss.agent_loop import ErrorAction
+        from moss.workflows import workflow_to_agent_loop
+
+        wf = load_workflow("validate-fix")
+        loop = workflow_to_agent_loop(wf)
+
+        # validate step has on_error: skip
+        assert loop.steps[0].on_error == ErrorAction.SKIP
+        # fix step has no on_error, defaults to ABORT
+        assert loop.steps[2].on_error == ErrorAction.ABORT
+
+    def test_converts_goto_error_action(self):
+        """GOTO error action with target is converted correctly."""
+        from moss.agent_loop import ErrorAction
+        from moss.workflows import WorkflowStep, workflow_to_agent_loop
+
+        wf = Workflow(
+            name="test",
+            steps=[
+                WorkflowStep(
+                    name="step1",
+                    tool="tool1",
+                    on_error={"action": "goto", "target": "step1"},
+                )
+            ],
+        )
+        loop = workflow_to_agent_loop(wf)
+
+        assert loop.steps[0].on_error == ErrorAction.GOTO
+        assert loop.steps[0].goto_target == "step1"
+
+    def test_converts_input_from(self):
+        """input_from is preserved in conversion."""
+        from moss.workflows import workflow_to_agent_loop
+
+        wf = load_workflow("validate-fix")
+        loop = workflow_to_agent_loop(wf)
+
+        assert loop.steps[1].input_from == "validate"
+        assert loop.steps[2].input_from == "analyze"
+
+
+class TestWorkflowToLLMConfig:
+    """Tests for workflow LLM config conversion."""
+
+    def test_converts_llm_config(self):
+        """LLM config is converted correctly."""
+        from moss.workflows import workflow_to_llm_config
+
+        wf = load_workflow("validate-fix")
+        config = workflow_to_llm_config(wf)
+
+        assert config.model == "gemini/gemini-3-flash-preview"
+        assert config.temperature == 0.0
+        assert config.system_prompt is not None

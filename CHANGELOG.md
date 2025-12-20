@@ -18,6 +18,12 @@
 - User override examples in docs (`docs/workflow-format.md`)
 - 19 tests for workflow loading
 - Integration test for hunk-level rollback with verification failure
+- `workflow_to_agent_loop()` - convert TOML workflows to executable AgentLoop
+- `workflow_to_llm_config()` - convert workflow LLM config to LLMConfig
+- `run_workflow()` - convenience function to load and run a workflow
+- `moss workflow list` - list available workflows
+- `moss workflow show <name>` - show workflow details (human or JSON)
+- `moss workflow run <name> --file <path>` - execute a workflow
 
 **Memory integration in agent loops** (new)
 - `LLMToolExecutor` now accepts `memory: MemoryManager` parameter

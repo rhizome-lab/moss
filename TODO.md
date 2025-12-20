@@ -4,19 +4,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Wire workflow loader into agent loop runner
-2. Add CLI commands for workflow management (`moss workflow list/run`)
-3. Implement Python workflow protocol for complex logic
+1. Implement Python workflow protocol for complex logic
+2. MCP preview size reduction - current preview is ~40 lines, should be 1 line
+3. Wire validate-fix workflow tools to executors
 
 ## Active Backlog
 
 **Large:**
 - [ ] Memory system - layered memory for cross-session learning (see `docs/memory-system.md`)
-- [ ] Workflow/prompt externalization - plugin architecture for agent definitions
-  - TOML format as default plugin, Python workflows remain for complex logic
-  - Move prompts to external files, load at runtime
-  - Enables: workflow composition, agent manipulation, user-defined workflows in `.moss/workflows/`
-  - Tooling opportunities: visualizers, validators, graph editors
+- [ ] Workflow loader plugin abstraction - extract protocol when Python workflows need it
+  - Current: TOML loader is direct implementation
+  - Future: `WorkflowLoader` protocol, entry point registration, multiple loader types
 
 ### Strict Harness (guardrails for all agents)
 
