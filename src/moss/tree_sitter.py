@@ -860,3 +860,48 @@ def is_supported_extension(ext: str) -> bool:
         True if extension is supported
     """
     return ext.lower() in TreeSitterParser.EXTENSION_MAP
+
+
+def get_symbols_at_line(file_path: Path | str, line: int) -> list[str]:
+    """Find symbols (functions, classes) that contain a given line.
+
+    Used for mapping diff hunks to AST nodes.
+
+    Args:
+        file_path: Path to the source file
+        line: 1-indexed line number
+
+    Returns:
+        List of symbol names containing the line, from innermost to outermost.
+        Empty list if no containing symbol or parsing fails.
+    """
+    from pathlib import Path
+
+    file_path = Path(file_path)
+    if not file_path.exists():
+        return []
+
+    ext = file_path.suffix
+    if not is_supported_extension(ext):
+        return []
+
+    try:
+        source = file_path.read_text()
+        skeleton = TreeSitterSkeletonProvider()
+        symbols = skeleton.extract_skeleton(source)
+    except Exception:
+        return []
+
+    def find_containing(syms: list[TSSymbol], target_line: int) -> list[str]:
+        """Recursively find symbols containing the line."""
+        result = []
+        for sym in syms:
+            if sym.line <= target_line <= sym.end_line:
+                # Check children first (inner symbols)
+                child_matches = find_containing(sym.children, target_line)
+                if child_matches:
+                    result.extend(child_matches)
+                result.append(sym.name)
+        return result
+
+    return find_containing(symbols, line)

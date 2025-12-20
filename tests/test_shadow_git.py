@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from moss.shadow_git import CommitHandle, GitError, ShadowGit
+from moss.shadow_git import CommitHandle, DiffHunk, GitError, ShadowGit, parse_diff
 
 
 @pytest.fixture
@@ -262,3 +262,163 @@ class TestCommitHandle:
         )
         with pytest.raises(AttributeError):
             handle.sha = "def456"  # type: ignore[misc]
+
+
+class TestDiffHunk:
+    """Tests for DiffHunk dataclass."""
+
+    def test_is_addition(self):
+        hunk = DiffHunk(
+            file_path="test.py",
+            old_start=0,
+            old_count=0,
+            new_start=1,
+            new_count=3,
+            content="+line1\n+line2\n+line3",
+            header="@@ -0,0 +1,3 @@",
+        )
+        assert hunk.is_addition
+        assert not hunk.is_deletion
+
+    def test_is_deletion(self):
+        hunk = DiffHunk(
+            file_path="test.py",
+            old_start=1,
+            old_count=3,
+            new_start=0,
+            new_count=0,
+            content="-line1\n-line2\n-line3",
+            header="@@ -1,3 +0,0 @@",
+        )
+        assert hunk.is_deletion
+        assert not hunk.is_addition
+
+    def test_lines_changed(self):
+        hunk = DiffHunk(
+            file_path="test.py",
+            old_start=1,
+            old_count=2,
+            new_start=1,
+            new_count=2,
+            content="-old line\n+new line\n context",
+            header="@@ -1,2 +1,2 @@",
+        )
+        removed, added = hunk.lines_changed()
+        assert removed == ["old line"]
+        assert added == ["new line"]
+
+
+class TestParseDiff:
+    """Tests for parse_diff function."""
+
+    def test_parse_simple_diff(self):
+        diff = """diff --git a/file.txt b/file.txt
+index abc123..def456 100644
+--- a/file.txt
++++ b/file.txt
+@@ -1,3 +1,4 @@
+ line1
++new line
+ line2
+ line3"""
+        hunks = parse_diff(diff)
+        assert len(hunks) == 1
+        assert hunks[0].file_path == "file.txt"
+        assert hunks[0].old_start == 1
+        assert hunks[0].new_count == 4
+
+    def test_parse_multiple_hunks(self):
+        diff = """diff --git a/file.txt b/file.txt
+--- a/file.txt
++++ b/file.txt
+@@ -1,3 +1,4 @@
+ line1
++added
+ line2
+@@ -10,2 +11,3 @@
+ line10
++another
+ line11"""
+        hunks = parse_diff(diff)
+        assert len(hunks) == 2
+        assert hunks[0].old_start == 1
+        assert hunks[1].old_start == 10
+
+    def test_parse_multiple_files(self):
+        diff = """diff --git a/file1.txt b/file1.txt
+--- a/file1.txt
++++ b/file1.txt
+@@ -1 +1,2 @@
+ line1
++added
+diff --git a/file2.txt b/file2.txt
+--- a/file2.txt
++++ b/file2.txt
+@@ -1 +1 @@
+-old
++new"""
+        hunks = parse_diff(diff)
+        assert len(hunks) == 2
+        assert hunks[0].file_path == "file1.txt"
+        assert hunks[1].file_path == "file2.txt"
+
+
+class TestHunkLevelRollback:
+    """Tests for hunk-level rollback functionality."""
+
+    async def test_get_hunks(self, shadow_git: ShadowGit, git_repo: Path):
+        branch = await shadow_git.create_shadow_branch("shadow/test")
+
+        # Create a file with multiple lines
+        (git_repo / "code.py").write_text("line1\nline2\nline3\n")
+        await shadow_git.commit(branch, "Add code")
+
+        hunks = await shadow_git.get_hunks(branch)
+
+        assert len(hunks) >= 1
+        assert hunks[0].file_path == "code.py"
+
+    async def test_rollback_hunks_single(self, shadow_git: ShadowGit, git_repo: Path):
+        # Start on master, create file
+        (git_repo / "code.py").write_text("line1\nline2\nline3\n")
+        await shadow_git._run_git("add", "-A")
+        await shadow_git._run_git("commit", "-m", "Add code")
+
+        branch = await shadow_git.create_shadow_branch("shadow/test")
+
+        # Modify two separate parts
+        (git_repo / "code.py").write_text("NEW1\nline2\nNEW3\n")
+        await shadow_git.commit(branch, "Modify code")
+
+        hunks = await shadow_git.get_hunks(branch)
+
+        # Revert only the first hunk
+        if hunks:
+            reverted = await shadow_git.rollback_hunks(branch, [hunks[0]])
+            assert reverted >= 1
+
+    async def test_rollback_hunks_preserves_others(self, shadow_git: ShadowGit, git_repo: Path):
+        # Create two files on master
+        (git_repo / "keep.txt").write_text("keep this\n")
+        (git_repo / "revert.txt").write_text("revert this\n")
+        await shadow_git._run_git("add", "-A")
+        await shadow_git._run_git("commit", "-m", "Add files")
+
+        branch = await shadow_git.create_shadow_branch("shadow/test")
+
+        # Modify both files
+        (git_repo / "keep.txt").write_text("modified keep\n")
+        (git_repo / "revert.txt").write_text("modified revert\n")
+        await shadow_git.commit(branch, "Modify both")
+
+        hunks = await shadow_git.get_hunks(branch)
+
+        # Find and revert only the revert.txt hunk
+        revert_hunks = [h for h in hunks if h.file_path == "revert.txt"]
+        if revert_hunks:
+            await shadow_git.rollback_hunks(branch, revert_hunks)
+
+            # keep.txt should still be modified
+            assert "modified keep" in (git_repo / "keep.txt").read_text()
+            # revert.txt should be reverted
+            assert "revert this" in (git_repo / "revert.txt").read_text()

@@ -6,11 +6,122 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import subprocess
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
+
+
+@dataclass(frozen=True)
+class DiffHunk:
+    """A single hunk from a git diff.
+
+    Represents a contiguous block of changes in a file.
+    """
+
+    file_path: str
+    old_start: int  # Starting line in old file
+    old_count: int  # Number of lines in old file
+    new_start: int  # Starting line in new file
+    new_count: int  # Number of lines in new file
+    content: str  # Raw hunk content including +/- prefixes
+    header: str  # The @@ line
+    symbol: str | None = None  # Containing AST symbol (set by map_hunks_to_symbols)
+
+    @property
+    def is_addition(self) -> bool:
+        """True if this hunk only adds lines."""
+        return self.old_count == 0
+
+    @property
+    def is_deletion(self) -> bool:
+        """True if this hunk only removes lines."""
+        return self.new_count == 0
+
+    def lines_changed(self) -> tuple[list[str], list[str]]:
+        """Get (removed_lines, added_lines) from the hunk."""
+        removed = []
+        added = []
+        for line in self.content.split("\n"):
+            if line.startswith("-") and not line.startswith("---"):
+                removed.append(line[1:])
+            elif line.startswith("+") and not line.startswith("+++"):
+                added.append(line[1:])
+        return removed, added
+
+
+def parse_diff(diff_output: str) -> list[DiffHunk]:
+    """Parse git diff output into individual hunks.
+
+    Args:
+        diff_output: Raw output from git diff
+
+    Returns:
+        List of DiffHunk objects
+    """
+    hunks: list[DiffHunk] = []
+    current_file: str | None = None
+
+    # Pattern for diff header
+    file_pattern = re.compile(r"^diff --git a/(.*) b/(.*)$")
+    # Pattern for hunk header: @@ -old_start,old_count +new_start,new_count @@
+    hunk_pattern = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$")
+
+    lines = diff_output.split("\n")
+    i = 0
+
+    while i < len(lines):
+        line = lines[i]
+
+        # Check for new file
+        file_match = file_pattern.match(line)
+        if file_match:
+            current_file = file_match.group(2)
+            i += 1
+            continue
+
+        # Check for hunk
+        hunk_match = hunk_pattern.match(line)
+        if hunk_match and current_file:
+            old_start = int(hunk_match.group(1))
+            old_count = int(hunk_match.group(2) or "1")
+            new_start = int(hunk_match.group(3))
+            new_count = int(hunk_match.group(4) or "1")
+            header = line
+
+            # Collect hunk content
+            content_lines = []
+            i += 1
+            while i < len(lines):
+                next_line = lines[i]
+                # Stop at next hunk, file, or end
+                if (
+                    next_line.startswith("@@")
+                    or next_line.startswith("diff --git")
+                    or (not next_line and i + 1 < len(lines) and lines[i + 1].startswith("diff"))
+                ):
+                    break
+                content_lines.append(next_line)
+                i += 1
+
+            hunks.append(
+                DiffHunk(
+                    file_path=current_file,
+                    old_start=old_start,
+                    old_count=old_count,
+                    new_start=new_start,
+                    new_count=new_count,
+                    content="\n".join(content_lines),
+                    header=header,
+                )
+            )
+            continue
+
+        i += 1
+
+    return hunks
 
 
 class GitError(Exception):
@@ -224,6 +335,109 @@ class ShadowGit:
         """Get diff stat of changes on shadow branch."""
         result = await self._run_git("diff", "--stat", f"{branch.base_branch}...{branch.name}")
         return result.stdout
+
+    async def get_hunks(self, branch: ShadowBranch) -> list[DiffHunk]:
+        """Get all diff hunks for the shadow branch.
+
+        Parses the diff into individual hunks for fine-grained analysis.
+        """
+        diff_output = await self.diff(branch)
+        return parse_diff(diff_output)
+
+    async def map_hunks_to_symbols(self, hunks: list[DiffHunk]) -> list[DiffHunk]:
+        """Map each hunk to its containing AST symbol.
+
+        Uses tree-sitter to find the function/class containing each hunk.
+
+        Returns:
+            New list of DiffHunk objects with symbol field populated.
+        """
+        from dataclasses import replace
+
+        try:
+            from moss.tree_sitter import get_symbols_at_line
+        except ImportError:
+            # tree-sitter not available, return hunks unchanged
+            return hunks
+
+        result = []
+        for hunk in hunks:
+            file_path = self.repo_path / hunk.file_path
+            if not file_path.exists():
+                result.append(hunk)
+                continue
+
+            # Find symbol at the start of the hunk (new file line numbers)
+            try:
+                symbols = get_symbols_at_line(file_path, hunk.new_start)
+                symbol_name = symbols[0] if symbols else None
+            except Exception:
+                symbol_name = None
+
+            result.append(replace(hunk, symbol=symbol_name))
+
+        return result
+
+    async def rollback_hunks(
+        self,
+        branch: ShadowBranch,
+        hunks_to_revert: list[DiffHunk],
+    ) -> int:
+        """Selectively revert specific hunks while keeping others.
+
+        This is more surgical than commit-level rollback - keeps passing
+        changes while reverting only the problematic hunks.
+
+        Args:
+            branch: The shadow branch to modify
+            hunks_to_revert: List of hunks to revert (must be from get_hunks)
+
+        Returns:
+            Number of hunks actually reverted
+        """
+        if not hunks_to_revert:
+            return 0
+
+        current = await self._get_current_branch()
+        if current != branch.name:
+            await self._run_git("checkout", branch.name)
+
+        reverted = 0
+
+        # Group hunks by file for efficiency
+        by_file: dict[str, list[DiffHunk]] = {}
+        for hunk in hunks_to_revert:
+            by_file.setdefault(hunk.file_path, []).append(hunk)
+
+        for file_path, file_hunks in by_file.items():
+            full_path = self.repo_path / file_path
+
+            if not full_path.exists():
+                continue
+
+            # Read current file content
+            content = full_path.read_text()
+            lines = content.split("\n")
+
+            # Sort hunks by line number descending (revert from bottom up)
+            file_hunks.sort(key=lambda h: h.new_start, reverse=True)
+
+            for hunk in file_hunks:
+                removed, _added = hunk.lines_changed()
+
+                # Calculate the range to replace
+                # new_start is 1-indexed, convert to 0-indexed
+                start_idx = hunk.new_start - 1
+                end_idx = start_idx + hunk.new_count
+
+                # Replace added lines with removed lines
+                lines[start_idx:end_idx] = removed
+                reverted += 1
+
+            # Write back
+            full_path.write_text("\n".join(lines))
+
+        return reverted
 
     def get_branch(self, name: str) -> ShadowBranch | None:
         """Get a tracked shadow branch by name."""

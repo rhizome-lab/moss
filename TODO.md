@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Hunk-level rollback for shadow_git
+(Queue empty - pick from Active Backlog)
 
 ## Active Backlog
 
@@ -34,10 +34,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Must `expand` before `edit` - enforced in agent loop (`MossToolExecutor.enforce_peek_first`)
 - [x] Prevents hallucination of function bodies
 
-**Hunk-Level Rollback (shadow_git enhancement):**
-- [ ] Map diff hunks to AST nodes
-- [ ] On verification failure, cherry-pick passing hunks, revert failing ones
-- [ ] More surgical than commit-level rollback
+**Hunk-Level Rollback:** (done - see `src/moss/shadow_git.py`)
+- [x] `DiffHunk` dataclass and `parse_diff()` for diff parsing
+- [x] `get_hunks()` - parse branch diff into hunks
+- [x] `map_hunks_to_symbols()` - map hunks to AST nodes via tree-sitter
+- [x] `rollback_hunks()` - selectively revert specific hunks
 
 ## Future Work
 
