@@ -47,6 +47,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
    - [x] Add `--profile` flag to CLI for timing breakdown
    - [ ] Error recovery when index is corrupted
    - [ ] Graceful degradation when daemon unavailable
+   - [ ] Index invalidation (inotify/file watching for auto-refresh)
 
 ## Active Backlog
 

@@ -272,15 +272,50 @@ impl FileIndex {
     }
 
     /// Find callers of a symbol by name (from call graph)
+    /// Uses case-insensitive matching and supports partial matches
     pub fn find_callers(&self, symbol_name: &str) -> rusqlite::Result<Vec<(String, String, usize)>> {
+        // Try exact match first
         let mut stmt = self.conn.prepare(
             "SELECT caller_file, caller_symbol, line FROM calls WHERE callee_name = ?1"
         )?;
-        let callers = stmt
+        let callers: Vec<(String, String, usize)> = stmt
             .query_map(params![symbol_name], |row| {
                 Ok((row.get(0)?, row.get(1)?, row.get(2)?))
             })?
-            .collect::<Result<Vec<_>, _>>()?;
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if !callers.is_empty() {
+            return Ok(callers);
+        }
+
+        // Try case-insensitive match
+        let mut stmt = self.conn.prepare(
+            "SELECT caller_file, caller_symbol, line FROM calls WHERE LOWER(callee_name) = LOWER(?1)"
+        )?;
+        let callers: Vec<(String, String, usize)> = stmt
+            .query_map(params![symbol_name], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if !callers.is_empty() {
+            return Ok(callers);
+        }
+
+        // Try LIKE pattern match (contains)
+        let pattern = format!("%{}%", symbol_name);
+        let mut stmt = self.conn.prepare(
+            "SELECT caller_file, caller_symbol, line FROM calls WHERE LOWER(callee_name) LIKE LOWER(?1) LIMIT 100"
+        )?;
+        let callers = stmt
+            .query_map(params![pattern], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
         Ok(callers)
     }
 

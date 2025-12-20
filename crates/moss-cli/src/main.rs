@@ -708,55 +708,85 @@ fn cmd_callers(symbol: &str, root: Option<&Path>, json: bool, profiler: &mut Pro
     // Try index first (fast path)
     if let Ok(idx) = index::FileIndex::open(&root) {
         profiler.mark("open_index");
-        if let Ok(callers) = idx.find_callers(symbol) {
-            profiler.mark("index_query");
-            if !callers.is_empty() {
-                if json {
-                    let output: Vec<_> = callers
-                        .iter()
-                        .map(|(file, sym, line)| serde_json::json!({"file": file, "symbol": sym, "line": line}))
-                        .collect();
-                    println!("{}", serde_json::to_string(&output).unwrap());
-                } else {
-                    println!("Callers of {}:", symbol);
-                    for (file, sym, line) in &callers {
-                        println!("  {}:{}:{}", file, line, sym);
+
+        // Check if call graph is populated
+        let (symbols, calls) = idx.call_graph_stats().unwrap_or((0, 0));
+        if calls > 0 {
+            // Index is populated - use it exclusively (don't fall back to slow scan)
+            if let Ok(callers) = idx.find_callers(symbol) {
+                profiler.mark("index_query");
+                if !callers.is_empty() {
+                    if json {
+                        let output: Vec<_> = callers
+                            .iter()
+                            .map(|(file, sym, line)| serde_json::json!({"file": file, "symbol": sym, "line": line}))
+                            .collect();
+                        println!("{}", serde_json::to_string(&output).unwrap());
+                    } else {
+                        println!("Callers of {}:", symbol);
+                        for (file, sym, line) in &callers {
+                            println!("  {}:{}:{}", file, line, sym);
+                        }
                     }
+                    return 0;
                 }
-                return 0;
             }
+            // Index populated but no results - symbol not called anywhere
+            eprintln!("No callers found for: {} (index: {} symbols, {} calls)", symbol, symbols, calls);
+            return 1;
         }
     }
     profiler.mark("index_miss");
 
-    // Fall back to file scan (slow path)
-    let all_paths = path_resolve::all_files(&root);
-    profiler.mark("list_files");
-    let files: Vec<_> = all_paths.into_iter().map(|m| (m.path, m.kind == "directory")).collect();
+    // Index empty - auto-reindex (faster than file scan)
+    eprintln!("Call graph not indexed. Building now (one-time)...");
 
-    let mut parser = symbols::SymbolParser::new();
-    let callers = parser.find_callers(&root, &files, symbol);
-    profiler.mark("find_callers");
+    if let Ok(mut idx) = index::FileIndex::open(&root) {
+        // Ensure file index is populated first
+        if idx.needs_refresh() {
+            if let Err(e) = idx.refresh() {
+                eprintln!("Failed to refresh file index: {}", e);
+                return 1;
+            }
+        }
+        profiler.mark("file_index");
 
-    if callers.is_empty() {
-        eprintln!("No callers found for: {}", symbol);
-        return 1;
-    }
+        // Now build call graph
+        match idx.refresh_call_graph() {
+            Ok((symbols, calls)) => {
+                eprintln!("Indexed {} symbols, {} calls", symbols, calls);
+                profiler.mark("call_graph");
 
-    if json {
-        let output: Vec<_> = callers
-            .iter()
-            .map(|(file, sym)| serde_json::json!({"file": file, "symbol": sym}))
-            .collect();
-        println!("{}", serde_json::to_string(&output).unwrap());
-    } else {
-        println!("Callers of {}:", symbol);
-        for (file, sym) in &callers {
-            println!("  {}:{}", file, sym);
+                // Retry the query
+                if let Ok(callers) = idx.find_callers(symbol) {
+                    if !callers.is_empty() {
+                        if json {
+                            let output: Vec<_> = callers
+                                .iter()
+                                .map(|(file, sym, line)| serde_json::json!({"file": file, "symbol": sym, "line": line}))
+                                .collect();
+                            println!("{}", serde_json::to_string(&output).unwrap());
+                        } else {
+                            println!("Callers of {}:", symbol);
+                            for (file, sym, line) in &callers {
+                                println!("  {}:{}:{}", file, line, sym);
+                            }
+                        }
+                        return 0;
+                    }
+                }
+                eprintln!("No callers found for: {}", symbol);
+                return 1;
+            }
+            Err(e) => {
+                eprintln!("Failed to build call graph: {}", e);
+                return 1;
+            }
         }
     }
 
-    0
+    eprintln!("Failed to open index");
+    1
 }
 
 fn cmd_tree(path: &str, root: Option<&Path>, depth: Option<usize>, dirs_only: bool, json: bool) -> i32 {
