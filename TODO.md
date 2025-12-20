@@ -28,7 +28,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
    - [x] CLI auto-start daemon on first query if not running
    - [x] Add daemon `status`/`shutdown`/`start` subcommands to CLI
    - [x] Daemon auto-shutdown after idle timeout (default 10 min)
-   - [ ] Handle large query responses (streaming/chunking)
+   - [x] Handle large query responses (streaming/chunking)
 
 3. **Reference tracing** - AST-based callers/callees
    - [ ] Store call graph in SQLite (caller_symbol, callee_name, file, line)

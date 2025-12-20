@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::Path;
 use std::time::Duration;
@@ -106,11 +106,13 @@ impl DaemonClient {
         let mut stream = UnixStream::connect(&self.socket_path)
             .map_err(|e| format!("Failed to connect to daemon: {}", e))?;
 
+        // Use reasonable per-operation timeouts - these reset on each read/write
+        // For truly long operations, chunked responses handle progress
         stream
-            .set_read_timeout(Some(Duration::from_secs(30)))
+            .set_read_timeout(Some(Duration::from_secs(120)))
             .ok();
         stream
-            .set_write_timeout(Some(Duration::from_secs(5)))
+            .set_write_timeout(Some(Duration::from_secs(10)))
             .ok();
 
         let request_json = serde_json::to_string(request)
@@ -123,13 +125,70 @@ impl DaemonClient {
             .write_all(b"\n")
             .map_err(|e| format!("Failed to send newline: {}", e))?;
 
-        let mut reader = BufReader::new(stream);
+        let mut reader = BufReader::new(&stream);
         let mut response_line = String::new();
         reader
             .read_line(&mut response_line)
             .map_err(|e| format!("Failed to read response: {}", e))?;
 
+        // Check if response indicates chunked transfer
+        if response_line.contains("\"chunked\":true") {
+            // Need mutable access to underlying stream for timeout adjustment
+            drop(reader);
+            let mut stream = stream;
+            return self.read_chunked_response(&mut stream, &response_line);
+        }
+
         serde_json::from_str(&response_line)
+            .map_err(|e| format!("Failed to parse response: {}", e))
+    }
+
+    fn read_chunked_response(&self, stream: &mut UnixStream, header: &str) -> Result<Response, String> {
+        // Parse header to get total size
+        #[derive(Deserialize)]
+        struct ChunkedHeader {
+            chunked: bool,
+            total_size: usize,
+        }
+
+        let header_info: ChunkedHeader = serde_json::from_str(header)
+            .map_err(|e| format!("Failed to parse chunked header: {}", e))?;
+
+        if !header_info.chunked {
+            return Err("Invalid chunked header".to_string());
+        }
+
+        // For chunked transfer, use longer per-chunk timeout since data is streaming
+        // Each chunk proves the daemon is alive, so we just need reasonable timeout
+        // between chunks (5 minutes should handle even slow analysis)
+        stream.set_read_timeout(Some(Duration::from_secs(300))).ok();
+
+        // Read length-prefixed chunks until we get all data
+        let mut data = Vec::with_capacity(header_info.total_size);
+        let mut length_buf = [0u8; 4];
+
+        loop {
+            stream
+                .read_exact(&mut length_buf)
+                .map_err(|e| format!("Failed to read chunk length: {}", e))?;
+
+            let chunk_len = u32::from_be_bytes(length_buf) as usize;
+            if chunk_len == 0 {
+                break; // End of chunks
+            }
+
+            let mut chunk = vec![0u8; chunk_len];
+            stream
+                .read_exact(&mut chunk)
+                .map_err(|e| format!("Failed to read chunk data: {}", e))?;
+
+            data.extend_from_slice(&chunk);
+        }
+
+        let response_str = String::from_utf8(data)
+            .map_err(|e| format!("Invalid UTF-8 in response: {}", e))?;
+
+        serde_json::from_str(&response_str)
             .map_err(|e| format!("Failed to parse response: {}", e))
     }
 

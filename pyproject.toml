@@ -9,6 +9,7 @@ dependencies = []
 [project.scripts]
 moss = "moss.cli:main"
 moss-server = "moss.server.app:main"
+moss-daemon = "moss.server.daemon:main"
 moss-mcp = "moss.mcp_server:main"
 moss-mcp-full = "moss.mcp_server_full:main"
 
