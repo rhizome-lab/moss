@@ -4,14 +4,19 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Investigate `moss clones` output format
-  - Level 0: same-named clones are real copy-paste (working correctly)
-  - Level 2: shows different-named functions with same body (property getters, etc.)
-  - Question: improve output to show WHY code matches (diff-style highlighting?)
+- Fix remaining 14 clone groups (~30 clones total)
+  - `metadata` property clones across plugin generators (consider PluginMetadataMixin)
+  - `supports` method clones in skeleton.py/dependencies.py
+  - `api` property clones in lsp.py/http.py generators
 - Architect/Editor split - separate reasoning from editing in agent loop
 - Terminal subagent with persistent shell session
 
 ## Recently Completed
+
+- **Clone elimination** (Dec 2025):
+  - Reduced clones from 56→30 (46% reduction) using mixins and shared utilities
+  - PathResolvingMixin, EventEmitterMixin, WorkspaceRunner base class
+  - `moss clones` now shows full relative paths (e.g. `src/moss/foo.py:42-50`)
 
 - **Memory plugin system** (Dec 2025):
   - `MemoryPlugin` protocol for extensible memory sources
