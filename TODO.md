@@ -17,6 +17,28 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] Sessions as first-class - resumable, observable work units
 - [ ] Memory system - layered memory for cross-session learning (see `docs/memory-system.md`)
 
+### Strict Harness (guardrails for all agents)
+
+**Signal-Only Diagnostics:**
+- [ ] Parse `cargo check --message-format=json` instead of raw stderr
+- [ ] Extract: error code, message, file/line, suggestion - discard ASCII art
+- [ ] "Syntax Repair Engine" system prompt when errors present
+
+**Degraded Mode (AST fallback):**
+- [ ] Wrap tree-sitter parse in Result
+- [ ] On parse failure, fallback to "Text Window" mode (raw lines around error location)
+- [ ] Never block read access due to parse failures
+
+**Peek-First Policy:**
+- [ ] Constraint: agent cannot edit symbol only seen as skeleton
+- [ ] Must `expand` before `edit` - enforced in agent loop
+- [ ] Prevents hallucination of function bodies
+
+**Hunk-Level Rollback (shadow_git enhancement):**
+- [ ] Map diff hunks to AST nodes
+- [ ] On verification failure, cherry-pick passing hunks, revert failing ones
+- [ ] More surgical than commit-level rollback
+
 ## Future Work
 
 ### Codebase Tree Consolidation (see `docs/codebase-tree.md`)
