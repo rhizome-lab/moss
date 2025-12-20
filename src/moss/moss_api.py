@@ -2537,77 +2537,39 @@ class SearchAPI:
         limit: int = 100,
         ignore_case: bool = False,
     ) -> GrepResult:
-        """Search for text patterns in files.
-
-        Uses the Rust CLI for fast pattern matching if available,
-        falls back to pure Python otherwise.
+        """Search for text patterns in files using Rust CLI.
 
         Args:
             pattern: Regex pattern to search for
             path: Directory to search in (defaults to project root)
             glob: Glob pattern to filter files (e.g., "*.py", "**/*.ts")
-            context_lines: Number of context lines before/after match
+            context_lines: Number of context lines before/after match (unused)
             limit: Maximum number of matches to return
             ignore_case: If True, perform case-insensitive matching
 
         Returns:
             GrepResult with matches and statistics
         """
+        import json
+        import subprocess
+
         search_path = Path(path) if path else self.root
         if not search_path.is_absolute():
             search_path = self.root / search_path
 
-        # Try Rust CLI first
-        result = self._grep_rust_cli(pattern, search_path, glob, limit, ignore_case)
-        if result is not None:
-            return result
-
-        # Fallback to pure Python
-        return self._grep_python(pattern, search_path, glob, limit, ignore_case)
-
-    def _grep_rust_cli(
-        self,
-        pattern: str,
-        search_path: Path,
-        glob: str | None,
-        limit: int,
-        ignore_case: bool,
-    ) -> GrepResult | None:
-        """Search using Rust CLI. Returns None if not available."""
-        import json
-        import shutil
-        import subprocess
-
-        moss_path = shutil.which("moss")
-        if not moss_path:
-            return None
-
-        cmd = [moss_path, "grep", "--json", "-l", str(limit)]
+        cmd = ["moss", "grep", "--json", "-l", str(limit)]
         if ignore_case:
             cmd.append("-i")
         if glob:
             cmd.extend(["--glob", glob])
         cmd.extend([pattern, "-r", str(search_path)])
 
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            return None
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
-        if result.returncode != 0:
-            # Command not found or failed - fall back
-            return None
+        if result.returncode != 0 or not result.stdout.strip():
+            return GrepResult(matches=[], total_matches=0, files_searched=0)
 
-        try:
-            data = json.loads(result.stdout)
-        except json.JSONDecodeError:
-            return None
-
+        data = json.loads(result.stdout)
         matches = [
             GrepMatch(
                 file_path=m["file"],
@@ -2623,85 +2585,6 @@ class SearchAPI:
             matches=matches,
             total_matches=data.get("total_matches", len(matches)),
             files_searched=data.get("files_searched", 0),
-        )
-
-    def _grep_python(
-        self,
-        pattern: str,
-        search_path: Path,
-        glob: str | None,
-        limit: int,
-        ignore_case: bool,
-    ) -> GrepResult:
-        """Pure Python fallback for grep."""
-        import re
-
-        flags = re.IGNORECASE if ignore_case else 0
-        try:
-            regex = re.compile(pattern, flags)
-        except re.error:
-            return GrepResult(matches=[], total_matches=0, files_searched=0)
-
-        matches: list[GrepMatch] = []
-        files_searched = 0
-        total_matches = 0
-
-        file_pattern = glob or "**/*"
-
-        for file_path in search_path.glob(file_pattern):
-            if not file_path.is_file():
-                continue
-
-            # Skip binary files and hidden dirs
-            parts = file_path.parts
-            skip_dirs = ("venv", "node_modules", "__pycache__")
-            if any(p.startswith(".") or p in skip_dirs for p in parts):
-                continue
-
-            # Skip common binary extensions
-            binary_exts = (
-                ".pyc",
-                ".pyo",
-                ".so",
-                ".dll",
-                ".exe",
-                ".bin",
-                ".jpg",
-                ".png",
-                ".gif",
-                ".pdf",
-            )
-            if file_path.suffix.lower() in binary_exts:
-                continue
-
-            try:
-                content = file_path.read_text(errors="ignore")
-            except Exception:
-                continue
-
-            files_searched += 1
-            lines = content.split("\n")
-
-            for i, line in enumerate(lines, 1):
-                match = regex.search(line)
-                if match:
-                    total_matches += 1
-                    if len(matches) < limit:
-                        rel_path = str(file_path.relative_to(self.root))
-                        matches.append(
-                            GrepMatch(
-                                file_path=rel_path,
-                                line_number=i,
-                                line_content=line,
-                                match_start=match.start(),
-                                match_end=match.end(),
-                            )
-                        )
-
-        return GrepResult(
-            matches=matches,
-            total_matches=total_matches,
-            files_searched=files_searched,
         )
 
     def find_files(

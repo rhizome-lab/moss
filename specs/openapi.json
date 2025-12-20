@@ -1832,7 +1832,7 @@
     },
     "/search/grep": {
       "post": {
-        "description": "Search for text patterns in files. Uses the Rust CLI for fast pattern matching if available, falls back to pure Python otherwise. GrepResult with matches and statistics",
+        "description": "Search for text patterns in files using Rust CLI. GrepResult with matches and statistics",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1840,7 +1840,7 @@
                 "properties": {
                   "context_lines": {
                     "default": 0,
-                    "description": "Number of context lines before/after match",
+                    "description": "Number of context lines before/after match (unused)",
                     "type": "integer"
                   },
                   "glob": {
@@ -1880,7 +1880,7 @@
             "description": "Successful response"
           }
         },
-        "summary": "Search for text patterns in files",
+        "summary": "Search for text patterns in files using Rust CLI",
         "tags": [
           "search"
         ]
