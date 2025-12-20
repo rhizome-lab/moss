@@ -4,29 +4,33 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Wire DWIMLoop into CLI (`moss agent` command)
-2. Add context truncation/summarization for long loops
-3. Evaluate DWIMLoop on test tasks
+1. Implement TaskTree - recursive breakdown, path-based context, notes with TTL
+2. Refactor DWIMLoop to context-excluded model (use TaskTree, no conversation history)
+3. Wire DWIMLoop into CLI (`moss agent` command)
+4. Evaluate DWIMLoop on test tasks
 
 ## Recently Completed
 
+- **Hierarchical context model** (see `docs/agentic-loop.md`):
+  - Context-excluded by default - no conversation history accumulation
+  - Path-based state: Task → Subtask → Current step (arbitrary depth)
+  - Notes with expiration conditions (on_done, after:N_turns, manual)
+  - Recursive breakdown as fundamental agent behavior
+- **Optional dependencies cleanup**:
+  - Removed `gemini` extra (use litellm instead, no direct provider)
+  - Removed `grpc` extra (unused)
+  - Made `rag` alias for `chroma` (backward compat)
+  - Simplified `all` group
 - **DWIM-driven agent loop** (`src/moss/dwim_loop.py`):
   - `parse_intent()` - extracts verb + target from terse commands
   - `DWIMLoop` class - full agent loop with LLM → DWIM → execute → result cycle
   - Terse command format: "skeleton foo.py", "expand Patch", "fix: add null check", "done"
   - No tool schemas in prompts - 90%+ token reduction vs function calling
-- **Workflow execution blockers fixed**:
-  - Added `validator.run` alias for `validation.validate`
-  - Added `parse.patch` tool to convert LLM text output to Patch objects
-  - Workflow: validate → analyze (LLM) → parse → fix
-- **MCP resource reading failure**: Claude Code bug, not moss. ReadMcpResourceTool accesses `.content` but MCP's TextResourceContents has `.text` field
-- **Optional dependencies reviewed**: extras are well-organized. `all` includes common features, excludes dev/docs/eval/llm-lib/local-llm/grpc by design
 - **DWIM heuristics improved**:
   - Keyword scoring: reward matches rather than penalize tools with many keywords
   - First-word action boost: 30% bonus when first word matches a keyword
-  - Exact name boost: 40% bonus when first word is the tool name (e.g., "skeleton foo.py")
-  - Common verbs exemption: generic verbs (search, find, show) don't get name boost
-  - Scores improved from 0.29→0.83 for direct commands, query now wins for semantic matches
+  - Exact name boost: 40% bonus when first word is the tool name
+  - Scores improved from 0.29→0.83 for direct commands
 
 ## Active Backlog
 
@@ -93,6 +97,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] `moss expand` - when multiple matches, pick best or show numbered list
 - [ ] General pattern: all symbol-targeting commands (`expand`, `callers`, `callees`, `deps`) accept flexible args
 - [ ] DWIM for CLI args - detect file path vs symbol name automatically
+- [ ] Smart TOML navigation - parse to JSON, use jq-like filtering for config exploration
 
 ### Workflow Collaboration
 - [ ] Pattern detection - heuristic (frequency, similarity, rapid re-runs) + LLM for judgment
@@ -120,6 +125,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] `moss patterns` - detect architectural patterns
 - [ ] `moss refactor` - detect opportunities, apply with rope/libcst
 - [ ] `moss review` - PR analysis using rules + LLM
+
+### Plugin Simplification
+- [ ] LLM providers: choose consistent approach
+  - Option A: keep direct SDKs → add gemini.py for parity
+  - Option B: litellm only → remove anthropic.py, openai.py
+  - Evaluate: does direct SDK offer anything litellm doesn't?
+- [ ] Linter plugins: evaluate generic SARIF runner vs per-tool plugins
+  - Tools with SARIF → generic runner
+  - Tools with custom JSON → minimal parser
+  - Special invocation needs → keep plugin
 
 ### Dependency Introspection
 - [ ] `moss external-deps` improvements - filtering, show which features include a dep

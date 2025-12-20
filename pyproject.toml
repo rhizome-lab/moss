@@ -73,7 +73,7 @@ chroma = [
     "chromadb>=0.4",
 ]
 rag = [
-    "chromadb>=0.4",
+    "moss[chroma]",  # alias for backward compat
 ]
 server = [
     "fastapi>=0.124.4",
@@ -95,9 +95,7 @@ anthropic = [
 openai = [
     "openai>=1.0.0",
 ]
-gemini = [
-    "google-genai>=1.0.0",
-]
+# gemini: use litellm instead (no direct provider)
 dotenv = [
     "python-dotenv>=1.0.0",
 ]
@@ -110,18 +108,15 @@ local-llm = [
 tui = [
     "textual>=0.89.0",
 ]
-grpc = [
-    "grpcio>=1.60.0",
-    "grpcio-tools>=1.60.0",
-]
+# grpc: removed (unused)
 eval = [
     "swebench>=2.0.0",
     "datasets>=2.0.0",
 ]
 # Meta-group: common optional features for most users
-# Excludes: dev (testing), docs, eval (swebench), llm-lib, local-llm (llama-cpp), grpc
+# Excludes: dev, docs, eval (swebench), llm-lib, local-llm
 all = [
-    "moss[server,mcp,lsp,llm,anthropic,openai,gemini,dotenv,tree-sitter,chroma,tui]",
+    "moss[server,mcp,lsp,llm,anthropic,openai,dotenv,tree-sitter,chroma,tui]",
 ]
 
 [build-system]

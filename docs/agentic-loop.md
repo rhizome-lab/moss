@@ -120,12 +120,75 @@ Compared to tool-schema approach:
 
 90%+ token reduction for tool selection.
 
+## Context Model: Hierarchical Path
+
+The agent does NOT accumulate conversation history. Context is structured as a **path** from root task to current leaf, with optional attachments.
+
+### Core Structure
+
+```
+Task: Fix auth bug
+  → Find failure point ✓ (token expires during refresh)
+  → Implement fix
+    → [now] Patching refresh_token()
+
+[note: refresh_token() is called from 3 places | expires: on_done]
+```
+
+### Design Principles
+
+- **Context-excluded by default**: Start lean, pull what's needed
+- **Path, not history**: Chain of refinements, not transcript
+- **Levels emerge, not predefined**: Arbitrary depth, task dictates structure
+- **Recursive breakdown is fundamental**: Agent decomposes until leaf is actionable
+
+### Path Components
+
+Each node in the path:
+- `goal`: What this step aims to do
+- `status`: pending | active | done | blocked
+- `summary`: One-line result (when done)
+- `description`: Expandable detail (on demand)
+- `children`: Subtasks (if decomposed)
+
+### Attachments
+
+Standalone notes that travel with context:
+- `content`: The note itself
+- `condition`: When to expire (on_done, after:N_turns, until:pattern_found, manual)
+- `scope`: Which subtree it applies to
+
+```
+note("refresh_token calls: auth.py:45, session.py:120, api.py:89", expires="on_done")
+note("avoid changing public API", expires="manual")
+```
+
+### Prompt Structure
+
+Each turn:
+```
+[system: terse agent role]
+[path: Task → Subtask → Current step]
+[notes: active attachments]
+[last_result: preview + id:0042]
+[action?]
+```
+
+~300 tokens typical, scales with path depth not turn count.
+
+### State is External
+
+- Path nodes: TaskTree structure
+- Full outputs: EphemeralCache (by ID)
+- Notes: Attachment store with TTL
+- Findings: Working memory (compact)
+
 ## Open Questions
 
 1. **Ambiguity handling** - when DWIM confidence is low, ask LLM to clarify or just pick best?
 2. **Error recovery** - tool fails, how does LLM know? Structured error format?
-3. **Context window** - as conversation grows, what to summarize/drop?
-4. **Multi-step intents** - "fix and validate" in one line?
+3. **Multi-step intents** - "fix and validate" in one line?
+4. **Decomposition trigger** - when does a task become subtasks? LLM decides? Heuristic?
 
 ## Related Docs
 
