@@ -66,6 +66,16 @@ Every configurable option should have a default that:
 - Errs on the side of usefulness over safety-theater
 - Can be discovered and changed when needed
 
+### Good Defaults, Fast Specialization
+
+Good defaults mean acceptable general performance out of the box. But we should absolutely support hyper-specialization for those who want it:
+- **Quick wins first**: Default config should "just work" reasonably well
+- **Escape hatches**: When defaults aren't enough, specialization should be one step away
+- **Zero-to-custom fast**: The path from "using defaults" to "fully customized" should be short and obvious
+- **No ceiling**: Power users shouldn't hit walls. If someone wants to optimize for their exact workflow, let them
+
+This is a conscious tradeoff: defaults optimize for breadth (works for everyone), specialization optimizes for depth (works perfectly for you). Both are valid, and the system should excel at both ends of the spectrum.
+
 ### Low Barrier to Entry
 
 Make it easy to get started:

@@ -293,11 +293,41 @@ impl FileIndex {
     /// Find callers of a symbol by name (from call graph)
     /// Resolves through imports: if file A imports X as Y and calls Y(), finds that as a caller of X
     /// Also handles qualified calls: if file A does `import foo` and calls `foo.bar()`, finds caller of `bar`
+    /// Also handles method calls: `self.method()` is resolved to the containing class's method
     pub fn find_callers(&self, symbol_name: &str) -> rusqlite::Result<Vec<(String, String, usize)>> {
+        // Handle Class.method format - split and search for method within class
+        let (class_filter, method_name) = if symbol_name.contains('.') {
+            let parts: Vec<&str> = symbol_name.splitn(2, '.').collect();
+            (Some(parts[0]), parts[1])
+        } else {
+            (None, symbol_name)
+        };
+
+        // If searching for Class.method, find callers that call self.method within that class
+        if let Some(class_name) = class_filter {
+            let mut stmt = self.conn.prepare(
+                "SELECT c.caller_file, c.caller_symbol, c.line
+                 FROM calls c
+                 JOIN symbols s ON c.caller_file = s.file AND c.caller_symbol = s.name
+                 WHERE c.callee_name = ?1 AND c.callee_qualifier = 'self' AND s.parent = ?2"
+            )?;
+            let callers: Vec<(String, String, usize)> = stmt
+                .query_map(params![method_name, class_name], |row| {
+                    Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+                })?
+                .filter_map(|r| r.ok())
+                .collect();
+
+            if !callers.is_empty() {
+                return Ok(callers);
+            }
+        }
+
         // Combined query: direct calls + calls via import aliases + qualified calls via module imports
         // 1. Direct calls where callee_name matches
         // 2. Calls where the callee_name matches an import alias/name that refers to our symbol
         // 3. Qualified calls (foo.bar()) where foo is an imported module containing bar
+        // 4. Method calls via self (self.method()) - caller's parent class has this method
         let mut stmt = self.conn.prepare(
             "SELECT caller_file, caller_symbol, line FROM calls WHERE callee_name = ?1
              UNION
@@ -309,10 +339,15 @@ impl FileIndex {
              SELECT c.caller_file, c.caller_symbol, c.line
              FROM calls c
              JOIN imports i ON c.caller_file = i.file AND c.callee_qualifier = COALESCE(i.alias, i.name)
-             WHERE c.callee_name = ?1 AND i.module IS NULL"
+             WHERE c.callee_name = ?1 AND i.module IS NULL
+             UNION
+             SELECT c.caller_file, c.caller_symbol, c.line
+             FROM calls c
+             JOIN symbols s ON c.caller_file = s.file AND c.caller_symbol = s.name
+             WHERE c.callee_name = ?1 AND c.callee_qualifier = 'self' AND s.parent IS NOT NULL"
         )?;
         let callers: Vec<(String, String, usize)> = stmt
-            .query_map(params![symbol_name], |row| {
+            .query_map(params![method_name], |row| {
                 Ok((row.get(0)?, row.get(1)?, row.get(2)?))
             })?
             .filter_map(|r| r.ok())
@@ -327,7 +362,7 @@ impl FileIndex {
             "SELECT caller_file, caller_symbol, line FROM calls WHERE LOWER(callee_name) = LOWER(?1)"
         )?;
         let callers: Vec<(String, String, usize)> = stmt
-            .query_map(params![symbol_name], |row| {
+            .query_map(params![method_name], |row| {
                 Ok((row.get(0)?, row.get(1)?, row.get(2)?))
             })?
             .filter_map(|r| r.ok())
@@ -338,7 +373,7 @@ impl FileIndex {
         }
 
         // Try LIKE pattern match (contains)
-        let pattern = format!("%{}%", symbol_name);
+        let pattern = format!("%{}%", method_name);
         let mut stmt = self.conn.prepare(
             "SELECT caller_file, caller_symbol, line FROM calls WHERE LOWER(callee_name) LIKE LOWER(?1) LIMIT 100"
         )?;
@@ -424,6 +459,40 @@ impl FileIndex {
         Ok(imports)
     }
 
+    /// Convert a Python module name to possible file paths
+    /// e.g., "moss.gen.serialize" → ["src/moss/gen/serialize.py", "moss/gen/serialize.py", ...]
+    fn module_to_files(&self, module: &str) -> Vec<String> {
+        let parts: Vec<&str> = module.split('.').collect();
+        let rel_path = parts.join("/");
+
+        // Try common source directories and both .py and __init__.py
+        let mut candidates = Vec::new();
+        for prefix in &["src/", ""] {
+            candidates.push(format!("{}{}.py", prefix, rel_path));
+            candidates.push(format!("{}{}/__init__.py", prefix, rel_path));
+        }
+
+        // Filter to files that exist in index
+        candidates.into_iter().filter(|path| {
+            self.conn.query_row(
+                "SELECT 1 FROM files WHERE path = ?1",
+                params![path],
+                |_| Ok(())
+            ).is_ok()
+        }).collect()
+    }
+
+    /// Check if a file exports (defines) a given symbol
+    fn file_exports_symbol(&self, file: &str, symbol: &str) -> rusqlite::Result<bool> {
+        // Check if symbol is defined in this file (top-level only, parent IS NULL)
+        let count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM symbols WHERE file = ?1 AND name = ?2 AND parent IS NULL",
+            params![file, symbol],
+            |row| row.get(0)
+        )?;
+        Ok(count > 0)
+    }
+
     /// Resolve a name in a file's context to its source module
     /// Returns: (source_module, original_name) if found
     pub fn resolve_import(&self, file: &str, name: &str) -> rusqlite::Result<Option<(String, String)>> {
@@ -450,11 +519,21 @@ impl FileIndex {
         )?;
         let wildcards: Vec<String> = stmt
             .query_map(params![file], |row| row.get(0))?
-            .filter_map(|r| r.ok())
+            .filter_map(|r: Result<Option<String>, _>| r.ok().flatten())
             .collect();
 
-        // For wildcard imports, we'd need to check if the source module exports this name
-        // For now, just return the first wildcard source as a possibility
+        // Check each wildcard source to see if it exports the symbol
+        for module in &wildcards {
+            let files = self.module_to_files(module);
+            for module_file in files {
+                if self.file_exports_symbol(&module_file, name)? {
+                    return Ok(Some((module.clone(), name.to_string())));
+                }
+            }
+        }
+
+        // Fallback: if we have wildcards but couldn't verify, return first as possibility
+        // This handles external modules (stdlib, third-party) we can't resolve
         if !wildcards.is_empty() {
             return Ok(Some((wildcards[0].clone(), name.to_string())));
         }
@@ -636,5 +715,73 @@ mod tests {
 
         let matches = index.find_by_stem("test").unwrap();
         assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn test_wildcard_import_resolution() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src/mylib")).unwrap();
+        // Module that exports MyClass
+        fs::write(dir.path().join("src/mylib/exports.py"), "class MyClass: pass").unwrap();
+        // Module that exports OtherThing
+        fs::write(dir.path().join("src/mylib/other.py"), "def OtherThing(): pass").unwrap();
+        // Consumer with wildcard imports
+        fs::write(dir.path().join("src/consumer.py"), "from mylib.exports import *\nfrom mylib.other import *\nMyClass()").unwrap();
+
+        let mut index = FileIndex::open(dir.path()).unwrap();
+        index.refresh().unwrap();
+        index.refresh_call_graph().unwrap();
+
+        // Manually add wildcard imports (refresh_call_graph parses these)
+        // The parser should have picked up the wildcard imports
+
+        // Now resolve MyClass - should find it in mylib.exports
+        let result = index.resolve_import("src/consumer.py", "MyClass").unwrap();
+        assert!(result.is_some(), "Should resolve MyClass");
+        let (module, name) = result.unwrap();
+        assert_eq!(module, "mylib.exports");
+        assert_eq!(name, "MyClass");
+
+        // Resolve OtherThing - should find it in mylib.other
+        let result = index.resolve_import("src/consumer.py", "OtherThing").unwrap();
+        assert!(result.is_some(), "Should resolve OtherThing");
+        let (module, name) = result.unwrap();
+        assert_eq!(module, "mylib.other");
+        assert_eq!(name, "OtherThing");
+    }
+
+    #[test]
+    fn test_method_call_resolution() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        // A class with methods that call each other
+        let class_code = r#"
+class MyClass:
+    def method_a(self):
+        self.method_b()
+
+    def method_b(self):
+        pass
+
+    def method_c(self):
+        self.method_b()
+"#;
+        fs::write(dir.path().join("src/myclass.py"), class_code).unwrap();
+
+        let mut index = FileIndex::open(dir.path()).unwrap();
+        index.refresh().unwrap();
+        index.refresh_call_graph().unwrap();
+
+        // Find callers of method_b - should include method_a and method_c
+        let callers = index.find_callers("method_b").unwrap();
+        assert!(!callers.is_empty(), "Should find callers of method_b");
+
+        let caller_names: Vec<&str> = callers.iter().map(|(_, name, _)| name.as_str()).collect();
+        assert!(caller_names.contains(&"method_a"), "method_a should call method_b");
+        assert!(caller_names.contains(&"method_c"), "method_c should call method_b");
+
+        // Find callers of MyClass.method_b - more specific
+        let callers = index.find_callers("MyClass.method_b").unwrap();
+        assert!(!callers.is_empty(), "Should find callers of MyClass.method_b");
     }
 }

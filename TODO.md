@@ -4,29 +4,25 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. **Reference tracing** - Complete cross-file resolution
-   - [x] Import tracking (SQLite table: file → module, name, alias)
-   - [x] `moss imports <file>` command to query imports from index
-   - [x] `moss imports <file>:<name> --resolve` to trace name to source module
-   - [x] Use imports in callers/callees (cross-file resolution via import alias JOIN)
-   - [x] Handle qualified names (module.func vs func) - store callee_qualifier, JOIN on imports
-   - [ ] Wildcard import resolution (from X import * → check X's exports)
-   - [ ] Handle method calls (obj.method() → Class.method)
-
-2. **Index reliability**
+1. **Index reliability**
    - [ ] Index invalidation (inotify/file watching for auto-refresh)
    - [ ] Error recovery when index is corrupted
    - [ ] Graceful degradation when daemon unavailable
-
-3. **Benchmark suite** - Measure CLI performance
-   - [x] Run `crates/moss-cli/bench.sh` and document baselines (see Notes)
-   - [ ] Add CI integration for regression detection
 
 ## Completed (move to CHANGELOG)
 
 - **Rust CLI** - 18 commands: path, view, search-tree, symbols, expand, callers, callees, tree, skeleton, anchors, deps, cfg, complexity, health, summarize, daemon (status/shutdown/start), reindex
 - **Daemon** - Unix socket IPC, idle timeout, chunked streaming
 - **Call graph** - SQLite index, 29,000x faster callers lookup (0.6ms vs 17.5s)
+- **Reference tracing** - Complete cross-file resolution
+  - Import tracking (SQLite table: file → module, name, alias)
+  - `moss imports <file>` command to query imports from index
+  - `moss imports <file>:<name> --resolve` to trace name to source module
+  - Cross-file resolution via import alias JOIN for callers/callees
+  - Qualified names (module.func vs func) with callee_qualifier
+  - Wildcard import resolution (from X import * → check X's exports)
+  - Method call resolution (self.method() → Class.method)
+- **Benchmark suite** - CI integration with regression detection thresholds
 
 ## Active Backlog
 

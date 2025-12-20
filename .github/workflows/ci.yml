@@ -116,3 +116,94 @@ jobs:
 
       - name: Check generated interface drift
         run: uv run python scripts/check_gen_drift.py
+
+  rust-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "crates -> target"
+
+      - name: Run Rust tests
+        run: cargo test --workspace
+
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "crates -> target"
+
+      - name: Build release
+        run: cargo build --release -p moss-cli
+
+      - name: Run benchmarks
+        run: |
+          ./crates/moss-cli/bench.sh --quick 2>&1 | tee benchmark-results.txt
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results.txt
+
+      - name: Check for major regressions
+        run: |
+          # Parse results and check against thresholds
+          # Fast commands should be < 50ms, slow commands < 1000ms
+          python3 << 'EOF'
+          import re
+          import sys
+
+          thresholds = {
+              "path": 50,
+              "expand": 50,
+              "callers": 50,
+              "callees": 50,
+              "search-tree": 50,
+              "tree": 100,
+              "symbols": 100,
+              "skeleton": 100,
+              "complexity": 100,
+              "deps": 100,
+              "anchors": 100,
+              "summarize": 150,
+              "health": 1000,
+          }
+
+          with open("benchmark-results.txt") as f:
+              content = f.read()
+
+          failures = []
+          for line in content.split("\n"):
+              match = re.match(r"(\S+)\s+(\d+)\s*ms", line.strip())
+              if match:
+                  name, ms = match.groups()
+                  ms = int(ms)
+                  # Find matching threshold (prefix match)
+                  for key, threshold in thresholds.items():
+                      if name.startswith(key):
+                          if ms > threshold:
+                              failures.append(f"{name}: {ms}ms > {threshold}ms threshold")
+                          break
+
+          if failures:
+              print("Benchmark regressions detected:")
+              for f in failures:
+                  print(f"  - {f}")
+              sys.exit(1)
+          else:
+              print("All benchmarks within thresholds")
+          EOF
