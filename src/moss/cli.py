@@ -4324,9 +4324,12 @@ def cmd_agent(args: Namespace) -> int:
     if model:
         config.model = model
 
-    loop = DWIMLoop(api, config)
+    from moss.session import Session
 
-    output.info(f"Starting agent: {task}")
+    session = Session.create(workspace=api.root, task=task)
+    loop = DWIMLoop(api, config, session=session)
+
+    output.info(f"Starting agent: {task} (session: {session.id})")
     if verbose:
         output.info(f"Model: {config.model}")
         output.info(f"Max turns: {max_turns}")

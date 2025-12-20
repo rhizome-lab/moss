@@ -4,16 +4,32 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- **Mistake Detection**: Detect when an LLM *maybe* made a mistake (Critic loop enhancement)
-- **Shadow Git Access**: Give LLM first-class access to 'Shadow Git' (diffs, rollback, "what did I break?")
-- **User Feedback Story**: Improve interruptibility and feedback loops (client-side interrupts, agent "check mail" steps) to handle mid-task corrections.
 - [ ] **Comprehensive Telemetry & Analysis**:
   - Track all token usage, patterns, and codebase access patterns by default
   - Store maximal metadata for every session
   - Built-in high-quality analysis tools (CLI & visual)
   - Easy interface for complex custom analysis (e.g. "what files do I edit most with `fix`?")
+- [ ] **Agentic TUI UX**:
+  - Fluid mode switching (inspired by shift-tab in Claude Code)
+  - Avoid fixed modes; allow dynamic transitions between Plan/Read/Write states
+- [ ] **Workflow Loader Abstraction**: Extract `WorkflowLoader` protocol for Python workflows
 
 ## Recently Completed
+
+- **Mistake Detection** (Dec 2025):
+  - Added `detect_mistakes` operation to `LLMToolExecutor` for turn analysis
+  - Implemented `enhanced_critic_loop` with dedicated mistake detection step
+  - Detects hallucinations, logical errors, and safety violations
+
+- **Shadow Git Access** (Dec 2025):
+  - Added `ShadowGitAPI` to `MossAPI` for first-class git operations
+  - Exposed `diff` and `revert` commands in `DWIMLoop`
+  - Support for hunk-level surgical rollback and diff parsing
+
+- **User Feedback Story** (Dec 2025):
+  - Implemented `AgentInbox` in `Session` for asynchronous mid-task feedback
+  - Integrated `_check_mail` into `DWIMLoop` to incorporate feedback at each turn
+  - Added session tracking to `moss agent` CLI command
 
 - **TUI Interface** (Dec 2025):
   - Initial `MossTUI` implementation using Textual

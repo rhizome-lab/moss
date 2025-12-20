@@ -625,6 +625,23 @@ def critic_loop(name: str = "critic") -> AgentLoop:
     )
 
 
+def enhanced_critic_loop(name: str = "enhanced_critic") -> AgentLoop:
+    """Robust critic loop with dedicated mistake detection."""
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep("draft", "llm.generate", step_type=StepType.LLM),
+            LoopStep("detect", "llm.critique", input_from="draft", step_type=StepType.LLM),
+            LoopStep("fix", "llm.generate", input_from="detect", step_type=StepType.LLM),
+            LoopStep("apply", "patch.apply", input_from="fix", step_type=StepType.TOOL),
+            LoopStep(
+                "validate", "validation.validate", input_from="apply", step_type=StepType.TOOL
+            ),
+        ],
+        exit_conditions=["validate.success"],
+    )
+
+
 def analysis_loop(name: str = "analysis") -> AgentLoop:
     """Simple analysis loop: skeleton → LLM analyze → done.
 
@@ -2270,6 +2287,18 @@ class LLMToolExecutor:
                 f"Improve docstrings based on critique. Address each issue.\n"
                 f"Output improved docstrings.\n\n"
                 f"Critique:\n{focus_str}"
+            ),
+            "detect_mistakes": (
+                f"{structured_context}\n\n"
+                f"Critically analyze the PREVIOUS turn for mistakes.\n"
+                f"Identify:\n"
+                f"- Logical errors or incorrect assumptions\n"
+                f"- Hallucinated code or file content\n"
+                f"- Safety violations or risky patterns\n"
+                f"- Inefficient or redundant actions\n\n"
+                f"Previous action & result:\n{focus_str}\n\n"
+                f"Output a bulleted list of concerns, or 'No mistakes detected' "
+                f"if it looks correct."
             ),
         }
 

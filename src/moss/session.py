@@ -32,6 +32,41 @@ class SessionStatus(Enum):
     CANCELLED = auto()
 
 
+class MessageRole(Enum):
+    """Role of a message sender."""
+
+    USER = auto()
+    AGENT = auto()
+    SYSTEM = auto()
+
+
+@dataclass
+class Message:
+    """A message in the session inbox/chat history."""
+
+    role: MessageRole
+    content: str
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    read: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "role": self.role.name.lower(),
+            "content": self.content,
+            "timestamp": self.timestamp.isoformat(),
+            "read": self.read,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Message:
+        return cls(
+            role=MessageRole[data["role"].upper()],
+            content=data["content"],
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            read=data.get("read", False),
+        )
+
+
 @dataclass
 class ToolCall:
     """Record of a single tool call."""
@@ -173,6 +208,7 @@ class Session:
     tool_calls: list[ToolCall] = field(default_factory=list)
     file_changes: list[FileChange] = field(default_factory=list)
     checkpoints: list[Checkpoint] = field(default_factory=list)
+    messages: list[Message] = field(default_factory=list)
 
     # Metrics
     llm_tokens_in: int = 0
@@ -370,6 +406,27 @@ class Session:
                 return cp
         return None
 
+    def send_message(self, content: str, role: MessageRole = MessageRole.USER) -> Message:
+        """Send a message to the session inbox."""
+        msg = Message(role=role, content=content)
+        self.messages.append(msg)
+        self._emit(
+            EventType.STEP_COMPLETED,
+            {"session_id": self.id, "action": "message_sent", "role": role.name.lower()},
+        )
+        self._notify_update()
+        return msg
+
+    def get_unread_messages(self, mark_as_read: bool = True) -> list[Message]:
+        """Get all unread messages from the inbox."""
+        unread = [m for m in self.messages if not m.read]
+        if mark_as_read:
+            for m in unread:
+                m.read = True
+            if unread:
+                self._notify_update()
+        return unread
+
     @property
     def duration_seconds(self) -> float:
         """Total session duration in seconds."""
@@ -392,6 +449,7 @@ class Session:
             "tool_calls": [tc.to_dict() for tc in self.tool_calls],
             "file_changes": [fc.to_dict() for fc in self.file_changes],
             "checkpoints": [cp.to_dict() for cp in self.checkpoints],
+            "messages": [m.to_dict() for m in self.messages],
             "llm_tokens_in": self.llm_tokens_in,
             "llm_tokens_out": self.llm_tokens_out,
             "llm_calls": self.llm_calls,
@@ -413,6 +471,7 @@ class Session:
             tool_calls=[ToolCall.from_dict(tc) for tc in data.get("tool_calls", [])],
             file_changes=[FileChange.from_dict(fc) for fc in data.get("file_changes", [])],
             checkpoints=[Checkpoint.from_dict(cp) for cp in data.get("checkpoints", [])],
+            messages=[Message.from_dict(m) for m in data.get("messages", [])],
             llm_tokens_in=data.get("llm_tokens_in", 0),
             llm_tokens_out=data.get("llm_tokens_out", 0),
             llm_calls=data.get("llm_calls", 0),

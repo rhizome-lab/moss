@@ -28,6 +28,7 @@ from moss.task_tree import NoteExpiry, TaskTree
 
 if TYPE_CHECKING:
     from moss.moss_api import MossAPI
+    from moss.session import Session
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +168,8 @@ ACTION_VERBS = {
     "write": "write",
     "replace": "replace",
     "insert": "insert",
+    "revert": "revert",
+    "diff": "diff",
     # Validation
     "validate": "validate",
     "check": "validate",
@@ -284,6 +287,8 @@ def build_tool_call(intent: ParsedIntent, api: MossAPI) -> tuple[str, dict[str, 
         "write": "edit.write_file",
         "replace": "edit.replace_text",
         "insert": "edit.insert_line",
+        "revert": "shadow_git.rollback_hunk",
+        "diff": "shadow_git.get_diff",
     }
 
     tool_name = verb_to_tool.get(verb, verb)
@@ -293,7 +298,19 @@ def build_tool_call(intent: ParsedIntent, api: MossAPI) -> tuple[str, dict[str, 
         # Parse target - could be "file", "symbol", or "file symbol" / "symbol file"
         parts = target.split()
 
-        if tool_name == "skeleton.expand":
+        if tool_name == "shadow_git.rollback_hunk":
+            # revert <file> <line>
+            if len(parts) >= 2:
+                params["file_path"] = parts[0]
+                try:
+                    params["line"] = int(parts[1])
+                except ValueError:
+                    params["line"] = 0
+                # Use current shadow branch if any, or default
+                params["branch_name"] = "shadow/current"
+        elif tool_name == "shadow_git.get_diff":
+            params["branch_name"] = target if target else "shadow/current"
+        elif tool_name == "skeleton.expand":
             # expand needs both file_path and symbol_name
             # Accept: "Symbol file.py" or "file.py Symbol" or just "Symbol"
             file_parts = []
@@ -362,9 +379,11 @@ class DWIMLoop:
         self,
         api: MossAPI,
         config: LoopConfig | None = None,
+        session: Session | None = None,
     ):
         self.api = api
         self.config = config or LoopConfig()
+        self.session = session
         self._turns: list[TurnResult] = []
         self._task_tree: TaskTree | None = None
         self._last_result: str | None = None
@@ -375,6 +394,28 @@ class DWIMLoop:
             default_ttl=600.0,  # 10 minutes for agent session
             preview_lines=30,
         )
+
+    def _check_mail(self) -> str | None:
+        """Check session inbox for unread user feedback."""
+        if not self.session:
+            return None
+
+        unread = self.session.get_unread_messages()
+        if not unread:
+            return None
+
+        feedback = "\n".join(f"- {m.content}" for m in unread)
+        return f"\nUser Feedback (Mid-task correction):\n{feedback}"
+
+    def interrupt(self, reason: str = "") -> None:
+        """Interrupt the running loop."""
+        if self.session:
+            self.session.pause(reason)
+
+    def send_feedback(self, message: str) -> None:
+        """Send feedback to the agent while it's running."""
+        if self.session:
+            self.session.send_message(message)
 
     def _build_system_prompt(self) -> str:
         """Build the system prompt for terse agent mode."""
@@ -394,6 +435,8 @@ Commands:
 - write <file>:<content> - overwrite file
 - replace <file> <search> <replace> - replace text
 - insert <file> <content> - append or insert line
+- diff [branch] - show changes
+- revert <file> <line> - undo change at line
 - fix: <description> - describe fix
 - breakdown: <step1>, <step2>, ... - split current task
 - note: <content> - remember for this task
@@ -435,6 +478,11 @@ Do NOT repeat the same command. Never output prose."""
         # Task path
         if self._task_tree:
             parts.append(self._task_tree.format_context())
+
+        # Mid-task feedback
+        mail = self._check_mail()
+        if mail:
+            parts.append(mail)
 
         # Last result
         if self._last_result:

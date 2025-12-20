@@ -104,6 +104,68 @@ class EditAPI(PathResolvingMixin):
 
 
 @dataclass
+class ShadowGitAPI:
+    """API for advanced shadow git operations.
+
+    Provides first-class access to 'Shadow Git' features: diffs,
+    surgical hunk-level rollback, and branch management.
+    """
+
+    root: Path
+
+    def _get_git(self) -> ShadowGit:
+        from moss.shadow_git import ShadowGit
+
+        return ShadowGit(self.root)
+
+    async def get_diff(self, branch_name: str) -> str:
+        """Get the full diff for a shadow branch."""
+        git = self._get_git()
+        from moss.shadow_git import ShadowBranch
+
+        branch = ShadowBranch(branch_name, "main", self.root)
+        return await git.diff(branch)
+
+    async def get_hunks(self, branch_name: str) -> list[dict[str, Any]]:
+        """Get parsed diff hunks for a branch."""
+        git = self._get_git()
+        from moss.shadow_git import ShadowBranch
+
+        branch = ShadowBranch(branch_name, "main", self.root)
+        hunks = await git.get_hunks(branch)
+        hunks_with_symbols = await git.map_hunks_to_symbols(hunks)
+        return [
+            {
+                "file_path": h.file_path,
+                "old_start": h.old_start,
+                "new_start": h.new_start,
+                "symbol": h.symbol,
+                "content": h.content,
+            }
+            for h in hunks_with_symbols
+        ]
+
+    async def rollback_hunk(self, branch_name: str, file_path: str, line: int) -> bool:
+        """Surgically rollback a specific hunk by file and line number."""
+        git = self._get_git()
+        from moss.shadow_git import ShadowBranch
+
+        branch = ShadowBranch(branch_name, "main", self.root)
+        hunks = await git.get_hunks(branch)
+        # Find the hunk at this line
+        target = None
+        for h in hunks:
+            if h.file_path == file_path and h.new_start <= line < h.new_start + h.new_count:
+                target = h
+                break
+
+        if target:
+            await git.rollback_hunks(branch, [target])
+            return True
+        return False
+
+
+@dataclass
 class SkeletonAPI(PathResolvingMixin):
     """API for code skeleton extraction.
 
@@ -3615,6 +3677,7 @@ class MossAPI:
     _dwim: DWIMAPI | None = None
     _agent: AgentAPI | None = None
     _edit: EditAPI | None = None
+    _shadow_git: ShadowGitAPI | None = None
     _complexity: ComplexityAPI | None = None
     _clones: ClonesAPI | None = None
     _security: SecurityAPI | None = None
@@ -3676,6 +3739,13 @@ class MossAPI:
         if self._edit is None:
             self._edit = EditAPI(root=self.root)
         return self._edit
+
+    @property
+    def shadow_git(self) -> ShadowGitAPI:
+        """Access advanced shadow git features."""
+        if self._shadow_git is None:
+            self._shadow_git = ShadowGitAPI(root=self.root)
+        return self._shadow_git
 
     @property
     def dependencies(self) -> DependencyAPI:
