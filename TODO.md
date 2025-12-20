@@ -4,11 +4,14 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. CLI `moss expand` - support flexible arg syntax: `file symbol` or `symbol file` or `file:symbol`
-2. DWIM terse command parsing - "expand Patch" should not match patch tools
-3. Add `moss agent --dry-run` to show what commands would be executed
+(Session complete - see Recently Completed for work done)
 
 ## Recently Completed
+
+- **CLI UX improvements** (Dec 2025):
+  - Flexible arg syntax for expand/callers/callees: `symbol`, `file:symbol`, `file symbol`, `symbol file`
+  - DWIM terse parsing fix: "expand Patch" now correctly matches cli_expand, not patch tools
+  - Added `moss agent --dry-run` to preview task classification and tool suggestions
 
 - **DWIMLoop improvements** (Dec 2025):
   - Task classification (read-only vs write) with completion hints
@@ -110,17 +113,15 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] "what's in X" → view, "show me Y" → view, "full code of Z" → expand
 
 ### DWIM Improvements
-- [ ] Terse command parsing - "expand Patch" → skeleton_expand, not patch tools
+- [x] Terse command parsing - "expand Patch" → cli_expand, not patch tools (done Dec 2025)
 - [ ] MCP tool discovery - auto-register MCP server tools into DWIM registry
 - [ ] Custom tool semantics - plugin architecture for user-defined intent→tool mappings
 - [ ] Confidence thresholds - when to ask for clarification vs just do it
 
 ### CLI UX Improvements
-- [ ] `moss expand` - support two args, order-independent: `file symbol` or `symbol file`
-- [ ] `moss expand` - also support `file:symbol` syntax
+- [x] `moss expand` - flexible arg syntax: `symbol`, `file:symbol`, `file symbol` (done Dec 2025)
+- [x] `moss agent --dry-run` - show task classification and tool suggestions (done Dec 2025)
 - [ ] `moss expand` - when multiple matches, pick best or show numbered list
-- [ ] General pattern: all symbol-targeting commands (`expand`, `callers`, `callees`, `deps`) accept flexible args
-- [ ] DWIM for CLI args - detect file path vs symbol name automatically
 - [ ] Smart TOML navigation - parse to JSON, use jq-like filtering for config exploration
 
 ### Workflow Collaboration

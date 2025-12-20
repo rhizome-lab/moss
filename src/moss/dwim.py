@@ -818,9 +818,51 @@ class ToolRouter:
         """
         tools = set(available_tools) if available_tools else set(TOOL_REGISTRY.keys())
 
+        # Fast path: if first word is a recognized tool name or alias, use it directly
+        # This prevents "expand Patch" from matching patch tools due to the second word
+        # But skip this for natural language queries (detected by common words)
+        query_words = query.lower().split()
+        natural_lang_words = {
+            "and",
+            "or",
+            "but",
+            "the",
+            "a",
+            "an",
+            "for",
+            "to",
+            "in",
+            "of",
+            "with",
+            "what",
+            "how",
+            "where",
+            "why",
+            "which",
+            "that",
+            "this",
+            "is",
+            "are",
+        }
+        is_natural_language = any(w in natural_lang_words for w in query_words[1:])
+
+        if query_words and not is_natural_language:
+            first_word = query_words[0]
+            # Check for alias match
+            if first_word in TOOL_ALIASES:
+                tool = TOOL_ALIASES[first_word]
+                if tool in tools:
+                    return [ToolMatch(tool=tool, confidence=1.0)]
+            # Check for direct tool name match (first word matches tool base name)
+            for tool_name in tools:
+                if tool_name not in TOOL_REGISTRY:
+                    continue
+                tool_base = tool_name.split("_")[0]
+                if first_word == tool_base or first_word == tool_name:
+                    return [ToolMatch(tool=tool_name, confidence=1.0)]
+
         # Expand query with word form variants for better TF-IDF matching
         # e.g., "summarize" -> "summarize summary summarization summarizing"
-        query_words = query.lower().split()
         expanded_words = set(query_words)
         for word in query_words:
             if word in WORD_FORMS:

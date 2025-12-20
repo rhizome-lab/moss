@@ -53,6 +53,49 @@ def wants_json(args: Namespace) -> bool:
     return getattr(args, "json", False) or getattr(args, "jq", None) is not None
 
 
+def normalize_symbol_args(args: list[str]) -> str:
+    """Normalize flexible symbol arguments to file:symbol or symbol format.
+
+    Supports:
+    - "symbol" -> "symbol"
+    - "file:symbol" -> "file:symbol"
+    - "file symbol" -> "file:symbol"
+    - "symbol file" -> "file:symbol"
+
+    Detection heuristics:
+    - File path: contains '/' or ends with common extension (.py, .rs, .js, etc.)
+    - Everything else is assumed to be a symbol
+    """
+    if len(args) == 1:
+        return args[0]
+
+    if len(args) == 2:
+        a, b = args
+        # Detect which is the file
+        file_extensions = (".py", ".rs", ".js", ".ts", ".go", ".java", ".c", ".cpp", ".h")
+
+        def looks_like_file(s: str) -> bool:
+            return "/" in s or s.endswith(file_extensions)
+
+        a_is_file = looks_like_file(a)
+        b_is_file = looks_like_file(b)
+
+        if a_is_file and not b_is_file:
+            return f"{a}:{b}"
+        elif b_is_file and not a_is_file:
+            return f"{b}:{a}"
+        elif a_is_file and b_is_file:
+            # Both look like files, use first as file
+            return f"{a}:{b}"
+        else:
+            # Neither looks like file, use first as symbol target
+            # and second as scope hint (file:symbol format)
+            return f"{b}:{a}"
+
+    # More than 2 args, join with :
+    return ":".join(args)
+
+
 def output_result(data: Any, args: Namespace) -> None:
     """Output result in appropriate format."""
     output = get_output()
@@ -542,7 +585,7 @@ def cmd_expand(args: Namespace) -> int:
     from moss.codebase import build_tree
 
     output = setup_output(args)
-    target = args.target
+    target = normalize_symbol_args(args.target)
     root = Path.cwd()
 
     tree = build_tree(root)
@@ -582,7 +625,7 @@ def cmd_callers(args: Namespace) -> int:
     from moss.codebase import build_tree
 
     output = setup_output(args)
-    target = args.target
+    target = normalize_symbol_args(args.target)
     root = Path.cwd()
 
     tree = build_tree(root)
@@ -617,7 +660,7 @@ def cmd_callees(args: Namespace) -> int:
     from moss.codebase import build_tree
 
     output = setup_output(args)
-    target = args.target
+    target = normalize_symbol_args(args.target)
     root = Path.cwd()
 
     tree = build_tree(root)
@@ -3883,13 +3926,15 @@ def cmd_agent(args: Namespace) -> int:
     import asyncio
 
     from moss import MossAPI
-    from moss.dwim_loop import DWIMLoop, LoopConfig, LoopState
+    from moss.dwim import analyze_intent
+    from moss.dwim_loop import DWIMLoop, LoopConfig, LoopState, classify_task
 
     output = setup_output(args)
     task = getattr(args, "task", None)
     model = getattr(args, "model", None)
     max_turns = getattr(args, "max_turns", 50)
     verbose = getattr(args, "verbose", False)
+    dry_run = getattr(args, "dry_run", False)
 
     if not task:
         output.error("Usage: moss agent <task>")
@@ -3897,6 +3942,28 @@ def cmd_agent(args: Namespace) -> int:
         return 1
 
     api = MossAPI.for_project(Path.cwd())
+
+    # Dry-run mode: show what would happen without executing
+    if dry_run:
+        task_type = classify_task(task)
+        output.info(f"Task: {task}")
+        output.info(f"Type: {task_type.name}")
+        output.info("")
+
+        # Show DWIM suggestions for the task
+        matches = analyze_intent(task)
+        if matches:
+            output.info("Tool suggestions:")
+            for m in matches[:5]:
+                conf_pct = int(m.confidence * 100)
+                output.info(f"  {m.tool} ({conf_pct}%)")
+        else:
+            output.info("No specific tools matched. Agent would use LLM guidance.")
+
+        output.info("")
+        output.info(f"Would run with model: {model or 'gemini/gemini-2.0-flash'}")
+        output.info(f"Max turns: {max_turns}")
+        return 0
 
     config = LoopConfig(max_turns=max_turns)
     if model:
@@ -4683,17 +4750,29 @@ def create_parser() -> argparse.ArgumentParser:
 
     # expand command (new codebase tree)
     expand_parser = subparsers.add_parser("expand", help="Show full source of a symbol")
-    expand_parser.add_argument("target", help="Symbol to expand (fuzzy matching)")
+    expand_parser.add_argument(
+        "target",
+        nargs="+",
+        help="Symbol to expand (supports: symbol, file:symbol, file symbol)",
+    )
     expand_parser.set_defaults(func=cmd_expand)
 
     # callers command (new codebase tree)
     callers_parser = subparsers.add_parser("callers", help="Find callers of a symbol")
-    callers_parser.add_argument("target", help="Symbol to find callers of (fuzzy matching)")
+    callers_parser.add_argument(
+        "target",
+        nargs="+",
+        help="Symbol to find callers of (supports: symbol, file:symbol, file symbol)",
+    )
     callers_parser.set_defaults(func=cmd_callers)
 
     # callees command (new codebase tree)
     callees_parser = subparsers.add_parser("callees", help="Find what a symbol calls")
-    callees_parser.add_argument("target", help="Symbol to find callees of (fuzzy matching)")
+    callees_parser.add_argument(
+        "target",
+        nargs="+",
+        help="Symbol to find callees of (supports: symbol, file:symbol, file symbol)",
+    )
     callees_parser.set_defaults(func=cmd_callees)
 
     # skeleton command
@@ -6051,6 +6130,12 @@ def create_parser() -> argparse.ArgumentParser:
         "-v",
         action="store_true",
         help="Show detailed turn-by-turn output",
+    )
+    agent_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Show what would be executed without running",
     )
     agent_parser.set_defaults(func=cmd_agent)
 
