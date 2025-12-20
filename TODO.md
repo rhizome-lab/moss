@@ -15,6 +15,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
    - No tool schemas in prompt - DWIM handles interpretation
    - Already have: Session tracking, MossAPI, DWIM scaffolding, litellm
 3. Investigate MCP resource reading failure (ReadMcpResourceTool returns attribute error)
+4. Review optional dependency sets - are extras well-organized? (litellm was missing despite --extra all)
+5. Evaluate DWIM heuristics - confidence scores are 0.3-0.4, feels low. Wrong similarity metric? Bad keywords?
 
 ## Active Backlog
 
