@@ -3771,6 +3771,8 @@ def cmd_workflow(args: Namespace) -> int:
     - list: Show available workflows
     - show: Show workflow details
     - run: Execute a workflow on a file
+    - generate: Auto-create workflows based on project
+    - new: Scaffold a new workflow from template
     """
     import asyncio
 
@@ -3802,8 +3804,17 @@ def cmd_workflow(args: Namespace) -> int:
 
         name = getattr(args, "workflow_name", None)
         if not name:
-            output.error("Workflow name required for 'new' action")
-            return 1
+            # Interactive prompt if no name provided
+            if sys.stdin.isatty():
+                try:
+                    name = input("Enter workflow name (e.g., validate-fix): ").strip()
+                except (KeyboardInterrupt, EOFError):
+                    print()
+                    return 1
+
+            if not name:
+                output.error("Workflow name required")
+                return 1
 
         template_name = getattr(args, "template", "standard")
         template_content = TEMPLATES.get(template_name)
@@ -3823,6 +3834,11 @@ def cmd_workflow(args: Namespace) -> int:
         content = template_content.format(name=name)
         file_path.write_text(content)
         output.success(f"Created workflow '{name}' at {file_path}")
+
+        output.blank()
+        output.step("Next steps:")
+        output.info(f"  1. Edit {file_path}")
+        output.info(f"  2. Run with: moss workflow run {name} --file <file>")
         return 0
 
     elif action == "generate":
