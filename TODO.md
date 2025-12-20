@@ -4,9 +4,15 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Terminal subagent with persistent shell session
+- Memory plugins with LRU caching
+- Agent swarm coordination patterns
 
 ## Recently Completed
+
+- **Persistent terminal sessions** (Dec 2025):
+  - `PersistentShell` maintains state across commands (cd, export, aliases)
+  - `TerminalSubagent` provides high-level interface for scripts
+  - Auto-detection of shell path for cross-platform support
 
 - **Architect/Editor split** (Dec 2025):
   - Separated reasoning (planning what to change) from execution (making changes)
