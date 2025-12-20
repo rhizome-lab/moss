@@ -1180,22 +1180,20 @@ fn cmd_imports(query: &str, root: Option<&Path>, resolve: bool, json: bool) -> i
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    let idx = match index::FileIndex::open(&root) {
-        Ok(i) => i,
-        Err(e) => {
-            eprintln!("Error opening index: {}", e);
+    // Try index first, but fall back to direct parsing if not available
+    let idx = index::FileIndex::open(&root).ok();
+    let import_count = idx.as_ref()
+        .and_then(|i| i.call_graph_stats().ok())
+        .map(|(_, _, imports)| imports)
+        .unwrap_or(0);
+
+    // For resolve mode, we need the index - no direct fallback possible
+    if resolve {
+        if import_count == 0 {
+            eprintln!("Import resolution requires indexed call graph. Run: moss reindex --call-graph");
             return 1;
         }
-    };
-
-    // Check if index has imports
-    let (_, _, import_count) = idx.call_graph_stats().unwrap_or((0, 0, 0));
-    if import_count == 0 {
-        eprintln!("No imports indexed. Run: moss reindex --call-graph");
-        return 1;
-    }
-
-    if resolve {
+        let idx = idx.unwrap();
         // Query format: "file:name" - resolve what module a name comes from
         let (file, name) = if let Some(idx) = query.find(':') {
             (&query[..idx], &query[idx + 1..])
@@ -1247,57 +1245,102 @@ fn cmd_imports(query: &str, root: Option<&Path>, resolve: bool, json: bool) -> i
     } else {
         // Show all imports for a file
         let matches = path_resolve::resolve(query, &root);
-        let file_path = match matches.iter().find(|m| m.kind == "file") {
-            Some(m) => &m.path,
+        let file_match = match matches.iter().find(|m| m.kind == "file") {
+            Some(m) => m,
             None => {
                 eprintln!("File not found: {}", query);
                 return 1;
             }
         };
+        let file_path = &file_match.path;
 
-        match idx.get_imports(file_path) {
-            Ok(imports) => {
-                if imports.is_empty() {
-                    if json {
-                        println!("[]");
-                    } else {
-                        println!("No imports found in {}", file_path);
+        // Try index first, fall back to direct parsing
+        if import_count > 0 {
+            if let Some(ref idx) = idx {
+                match idx.get_imports(file_path) {
+                    Ok(imports) => {
+                        return output_imports(&imports, file_path, json);
                     }
-                    return 0;
-                }
-
-                if json {
-                    let output: Vec<_> = imports
-                        .iter()
-                        .map(|i| {
-                            serde_json::json!({
-                                "module": i.module,
-                                "name": i.name,
-                                "alias": i.alias,
-                                "line": i.line
-                            })
-                        })
-                        .collect();
-                    println!("{}", serde_json::to_string_pretty(&output).unwrap());
-                } else {
-                    println!("# Imports in {}", file_path);
-                    for imp in imports {
-                        let alias = imp.alias.map(|a| format!(" as {}", a)).unwrap_or_default();
-                        if let Some(module) = imp.module {
-                            println!("  from {} import {}{}", module, imp.name, alias);
-                        } else {
-                            println!("  import {}{}", imp.name, alias);
-                        }
+                    Err(_) => {
+                        // Fall through to direct parsing
                     }
                 }
-                0
             }
+        }
+
+        // Direct parsing fallback
+        let full_path = root.join(file_path);
+        let content = match std::fs::read_to_string(&full_path) {
+            Ok(c) => c,
             Err(e) => {
-                eprintln!("Error getting imports: {}", e);
-                1
+                eprintln!("Error reading file: {}", e);
+                return 1;
+            }
+        };
+
+        let mut extractor = deps::DepsExtractor::new();
+        let result = extractor.extract(&full_path, &content);
+
+        // Convert deps::Import to symbols::Import format for output
+        let imports: Vec<symbols::Import> = result.imports.iter().flat_map(|imp| {
+            if imp.names.is_empty() {
+                // "import x" or "import x as y"
+                vec![symbols::Import {
+                    module: None,
+                    name: imp.module.clone(),
+                    alias: imp.alias.clone(),
+                    line: imp.line,
+                }]
+            } else {
+                // "from x import a, b, c"
+                imp.names.iter().map(|name| symbols::Import {
+                    module: Some(imp.module.clone()),
+                    name: name.clone(),
+                    alias: None,
+                    line: imp.line,
+                }).collect()
+            }
+        }).collect();
+
+        output_imports(&imports, file_path, json)
+    }
+}
+
+fn output_imports(imports: &[symbols::Import], file_path: &str, json: bool) -> i32 {
+    if imports.is_empty() {
+        if json {
+            println!("[]");
+        } else {
+            println!("No imports found in {}", file_path);
+        }
+        return 0;
+    }
+
+    if json {
+        let output: Vec<_> = imports
+            .iter()
+            .map(|i| {
+                serde_json::json!({
+                    "module": i.module,
+                    "name": i.name,
+                    "alias": i.alias,
+                    "line": i.line
+                })
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    } else {
+        println!("# Imports in {}", file_path);
+        for imp in imports {
+            let alias = imp.alias.as_ref().map(|a| format!(" as {}", a)).unwrap_or_default();
+            if let Some(module) = &imp.module {
+                println!("  from {} import {}{}", module, imp.name, alias);
+            } else {
+                println!("  import {}{}", imp.name, alias);
             }
         }
     }
+    0
 }
 
 fn cmd_complexity(file: &str, root: Option<&Path>, threshold: Option<usize>, json: bool) -> i32 {

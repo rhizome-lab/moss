@@ -23,12 +23,57 @@ pub struct FileIndex {
 impl FileIndex {
     /// Open or create an index for a directory.
     /// Index is stored in .moss/index.sqlite
+    /// On corruption, automatically deletes and recreates the index.
     pub fn open(root: &Path) -> rusqlite::Result<Self> {
         let moss_dir = root.join(".moss");
         std::fs::create_dir_all(&moss_dir).ok();
 
         let db_path = moss_dir.join("index.sqlite");
+
+        // Try to open, with recovery on corruption
+        match Self::try_open(&db_path, root) {
+            Ok(idx) => Ok(idx),
+            Err(e) => {
+                // Check for corruption-like errors
+                let err_str = e.to_string().to_lowercase();
+                let is_corruption = err_str.contains("corrupt")
+                    || err_str.contains("malformed")
+                    || err_str.contains("disk i/o error")
+                    || err_str.contains("not a database")
+                    || err_str.contains("database disk image")
+                    || err_str.contains("integrity check failed");
+
+                if is_corruption {
+                    eprintln!("Index corrupted, rebuilding: {}", e);
+                    // Delete corrupted database and retry
+                    let _ = std::fs::remove_file(&db_path);
+                    // Also remove journal/wal files if they exist
+                    let _ = std::fs::remove_file(db_path.with_extension("sqlite-journal"));
+                    let _ = std::fs::remove_file(db_path.with_extension("sqlite-wal"));
+                    let _ = std::fs::remove_file(db_path.with_extension("sqlite-shm"));
+                    Self::try_open(&db_path, root)
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
+    /// Internal: try to open database without recovery
+    fn try_open(db_path: &Path, root: &Path) -> rusqlite::Result<Self> {
         let conn = Connection::open(&db_path)?;
+
+        // Quick integrity check - this will catch most corruption
+        // PRAGMA quick_check is faster than full integrity_check
+        let integrity: String = conn
+            .query_row("PRAGMA quick_check(1)", [], |row| row.get(0))
+            .unwrap_or_else(|_| "error".to_string());
+        if integrity != "ok" {
+            return Err(rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(11), // SQLITE_CORRUPT
+                Some(format!("Database integrity check failed: {}", integrity))
+            ));
+        }
 
         // Initialize schema
         conn.execute_batch(
@@ -158,6 +203,123 @@ impl FileIndex {
         }
 
         false
+    }
+
+    /// Get files that have changed since last index
+    /// Returns (new_files, modified_files, deleted_files)
+    pub fn get_changed_files(&self) -> rusqlite::Result<(Vec<String>, Vec<String>, Vec<String>)> {
+        let mut new_files = Vec::new();
+        let mut modified_files = Vec::new();
+        let mut deleted_files = Vec::new();
+
+        // Get all indexed files with their mtimes
+        let mut indexed: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+        {
+            let mut stmt = self.conn.prepare("SELECT path, mtime FROM files WHERE is_dir = 0")?;
+            let mut rows = stmt.query([])?;
+            while let Some(row) = rows.next()? {
+                let path: String = row.get(0)?;
+                let mtime: i64 = row.get(1)?;
+                indexed.insert(path, mtime);
+            }
+        }
+
+        // Walk current filesystem
+        let walker = WalkBuilder::new(&self.root)
+            .hidden(false)
+            .git_ignore(true)
+            .git_global(true)
+            .git_exclude(true)
+            .build();
+
+        let mut seen = std::collections::HashSet::new();
+        for entry in walker.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                continue;
+            }
+            if let Ok(rel) = path.strip_prefix(&self.root) {
+                let rel_str = rel.to_string_lossy().to_string();
+                if rel_str.is_empty() || rel_str.starts_with(".moss") {
+                    continue;
+                }
+                seen.insert(rel_str.clone());
+
+                let current_mtime = path
+                    .metadata()
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0);
+
+                if let Some(&indexed_mtime) = indexed.get(&rel_str) {
+                    if current_mtime > indexed_mtime {
+                        modified_files.push(rel_str);
+                    }
+                } else {
+                    new_files.push(rel_str);
+                }
+            }
+        }
+
+        // Find deleted files
+        for path in indexed.keys() {
+            if !seen.contains(path) {
+                deleted_files.push(path.clone());
+            }
+        }
+
+        Ok((new_files, modified_files, deleted_files))
+    }
+
+    /// Refresh only files that have changed (faster than full refresh)
+    /// Returns number of files updated
+    pub fn incremental_refresh(&mut self) -> rusqlite::Result<usize> {
+        let (new_files, modified_files, deleted_files) = self.get_changed_files()?;
+        let total_changes = new_files.len() + modified_files.len() + deleted_files.len();
+
+        if total_changes == 0 {
+            return Ok(0);
+        }
+
+        let tx = self.conn.transaction()?;
+
+        // Delete removed files
+        for path in &deleted_files {
+            tx.execute("DELETE FROM files WHERE path = ?1", params![path])?;
+        }
+
+        // Update/insert changed files
+        for path in new_files.iter().chain(modified_files.iter()) {
+            let full_path = self.root.join(path);
+            let is_dir = full_path.is_dir();
+            let mtime = full_path
+                .metadata()
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+
+            tx.execute(
+                "INSERT OR REPLACE INTO files (path, is_dir, mtime) VALUES (?1, ?2, ?3)",
+                params![path, is_dir as i64, mtime],
+            )?;
+        }
+
+        // Update last indexed time
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        tx.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES ('last_indexed', ?1)",
+            params![now.to_string()],
+        )?;
+
+        tx.commit()?;
+        Ok(total_changes)
     }
 
     /// Refresh the index by walking the filesystem
@@ -615,6 +777,85 @@ impl FileIndex {
             }
 
             // Index imports for Python files
+            if file_path.ends_with(".py") {
+                let imports = parser.parse_python_imports(&content);
+                for imp in imports {
+                    tx.execute(
+                        "INSERT INTO imports (file, module, name, alias, line) VALUES (?1, ?2, ?3, ?4, ?5)",
+                        params![file_path, imp.module, imp.name, imp.alias, imp.line],
+                    )?;
+                    import_count += 1;
+                }
+            }
+        }
+
+        tx.commit()?;
+        Ok((symbol_count, call_count, import_count))
+    }
+
+    /// Incrementally update call graph for changed files only
+    /// Much faster than full refresh when few files changed
+    pub fn incremental_call_graph_refresh(&mut self) -> rusqlite::Result<(usize, usize, usize)> {
+        let (new_files, modified_files, deleted_files) = self.get_changed_files()?;
+
+        // Only process Python/Rust files
+        let changed_files: Vec<String> = new_files.into_iter()
+            .chain(modified_files.into_iter())
+            .filter(|f| f.ends_with(".py") || f.ends_with(".rs"))
+            .collect();
+
+        let deleted_source_files: Vec<String> = deleted_files.into_iter()
+            .filter(|f| f.ends_with(".py") || f.ends_with(".rs"))
+            .collect();
+
+        if changed_files.is_empty() && deleted_source_files.is_empty() {
+            return Ok((0, 0, 0));
+        }
+
+        let tx = self.conn.transaction()?;
+
+        // Remove data for deleted/modified files
+        for path in deleted_source_files.iter().chain(changed_files.iter()) {
+            tx.execute("DELETE FROM symbols WHERE file = ?1", params![path])?;
+            tx.execute("DELETE FROM calls WHERE caller_file = ?1", params![path])?;
+            tx.execute("DELETE FROM imports WHERE file = ?1", params![path])?;
+        }
+
+        let mut parser = SymbolParser::new();
+        let mut symbol_count = 0;
+        let mut call_count = 0;
+        let mut import_count = 0;
+
+        // Parse changed files
+        for file_path in &changed_files {
+            let full_path = self.root.join(file_path);
+            let content = match std::fs::read_to_string(&full_path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let symbols = parser.parse_file(&full_path, &content);
+
+            for sym in &symbols {
+                tx.execute(
+                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![file_path, sym.name, sym.kind.as_str(), sym.start_line, sym.end_line, sym.parent],
+                )?;
+                symbol_count += 1;
+
+                let kind = sym.kind.as_str();
+                if kind == "function" || kind == "method" {
+                    let calls = parser.find_callees_with_lines(&full_path, &content, &sym.name);
+                    for (callee_name, line, qualifier) in calls {
+                        tx.execute(
+                            "INSERT INTO calls (caller_file, caller_symbol, callee_name, callee_qualifier, line) VALUES (?1, ?2, ?3, ?4, ?5)",
+                            params![file_path, sym.name, callee_name, qualifier, line],
+                        )?;
+                        call_count += 1;
+                    }
+                }
+            }
+
             if file_path.ends_with(".py") {
                 let imports = parser.parse_python_imports(&content);
                 for imp in imports {

@@ -4,12 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. **Index reliability**
-   - [ ] Index invalidation (inotify/file watching for auto-refresh)
-   - [ ] Error recovery when index is corrupted
-   - [ ] Graceful degradation when daemon unavailable
+1. **Performance profiling** - measure hot paths in CLI, daemon, Python components
+2. **Compact tool encoding** - bypass JSON Schema overhead for moss agent
 
 ## Completed (move to CHANGELOG)
+
+- **Index reliability** - Robust handling of index issues
+  - Graceful degradation: `imports` command falls back to direct parsing when index unavailable
+  - Error recovery: Automatic database rebuild on corruption detection
+  - Incremental refresh: `incremental_refresh()` and `incremental_call_graph_refresh()` for faster updates
+  - File watching: Daemon auto-reindexes on file changes (via inotify/watchfiles)
 
 - **Rust CLI** - 18 commands: path, view, search-tree, symbols, expand, callers, callees, tree, skeleton, anchors, deps, cfg, complexity, health, summarize, daemon (status/shutdown/start), reindex
 - **Daemon** - Unix socket IPC, idle timeout, chunked streaming

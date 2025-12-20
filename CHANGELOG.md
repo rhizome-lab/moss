@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.6.9
+
+### Index Reliability
+
+**Graceful Degradation**
+- `moss imports` now falls back to direct file parsing when index unavailable
+- Commands work without daemon - all have local fallback paths
+
+**Error Recovery**
+- Automatic database rebuild on corruption detection
+- Quick integrity check (`PRAGMA quick_check`) on index open
+- Removes corrupted DB files and journal/WAL files before rebuild
+
+**Incremental Refresh**
+- `incremental_refresh()` - only update changed files (faster than full reindex)
+- `incremental_call_graph_refresh()` - only re-parse changed source files
+- `get_changed_files()` - detect new/modified/deleted files since last index
+
+**File Watching (Daemon)**
+- Daemon auto-reindexes files on create/modify/delete events
+- Uses `notify` crate for cross-platform file system events
+- Skips `.moss` directory to avoid infinite loops
+
 ## v0.6.8
 
 ### Tree Commands & Performance
