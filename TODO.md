@@ -6,7 +6,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 1. **Reference tracing** - Complete cross-file resolution
    - [x] Import tracking (SQLite table: file → module, name, alias)
-   - [ ] Resolve callee names via imports (foo() → find source module)
+   - [x] `moss imports <file>` command to query imports from index
+   - [x] `moss imports <file>:<name> --resolve` to trace name to source module
+   - [ ] Use imports in callers/callees (cross-file resolution)
    - [ ] Wildcard import resolution (from X import * → check X's exports)
    - [ ] Handle method calls (obj.method() → Class.method)
    - [ ] Handle qualified names (module.func vs func)
