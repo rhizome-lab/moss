@@ -160,6 +160,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ## Active Backlog
 
 **Large:**
+- [ ] **Comprehensive Telemetry & Analysis**:
+  - Track all token usage, patterns, and codebase access patterns by default
+  - Store maximal metadata for every session
+  - Built-in high-quality analysis tools (CLI & visual)
+  - Easy interface for complex custom analysis (e.g. "what files do I edit most with `fix`?")
 - [ ] Memory system - layered memory for cross-session learning (see `docs/memory-system.md`)
 - [ ] Workflow loader plugin abstraction - extract protocol when Python workflows need it
   - Current: TOML loader is direct implementation
