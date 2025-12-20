@@ -3614,6 +3614,7 @@ class MossAPI:
     _todo: TodoAPI | None = None
     _dwim: DWIMAPI | None = None
     _agent: AgentAPI | None = None
+    _edit: EditAPI | None = None
     _complexity: ComplexityAPI | None = None
     _clones: ClonesAPI | None = None
     _security: SecurityAPI | None = None
@@ -3738,6 +3739,13 @@ class MossAPI:
         if self._agent is None:
             self._agent = AgentAPI(root=self.root)
         return self._agent
+
+    @property
+    def tui(self) -> Any:
+        """Launch the interactive TUI."""
+        from moss.tui import run_tui
+
+        return run_tui(self)
 
     @property
     def complexity(self) -> ComplexityAPI:

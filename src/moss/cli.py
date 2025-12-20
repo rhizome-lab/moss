@@ -4238,6 +4238,7 @@ def cmd_agent(args: Namespace) -> int:
     max_turns = getattr(args, "max_turns", 50)
     verbose = getattr(args, "verbose", False)
     dry_run = getattr(args, "dry_run", False)
+    use_vanilla = getattr(args, "vanilla", False)
 
     if not task:
         output.error("Usage: moss agent <task>")
@@ -4251,22 +4252,73 @@ def cmd_agent(args: Namespace) -> int:
         task_type = classify_task(task)
         output.info(f"Task: {task}")
         output.info(f"Type: {task_type.name}")
+        output.info(f"Mode: {'Vanilla' if use_vanilla else 'DWIM'}")
         output.info("")
 
         # Show DWIM suggestions for the task
-        matches = analyze_intent(task)
-        if matches:
-            output.info("Tool suggestions:")
-            for m in matches[:5]:
-                conf_pct = int(m.confidence * 100)
-                output.info(f"  {m.tool} ({conf_pct}%)")
-        else:
-            output.info("No specific tools matched. Agent would use LLM guidance.")
+        if not use_vanilla:
+            matches = analyze_intent(task)
+            if matches:
+                output.info("Tool suggestions:")
+                for m in matches[:5]:
+                    conf_pct = int(m.confidence * 100)
+                    output.info(f"  {m.tool} ({conf_pct}%)")
+            else:
+                output.info("No specific tools matched. Agent would use LLM guidance.")
 
         output.info("")
         output.info(f"Would run with model: {model or 'gemini/gemini-2.0-flash'}")
         output.info(f"Max turns: {max_turns}")
         return 0
+
+    if use_vanilla:
+        from moss.agent_loop import LLMConfig, LLMToolExecutor
+        from moss.vanilla_loop import VanillaAgentLoop, VanillaLoopState
+
+        llm_config = LLMConfig(model=model or "gemini/gemini-2.0-flash")
+        executor = LLMToolExecutor(config=llm_config, root=api.root)
+        loop = VanillaAgentLoop(api, llm_config, executor, max_turns=max_turns)
+
+        output.info(f"Starting Vanilla agent: {task}")
+        if verbose:
+            output.info(f"Model: {llm_config.model}")
+            output.info(f"Max turns: {max_turns}")
+        output.info("")
+
+        try:
+            result = asyncio.run(loop.run(task))
+        except ImportError as e:
+            output.error(f"Missing dependency: {e}")
+            output.info("Install with: pip install 'moss[llm]'")
+            return 1
+        except Exception as e:
+            output.error(f"Vanilla agent failed: {e}")
+            return 1
+
+        # Show Vanilla results
+        if verbose:
+            output.info(f"\nTurns: {len(result.turns)}")
+            output.info(f"Duration: {result.total_duration_ms}ms")
+            for i, turn in enumerate(result.turns, 1):
+                output.info(f"\n--- Turn {i} ---")
+                output.info(f"Prompt: {turn.prompt[:100]}...")
+                output.info(f"Response: {turn.response[:200]}...")
+                if turn.tool_name:
+                    output.info(f"Tool: {turn.tool_name}")
+                if turn.error:
+                    output.warning(f"Error: {turn.error}")
+
+        if result.state == VanillaLoopState.DONE:
+            output.success(f"\nCompleted in {len(result.turns)} turns")
+            if result.final_output:
+                output.info(f"Final: {str(result.final_output)[:500]}")
+            return 0
+        elif result.state == VanillaLoopState.MAX_TURNS:
+            output.warning(f"\nMax turns ({max_turns}) reached")
+            return 1
+        else:
+            output.error(f"\nFailed: {result.error}")
+            return 1
 
     config = LoopConfig(max_turns=max_turns)
     if model:
@@ -6492,6 +6544,11 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         dest="dry_run",
         help="Show what would be executed without running",
+    )
+    agent_parser.add_argument(
+        "--vanilla",
+        action="store_true",
+        help="Run minimal vanilla agent loop instead of DWIM loop",
     )
     agent_parser.set_defaults(func=cmd_agent)
 
