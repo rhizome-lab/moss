@@ -4,50 +4,25 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. **Rust CLI polish** - Complete the fast path
-   - [x] Create `crates/moss-cli/` with Cargo workspace
-   - [x] Implement `moss path` in Rust with fuzzy matching (~4ms with LIKE pre-filter)
-   - [x] Add SQLite index for file caching
-   - [x] Add `view`, `search-tree`, `reindex` commands
-   - [x] Add tree-sitter parsing for Python/Rust
-   - [x] Add `symbols`, `expand`, `callers`, `callees` commands
-   - [x] Fix `callers` to search all files (not just fuzzy matches)
-   - [x] Fix SQLite TEXT→INTEGER conversions (CAST)
-   - [x] Add `tree` command to Rust (directory tree view)
-   - [x] Add `skeleton` command to Rust (AST-based)
-   - [x] Add `anchors` command to Rust (identify code anchors)
-   - [x] Add `deps` command to Rust (module dependencies)
-   - [x] Add `cfg` command to Rust (control flow graph)
-   - [x] Add `complexity` command to Rust
-   - [x] Add `health` command to Rust (codebase health metrics)
-   - [x] Add `summarize` command to Rust (module overview)
-
-2. **Daemon improvements**
-   - [x] Basic daemon scaffold with Unix socket IPC
-   - [x] SQLite symbol index with file watching
-   - [x] CLI auto-start daemon on first query if not running
-   - [x] Add daemon `status`/`shutdown`/`start` subcommands to CLI
-   - [x] Daemon auto-shutdown after idle timeout (default 10 min)
-   - [x] Handle large query responses (streaming/chunking)
-
-3. **Reference tracing** - AST-based callers/callees
-   - [x] Store call graph in SQLite (caller_symbol, callee_name, file, line)
-   - [x] Query call graph from daemon for fast lookups (0.6ms vs 17.5s = 29,000x faster)
+1. **Reference tracing** - Complete cross-file resolution
    - [ ] Cross-file reference resolution (import tracking)
    - [ ] Handle method calls (obj.method() → Class.method)
    - [ ] Handle qualified names (module.func vs func)
 
-4. **MCP improvements**
-   - [ ] Add `nucleo` fuzzy plugin for SQLite (research)
-   - [ ] Investigate CodeQL-style queries over moss index
-   - [ ] Add data flow tracking (basic taint analysis)
-
-5. **Performance & reliability**
-   - [ ] Benchmark suite for CLI commands
-   - [x] Add `--profile` flag to CLI for timing breakdown
+2. **Index reliability**
+   - [ ] Index invalidation (inotify/file watching for auto-refresh)
    - [ ] Error recovery when index is corrupted
    - [ ] Graceful degradation when daemon unavailable
-   - [ ] Index invalidation (inotify/file watching for auto-refresh)
+
+3. **Benchmark suite** - Measure CLI performance
+   - [x] Run `crates/moss-cli/bench.sh` and document baselines (see Notes)
+   - [ ] Add CI integration for regression detection
+
+## Completed (move to CHANGELOG)
+
+- **Rust CLI** - 18 commands: path, view, search-tree, symbols, expand, callers, callees, tree, skeleton, anchors, deps, cfg, complexity, health, summarize, daemon (status/shutdown/start), reindex
+- **Daemon** - Unix socket IPC, idle timeout, chunked streaming
+- **Call graph** - SQLite index, 29,000x faster callers lookup (0.6ms vs 17.5s)
 
 ## Active Backlog
 
@@ -58,8 +33,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] Graceful failure - handle errors without crashing, provide useful feedback
 - [ ] Revisit CLAUDE.md dogfooding section - tools should be self-evident, not need instructions
 - [ ] MCP response ephemeral handling - large responses should stream/page instead of filling context
-- [x] MCP DWIM: route natural language to `dwim` command, only use exact CLI syntax as fallback
-- [x] Tune DWIM: "structure" → `summarize` first, `skeleton` for details
 
 **Medium:**
 - [ ] Compact tool encoding for moss agent - bypass JSON Schema overhead
@@ -110,6 +83,12 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] Anchor patching comparison vs search/replace vs diff
 - [ ] Skeleton value measurement - does structural context help?
 
+### Reference Resolution (GitHub-level)
+- [ ] Full import graph with alias tracking (`from x import y as z`)
+- [ ] Variable scoping analysis (what does `x` refer to in context?)
+- [ ] Type inference for method calls (`foo.bar()` where `foo: Foo`)
+- [ ] Cross-language reference tracking (Python ↔ Rust)
+
 ## Deferred
 
 - Log format adapters - after loop work validates architecture
@@ -120,6 +99,12 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - **86.9% token reduction** using skeleton vs full file (dwim.py: 3,890 vs 29,748 chars)
 - **12x output token reduction** with terse prompts (1421 → 112 tokens)
 - **90.2% token savings** in composable loops E2E tests
+
+### CLI Benchmark Baselines (Dec 2025)
+Fast (3-4ms): path, expand, callers, callees, search-tree, tree --depth 2
+Medium (32-37ms): symbols, skeleton, complexity, deps, anchors
+Slow (58ms): summarize (tree-sitter full parse)
+Slowest (503ms): health (full codebase scan)
 
 ### Dogfooding Observations (Dec 2025)
 - `skeleton_format` / `skeleton_expand` - very useful, genuinely saves tokens
