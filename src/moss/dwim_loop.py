@@ -164,6 +164,9 @@ ACTION_VERBS = {
     "fix": "fix",
     "patch": "patch",
     "edit": "edit",
+    "write": "write",
+    "replace": "replace",
+    "insert": "insert",
     # Validation
     "validate": "validate",
     "check": "validate",
@@ -278,6 +281,9 @@ def build_tool_call(intent: ParsedIntent, api: MossAPI) -> tuple[str, dict[str, 
         "deps": "dependencies.format",
         "callers": "callers",
         "callees": "callees",
+        "write": "edit.write_file",
+        "replace": "edit.replace_text",
+        "insert": "edit.insert_line",
     }
 
     tool_name = verb_to_tool.get(verb, verb)
@@ -385,6 +391,9 @@ Commands:
 - callers <symbol> - who calls this
 - callees <symbol> - what this calls
 - validate - run linters
+- write <file>:<content> - overwrite file
+- replace <file> <search> <replace> - replace text
+- insert <file> <content> - append or insert line
 - fix: <description> - describe fix
 - breakdown: <step1>, <step2>, ... - split current task
 - note: <content> - remember for this task

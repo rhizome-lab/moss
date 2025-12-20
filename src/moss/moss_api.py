@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from moss.context import CompiledContext, ContextHost
     from moss.dependencies import DependencyInfo
     from moss.dependency_analysis import DependencyAnalysis
+    from moss.edit import SimpleEditResult
     from moss.external_deps import DependencyAnalysisResult
     from moss.git_hotspots import GitHotspotAnalysis
     from moss.patches import Patch, PatchResult
@@ -56,6 +57,50 @@ class PathResolvingMixin:
         if not path.is_absolute():
             path = self.root / path
         return path
+
+
+@dataclass
+class EditAPI(PathResolvingMixin):
+    """API for direct file modifications.
+
+    Provides tools for writing files, replacing text, and inserting lines.
+    Useful for simple edits that don't require AST awareness.
+    """
+
+    root: Path
+
+    def write_file(self, file_path: str | Path, content: str) -> SimpleEditResult:
+        """Overwrite or create a file with new content."""
+        from moss.edit import EditAPI as InternalEditAPI
+
+        api = InternalEditAPI(self.root)
+        return api.write_file(file_path, content)
+
+    def replace_text(
+        self,
+        file_path: str | Path,
+        search: str,
+        replace: str,
+        occurrence: int = 0,
+    ) -> SimpleEditResult:
+        """Replace text in a file."""
+        from moss.edit import EditAPI as InternalEditAPI
+
+        api = InternalEditAPI(self.root)
+        return api.replace_text(file_path, search, replace, occurrence)
+
+    def insert_line(
+        self,
+        file_path: str | Path,
+        line_content: str,
+        at_line: int | None = None,
+        after_pattern: str | None = None,
+    ) -> SimpleEditResult:
+        """Insert a line into a file at a specific position."""
+        from moss.edit import EditAPI as InternalEditAPI
+
+        api = InternalEditAPI(self.root)
+        return api.insert_line(file_path, line_content, at_line, after_pattern)
 
 
 @dataclass
@@ -3559,6 +3604,7 @@ class MossAPI:
     _tree: TreeAPI | None = None
     _anchor: AnchorAPI | None = None
     _patch: PatchAPI | None = None
+    _edit: EditAPI | None = None
     _dependencies: DependencyAPI | None = None
     _cfg: CFGAPI | None = None
     _validation: ValidationAPI | None = None
@@ -3622,6 +3668,13 @@ class MossAPI:
         if self._patch is None:
             self._patch = PatchAPI(root=self.root)
         return self._patch
+
+    @property
+    def edit(self) -> EditAPI:
+        """Access direct file modification functionality."""
+        if self._edit is None:
+            self._edit = EditAPI(root=self.root)
+        return self._edit
 
     @property
     def dependencies(self) -> DependencyAPI:

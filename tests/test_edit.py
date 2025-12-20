@@ -288,3 +288,63 @@ class TestExtractSpecification:
 
         # Should extract "must validate input" and "should log attempts"
         assert len(spec.constraints) >= 2
+
+
+class TestEditAPI:
+    """Tests for the EditAPI."""
+
+    def test_write_file(self, tmp_path):
+        """Test writing a new file."""
+        from moss.edit import EditAPI
+
+        api = EditAPI(tmp_path)
+        file_path = "test.txt"
+        content = "hello world"
+
+        result = api.write_file(file_path, content)
+
+        assert result.success
+        assert (tmp_path / file_path).read_text() == content
+        assert result.new_size == len(content)
+
+    def test_replace_text(self, tmp_path):
+        """Test replacing text in a file."""
+        from moss.edit import EditAPI
+
+        api = EditAPI(tmp_path)
+        file_path = "test.txt"
+        (tmp_path / file_path).write_text("hello world\nhello universe")
+
+        # Replace all
+        result = api.replace_text(file_path, "hello", "hi")
+        assert result.success
+        assert (tmp_path / file_path).read_text() == "hi world\nhi universe"
+
+        # Replace specific occurrence
+        (tmp_path / file_path).write_text("a b a c")
+        result = api.replace_text(file_path, "a", "x", occurrence=2)
+        assert result.success
+        assert (tmp_path / file_path).read_text() == "a b x c"
+
+    def test_insert_line(self, tmp_path):
+        """Test inserting lines."""
+        from moss.edit import EditAPI
+
+        api = EditAPI(tmp_path)
+        file_path = "test.txt"
+        (tmp_path / file_path).write_text("line 1\nline 3")
+
+        # Insert at line
+        result = api.insert_line(file_path, "line 2", at_line=2)
+        assert result.success
+        assert (tmp_path / file_path).read_text() == "line 1\nline 2\nline 3"
+
+        # Insert after pattern
+        result = api.insert_line(file_path, "line 4", after_pattern="line 3")
+        assert result.success
+        assert (tmp_path / file_path).read_text() == "line 1\nline 2\nline 3\nline 4\n"
+
+        # Append
+        result = api.insert_line(file_path, "line 5")
+        assert result.success
+        assert (tmp_path / file_path).read_text().endswith("line 5\n")

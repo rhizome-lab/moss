@@ -475,9 +475,11 @@ async def edit(task: str, context: EditContext) -> EditResult:
 
 
 __all__ = [
+    "EditAPI",
     "EditContext",
     "EditResult",
     "FileChange",
+    "SimpleEditResult",
     "TaskComplexity",
     "analyze_complexity",
     "edit",
@@ -491,3 +493,150 @@ __all__ = [
     "structural_edit",
     "synthesize_edit",
 ]
+
+
+@dataclass
+class SimpleEditResult:
+    """Result of a direct file edit operation."""
+
+    success: bool
+    file_path: str
+    message: str
+    original_size: int = 0
+    new_size: int = 0
+    error: str | None = None
+
+
+class EditAPI:
+    """API for direct file modifications."""
+
+    def __init__(self, root: Path):
+        self.root = root
+
+    def _resolve_path(self, file_path: str | Path) -> Path:
+        """Resolve path relative to root."""
+        path = Path(file_path)
+        if not path.is_absolute():
+            path = self.root / path
+        return path
+
+    def write_file(self, file_path: str | Path, content: str) -> SimpleEditResult:
+        """Overwrite or create a file with new content."""
+        path = self._resolve_path(file_path)
+        original_size = path.stat().st_size if path.exists() else 0
+
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content)
+            new_size = len(content)
+            return SimpleEditResult(
+                success=True,
+                file_path=str(file_path),
+                message=f"Successfully wrote {new_size} bytes to {file_path}",
+                original_size=original_size,
+                new_size=new_size,
+            )
+        except Exception as e:
+            return SimpleEditResult(
+                success=False,
+                file_path=str(file_path),
+                message=f"Failed to write file: {e}",
+                error=str(e),
+            )
+
+    def replace_text(
+        self, file_path: str | Path, search: str, replace: str, occurrence: int = 0
+    ) -> SimpleEditResult:
+        """Replace text in a file."""
+        path = self._resolve_path(file_path)
+        if not path.exists():
+            return SimpleEditResult(False, str(file_path), "File not found", error="FileNotFound")
+
+        content = path.read_text()
+        original_size = len(content)
+
+        if search not in content:
+            return SimpleEditResult(
+                False, str(file_path), f"Search string not found: {search[:50]}..."
+            )
+
+        if occurrence == 0:
+            new_content = content.replace(search, replace)
+            count = content.count(search)
+            msg = f"Replaced {count} occurrences"
+        else:
+            parts = content.split(search)
+            if len(parts) <= occurrence:
+                return SimpleEditResult(False, str(file_path), f"Occurrence {occurrence} not found")
+
+            new_content = (
+                search.join(parts[:occurrence]) + replace + search.join(parts[occurrence:])
+            )
+            msg = f"Replaced occurrence {occurrence}"
+
+        path.write_text(new_content)
+        return SimpleEditResult(
+            success=True,
+            file_path=str(file_path),
+            message=msg,
+            original_size=original_size,
+            new_size=len(new_content),
+        )
+
+    def insert_line(
+        self,
+        file_path: str | Path,
+        line_content: str,
+        at_line: int | None = None,
+        after_pattern: str | None = None,
+    ) -> SimpleEditResult:
+        """Insert a line into a file at a specific position."""
+        path = self._resolve_path(file_path)
+        if not path.exists():
+            return SimpleEditResult(False, str(file_path), "File not found", error="FileNotFound")
+
+        lines = path.read_text().splitlines(keepends=True)
+        original_size = sum(len(line) for line in lines)
+
+        new_line = line_content + "\n" if not line_content.endswith("\n") else line_content
+
+        if at_line is not None:
+            # 1-indexed to 0-indexed
+            idx = max(0, min(at_line - 1, len(lines)))
+            # Ensure the line before has a newline if we're not at the start
+            if idx > 0 and not lines[idx - 1].endswith("\n"):
+                lines[idx - 1] += "\n"
+            lines.insert(idx, new_line)
+            msg = f"Inserted line at {at_line}"
+        elif after_pattern:
+            found = False
+            for i, line in enumerate(lines):
+                if re.search(after_pattern, line):
+                    # Ensure the matched line has a newline
+                    if not lines[i].endswith("\n"):
+                        lines[i] += "\n"
+                    lines.insert(i + 1, new_line)
+                    msg = f"Inserted line after pattern: {after_pattern}"
+                    found = True
+                    break
+            if not found:
+                return SimpleEditResult(
+                    False, str(file_path), f"Pattern not found: {after_pattern}"
+                )
+        else:
+            # Append to end
+            # Ensure last line has newline
+            if lines and not lines[-1].endswith("\n"):
+                lines[-1] += "\n"
+            lines.append(new_line)
+            msg = "Appended line to end of file"
+
+        new_content = "".join(lines)
+        path.write_text(new_content)
+        return SimpleEditResult(
+            success=True,
+            file_path=str(file_path),
+            message=msg,
+            original_size=original_size,
+            new_size=len(new_content),
+        )
