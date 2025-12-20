@@ -3,6 +3,12 @@
 Design principle: No tool schemas in LLM prompts. LLM outputs terse commands
 like "skeleton foo.py" or "fix: add null check", DWIM interprets and routes.
 
+Context model: Path-based, not conversation history. Each turn gets:
+- System prompt
+- Task path (root → current leaf)
+- Active notes
+- Last result preview
+
 See: docs/agentic-loop.md
 """
 
@@ -15,11 +21,15 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING, Any
 
 from moss.dwim import ToolMatch, analyze_intent, resolve_tool
+from moss.task_tree import NoteExpiry, TaskTree
 
 if TYPE_CHECKING:
     from moss.moss_api import MossAPI
 
 logger = logging.getLogger(__name__)
+
+# Max chars for result preview in context
+RESULT_PREVIEW_LIMIT = 500
 
 
 class LoopState(Enum):
@@ -109,6 +119,14 @@ ACTION_VERBS = {
     "callers": "callers",
     "callees": "callees",
     "calls": "callees",
+    # Task management (meta-commands)
+    "breakdown": "breakdown",
+    "split": "breakdown",
+    "decompose": "breakdown",
+    "note": "note",
+    "remember": "note",
+    "fetch": "fetch",
+    "getresult": "fetch",
     # Termination
     "done": "done",
     "finished": "done",
@@ -219,15 +237,21 @@ def build_tool_call(intent: ParsedIntent, api: MossAPI) -> tuple[str, dict[str, 
 
 
 class DWIMLoop:
-    """DWIM-driven agent loop.
+    """DWIM-driven agent loop with context-excluded model.
+
+    Context model:
+    - No conversation history accumulation
+    - Each turn gets: system + task path + notes + last result preview
+    - State lives in TaskTree, not message list
+    - ~300 tokens per turn instead of unbounded growth
 
     The loop:
-    1. Gets terse intent from LLM ("skeleton foo.py")
-    2. Parses intent with parse_intent()
-    3. Routes to tool with DWIM
-    4. Executes tool and collects result
-    5. Feeds result back to LLM
-    6. Repeats until "done" or limit reached
+    1. Build context from TaskTree path
+    2. Get terse intent from LLM
+    3. Parse intent, route via DWIM
+    4. Execute tool, store result
+    5. Update TaskTree state
+    6. Repeat until "done" or limit
     """
 
     def __init__(
@@ -238,7 +262,10 @@ class DWIMLoop:
         self.api = api
         self.config = config or LoopConfig()
         self._turns: list[TurnResult] = []
-        self._context: list[dict[str, str]] = []
+        self._task_tree: TaskTree | None = None
+        self._last_result: str | None = None
+        self._result_cache: dict[str, str] = {}  # id -> full result
+        self._result_counter: int = 0
 
     def _build_system_prompt(self) -> str:
         """Build the system prompt for terse agent mode."""
@@ -247,27 +274,59 @@ class DWIMLoop:
 
         return """You are a code assistant. Output terse commands, one per line.
 
-Available commands:
+Commands:
 - skeleton <file> - show file structure
-- expand <symbol> - show full source of symbol
-- grep <pattern> <path> - search for pattern
-- deps <file> - show imports/dependencies
+- expand <symbol> - show full source
+- grep <pattern> <path> - search
+- deps <file> - imports/dependencies
 - callers <symbol> - who calls this
-- callees <symbol> - what does this call
-- validate - run linters/checks
-- fix: <description> - describe the fix to make
-- done - signal completion
+- callees <symbol> - what this calls
+- validate - run linters
+- fix: <description> - describe fix
+- breakdown: <step1>, <step2>, ... - split current task
+- note: <content> - remember for this task
+- done [summary] - complete current task
 
 Be terse. No prose. Just commands."""
 
-    async def _get_llm_response(self, user_message: str) -> str:
-        """Get next intent from LLM.
-
-        Args:
-            user_message: Result from previous tool or user input
+    def _preview_result(self, result: str) -> tuple[str, str | None]:
+        """Create preview of result, cache full if large.
 
         Returns:
-            LLM's terse response
+            (preview_text, result_id or None)
+        """
+        if len(result) <= RESULT_PREVIEW_LIMIT:
+            return result, None
+
+        # Store full result, return preview
+        self._result_counter += 1
+        result_id = f"r{self._result_counter:04d}"
+        self._result_cache[result_id] = result
+
+        preview = result[:RESULT_PREVIEW_LIMIT] + f"... [{result_id}]"
+        return preview, result_id
+
+    def _build_turn_context(self) -> str:
+        """Build context for current turn from TaskTree.
+
+        Returns minimal context: path + notes + last result preview.
+        """
+        parts = []
+
+        # Task path
+        if self._task_tree:
+            parts.append(self._task_tree.format_context())
+
+        # Last result
+        if self._last_result:
+            parts.append(f"\nLast result:\n{self._last_result}")
+
+        return "\n".join(parts) if parts else "(no context)"
+
+    async def _get_llm_response(self) -> str:
+        """Get next intent from LLM using context-excluded model.
+
+        No conversation history - just current state.
         """
         try:
             import litellm
@@ -275,27 +334,21 @@ Be terse. No prose. Just commands."""
             msg = "litellm required for DWIMLoop. Install with: pip install litellm"
             raise ImportError(msg) from e
 
-        # Add user message to context
-        self._context.append({"role": "user", "content": user_message})
+        # Build minimal context
+        context = self._build_turn_context()
 
-        # Build messages
-        messages = [{"role": "system", "content": self._build_system_prompt()}]
-        messages.extend(self._context)
+        messages = [
+            {"role": "system", "content": self._build_system_prompt()},
+            {"role": "user", "content": context},
+        ]
 
-        # Call LLM
         response = await litellm.acompletion(
             model=self.config.model,
             messages=messages,
             temperature=self.config.temperature,
         )
 
-        # Extract response
-        assistant_msg = response.choices[0].message.content or ""
-
-        # Add to context
-        self._context.append({"role": "assistant", "content": assistant_msg})
-
-        return assistant_msg.strip()
+        return (response.choices[0].message.content or "").strip()
 
     async def _execute_tool(self, tool_name: str, params: dict[str, Any]) -> Any:
         """Execute a tool and return result.
@@ -334,6 +387,46 @@ Be terse. No prose. Just commands."""
 
         return f"Unknown tool: {tool_name}"
 
+    def _handle_meta_command(self, intent: ParsedIntent) -> str | None:
+        """Handle meta-commands that modify TaskTree state.
+
+        Returns output string, or None if not a meta-command.
+        """
+        if not self._task_tree:
+            return None
+
+        verb = intent.verb
+
+        # breakdown: step1, step2, step3
+        if verb == "breakdown" and intent.content:
+            steps = [s.strip() for s in intent.content.split(",") if s.strip()]
+            if steps:
+                self._task_tree.breakdown(steps)
+                return f"Split into {len(steps)} subtasks"
+            return "No steps provided"
+
+        # note: content
+        if verb == "note" and intent.content:
+            self._task_tree.add_note(intent.content, NoteExpiry.ON_DONE)
+            return "Note added"
+
+        # done [summary]
+        if verb == "done":
+            summary = intent.target or intent.content or "completed"
+            result = self._task_tree.complete(summary)
+            if result is None:
+                return None  # Root complete - will exit loop
+            return f"Completed, now at: {result.goal}"
+
+        # fetch: result_id - expand cached result
+        if verb == "fetch" and intent.target:
+            result_id = intent.target
+            if result_id in self._result_cache:
+                return self._result_cache[result_id]
+            return f"Unknown result ID: {result_id}"
+
+        return None
+
     async def run(self, task: str) -> LoopResult:
         """Run the DWIM loop on a task.
 
@@ -344,23 +437,41 @@ Be terse. No prose. Just commands."""
             LoopResult with final state and all turns
         """
         self._turns = []
-        self._context = []
+        self._task_tree = TaskTree(task)
+        self._last_result = None
+        self._result_cache = {}
+        self._result_counter = 0
         start_time = datetime.now(UTC)
-
-        # Initial prompt
-        current_input = f"Task: {task}"
 
         try:
             for _turn_num in range(self.config.max_turns):
                 turn_start = datetime.now(UTC)
 
-                # Get LLM response
-                llm_response = await self._get_llm_response(current_input)
+                # Tick note counters
+                self._task_tree.tick_notes()
+
+                # Get LLM response (context built from TaskTree)
+                llm_response = await self._get_llm_response()
 
                 # Parse intent
                 intent = parse_intent(llm_response)
 
-                # Check for completion
+                # Handle meta-commands first
+                meta_output = self._handle_meta_command(intent)
+                if meta_output is not None:
+                    self._last_result, _ = self._preview_result(meta_output)
+                    duration = int((datetime.now(UTC) - turn_start).total_seconds() * 1000)
+                    self._turns.append(
+                        TurnResult(
+                            intent=intent,
+                            tool_match=None,
+                            tool_output=meta_output,
+                            duration_ms=duration,
+                        )
+                    )
+                    continue
+
+                # Check for root completion
                 if intent.verb == "done":
                     duration = int((datetime.now(UTC) - turn_start).total_seconds() * 1000)
                     self._turns.append(
@@ -390,6 +501,15 @@ Be terse. No prose. Just commands."""
                     output = None
                     error = str(e)
 
+                # Store result with preview
+                if output:
+                    result_str = str(output) if not isinstance(output, str) else output
+                    self._last_result, _ = self._preview_result(result_str)
+                elif error:
+                    self._last_result = f"Error: {error}"
+                else:
+                    self._last_result = "(no output)"
+
                 # Record turn
                 duration = int((datetime.now(UTC) - turn_start).total_seconds() * 1000)
                 self._turns.append(
@@ -401,16 +521,6 @@ Be terse. No prose. Just commands."""
                         duration_ms=duration,
                     )
                 )
-
-                # Format result for next turn
-                if error:
-                    current_input = f"Error: {error}"
-                elif output is None:
-                    current_input = "(no output)"
-                elif isinstance(output, str):
-                    current_input = output[:2000]  # Truncate large outputs
-                else:
-                    current_input = str(output)[:2000]
 
             # Max turns reached
             total_duration = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
