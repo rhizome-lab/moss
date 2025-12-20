@@ -8,6 +8,7 @@ from moss.memory import (
     Action,
     Episode,
     EpisodicStore,
+    LRUCache,
     MemoryLayer,
     MemoryManager,
     MemoryPlugin,
@@ -20,6 +21,117 @@ from moss.memory import (
     create_memory_manager,
     discover_plugins,
 )
+
+
+class TestLRUCache:
+    """Tests for LRUCache."""
+
+    def test_basic_put_get(self):
+        cache: LRUCache[str, int] = LRUCache(3)
+        cache.put("a", 1)
+        cache.put("b", 2)
+
+        assert cache.get("a") == 1
+        assert cache.get("b") == 2
+        assert cache.get("c") is None
+
+    def test_capacity_enforcement(self):
+        cache: LRUCache[str, int] = LRUCache(2)
+        cache.put("a", 1)
+        cache.put("b", 2)
+        evicted = cache.put("c", 3)
+
+        assert evicted == "a"  # LRU item evicted
+        assert len(cache) == 2
+        assert cache.get("a") is None
+        assert cache.get("b") == 2
+        assert cache.get("c") == 3
+
+    def test_lru_eviction_order(self):
+        cache: LRUCache[str, int] = LRUCache(3)
+        cache.put("a", 1)
+        cache.put("b", 2)
+        cache.put("c", 3)
+
+        # Access 'a' to make it recently used
+        cache.get("a")
+
+        # Add new item - 'b' should be evicted (least recently used)
+        evicted = cache.put("d", 4)
+
+        assert evicted == "b"
+        assert cache.get("a") == 1
+        assert cache.get("b") is None
+        assert cache.get("c") == 3
+        assert cache.get("d") == 4
+
+    def test_update_existing_key(self):
+        cache: LRUCache[str, int] = LRUCache(2)
+        cache.put("a", 1)
+        cache.put("b", 2)
+
+        # Update 'a' - should move to most recently used
+        evicted = cache.put("a", 10)
+
+        assert evicted is None  # No eviction on update
+        assert cache.get("a") == 10
+
+        # Add new item - 'b' should be evicted
+        evicted = cache.put("c", 3)
+        assert evicted == "b"
+
+    def test_delete(self):
+        cache: LRUCache[str, int] = LRUCache(3)
+        cache.put("a", 1)
+        cache.put("b", 2)
+
+        assert cache.delete("a")
+        assert not cache.delete("a")  # Already deleted
+        assert cache.get("a") is None
+        assert len(cache) == 1
+
+    def test_peek_does_not_update_order(self):
+        cache: LRUCache[str, int] = LRUCache(3)
+        cache.put("a", 1)
+        cache.put("b", 2)
+        cache.put("c", 3)
+
+        # Peek at 'a' - should NOT update order
+        assert cache.peek("a") == 1
+
+        # Add new item - 'a' should still be evicted (oldest)
+        evicted = cache.put("d", 4)
+        assert evicted == "a"
+
+    def test_contains(self):
+        cache: LRUCache[str, int] = LRUCache(3)
+        cache.put("a", 1)
+
+        assert "a" in cache
+        assert "b" not in cache
+
+    def test_iteration(self):
+        cache: LRUCache[str, int] = LRUCache(3)
+        cache.put("a", 1)
+        cache.put("b", 2)
+        cache.put("c", 3)
+
+        # Keys in LRU order (oldest first)
+        keys = list(cache.keys())
+        assert keys == ["a", "b", "c"]
+
+        # Access 'a' to change order
+        cache.get("a")
+        keys = list(cache.keys())
+        assert keys == ["b", "c", "a"]
+
+    def test_invalid_capacity(self):
+        with pytest.raises(ValueError, match="Capacity must be at least 1"):
+            LRUCache(0)
+
+    def test_capacity_property(self):
+        cache: LRUCache[str, int] = LRUCache(5)
+        assert cache.capacity == 5
 
 
 class TestStateSnapshot:
@@ -239,6 +351,95 @@ class TestEpisodicStore:
             await store.store(episode)
 
         assert store.count == 3  # Only 3 remain
+
+    async def test_lru_eviction_access_order(self):
+        """Test that LRU eviction respects access order, not insertion order."""
+        store = EpisodicStore(max_episodes=3)
+        stored_ids: list[str] = []
+
+        # Store 3 episodes
+        for i in range(3):
+            state = StateSnapshot.create(files=[f"file{i}.py"], context=f"code{i}")
+            action = Action.create(tool="edit", target=f"file{i}.py")
+            episode = Episode.create(state=state, action=action, outcome=Outcome.SUCCESS)
+            episode_id = await store.store(episode)
+            stored_ids.append(episode_id)
+
+        # Access first episode to make it recently used
+        await store.get(stored_ids[0])
+
+        # Store new episode - should evict stored_ids[1] (least recently used)
+        state = StateSnapshot.create(files=["file3.py"], context="code3")
+        action = Action.create(tool="edit", target="file3.py")
+        episode = Episode.create(state=state, action=action, outcome=Outcome.SUCCESS)
+        await store.store(episode)
+
+        # First episode should still exist (was accessed)
+        assert await store.get(stored_ids[0]) is not None
+        # Second episode should be evicted (LRU)
+        assert await store.get(stored_ids[1]) is None
+        # Third episode should exist
+        assert await store.get(stored_ids[2]) is not None
+
+    async def test_lru_eviction_cleans_indices(self):
+        """Test that LRU eviction properly cleans up secondary indices."""
+        store = EpisodicStore(max_episodes=2)
+
+        # Store first episode with a tag
+        state1 = StateSnapshot.create(files=["file1.py"], context="code1")
+        action1 = Action.create(tool="edit", target="file1.py")
+        episode1 = Episode.create(
+            state=state1, action=action1, outcome=Outcome.SUCCESS, tags={"tagged"}
+        )
+        await store.store(episode1)
+
+        # Store second episode
+        state2 = StateSnapshot.create(files=["file2.py"], context="code2")
+        action2 = Action.create(tool="shell", target="file2.py")
+        episode2 = Episode.create(state=state2, action=action2, outcome=Outcome.FAILURE)
+        await store.store(episode2)
+
+        # Store third episode - should evict first
+        state3 = StateSnapshot.create(files=["file3.py"], context="code3")
+        action3 = Action.create(tool="test", target="file3.py")
+        episode3 = Episode.create(state=state3, action=action3, outcome=Outcome.SUCCESS)
+        await store.store(episode3)
+
+        # Check indices are cleaned
+        assert len(await store.find_by_tag("tagged")) == 0  # Tag removed
+        assert len(await store.find_failures()) == 1  # Failure still there
+        stats = store.stats()
+        assert stats["total"] == 2
+        # edit tool should be gone from stats
+        assert "edit" not in stats["by_tool"] or stats["by_tool"]["edit"] == 0
+
+
+class TestSimpleVectorIndexLRU:
+    """Tests for SimpleVectorIndex with LRU caching."""
+
+    async def test_index_with_max_items(self):
+        index = SimpleVectorIndex(max_items=3)
+        await index.index("1", "python code", {"type": "code"})
+        await index.index("2", "python test", {"type": "test"})
+        await index.index("3", "javascript", {"type": "code"})
+        await index.index("4", "rust code", {"type": "code"})  # Evicts "1"
+
+        results = await index.search("python")
+        result_ids = [r[0] for r in results]
+
+        assert "1" not in result_ids  # Was evicted
+        assert "2" in result_ids
+
+    async def test_index_without_max_items(self):
+        """Test that index without max_items has no limit."""
+        index = SimpleVectorIndex()  # No max_items
+
+        for i in range(100):
+            await index.index(str(i), f"content {i}", {})
+
+        # Search with high limit to verify all items are stored
+        results = await index.search("content", limit=200)
+        assert len(results) == 100  # All items stored
 
 
 class TestSemanticRule:

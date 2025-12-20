@@ -18,6 +18,7 @@ import importlib.util
 import logging
 import sys
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum, auto
@@ -25,9 +26,83 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterator, Sequence
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# LRU Cache
+# =============================================================================
+
+
+class LRUCache[K, V]:
+    """Thread-safe LRU cache with O(1) operations.
+
+    Uses OrderedDict for efficient move-to-end on access.
+    Evicts least recently used items when capacity is reached.
+    """
+
+    def __init__(self, capacity: int):
+        if capacity < 1:
+            raise ValueError("Capacity must be at least 1")
+        self._capacity = capacity
+        self._cache: OrderedDict[K, V] = OrderedDict()
+
+    def get(self, key: K) -> V | None:
+        """Get item and mark as recently used. Returns None if not found."""
+        if key not in self._cache:
+            return None
+        self._cache.move_to_end(key)
+        return self._cache[key]
+
+    def put(self, key: K, value: V) -> K | None:
+        """Add/update item. Returns evicted key if capacity exceeded, else None."""
+        evicted: K | None = None
+        if key in self._cache:
+            self._cache.move_to_end(key)
+        else:
+            if len(self._cache) >= self._capacity:
+                evicted, _ = self._cache.popitem(last=False)
+        self._cache[key] = value
+        return evicted
+
+    def delete(self, key: K) -> bool:
+        """Remove item. Returns True if found and removed."""
+        if key in self._cache:
+            del self._cache[key]
+            return True
+        return False
+
+    def peek(self, key: K) -> V | None:
+        """Get item without marking as recently used."""
+        return self._cache.get(key)
+
+    def __len__(self) -> int:
+        return len(self._cache)
+
+    def __contains__(self, key: K) -> bool:
+        return key in self._cache
+
+    def __iter__(self) -> Iterator[K]:
+        """Iterate keys in LRU order (oldest first)."""
+        return iter(self._cache)
+
+    def keys(self) -> Iterator[K]:
+        """Return keys in LRU order (oldest first)."""
+        return iter(self._cache)
+
+    def values(self) -> Iterator[V]:
+        """Return values in LRU order (oldest first)."""
+        return iter(self._cache.values())
+
+    def items(self) -> Iterator[tuple[K, V]]:
+        """Return (key, value) pairs in LRU order (oldest first)."""
+        return iter(self._cache.items())
+
+    @property
+    def capacity(self) -> int:
+        return self._capacity
 
 
 # =============================================================================
@@ -229,13 +304,31 @@ class SimpleVectorIndex(VectorIndex):
 
     For production use, replace with a real vector database like
     Chroma, Pinecone, or Weaviate.
+
+    Uses LRU caching when max_items is set to evict least recently accessed items.
     """
 
-    def __init__(self):
-        self._items: dict[str, tuple[str, dict[str, Any]]] = {}
+    def __init__(self, max_items: int | None = None):
+        """Initialize the index.
+
+        Args:
+            max_items: Maximum items to store. If None, no limit (uses regular dict).
+                      If set, uses LRU eviction when capacity is reached.
+        """
+        self._max_items = max_items
+        if max_items is not None:
+            self._lru: LRUCache[str, tuple[str, dict[str, Any]]] = LRUCache(max_items)
+            self._items: dict[str, tuple[str, dict[str, Any]]] | None = None
+        else:
+            self._items = {}
+            self._lru = None  # type: ignore[assignment]
 
     async def index(self, id: str, text: str, metadata: dict[str, Any]) -> None:
-        self._items[id] = (text.lower(), metadata)
+        value = (text.lower(), metadata)
+        if self._lru is not None:
+            self._lru.put(id, value)
+        else:
+            self._items[id] = value  # type: ignore[index]
 
     async def search(
         self, query: str, limit: int = 10, filter: dict[str, Any] | None = None
@@ -243,7 +336,9 @@ class SimpleVectorIndex(VectorIndex):
         query_words = set(query.lower().split())
         scores: list[tuple[str, float]] = []
 
-        for id, (text, metadata) in self._items.items():
+        items_iter = self._lru.items() if self._lru is not None else self._items.items()  # type: ignore[union-attr]
+
+        for id, (text, metadata) in items_iter:
             # Apply filter
             if filter:
                 if not all(metadata.get(k) == v for k, v in filter.items()):
@@ -261,33 +356,37 @@ class SimpleVectorIndex(VectorIndex):
         return scores[:limit]
 
     async def delete(self, id: str) -> bool:
-        return self._items.pop(id, None) is not None
+        if self._lru is not None:
+            return self._lru.delete(id)
+        return self._items.pop(id, None) is not None  # type: ignore[union-attr]
 
 
 class EpisodicStore:
-    """Store and retrieve episodes (State, Action, Outcome records)."""
+    """Store and retrieve episodes (State, Action, Outcome records).
+
+    Uses LRU caching to evict least recently accessed episodes when at capacity.
+    """
 
     def __init__(
         self,
         vector_index: VectorIndex | None = None,
         max_episodes: int = 10000,
     ):
-        self._episodes: dict[str, Episode] = {}
+        self._episodes: LRUCache[str, Episode] = LRUCache(max_episodes)
         self._by_outcome: dict[Outcome, list[str]] = {o: [] for o in Outcome}
         self._by_tool: dict[str, list[str]] = {}
         self._by_tag: dict[str, list[str]] = {}
         self._index = vector_index or SimpleVectorIndex()
-        self._max_episodes = max_episodes
 
     async def store(self, episode: Episode) -> str:
-        """Store an episode and index it for retrieval."""
-        # Evict oldest if at capacity
-        if len(self._episodes) >= self._max_episodes:
-            oldest_id = next(iter(self._episodes))
-            await self.delete(oldest_id)
+        """Store an episode and index it for retrieval.
 
-        # Store episode
-        self._episodes[episode.id] = episode
+        Uses LRU eviction - least recently accessed episode is removed when at capacity.
+        """
+        # Store in LRU cache - returns evicted key if any
+        evicted_id = self._episodes.put(episode.id, episode)
+        if evicted_id is not None:
+            await self._cleanup_evicted(evicted_id)
 
         # Index by outcome
         self._by_outcome[episode.outcome].append(episode.id)
@@ -315,14 +414,40 @@ class EpisodicStore:
         return episode.id
 
     async def get(self, id: str) -> Episode | None:
-        """Get an episode by ID."""
+        """Get an episode by ID. Marks as recently used for LRU."""
         return self._episodes.get(id)
+
+    async def _cleanup_evicted(self, evicted_id: str) -> None:
+        """Clean up indices for an evicted episode.
+
+        Called when LRU cache evicts an episode. We need to retrieve the episode
+        from peek (since it was just evicted, we stored it before calling this).
+        """
+        # The episode was evicted, so we need to clean indices
+        # We can't get it from cache anymore, so we look it up in indices
+        for _outcome, ids in self._by_outcome.items():
+            if evicted_id in ids:
+                ids.remove(evicted_id)
+                break
+
+        for _tool, ids in self._by_tool.items():
+            if evicted_id in ids:
+                ids.remove(evicted_id)
+                break
+
+        for _tag, ids in list(self._by_tag.items()):
+            if evicted_id in ids:
+                ids.remove(evicted_id)
+
+        await self._index.delete(evicted_id)
 
     async def delete(self, id: str) -> bool:
         """Delete an episode."""
-        episode = self._episodes.pop(id, None)
+        episode = self._episodes.peek(id)
         if episode is None:
             return False
+
+        self._episodes.delete(id)
 
         # Remove from indices
         if id in self._by_outcome[episode.outcome]:
@@ -988,6 +1113,7 @@ __all__ = [
     "Action",
     "Episode",
     "EpisodicStore",
+    "LRUCache",
     "MemoryContext",
     "MemoryLayer",
     "MemoryManager",

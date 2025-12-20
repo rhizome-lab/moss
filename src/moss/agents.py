@@ -734,3 +734,508 @@ def create_manager(
 ) -> Manager:
     """Create a manager with default settings."""
     return Manager(shadow_git, event_bus)
+
+
+# =============================================================================
+# Swarm Coordination Patterns
+# =============================================================================
+
+
+class SwarmPattern(Enum):
+    """Common swarm coordination patterns."""
+
+    FORK_JOIN = auto()  # Split work, gather all results
+    PIPELINE = auto()  # Chain workers, each processes previous output
+    MAP_REDUCE = auto()  # Parallel map, then aggregate reduce
+    VOTING = auto()  # Multiple workers same task, pick best
+    RACE = auto()  # First completion wins
+    SUPERVISED = auto()  # Monitor and restart failed workers
+
+
+@dataclass
+class SwarmResult:
+    """Result of swarm execution."""
+
+    pattern: SwarmPattern
+    results: list[TicketResult]
+    aggregated: Any = None  # Pattern-specific aggregated result
+    duration_ms: int = 0
+    success: bool = True
+    error: str | None = None
+
+    @property
+    def successful_count(self) -> int:
+        return sum(1 for r in self.results if r.success)
+
+    @property
+    def failed_count(self) -> int:
+        return sum(1 for r in self.results if not r.success)
+
+
+WorkerFactory = Any  # Callable[[], Worker]
+ReducerFunc = Any  # Callable[[list[TicketResult]], Any]
+VoterFunc = Any  # Callable[[list[TicketResult]], TicketResult]
+TransformFunc = Any  # Callable[[TicketResult], Ticket]
+
+
+class SwarmCoordinator(EventEmitterMixin):
+    """Coordinator for common swarm patterns.
+
+    Provides high-level APIs for:
+    - fork_join: parallel execution, wait for all
+    - pipeline: sequential chain with data flow
+    - map_reduce: parallel map, aggregate reduce
+    - voting: consensus from multiple workers
+    - race: first completion wins
+    """
+
+    def __init__(
+        self,
+        manager: Manager,
+        event_bus: EventBus | None = None,
+    ):
+        self.manager = manager
+        self.event_bus = event_bus or manager.event_bus
+
+    async def fork_join(
+        self,
+        tickets: list[Ticket],
+        worker_factory: WorkerFactory,
+        timeout: float | None = None,
+    ) -> SwarmResult:
+        """Execute tickets in parallel, wait for all to complete.
+
+        Classic fork-join pattern:
+        1. Fork: spawn N workers for N tickets
+        2. Execute: all work in parallel
+        3. Join: gather all results
+
+        Args:
+            tickets: Tasks to execute in parallel
+            worker_factory: Creates workers for each ticket
+            timeout: Max wait time in seconds
+
+        Returns:
+            SwarmResult with all individual results
+        """
+        start = datetime.now(UTC)
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {"action": "swarm_fork_join_start", "ticket_count": len(tickets)},
+        )
+
+        results = await self.manager.delegate_parallel(tickets, worker_factory)
+
+        duration = int((datetime.now(UTC) - start).total_seconds() * 1000)
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {
+                "action": "swarm_fork_join_complete",
+                "success_count": sum(1 for r in results if r.success),
+                "duration_ms": duration,
+            },
+        )
+
+        return SwarmResult(
+            pattern=SwarmPattern.FORK_JOIN,
+            results=list(results),
+            duration_ms=duration,
+            success=all(r.success for r in results),
+        )
+
+    async def pipeline(
+        self,
+        initial_ticket: Ticket,
+        stages: list[tuple[WorkerFactory, TransformFunc]],
+        stop_on_failure: bool = True,
+    ) -> SwarmResult:
+        """Execute workers in sequence, each processing previous output.
+
+        Pipeline pattern:
+        1. Worker A processes initial ticket
+        2. Transform A's result into ticket for worker B
+        3. Worker B processes, transform for C, etc.
+
+        Args:
+            initial_ticket: Starting ticket
+            stages: List of (worker_factory, transform_func) pairs
+            stop_on_failure: If True, stop pipeline on first failure
+
+        Returns:
+            SwarmResult with results from each stage
+        """
+        start = datetime.now(UTC)
+        results: list[TicketResult] = []
+        current_ticket = initial_ticket
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {"action": "swarm_pipeline_start", "stage_count": len(stages)},
+        )
+
+        for i, (worker_factory, transform) in enumerate(stages):
+            worker = worker_factory()
+            result = await self.manager.delegate(current_ticket, worker)
+            results.append(result)
+
+            if not result.success and stop_on_failure:
+                await self._emit(
+                    EventType.TOOL_CALL,
+                    {"action": "swarm_pipeline_failed", "stage": i, "error": result.error},
+                )
+                break
+
+            # Transform result for next stage (if not last)
+            if i < len(stages) - 1:
+                current_ticket = transform(result)
+
+        duration = int((datetime.now(UTC) - start).total_seconds() * 1000)
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {
+                "action": "swarm_pipeline_complete",
+                "stages_completed": len(results),
+                "duration_ms": duration,
+            },
+        )
+
+        return SwarmResult(
+            pattern=SwarmPattern.PIPELINE,
+            results=results,
+            duration_ms=duration,
+            success=all(r.success for r in results),
+        )
+
+    async def map_reduce(
+        self,
+        tickets: list[Ticket],
+        worker_factory: WorkerFactory,
+        reducer: ReducerFunc,
+        timeout: float | None = None,
+    ) -> SwarmResult:
+        """Map work across workers, then reduce results.
+
+        MapReduce pattern:
+        1. Map: execute tickets in parallel
+        2. Reduce: aggregate results with reducer function
+
+        Args:
+            tickets: Tasks to map
+            worker_factory: Creates workers for each ticket
+            reducer: Aggregates results into final value
+            timeout: Max wait time
+
+        Returns:
+            SwarmResult with aggregated field set
+        """
+        start = datetime.now(UTC)
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {"action": "swarm_map_reduce_start", "map_count": len(tickets)},
+        )
+
+        # Map phase
+        results = await self.manager.delegate_parallel(tickets, worker_factory)
+
+        # Reduce phase
+        aggregated = reducer(list(results))
+
+        duration = int((datetime.now(UTC) - start).total_seconds() * 1000)
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {"action": "swarm_map_reduce_complete", "duration_ms": duration},
+        )
+
+        return SwarmResult(
+            pattern=SwarmPattern.MAP_REDUCE,
+            results=list(results),
+            aggregated=aggregated,
+            duration_ms=duration,
+            success=all(r.success for r in results),
+        )
+
+    async def voting(
+        self,
+        ticket: Ticket,
+        worker_factory: WorkerFactory,
+        voter_count: int = 3,
+        voter: VoterFunc | None = None,
+    ) -> SwarmResult:
+        """Run same task on multiple workers, pick best result.
+
+        Voting/consensus pattern:
+        1. Spawn N workers for same ticket
+        2. All execute in parallel
+        3. Voter function picks best result (default: majority success)
+
+        Args:
+            ticket: Task for all workers
+            worker_factory: Creates worker instances
+            voter_count: Number of workers to spawn
+            voter: Picks best result (default: first successful)
+
+        Returns:
+            SwarmResult with aggregated set to winning result
+        """
+        start = datetime.now(UTC)
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {"action": "swarm_voting_start", "voter_count": voter_count},
+        )
+
+        # Create copies of ticket for each worker
+        tickets = [
+            Ticket.create(
+                task=ticket.task,
+                handles=ticket.handles,
+                constraints=ticket.constraints,
+                priority=ticket.priority,
+                parent_id=ticket.id,
+            )
+            for _ in range(voter_count)
+        ]
+
+        results = await self.manager.delegate_parallel(tickets, worker_factory)
+
+        # Default voter: first successful result
+        if voter is None:
+            winner = next((r for r in results if r.success), results[0])
+        else:
+            winner = voter(list(results))
+
+        duration = int((datetime.now(UTC) - start).total_seconds() * 1000)
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {
+                "action": "swarm_voting_complete",
+                "winner_success": winner.success,
+                "duration_ms": duration,
+            },
+        )
+
+        return SwarmResult(
+            pattern=SwarmPattern.VOTING,
+            results=list(results),
+            aggregated=winner,
+            duration_ms=duration,
+            success=winner.success,
+        )
+
+    async def race(
+        self,
+        tickets: list[Ticket],
+        worker_factory: WorkerFactory,
+        cancel_losers: bool = True,
+    ) -> SwarmResult:
+        """First worker to complete wins.
+
+        Race pattern:
+        1. Spawn workers for all tickets
+        2. Return as soon as any completes
+        3. Optionally cancel remaining workers
+
+        Args:
+            tickets: Tasks to race
+            worker_factory: Creates workers
+            cancel_losers: Cancel workers that didn't win
+
+        Returns:
+            SwarmResult with winner as first result
+        """
+        start = datetime.now(UTC)
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {"action": "swarm_race_start", "racer_count": len(tickets)},
+        )
+
+        # Spawn all in background
+        ticket_ids = self.manager.spawn_many_async(tickets, worker_factory)
+
+        # Wait for first to complete
+        winner_pair = await self.manager.wait_any(ticket_ids)
+
+        # Cancel losers if requested
+        if cancel_losers and winner_pair:
+            winner_id, _winner_result = winner_pair
+            for tid in ticket_ids:
+                if tid != winner_id:
+                    self.manager.cancel(tid)
+
+        duration = int((datetime.now(UTC) - start).total_seconds() * 1000)
+
+        results = [winner_pair[1]] if winner_pair else []
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {
+                "action": "swarm_race_complete",
+                "winner_id": winner_pair[0] if winner_pair else None,
+                "duration_ms": duration,
+            },
+        )
+
+        return SwarmResult(
+            pattern=SwarmPattern.RACE,
+            results=results,
+            aggregated=winner_pair[1] if winner_pair else None,
+            duration_ms=duration,
+            success=bool(results and results[0].success),
+        )
+
+    async def with_retry(
+        self,
+        ticket: Ticket,
+        worker_factory: WorkerFactory,
+        max_retries: int = 3,
+        delay_ms: int = 1000,
+    ) -> SwarmResult:
+        """Retry failed tasks with exponential backoff.
+
+        Args:
+            ticket: Task to execute
+            worker_factory: Creates workers
+            max_retries: Max retry attempts
+            delay_ms: Initial delay between retries (doubles each retry)
+
+        Returns:
+            SwarmResult with all attempt results
+        """
+        start = datetime.now(UTC)
+        results: list[TicketResult] = []
+        current_delay = delay_ms
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {"action": "swarm_retry_start", "max_retries": max_retries},
+        )
+
+        for attempt in range(max_retries + 1):
+            worker = worker_factory()
+            result = await self.manager.delegate(ticket, worker)
+            results.append(result)
+
+            if result.success:
+                break
+
+            if attempt < max_retries:
+                await asyncio.sleep(current_delay / 1000.0)
+                current_delay *= 2  # Exponential backoff
+
+        duration = int((datetime.now(UTC) - start).total_seconds() * 1000)
+        final_success = results[-1].success if results else False
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {
+                "action": "swarm_retry_complete",
+                "attempts": len(results),
+                "success": final_success,
+                "duration_ms": duration,
+            },
+        )
+
+        return SwarmResult(
+            pattern=SwarmPattern.SUPERVISED,
+            results=results,
+            aggregated=results[-1] if results else None,
+            duration_ms=duration,
+            success=final_success,
+        )
+
+    async def supervised(
+        self,
+        tickets: list[Ticket],
+        worker_factory: WorkerFactory,
+        max_failures: int = 3,
+        restart_delay_ms: int = 500,
+    ) -> SwarmResult:
+        """Monitor workers and restart failed ones.
+
+        Supervised pattern:
+        1. Spawn workers in background
+        2. Monitor for failures
+        3. Restart failed workers up to max_failures total
+        4. Return when all succeed or max failures reached
+
+        Args:
+            tickets: Tasks to supervise
+            worker_factory: Creates workers
+            max_failures: Max total failures before giving up
+            restart_delay_ms: Delay before restarting failed worker
+
+        Returns:
+            SwarmResult with all attempt results
+        """
+        start = datetime.now(UTC)
+        all_results: list[TicketResult] = []
+        failure_count = 0
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {"action": "swarm_supervised_start", "ticket_count": len(tickets)},
+        )
+
+        # Track pending tickets
+        pending = list(tickets)
+        completed: set[str] = set()
+
+        while pending and failure_count < max_failures:
+            # Spawn batch
+            ticket_ids = self.manager.spawn_many_async(pending, worker_factory)
+            pending.clear()
+
+            # Wait for all to complete
+            results = await self.manager.wait_all(ticket_ids)
+
+            for tid, result in results.items():
+                all_results.append(result)
+                if result.success:
+                    completed.add(tid)
+                else:
+                    failure_count += 1
+                    if failure_count < max_failures:
+                        # Retry this ticket
+                        orig_ticket = self.manager.get_ticket(tid)
+                        if orig_ticket:
+                            pending.append(orig_ticket)
+                            await asyncio.sleep(restart_delay_ms / 1000.0)
+
+        duration = int((datetime.now(UTC) - start).total_seconds() * 1000)
+
+        await self._emit(
+            EventType.TOOL_CALL,
+            {
+                "action": "swarm_supervised_complete",
+                "completed": len(completed),
+                "failures": failure_count,
+                "duration_ms": duration,
+            },
+        )
+
+        error_msg = None
+        if failure_count >= max_failures:
+            error_msg = f"Max failures ({max_failures}) reached"
+
+        return SwarmResult(
+            pattern=SwarmPattern.SUPERVISED,
+            results=all_results,
+            duration_ms=duration,
+            success=len(completed) == len(tickets),
+            error=error_msg,
+        )
+
+
+def create_swarm_coordinator(
+    manager: Manager,
+    event_bus: EventBus | None = None,
+) -> SwarmCoordinator:
+    """Create a swarm coordinator with default settings."""
+    return SwarmCoordinator(manager, event_bus)

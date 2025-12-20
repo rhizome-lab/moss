@@ -4,10 +4,26 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Memory plugins with LRU caching
-- Agent swarm coordination patterns
+- Config schema in `.moss/config.toml` for memory system
+- Workflow self-creation from detected patterns
 
 ## Recently Completed
+
+- **Memory plugins with LRU caching** (Dec 2025):
+  - `LRUCache[K, V]` generic class with O(1) operations
+  - `EpisodicStore` now uses LRU eviction (least recently accessed)
+  - `SimpleVectorIndex` supports optional `max_items` with LRU
+  - Full test coverage for LRU behavior
+
+- **Agent swarm coordination patterns** (Dec 2025):
+  - `SwarmCoordinator` with common patterns
+  - Fork-join: parallel execution, wait for all
+  - Pipeline: sequential chain with data transformation
+  - MapReduce: parallel map, aggregate reduce
+  - Voting: consensus from multiple workers
+  - Race: first completion wins
+  - Retry with exponential backoff
+  - Supervised: monitor and restart failed workers
 
 - **Persistent terminal sessions** (Dec 2025):
   - `PersistentShell` maintains state across commands (cd, export, aliases)

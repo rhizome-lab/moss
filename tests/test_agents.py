@@ -10,12 +10,16 @@ from moss.agents import (
     Manager,
     MergeStrategy,
     SimpleWorker,
+    SwarmCoordinator,
+    SwarmPattern,
+    SwarmResult,
     Ticket,
     TicketPriority,
     TicketResult,
     TicketStatus,
     WorkerStatus,
     create_manager,
+    create_swarm_coordinator,
 )
 from moss.handles import HandleRef
 from moss.shadow_git import ShadowBranch, ShadowGit
@@ -301,3 +305,241 @@ class TestCreateManager:
         assert manager is not None
         assert manager.shadow_git is shadow_git
         assert manager.merge_strategy == MergeStrategy.SQUASH
+
+
+# =============================================================================
+# Swarm Coordination Tests
+# =============================================================================
+
+
+class TestSwarmResult:
+    """Tests for SwarmResult."""
+
+    def test_successful_count(self):
+        results = [
+            TicketResult(ticket_id="1", success=True, summary="ok"),
+            TicketResult(ticket_id="2", success=False, summary="fail"),
+            TicketResult(ticket_id="3", success=True, summary="ok"),
+        ]
+        swarm = SwarmResult(pattern=SwarmPattern.FORK_JOIN, results=results)
+
+        assert swarm.successful_count == 2
+        assert swarm.failed_count == 1
+
+
+class TestSwarmCoordinator:
+    """Tests for SwarmCoordinator."""
+
+    @pytest.fixture
+    def coordinator(self, shadow_git: ShadowGit):
+        manager = create_manager(shadow_git)
+        return create_swarm_coordinator(manager)
+
+    @pytest.fixture
+    def success_executor(self):
+        async def executor(ticket: Ticket, branch: ShadowBranch) -> TicketResult:
+            return TicketResult(
+                ticket_id=ticket.id,
+                success=True,
+                summary=f"Completed: {ticket.task}",
+            )
+
+        return executor
+
+    @pytest.fixture
+    def counting_executor(self):
+        """Executor that tracks call count."""
+        call_count = {"value": 0}
+
+        async def executor(ticket: Ticket, branch: ShadowBranch) -> TicketResult:
+            call_count["value"] += 1
+            return TicketResult(
+                ticket_id=ticket.id,
+                success=True,
+                summary=f"Call #{call_count['value']}",
+            )
+
+        return executor, call_count
+
+    async def test_fork_join_all_success(
+        self, coordinator: SwarmCoordinator, shadow_git: ShadowGit, success_executor
+    ):
+        tickets = [Ticket.create(f"Task {i}") for i in range(3)]
+
+        def worker_factory():
+            return SimpleWorker(shadow_git, success_executor)
+
+        result = await coordinator.fork_join(tickets, worker_factory)
+
+        assert result.pattern == SwarmPattern.FORK_JOIN
+        assert result.success
+        assert len(result.results) == 3
+        assert result.successful_count == 3
+
+    async def test_fork_join_partial_failure(
+        self, coordinator: SwarmCoordinator, shadow_git: ShadowGit
+    ):
+        async def sometimes_fails(ticket: Ticket, branch: ShadowBranch) -> TicketResult:
+            success = "0" in ticket.task or "2" in ticket.task
+            return TicketResult(
+                ticket_id=ticket.id,
+                success=success,
+                summary="ok" if success else "fail",
+            )
+
+        tickets = [Ticket.create(f"Task {i}") for i in range(3)]
+
+        def worker_factory():
+            return SimpleWorker(shadow_git, sometimes_fails)
+
+        result = await coordinator.fork_join(tickets, worker_factory)
+
+        assert not result.success  # One failure means overall failure
+        assert result.successful_count == 2
+        assert result.failed_count == 1
+
+    async def test_pipeline_all_stages(self, coordinator: SwarmCoordinator, shadow_git: ShadowGit):
+        stage_order: list[str] = []
+
+        async def stage_executor(ticket: Ticket, branch: ShadowBranch) -> TicketResult:
+            stage_order.append(ticket.task)
+            return TicketResult(
+                ticket_id=ticket.id,
+                success=True,
+                summary=f"Stage done: {ticket.task}",
+            )
+
+        def transform(result: TicketResult) -> Ticket:
+            return Ticket.create(f"After {result.summary}")
+
+        initial = Ticket.create("Stage 1")
+        stages = [
+            (lambda: SimpleWorker(shadow_git, stage_executor), transform),
+            (lambda: SimpleWorker(shadow_git, stage_executor), transform),
+        ]
+
+        result = await coordinator.pipeline(initial, stages)
+
+        assert result.pattern == SwarmPattern.PIPELINE
+        assert result.success
+        assert len(result.results) == 2
+        assert "Stage 1" in stage_order[0]
+
+    async def test_pipeline_stops_on_failure(
+        self, coordinator: SwarmCoordinator, shadow_git: ShadowGit
+    ):
+        call_count = {"value": 0}
+
+        async def failing_after_first(ticket: Ticket, branch: ShadowBranch) -> TicketResult:
+            call_count["value"] += 1
+            return TicketResult(
+                ticket_id=ticket.id,
+                success=(call_count["value"] == 1),
+                summary="ok" if call_count["value"] == 1 else "fail",
+            )
+
+        def transform(result: TicketResult) -> Ticket:
+            return Ticket.create("Next stage")
+
+        initial = Ticket.create("Start")
+        stages = [
+            (lambda: SimpleWorker(shadow_git, failing_after_first), transform),
+            (lambda: SimpleWorker(shadow_git, failing_after_first), transform),
+            (lambda: SimpleWorker(shadow_git, failing_after_first), transform),
+        ]
+
+        result = await coordinator.pipeline(initial, stages, stop_on_failure=True)
+
+        assert not result.success
+        assert len(result.results) == 2  # Stopped after second stage failed
+
+    async def test_map_reduce(
+        self, coordinator: SwarmCoordinator, shadow_git: ShadowGit, success_executor
+    ):
+        tickets = [Ticket.create(f"Task {i}") for i in range(3)]
+
+        def worker_factory():
+            return SimpleWorker(shadow_git, success_executor)
+
+        def reducer(results: list[TicketResult]) -> int:
+            return sum(1 for r in results if r.success)
+
+        result = await coordinator.map_reduce(tickets, worker_factory, reducer)
+
+        assert result.pattern == SwarmPattern.MAP_REDUCE
+        assert result.aggregated == 3  # All succeeded
+        assert result.success
+
+    async def test_voting_picks_winner(self, coordinator: SwarmCoordinator, shadow_git: ShadowGit):
+        async def varied_executor(ticket: Ticket, branch: ShadowBranch) -> TicketResult:
+            # One will fail
+            return TicketResult(
+                ticket_id=ticket.id,
+                success=("fail" not in ticket.task),
+                summary=ticket.task,
+            )
+
+        ticket = Ticket.create("Test voting")
+
+        def worker_factory():
+            return SimpleWorker(shadow_git, varied_executor)
+
+        result = await coordinator.voting(ticket, worker_factory, voter_count=3)
+
+        assert result.pattern == SwarmPattern.VOTING
+        assert len(result.results) == 3
+        assert result.aggregated is not None
+        assert result.aggregated.success  # Default voter picks first success
+
+    async def test_with_retry_succeeds_eventually(
+        self, coordinator: SwarmCoordinator, shadow_git: ShadowGit
+    ):
+        attempt = {"count": 0}
+
+        async def fails_twice(ticket: Ticket, branch: ShadowBranch) -> TicketResult:
+            attempt["count"] += 1
+            return TicketResult(
+                ticket_id=ticket.id,
+                success=(attempt["count"] >= 3),
+                summary=f"Attempt {attempt['count']}",
+            )
+
+        ticket = Ticket.create("Retry test")
+
+        def worker_factory():
+            return SimpleWorker(shadow_git, fails_twice)
+
+        result = await coordinator.with_retry(ticket, worker_factory, max_retries=3, delay_ms=1)
+
+        assert result.success
+        assert len(result.results) == 3  # Two failures, one success
+        assert result.aggregated.success
+
+    async def test_with_retry_gives_up(self, coordinator: SwarmCoordinator, shadow_git: ShadowGit):
+        async def always_fails(ticket: Ticket, branch: ShadowBranch) -> TicketResult:
+            return TicketResult(
+                ticket_id=ticket.id,
+                success=False,
+                summary="Always fails",
+            )
+
+        ticket = Ticket.create("Always fail")
+
+        def worker_factory():
+            return SimpleWorker(shadow_git, always_fails)
+
+        result = await coordinator.with_retry(ticket, worker_factory, max_retries=2, delay_ms=1)
+
+        assert not result.success
+        assert len(result.results) == 3  # Initial + 2 retries
+
+
+class TestCreateSwarmCoordinator:
+    """Tests for create_swarm_coordinator."""
+
+    def test_creates_coordinator(self, shadow_git: ShadowGit):
+        manager = create_manager(shadow_git)
+        coordinator = create_swarm_coordinator(manager)
+
+        assert coordinator is not None
+        assert coordinator.manager is manager
