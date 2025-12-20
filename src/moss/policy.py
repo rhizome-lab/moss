@@ -356,6 +356,444 @@ class PathPolicy(Policy):
         return PolicyResult(decision=PolicyDecision.ALLOW, policy_name=self.name)
 
 
+class CommandPolicy(Policy):
+    """Sandbox bash/shell commands.
+
+    Evaluates commands against allowlists and blocklists.
+    Detects dangerous patterns like rm -rf, curl|bash, etc.
+    """
+
+    from typing import ClassVar
+
+    # Commands that are always blocked
+    BLOCKED_COMMANDS: ClassVar[set[str]] = {
+        "rm",  # File deletion - use safe wrapper
+        "rmdir",
+        "mkfs",
+        "dd",
+        "fdisk",
+        "parted",
+        "mount",
+        "umount",
+        "shutdown",
+        "reboot",
+        "poweroff",
+        "init",
+        "systemctl",
+        "service",
+        "kill",
+        "killall",
+        "pkill",
+        "su",
+        "sudo",
+        "doas",
+        "chown",
+        "chmod",
+        "chgrp",
+        "useradd",
+        "userdel",
+        "usermod",
+        "groupadd",
+        "passwd",
+        "visudo",
+        "crontab",
+        "at",
+        "nc",
+        "netcat",
+        "ncat",
+        "telnet",
+        "ssh",  # Use safe wrapper with controlled hosts
+        "scp",
+        "sftp",
+        "rsync",
+        "wget",
+        "curl",  # Use safe wrapper with allowlisted URLs
+        "ftp",
+        "nmap",
+        "tcpdump",
+        "iptables",
+        "ip6tables",
+        "firewall-cmd",
+        "ufw",
+    }
+
+    # Commands that are always allowed (read-only, safe)
+    ALLOWED_COMMANDS: ClassVar[set[str]] = {
+        "ls",
+        "pwd",
+        "echo",
+        "printf",
+        "cat",
+        "head",
+        "tail",
+        "less",
+        "more",
+        "wc",
+        "sort",
+        "uniq",
+        "cut",
+        "tr",
+        "grep",
+        "egrep",
+        "fgrep",
+        "rg",
+        "ag",
+        "ack",
+        "find",
+        "locate",
+        "which",
+        "whereis",
+        "type",
+        "file",
+        "stat",
+        "date",
+        "cal",
+        "uptime",
+        "uname",
+        "hostname",
+        "whoami",
+        "id",
+        "env",
+        "printenv",
+        "set",
+        "tree",
+        "diff",
+        "cmp",
+        "comm",
+        "md5sum",
+        "sha1sum",
+        "sha256sum",
+        "base64",
+        "xxd",
+        "hexdump",
+        "od",
+        "strings",
+        "jq",
+        "yq",
+        "xargs",
+        "tee",
+        "true",
+        "false",
+        "test",
+        "[",
+        "seq",
+        "yes",
+        "man",
+        "info",
+        "help",
+        "moss",
+    }
+
+    # Commands allowed in build/dev contexts
+    BUILD_COMMANDS: ClassVar[set[str]] = {
+        "make",
+        "cmake",
+        "ninja",
+        "cargo",
+        "rustc",
+        "rustup",
+        "python",
+        "python3",
+        "pip",
+        "pip3",
+        "uv",
+        "poetry",
+        "pdm",
+        "pipx",
+        "node",
+        "npm",
+        "npx",
+        "yarn",
+        "pnpm",
+        "bun",
+        "deno",
+        "go",
+        "gcc",
+        "g++",
+        "clang",
+        "clang++",
+        "ld",
+        "ar",
+        "as",
+        "javac",
+        "java",
+        "mvn",
+        "gradle",
+        "dotnet",
+        "msbuild",
+        "ruby",
+        "gem",
+        "bundle",
+        "bundler",
+        "php",
+        "composer",
+        "perl",
+        "lua",
+        "luarocks",
+        "zig",
+        "nim",
+        "nimble",
+        "ghc",
+        "cabal",
+        "stack",
+        "ocaml",
+        "opam",
+        "dune",
+        "elixir",
+        "mix",
+        "erlc",
+        "rebar3",
+        "swift",
+        "swiftc",
+        "xcodebuild",
+        "kotlinc",
+        "scalac",
+        "sbt",
+        "lein",
+        "clj",
+        "clojure",
+    }
+
+    # Git commands (version control)
+    GIT_COMMANDS: ClassVar[set[str]] = {
+        "git",
+        "gh",
+        "hub",
+        "glab",
+        "hg",
+        "svn",
+        "fossil",
+    }
+
+    # Test/lint commands
+    TEST_COMMANDS: ClassVar[set[str]] = {
+        "pytest",
+        "py.test",
+        "unittest",
+        "nose",
+        "nose2",
+        "tox",
+        "nox",
+        "coverage",
+        "mypy",
+        "pyright",
+        "pylint",
+        "flake8",
+        "ruff",
+        "black",
+        "isort",
+        "autopep8",
+        "yapf",
+        "jest",
+        "mocha",
+        "vitest",
+        "playwright",
+        "cypress",
+        "eslint",
+        "prettier",
+        "tsc",
+        "biome",
+        "clippy",
+        "rustfmt",
+        "gofmt",
+        "golint",
+        "staticcheck",
+        "shellcheck",
+        "hadolint",
+    }
+
+    # Dangerous patterns (regex)
+    DANGEROUS_PATTERNS: ClassVar[list[tuple[str, str]]] = [
+        (r"rm\s+(-[^\s]*)?.*\s+-rf", "recursive force delete"),
+        (r"rm\s+(-[^\s]*)?.*\s+-fr", "recursive force delete"),
+        (r"rm\s+-rf\s+/", "root deletion"),
+        (r">\s*/dev/sd[a-z]", "raw disk write"),
+        (r"mkfs\.", "filesystem creation"),
+        (r"dd\s+.*of=/dev/", "raw disk write"),
+        (r"\|\s*(ba)?sh", "pipe to shell"),
+        (r"\|\s*bash", "pipe to bash"),
+        (r"\|\s*zsh", "pipe to zsh"),
+        (r"\$\(curl", "command substitution with curl"),
+        (r"\$\(wget", "command substitution with wget"),
+        (r"`curl", "backtick execution with curl"),
+        (r"`wget", "backtick execution with wget"),
+        (r"eval\s+", "eval execution"),
+        (r"exec\s+", "exec replacement"),
+        (r":>.*\|", "file truncation in pipeline"),
+        (r">\s*/etc/", "write to /etc"),
+        (r">\s*/usr/", "write to /usr"),
+        (r">\s*/var/", "write to /var"),
+        (r">\s*/bin/", "write to /bin"),
+        (r">\s*/sbin/", "write to /sbin"),
+        (r">\s*/lib/", "write to /lib"),
+        (r">\s*/boot/", "write to /boot"),
+        (r">\s*/root/", "write to /root"),
+        (r">\s*~/\.", "write to hidden dotfile"),
+        (r"chmod\s+777", "world-writable permissions"),
+        (r"chmod\s+666", "world-writable permissions"),
+        (r"--no-preserve-root", "disable root protection"),
+        (r"HISTFILE=/dev/null", "disable history"),
+        (r"unset\s+HISTFILE", "disable history"),
+        (r"history\s+-c", "clear history"),
+        (r"base64\s+-d.*\|", "decode and execute"),
+        (r"openssl.*-d.*\|", "decrypt and execute"),
+    ]
+
+    def __init__(
+        self,
+        *,
+        allow_build: bool = True,
+        allow_git: bool = True,
+        allow_test: bool = True,
+        extra_allowed: set[str] | None = None,
+        extra_blocked: set[str] | None = None,
+    ):
+        self.allow_build = allow_build
+        self.allow_git = allow_git
+        self.allow_test = allow_test
+        self.extra_allowed = extra_allowed or set()
+        self.extra_blocked = extra_blocked or set()
+        self._compiled_patterns: list[tuple[Any, str]] | None = None
+
+    @property
+    def name(self) -> str:
+        return "command"
+
+    @property
+    def priority(self) -> int:
+        return 15  # Between velocity (10) and quarantine (20)
+
+    def _get_allowed_commands(self) -> set[str]:
+        """Get the full set of allowed commands."""
+        allowed = set(self.ALLOWED_COMMANDS)
+        if self.allow_build:
+            allowed |= self.BUILD_COMMANDS
+        if self.allow_git:
+            allowed |= self.GIT_COMMANDS
+        if self.allow_test:
+            allowed |= self.TEST_COMMANDS
+        allowed |= self.extra_allowed
+        return allowed
+
+    def _get_blocked_commands(self) -> set[str]:
+        """Get the full set of blocked commands."""
+        return self.BLOCKED_COMMANDS | self.extra_blocked
+
+    def _compile_patterns(self) -> list[tuple[Any, str]]:
+        """Compile dangerous patterns (lazy)."""
+        if self._compiled_patterns is None:
+            import re
+
+            self._compiled_patterns = [
+                (re.compile(pattern, re.IGNORECASE), reason)
+                for pattern, reason in self.DANGEROUS_PATTERNS
+            ]
+        return self._compiled_patterns
+
+    def _extract_command(self, cmd_string: str) -> str | None:
+        """Extract the base command from a command string."""
+        import shlex
+
+        cmd = cmd_string.strip()
+        if not cmd:
+            return None
+
+        # Handle command substitution prefix
+        while cmd.startswith("$(") or cmd.startswith("`"):
+            cmd = cmd[2:] if cmd.startswith("$(") else cmd[1:]
+
+        # Handle env vars at start
+        while "=" in cmd.split()[0] if cmd.split() else False:
+            parts = cmd.split(None, 1)
+            if len(parts) > 1:
+                cmd = parts[1]
+            else:
+                return None
+
+        # Handle leading path
+        try:
+            parts = shlex.split(cmd)
+            if not parts:
+                return None
+            base = parts[0]
+            # Strip path to get command name
+            if "/" in base:
+                base = base.rsplit("/", 1)[-1]
+            return base
+        except ValueError:
+            # Malformed quotes - extract first word manually
+            first_word = cmd.split()[0] if cmd.split() else None
+            if first_word and "/" in first_word:
+                first_word = first_word.rsplit("/", 1)[-1]
+            return first_word
+
+    def _check_patterns(self, cmd_string: str) -> str | None:
+        """Check for dangerous patterns. Returns reason if found."""
+        patterns = self._compile_patterns()
+        for pattern, reason in patterns:
+            if pattern.search(cmd_string):
+                return reason
+        return None
+
+    async def evaluate(self, context: ToolCallContext) -> PolicyResult:
+        # Only check bash/shell/exec tools
+        tool_lower = context.tool_name.lower()
+        if not any(t in tool_lower for t in ("bash", "shell", "exec", "command", "run")):
+            return PolicyResult(decision=PolicyDecision.ALLOW, policy_name=self.name)
+
+        # Get command string from parameters
+        cmd_string = None
+        for key in ("command", "cmd", "script", "code"):
+            if key in context.parameters:
+                cmd_string = str(context.parameters[key])
+                break
+
+        if not cmd_string:
+            return PolicyResult(decision=PolicyDecision.ALLOW, policy_name=self.name)
+
+        # Check for dangerous patterns first
+        pattern_reason = self._check_patterns(cmd_string)
+        if pattern_reason:
+            return PolicyResult(
+                decision=PolicyDecision.DENY,
+                policy_name=self.name,
+                reason=f"Dangerous pattern detected: {pattern_reason}",
+                metadata={"command": cmd_string, "pattern": pattern_reason},
+            )
+
+        # Extract base command
+        base_cmd = self._extract_command(cmd_string)
+        if not base_cmd:
+            return PolicyResult(
+                decision=PolicyDecision.WARN,
+                policy_name=self.name,
+                reason="Could not parse command",
+            )
+
+        # Check blocklist (highest priority)
+        blocked = self._get_blocked_commands()
+        if base_cmd in blocked:
+            return PolicyResult(
+                decision=PolicyDecision.DENY,
+                policy_name=self.name,
+                reason=f"Command '{base_cmd}' is blocked",
+                metadata={"command": base_cmd, "blocked": True},
+            )
+
+        # Check allowlist
+        allowed = self._get_allowed_commands()
+        if base_cmd in allowed:
+            return PolicyResult(decision=PolicyDecision.ALLOW, policy_name=self.name)
+
+        # Unknown command - warn but allow
+        return PolicyResult(
+            decision=PolicyDecision.WARN,
+            policy_name=self.name,
+            reason=f"Unknown command '{base_cmd}' - not in allowlist",
+            metadata={"command": base_cmd, "unknown": True},
+        )
+
+
 class TrustPolicy(Policy):
     """Enforce trust levels from TrustManager.
 
@@ -568,6 +1006,7 @@ def create_default_policy_engine(
     event_bus: EventBus | None = None,
     root: Path | None = None,
     include_trust: bool = True,
+    include_command: bool = True,
 ) -> PolicyEngine:
     """Create a policy engine with sensible defaults.
 
@@ -575,6 +1014,7 @@ def create_default_policy_engine(
         event_bus: Event bus for emitting policy events
         root: Project root for loading trust config
         include_trust: Whether to include TrustPolicy (default: True)
+        include_command: Whether to include CommandPolicy for bash sandboxing (default: True)
 
     Returns:
         Configured PolicyEngine
@@ -585,6 +1025,9 @@ def create_default_policy_engine(
         RateLimitPolicy(),
         PathPolicy(),
     ]
+
+    if include_command:
+        policies.append(CommandPolicy())
 
     if include_trust:
         policies.append(TrustPolicy(root=root))

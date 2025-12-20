@@ -4,9 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Agent sandboxing - restrict bash/shell access, security-conscious CLI wrappers
-2. Sessions as first-class - resumable, observable work units
-3. Signal-only diagnostics - parse structured errors, not raw output
+1. Wire `MemoryLayer` into `LLMToolExecutor` (see Memory System backlog)
+2. Add `moss checkpoint --restore` CLI for session resumption
+3. Integrate diagnostics with validation loop for structured error feedback
 
 ## Active Backlog
 
@@ -15,9 +15,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ### Strict Harness (guardrails for all agents)
 
-**Signal-Only Diagnostics:** (see Next Up #3)
-- [ ] Parse `cargo check --message-format=json` instead of raw stderr
-- [ ] Extract: error code, message, file/line, suggestion - discard ASCII art
+**Signal-Only Diagnostics:** (done - see `src/moss/diagnostics.py`)
+- [x] Parse `cargo check --message-format=json` instead of raw stderr
+- [x] Extract: error code, message, file/line, suggestion - discard ASCII art
 - [ ] "Syntax Repair Engine" system prompt when errors present
 
 **Degraded Mode (AST fallback):**

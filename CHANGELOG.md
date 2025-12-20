@@ -4,6 +4,30 @@
 
 ### Features
 
+**Agent sandboxing** (new)
+- `CommandPolicy` in `policy.py` - evaluates bash/shell commands against allowlists/blocklists
+- Blocks dangerous commands (rm, sudo, curl, etc.) and patterns (pipe to shell, rm -rf)
+- Categories: ALLOWED (read-only), BUILD (compilers), GIT, TEST commands
+- `SafeShell` wrapper in `sandbox.py` with safe versions of blocked commands
+- `safe_curl()` - URL allowlisting, `safe_delete()` - path restrictions, `safe_git()` - blocks force push
+- `SandboxedToolExecutor` for agent loop integration with policy checks
+
+**First-class sessions** (new)
+- `Session` class in `session.py` - resumable, observable work units
+- Tracks tool calls, file changes, LLM usage, checkpoints
+- Status lifecycle: created → running → paused/completed/failed
+- `SessionManager` for persistence and listing
+- Event emission for observability via `EventBus`
+- JSON serialization for save/resume across restarts
+
+**Signal-only diagnostics** (new)
+- `diagnostics.py` - parse structured compiler/linter output, discard noise
+- Parsers: Cargo, TypeScript, ESLint, Ruff, GCC/Clang, Generic fallback
+- Extracts: severity, message, location, code, suggestions
+- Strips ANSI codes and ASCII art from raw output
+- `DiagnosticRegistry` for auto-detection of output format
+- `get_structured_command()` returns flags for JSON output
+
 **MCP ephemeral response handling** (new)
 - Large responses (>500 chars) now use ResourceLink + ephemeral cache
 - Preserves LLM context by storing full content separately (5 min TTL)
