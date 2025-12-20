@@ -1,6 +1,6 @@
-# CLAUDE.md
+# GEMINI.md
 
-Behavioral rules for Claude Code working in this repository.
+Behavioral rules for Gemini working in this repository.
 Design philosophy: `docs/philosophy.md`. Key tenets: Minimize LLM usage, Structure > Text, Library-first.
 
 ## Core Rule
@@ -64,10 +64,10 @@ Fall back to generic tools (Read/Grep) only for:
 
 ## Conventions
 
-### Updating CLAUDE.md
+### Updating GEMINI.md
 Add: workflow patterns, conventions, project-specific knowledge, tool usage patterns.
 Don't add: temporary notes (TODO.md), implementation details (docs/), one-off decisions (commit messages).
-Keep it slim: If CLAUDE.md grows past ~150 lines, refactor content to docs/ and reference it.
+Keep it slim: If GEMINI.md grows past ~150 lines, refactor content to docs/ and reference it.
 
 ### Updating TODO.md
 Proactively add features, ideas, patterns, technical debt, integration opportunities.
