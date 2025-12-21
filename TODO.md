@@ -4,17 +4,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Symbol Hover Info**: Show signatures/docstrings on hover in TUI
 - [ ] **Context Elision Heuristics**: Prune large files while preserving semantic anchors
 - [ ] **Shadow Git Branching**: Support for multiple concurrent experiment branches
+- [ ] **Adaptive Workspace Scoping**: Automatically shrink/expand sandbox based on detected drift
 
 ## Recently Completed
 
-- **Verification Loops & Heuristics** (Dec 2025):
-  - Implemented `HeuristicEngine` for fast, structural mistake detection
-  - Added built-in heuristics for unused imports and large functions
-  - Integrated heuristics into `ValidatorChain` as pre-validation guardrails
-  - Addresses LLM unreliability by catching obvious errors before full verification
+- **Symbol Hover Info** (Dec 2025):
+  - Implemented `HoverTooltip` widget in TUI for metadata preview
+  - Added node highlight tracking in `ProjectTree`
+  - Shows file skeletons and task summaries on hover/selection
+  - Added 'h' keybinding to toggle tooltip visibility
 
 - **Cross-file Symbol Navigation** (Dec 2025):
   - Implemented clickable `ProjectTree` in TUI with task and file modes

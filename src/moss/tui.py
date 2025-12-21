@@ -136,6 +136,17 @@ class ModeIndicator(Static):
         return f"Mode: [{self.mode_color} b]{self.mode_name}[/]"
 
 
+class HoverTooltip(Static):
+    """Tooltip displayed when a node is highlighted."""
+
+    content = reactive("")
+
+    def render(self) -> str:
+        if not self.content:
+            return ""
+        return f"[b]Details:[/b]\n{self.content}"
+
+
 class ProjectTree(Tree[Any]):
     """Unified tree for task and file navigation."""
 
@@ -245,12 +256,24 @@ class MossTUI(App):
         border: round $primary;
         margin: 0 1;
     }
+
+    HoverTooltip {
+        dock: right;
+        width: 25%;
+        height: auto;
+        max-height: 50%;
+        background: $surface-lighten-1;
+        border: solid $primary;
+        padding: 1;
+        display: none;
+    }
     """
 
     BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("q", "quit", "Quit"),
         ("d", "toggle_dark", "Toggle Dark Mode"),
         ("shift+tab", "next_mode", "Next Mode"),
+        ("h", "toggle_tooltip", "Toggle Tooltip"),
     ]
 
     current_mode_name = reactive("PLAN")
@@ -289,6 +312,7 @@ class MossTUI(App):
                 id="main-container",
             ),
             Input(placeholder="Enter command...", id="command-input"),
+            HoverTooltip(id="hover-tooltip"),
         )
         yield Footer()
 
@@ -322,6 +346,34 @@ class MossTUI(App):
         else:
             tree.update_from_files(self.api)
 
+    def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
+        """Handle node highlight (hover/selection movement)."""
+        data = event.node.data
+        if not data:
+            return
+
+        tooltip = self.query_one("#hover-tooltip", HoverTooltip)
+
+        if data["type"] == "file":
+            path = data["path"]
+            # Show file skeleton summary in tooltip
+            try:
+                skeleton = self.api.skeleton.format(path)
+                # Take first few lines of skeleton
+                summary = "\n".join(skeleton.split("\n")[:15])
+                if len(skeleton.split("\n")) > 15:
+                    summary += "\n..."
+                tooltip.content = summary
+            except Exception:
+                tooltip.content = f"File: {path.name}"
+        elif data["type"] == "task":
+            node = data["node"]
+            tooltip.content = f"Goal: {node.goal}\nStatus: {node.status.name}"
+            if node.summary:
+                tooltip.content += f"\nSummary: {node.summary}"
+        else:
+            tooltip.content = ""
+
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         """Handle tree node selection (click/enter)."""
         data = event.node.data
@@ -335,6 +387,11 @@ class MossTUI(App):
             self.query_one("#command-input").value = f"skeleton {path}"
             # Focus input so user can press enter
             self.query_one("#command-input").focus()
+
+    def action_toggle_tooltip(self) -> None:
+        """Toggle tooltip visibility."""
+        tooltip = self.query_one("#hover-tooltip")
+        tooltip.display = not tooltip.display
 
     def action_next_mode(self) -> None:
         """Switch to the next mode."""
