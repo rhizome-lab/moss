@@ -292,6 +292,27 @@ class ProjectTree(Tree[Any]):
         root = self.root
         root.label = f"[b]Files: {api.root.name}[/b]"
 
+        # Symbol kind icons
+        kind_icons = {
+            "class": "📦",
+            "function": "⚡",
+            "method": "🔧",
+            "variable": "📌",
+        }
+
+        def add_symbols(tree_node: TreeNode[Any], symbols: list, path: Path) -> None:
+            """Add symbol nodes as children of a file node."""
+            for symbol in symbols:
+                icon = kind_icons.get(symbol.kind, "•")
+                label = f"{icon} {symbol.name}"
+                sym_node = tree_node.add(
+                    label,
+                    data={"type": "symbol", "symbol": symbol, "path": path},
+                )
+                # Add nested symbols (class methods, nested functions)
+                if symbol.children:
+                    add_symbols(sym_node, symbol.children, path)
+
         # Simple recursive file tree
         import os
 
@@ -310,7 +331,16 @@ class ProjectTree(Tree[Any]):
                         node = tree_node.add(f"📁 {entry}", data={"type": "dir", "path": full_path})
                         add_dir(node, full_path)
                     else:
-                        tree_node.add_leaf(f"📄 {entry}", data={"type": "file", "path": full_path})
+                        file_node = tree_node.add(
+                            f"📄 {entry}", data={"type": "file", "path": full_path}
+                        )
+                        # Add symbols for Python files
+                        if entry.endswith(".py"):
+                            try:
+                                symbols = api.skeleton.extract(full_path)
+                                add_symbols(file_node, symbols, full_path)
+                            except (OSError, ValueError, SyntaxError):
+                                pass
             except OSError:
                 pass
 
@@ -580,6 +610,24 @@ class MossTUI(App):
                 tooltip.content = summary
             except (OSError, ValueError):
                 tooltip.content = f"File: {path.name}"
+        elif data["type"] == "symbol":
+            symbol = data["symbol"]
+            path = data["path"]
+            tooltip.file_path = path  # Enable syntax highlighting for signature
+            # Build symbol info display
+            lines = [symbol.signature]
+            if symbol.lineno:
+                lines[0] += f"  # line {symbol.lineno}"
+            if symbol.docstring:
+                # Show first few lines of docstring
+                doc_lines = symbol.docstring.strip().split("\n")[:5]
+                if len(doc_lines) < len(symbol.docstring.strip().split("\n")):
+                    doc_lines.append("...")
+                lines.append("")
+                lines.extend(f'"""{line}' if i == 0 else line for i, line in enumerate(doc_lines))
+                if not lines[-1].endswith('"""'):
+                    lines.append('"""')
+            tooltip.content = "\n".join(lines)
         elif data["type"] == "task":
             tooltip.file_path = None  # No syntax highlighting for tasks
             node = data["node"]
@@ -602,6 +650,13 @@ class MossTUI(App):
             # Automatically run skeleton command for selected file
             self.query_one("#command-input").value = f"skeleton {path}"
             # Focus input so user can press enter
+            self.query_one("#command-input").focus()
+        elif data["type"] == "symbol":
+            symbol = data["symbol"]
+            path = data["path"]
+            self._log(f"Symbol: {symbol.name} at {path.name}:{symbol.lineno}")
+            # Pre-fill with file:line for editor navigation
+            self.query_one("#command-input").value = f"{path}:{symbol.lineno}"
             self.query_one("#command-input").focus()
 
     def action_toggle_tooltip(self) -> None:
