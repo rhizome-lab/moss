@@ -416,7 +416,9 @@ class MossTUI(App):
             root = history.root
             root.label = "Current Hunks"
             for hunk in hunks:
-                label = f"{hunk['file_path']}:{hunk['new_start']} ({hunk['symbol'] or 'no symbol'})"
+                symbol = hunk["symbol"] or "no symbol"
+                path = hunk["file_path"]
+                label = f"[@click=app.navigate('{path}')]{path}[/]:{hunk['new_start']} ({symbol})"
                 root.add_leaf(label)
             root.expand()
         except Exception as e:
@@ -435,10 +437,23 @@ class MossTUI(App):
         if command == "exit":
             self.exit()
 
+    def navigate(self, target: str) -> None:
+        """Navigate to a specific file or symbol."""
+        self._log(f"Navigating to: {target}")
+        self.query_one("#command-input").value = f"expand {target}"
+        self.query_one("#command-input").focus()
+        # In a full implementation, this would also highlight the node in the tree
+
     def _log(self, message: str) -> None:
         """Add a message to the log view."""
         log_view = self.query_one("#log-view")
-        log_view.mount(Static(message, classes="log-entry"))
+        # Simple heuristic to make paths clickable
+        import re
+
+        pattern = r"([a-zA-Z0-9_\-\./]+\.[a-z]{2,4}(?::\d+)?)"
+        linked_message = re.sub(pattern, r"[@click=app.navigate('\1')]\1[/]", message)
+
+        log_view.mount(Static(linked_message, classes="log-entry", markup=True))
         log_view.scroll_end()
 
 

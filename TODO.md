@@ -4,38 +4,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Cross-file Symbol Jump**: Command-click support in TUI for quick navigation
 - [ ] **Agentic Policy Optimization**: Automatically refine safety rules based on rejected actions
 - [ ] **Adaptive Workspace Expansion**: Proactively grow sandbox when cross-file dependencies detected
+- [ ] **Heuristic Error Localization**: Automatically find buggy code from failing test output
 
 ## Recently Completed
 
-- **Dynamic Turn Budgeting** (Dec 2025):
-  - Added `max_tokens_per_turn` to `LLMConfig` for per-response resource control
-  - Implemented dynamic budget scaling in `LLMToolExecutor` based on task complexity
-  - Ensures deep reasoning for complex tasks while preserving tokens for trivial ones
-
-- **LLM Reliability Guardrails** (Dec 2025):
-  - Implemented 'critic-first' execution for high-risk loop steps
-  - Added `is_high_risk` property to `LoopStep`
-  - Integrated `llm.verify_action` pre-execution check in `AgentLoopRunner`
-  - Minimizes catastrophic failures by forcing explicit reasoning before risky edits
-
-- **Adaptive Workspace Scoping** (Dec 2025):
-  - Added `shrink_to_fit` to `SafeShell` for dynamic workspace restriction
-  - Implemented `predict_workspace_scope` LLM operation for proactive scoping
-  - Minimizes blast radius by automatically narrowing sandbox to accessed files
-
-- **Shadow Git Branching** (Dec 2025):
-  - Added `list_branches` and `switch_branch` to `ShadowGitAPI`
-  - Exposed `branch` command in `DWIMLoop` for multi-experiment management
-  - Support for concurrent shadow branches per agent session
-
-- **Context Elision Heuristics** (Dec 2025):
-  - Implemented `SnippetViewProvider` for intelligent file pruning
-  - Preserves semantic anchors (definitions, search hits) while eliding unimportant blocks
-  - Added `SNIPPET` view type to `ViewRegistry`
-  - Integrated with `ViewOptions` for configurable context depth
+- **Cross-file Symbol Jump** (Dec 2025):
+  - Implemented `navigate` method in TUI for quick file/symbol jumping
+  - Added regex-based clickable links in the Agent Log for file paths
+  - Support for clickable hunk references in the Shadow Git History tree
+  - Integrated clickable navigation with the command input for seamless UX
 
 - **Symbol Hover Info** (Dec 2025):
 
