@@ -306,7 +306,7 @@ class TOMLSchemaPlugin:
                     content="# TOML parser not available (need Python 3.11+ or tomli)",
                     metadata={"error": "TOML parser not available"},
                 )
-        except Exception as e:
+        except tomllib.TOMLDecodeError as e:
             return View(
                 target=target,
                 view_type=ViewType.SKELETON,

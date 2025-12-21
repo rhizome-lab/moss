@@ -268,7 +268,7 @@ class PluginRegistry:
                             "Entry point '%s' did not return a ViewPlugin",
                             ep.name,
                         )
-                except Exception as e:
+                except (ImportError, AttributeError, TypeError) as e:
                     logger.warning("Failed to load plugin '%s': %s", ep.name, e)
 
         except ImportError:

@@ -108,9 +108,9 @@ def _discover_entry_points() -> None:
                 adapter_class = ep.load()
                 if ep.name not in _ADAPTERS:
                     register_adapter(ep.name, adapter_class)
-            except Exception:
+            except (ImportError, AttributeError, TypeError):
                 pass
-    except Exception:
+    except (TypeError, StopIteration):
         pass
 
 

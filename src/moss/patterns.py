@@ -500,7 +500,7 @@ class PatternAnalyzer:
                         for impl in impls:
                             all_implementations[iface_name].append({**impl, "file": rel_path})
 
-            except Exception as e:
+            except (OSError, UnicodeDecodeError, SyntaxError) as e:
                 logger.debug("Failed to parse %s: %s", file_path, e)
 
         # Second pass: analyze each file
@@ -602,7 +602,7 @@ class PatternAnalyzer:
                     analyzer.visit(tree)
                     coupling_data[module_name] = analyzer.imports
 
-            except Exception as e:
+            except (OSError, UnicodeDecodeError, SyntaxError) as e:
                 logger.debug("Failed to analyze %s: %s", file_path, e)
 
         # Build coupling graph

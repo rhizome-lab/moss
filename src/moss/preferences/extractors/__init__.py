@@ -94,9 +94,9 @@ def _discover_entry_points() -> None:
                 extractor_class = ep.load()
                 if ep.name not in _EXTRACTORS:
                     register_extractor(ep.name, extractor_class)
-            except Exception:
+            except (ImportError, AttributeError, TypeError):
                 pass
-    except Exception:
+    except (TypeError, StopIteration):
         pass
 
 

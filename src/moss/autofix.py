@@ -435,7 +435,7 @@ class FixEngine:
                 if modified != content:
                     path.write_text(modified)
 
-            except Exception as e:
+            except (OSError, UnicodeDecodeError) as e:
                 for fix in file_fixes:
                     result.errors.append((fix, e))
 
@@ -446,7 +446,7 @@ class FixEngine:
             try:
                 result.commit = await git.commit(self._current_branch, msg)
                 self._last_commit = result.commit
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 # Rollback on commit failure
                 await self.rollback()
                 for fix in result.applied:
@@ -471,7 +471,7 @@ class FixEngine:
             self._current_branch = None
             self._last_commit = None
             return True
-        except Exception:
+        except (OSError, ValueError):
             return False
 
     async def finalize(self, message: str | None = None) -> CommitHandle | None:
@@ -493,7 +493,7 @@ class FixEngine:
             await git.abort(self._current_branch)  # Clean up shadow branch
             self._current_branch = None
             return commit
-        except Exception:
+        except (OSError, ValueError):
             return None
 
 

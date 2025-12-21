@@ -112,7 +112,7 @@ def detect_parser(path: Path) -> type[ParserPlugin]:
     try:
         with open(path, encoding="utf-8") as f:
             sample = f.read(4096)
-    except Exception:
+    except OSError:
         return GenericChatParser
 
     for parser_class in get_all_parsers():
@@ -130,9 +130,9 @@ def _discover_entry_points() -> None:
             try:
                 parser_class = ep.load()
                 register_parser(ep.name, parser_class)
-            except Exception:
+            except (ImportError, AttributeError, TypeError):
                 pass  # Skip failed imports
-    except Exception:
+    except (TypeError, StopIteration):
         pass
 
 

@@ -33,7 +33,7 @@ class BaseParser(ABC):
         """Read file contents."""
         try:
             return self.path.read_text(encoding="utf-8")
-        except Exception:
+        except (OSError, UnicodeDecodeError):
             return ""
 
     def _read_jsonl(self) -> list[dict[str, Any]]:
@@ -48,6 +48,6 @@ class BaseParser(ABC):
                             entries.append(json.loads(line))
                         except json.JSONDecodeError:
                             continue
-        except Exception:
+        except OSError:
             pass
         return entries

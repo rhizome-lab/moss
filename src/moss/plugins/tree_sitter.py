@@ -112,7 +112,7 @@ class TreeSitterSkeletonPlugin:
                 metadata={"error": str(e)},
             )
 
-        except Exception as e:
+        except (RuntimeError, OSError, ValueError) as e:
             # Parse or extraction error
             logger.warning("Tree-sitter extraction failed for %s: %s", target.path, e)
             return View(
