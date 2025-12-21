@@ -440,27 +440,18 @@ class DWIMLoop:
         return """You are a code assistant. Output ONE terse command per response.
 
 Commands:
-- skeleton <file> - show file structure
-- expand <symbol> - show full source
-- grep <pattern> <path> - search
-- deps <file> - imports/dependencies
-- callers <symbol> - who calls this
-- callees <symbol> - what this calls
-- validate - run linters
-- write <file>:<content> - overwrite file
-- replace <file> <search> <replace> - replace text
-- insert <file> <content> - append or insert line
-- diff [branch] - show changes
-- branch [name] - list or switch branch
-- merge <branch> - merge changes with auto-fix
-- checkpoint - group multiple changes
-- commit [message] - finish grouped changes
-- revert <file> <line> - undo change at line
-- analyze [session] - show telemetry
-- fix: <description> - describe fix
-- breakdown: <step1>, <step2>, ... - split current task
-- note: <content> - remember for this task
-- done [summary] - task complete, include brief summary
+- view [path] - show tree, file skeleton, or symbol source
+- edit -f <file> "task" - edit a file
+- edit -s <symbol> "task" - edit a symbol
+- analyze [path] - analyze codebase (health, complexity, security)
+- done [summary] - task complete
+
+Examples:
+- view - show project tree
+- view src/main.py - show file skeleton
+- view src/main.py/Foo - show class source
+- edit -f config.py "add logging" - edit file
+- analyze --complexity - find complex functions
 
 IMPORTANT: When the requested info is in "Last result", say "done <summary>".
 For read-only tasks (show, explain, find), say "done" after getting the answer.
@@ -701,6 +692,23 @@ Do NOT repeat the same command. Never output prose."""
 
     async def _run_tool_logic(self, tool_name: str, params: dict[str, Any], _depth: int) -> Any:
         """Core logic to run the tool (extracted from _execute_tool)."""
+        # Handle 3 core primitives: view, edit, analyze
+        # These are the primary CLI/MCP interface and wrap Rust CLI with fuzzy path resolution
+        if tool_name == "view":
+            target = params.get("path") or params.get("target") or params.get("symbol")
+            result = self.api.view.view(target=target, depth=params.get("depth", 1))
+            # Format result for LLM consumption
+            if result.content:
+                import json
+
+                return json.dumps(result.content, indent=2)
+            return f"View result for {target}: {result.to_compact()}"
+
+        if tool_name == "analyze":
+            target = params.get("path") or params.get("target") or "."
+            result = self.api.analyze.analyze(target=target)
+            return result.to_compact()
+
         # Handle multi-file/search expand
         if tool_name == "skeleton.expand_search":
             return self._expand_search(params.get("symbol_name", ""))
