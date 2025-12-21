@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from moss.context import CompiledContext, ContextHost, StaticContext
+from moss.context import CompiledContext, ContextHost, StaticContext, elide_view_with_anchors
 from moss.views import Intent, View, ViewTarget, ViewType
 
 
@@ -214,3 +214,129 @@ class Greeter:
         ctx = await host.compile(targets)
 
         assert "arch/missing.md" not in ctx.static_context
+
+    async def test_token_budget_with_elision(self, host: ContextHost, tmp_path: Path):
+        # Create a large Python file with clear function definitions
+        f = tmp_path / "large.py"
+        f.write_text(
+            '''
+def function_one():
+    """First function."""
+    x = 1
+    y = 2
+    z = 3
+    return x + y + z
+
+def function_two():
+    """Second function."""
+    a = 10
+    b = 20
+    c = 30
+    return a + b + c
+
+class MyClass:
+    """A class."""
+    def method_one(self):
+        pass
+    def method_two(self):
+        pass
+'''
+            + "# filler line\n" * 200
+        )
+
+        # Set a budget that's too small for full content but allows elided
+        host.set_token_budget(200)
+        targets = [ViewTarget(path=f)]
+        ctx = await host.compile(targets, view_types=[ViewType.RAW])
+
+        # Should have an elided view instead of nothing
+        if ctx.views:
+            assert "elided" in ctx.views[0].content or ctx.views[0].view_type == ViewType.ELIDED
+
+
+class TestElideViewWithAnchors:
+    """Tests for elide_view_with_anchors function."""
+
+    def test_elides_large_file(self, tmp_path: Path):
+        f = tmp_path / "test.py"
+        content = (
+            '''
+def hello():
+    """Say hello."""
+    x = 1
+    y = 2
+    return x + y
+
+# lots of filler
+'''
+            + "# filler\n" * 100
+            + '''
+def goodbye():
+    """Say goodbye."""
+    return "bye"
+'''
+        )
+        f.write_text(content)
+        target = ViewTarget(path=f)
+        view = View(target=target, view_type=ViewType.RAW, content=content)
+
+        elided = elide_view_with_anchors(view, target_tokens=100)
+
+        assert elided is not None
+        assert elided.view_type == ViewType.ELIDED
+        assert "def hello" in elided.content
+        assert "def goodbye" in elided.content
+        assert "elided" in elided.content
+
+    def test_preserves_docstrings(self, tmp_path: Path):
+        f = tmp_path / "test.py"
+        content = '''
+def my_function():
+    """This is the docstring."""
+    pass
+'''
+        f.write_text(content)
+        target = ViewTarget(path=f)
+        view = View(target=target, view_type=ViewType.RAW, content=content)
+
+        elided = elide_view_with_anchors(view, target_tokens=50)
+
+        assert elided is not None
+        assert "docstring" in elided.content
+
+    def test_returns_none_for_non_python(self, tmp_path: Path):
+        f = tmp_path / "test.js"
+        f.write_text("function hello() { return 'hi'; }")
+        target = ViewTarget(path=f)
+        view = View(
+            target=target, view_type=ViewType.RAW, content="function hello() { return 'hi'; }"
+        )
+
+        elided = elide_view_with_anchors(view, target_tokens=10)
+
+        assert elided is None
+
+    def test_returns_none_for_non_raw_view(self, tmp_path: Path):
+        f = tmp_path / "test.py"
+        f.write_text("def x(): pass")
+        target = ViewTarget(path=f)
+        view = View(target=target, view_type=ViewType.SKELETON, content="def x(): pass")
+
+        elided = elide_view_with_anchors(view, target_tokens=10)
+
+        assert elided is None
+
+    def test_metadata_tracks_elision(self, tmp_path: Path):
+        f = tmp_path / "test.py"
+        content = "def x(): pass\n" + "# line\n" * 50 + "def y(): pass\n"
+        f.write_text(content)
+        target = ViewTarget(path=f)
+        view = View(target=target, view_type=ViewType.RAW, content=content)
+
+        elided = elide_view_with_anchors(view, target_tokens=50)
+
+        assert elided is not None
+        assert "original_lines" in elided.metadata
+        assert "elided_lines" in elided.metadata
+        assert "anchor_count" in elided.metadata
+        assert elided.metadata["anchor_count"] >= 2

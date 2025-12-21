@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from moss.skeleton import Symbol, extract_python_skeleton
 from moss.views import (
     Intent,
     RawViewProvider,
@@ -18,6 +19,113 @@ from moss.views import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def elide_view_with_anchors(
+    view: View,
+    target_tokens: int,
+    context_lines: int = 2,
+) -> View | None:
+    """Elide view content while preserving symbol anchors.
+
+    Uses AST-based skeleton extraction to identify important code symbols
+    (classes, functions, methods) and preserves their line spans while
+    eliding content between them.
+
+    Args:
+        view: The view to elide
+        target_tokens: Target token count to fit within
+        context_lines: Lines of context to preserve around each anchor
+
+    Returns:
+        Elided view if successful, None if elision wouldn't help
+    """
+    if view.view_type != ViewType.RAW:
+        return None  # Only elide raw views
+
+    path = view.target.path
+    if not path.suffix == ".py":
+        return None  # Currently only Python supported
+
+    content = view.content
+    lines = content.splitlines()
+
+    # Extract symbol anchors
+    try:
+        symbols = extract_python_skeleton(content, include_private=True)
+    except SyntaxError:
+        return None
+
+    if not symbols:
+        return None
+
+    # Collect all symbol line spans
+    def collect_spans(syms: list[Symbol]) -> list[tuple[int, int]]:
+        spans = []
+        for sym in syms:
+            start = sym.lineno
+            end = sym.end_lineno or sym.lineno
+            spans.append((start, end))
+            if sym.children:
+                spans.extend(collect_spans(sym.children))
+        return spans
+
+    spans = collect_spans(symbols)
+    if not spans:
+        return None
+
+    # Build set of lines to preserve (anchor spans + context)
+    preserved = set()
+    for start, _end in spans:
+        # Preserve lines around the definition (signature area)
+        for line_no in range(max(1, start - context_lines), min(len(lines) + 1, start + 3)):
+            preserved.add(line_no)
+        # Preserve first few lines of body (docstring area)
+        for line_no in range(start, min(len(lines) + 1, start + 5)):
+            preserved.add(line_no)
+
+    # Build elided content
+    result_lines = []
+    last_preserved = 0
+    elided_count = 0
+
+    for i, line in enumerate(lines, start=1):
+        if i in preserved:
+            if last_preserved > 0 and i > last_preserved + 1:
+                gap = i - last_preserved - 1
+                result_lines.append(f"    ... [{gap} lines elided] ...")
+                elided_count += gap
+            result_lines.append(line)
+            last_preserved = i
+
+    # Handle trailing content
+    if last_preserved < len(lines):
+        gap = len(lines) - last_preserved
+        result_lines.append(f"    ... [{gap} lines elided] ...")
+        elided_count += gap
+
+    elided_content = "\n".join(result_lines)
+
+    # Check if elision helped
+    new_tokens = int(len(elided_content.split()) / 0.75)
+    if new_tokens > target_tokens:
+        # Progressive degradation: reduce context
+        if context_lines > 0:
+            return elide_view_with_anchors(view, target_tokens, context_lines - 1)
+        return None
+
+    return View(
+        target=view.target,
+        view_type=ViewType.ELIDED,
+        content=elided_content,
+        metadata={
+            "original_lines": len(lines),
+            "preserved_lines": len(result_lines),
+            "elided_lines": elided_count,
+            "anchor_count": len(spans),
+            "context_lines": context_lines,
+        },
+    )
 
 
 @dataclass
@@ -210,7 +318,10 @@ class ContextHost:
         views: list[View],
         static: dict[str, str],
     ) -> tuple[list[View], dict[str, str]]:
-        """Trim views and static context to fit budget."""
+        """Trim views and static context to fit budget.
+
+        Uses anchor-preserving elision to shrink large views before dropping them.
+        """
         if self._token_budget is None:
             return views, static
 
@@ -224,12 +335,24 @@ class ContextHost:
                 trimmed_static[name] = content
                 budget -= tokens
 
-        # Then add views
+        # Then add views, trying to elide if they don't fit
         trimmed_views = []
         for view in views:
             if view.token_estimate <= budget:
                 trimmed_views.append(view)
                 budget -= view.token_estimate
+            else:
+                # Try to elide the view while preserving anchors
+                elided = elide_view_with_anchors(view, budget)
+                if elided is not None:
+                    trimmed_views.append(elided)
+                    budget -= elided.token_estimate
+                    logger.debug(
+                        "Elided %s: %d -> %d tokens",
+                        view.target.path.name,
+                        view.token_estimate,
+                        elided.token_estimate,
+                    )
 
         return trimmed_views, trimmed_static
 
