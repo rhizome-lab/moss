@@ -507,7 +507,7 @@ class ExternalDependencyAnalyzer:
         try:
             content = path.read_text()
             data = tomllib.loads(content)
-        except Exception:
+        except (OSError, tomllib.TOMLDecodeError):
             return
 
         project = data.get("project", {})
@@ -543,7 +543,7 @@ class ExternalDependencyAnalyzer:
         """Parse requirements.txt style file."""
         try:
             content = path.read_text()
-        except Exception:
+        except OSError:
             return
 
         for line in content.splitlines():
@@ -570,7 +570,7 @@ class ExternalDependencyAnalyzer:
         try:
             content = path.read_text()
             data = json.loads(content)
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             return
 
         # Regular dependencies
@@ -722,7 +722,7 @@ class ExternalDependencyAnalyzer:
                         is_direct=True,
                     )
                 )
-            except Exception:
+            except (OSError, subprocess.SubprocessError):
                 continue
 
         return resolved
@@ -832,9 +832,13 @@ class ExternalDependencyAnalyzer:
                         )
                     )
 
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
-                continue
-            except Exception:
+            except (
+                urllib.error.URLError,
+                TimeoutError,
+                json.JSONDecodeError,
+                ValueError,
+                KeyError,
+            ):
                 continue
 
         return vulnerabilities
@@ -958,7 +962,7 @@ class ExternalDependencyAnalyzer:
                     )
                 )
 
-            except Exception:
+            except (OSError, subprocess.SubprocessError):
                 continue
 
         return licenses, issues

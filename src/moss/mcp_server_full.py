@@ -508,7 +508,7 @@ def _get_overview_content(root: Path) -> str:
     for f in py_files[:100]:  # Limit for performance
         try:
             total_lines += len(f.read_text().splitlines())
-        except Exception:
+        except (OSError, UnicodeDecodeError):
             pass
 
     lines.extend(
@@ -624,7 +624,7 @@ def _prompt_understand_file(file_path: Path) -> list[PromptMessage]:
         api = MossAPI.for_project(file_path.parent)
         skeleton = api.skeleton.extract(file_path)
         content_parts.append(f"## Structure\n```\n{skeleton.content}\n```\n")
-    except Exception:
+    except (OSError, ValueError, TypeError, AttributeError):
         pass
 
     # Get dependencies
@@ -634,7 +634,7 @@ def _prompt_understand_file(file_path: Path) -> list[PromptMessage]:
         if hasattr(deps, "imports") and deps.imports:
             imports_str = "\n".join(f"- {i}" for i in deps.imports[:20])
             content_parts.append(f"## Imports\n{imports_str}\n")
-    except Exception:
+    except (OSError, ValueError, TypeError, AttributeError):
         pass
 
     context = "\n".join(content_parts) if content_parts else "Unable to analyze file."
@@ -670,7 +670,7 @@ def _prompt_prepare_refactor(file_path: Path, goal: str) -> list[PromptMessage]:
         api = MossAPI.for_project(file_path.parent)
         skeleton = api.skeleton.extract(file_path)
         content_parts.append(f"## Current Structure\n```\n{skeleton.content}\n```\n")
-    except Exception:
+    except (OSError, ValueError, TypeError, AttributeError):
         pass
 
     # Get complexity if available
@@ -683,7 +683,7 @@ def _prompt_prepare_refactor(file_path: Path, goal: str) -> list[PromptMessage]:
             if high_complexity:
                 funcs = "\n".join(f"- {f.name}: {f.cyclomatic}" for f in high_complexity[:5])
                 content_parts.append(f"## High Complexity Functions\n{funcs}\n")
-    except Exception:
+    except (OSError, ValueError, TypeError, AttributeError, SyntaxError):
         pass
 
     context = "\n".join(content_parts) if content_parts else "File analysis unavailable."
@@ -714,7 +714,7 @@ def _prompt_code_review(file_path: Path) -> list[PromptMessage]:
     """Build prompt for code review."""
     try:
         content = file_path.read_text()
-    except Exception:
+    except (OSError, UnicodeDecodeError):
         content = f"Could not read file: {file_path}"
 
     return [
@@ -746,7 +746,7 @@ def _prompt_find_bugs(file_path: Path) -> list[PromptMessage]:
     """Build prompt for bug finding."""
     try:
         content = file_path.read_text()
-    except Exception:
+    except (OSError, UnicodeDecodeError):
         content = f"Could not read file: {file_path}"
 
     return [

@@ -189,7 +189,7 @@ class MutationAnalyzer:
                 timeout=10,
             )
             return result.stdout.strip() if result.returncode == 0 else None
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             return None
 
     async def run(
@@ -262,7 +262,7 @@ class MutationAnalyzer:
                 stderr=asyncio.subprocess.PIPE,
             )
             await process.communicate()
-        except Exception:
+        except (OSError, asyncio.SubprocessError):
             # Return empty result on error
             return MutationResult(
                 execution_time_seconds=time.time() - start_time,
@@ -332,7 +332,7 @@ class MutationAnalyzer:
                             filtered.append(path)
                             break
             return filtered if filtered else paths
-        except Exception:
+        except (OSError, subprocess.SubprocessError, ValueError):
             return paths
 
     def _parse_results(self) -> MutationResult:
@@ -350,7 +350,7 @@ class MutationAnalyzer:
             )
             if proc.returncode == 0:
                 result = self._parse_results_output(proc.stdout)
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             pass
 
         # Try to get detailed survivor info
@@ -364,7 +364,7 @@ class MutationAnalyzer:
             )
             if proc.returncode == 0:
                 result.survivors = self._parse_survivors(proc.stdout)
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             pass
 
         return result
@@ -420,7 +420,7 @@ class MutationAnalyzer:
                     if part.endswith(".py"):
                         try:
                             current_file = Path(part.lstrip("a/").lstrip("b/"))
-                        except Exception:
+                        except (ValueError, TypeError):
                             pass
             # Look for line numbers
             if line.startswith("@@"):
@@ -430,7 +430,7 @@ class MutationAnalyzer:
                     for part in parts:
                         if part.startswith("+") and "," in part:
                             current_line = int(part[1:].split(",")[0])
-                except Exception:
+                except (ValueError, IndexError):
                     pass
             # Look for actual mutations (- old / + new lines)
             if line.startswith("-") and not line.startswith("---"):

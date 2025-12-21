@@ -157,13 +157,13 @@ class TestAnalyzer:
         for path in source_modules.values():
             try:
                 result.source_lines += len(path.read_text().splitlines())
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 pass
 
         for path in test_files:
             try:
                 result.test_lines += len(path.read_text().splitlines())
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 pass
 
         # Map modules to tests
@@ -259,7 +259,7 @@ class TestAnalyzer:
         try:
             source = test_file.read_text()
             tree = ast.parse(source)
-        except Exception:
+        except (OSError, SyntaxError, UnicodeDecodeError):
             return 0
 
         count = 0
@@ -277,7 +277,7 @@ class TestAnalyzer:
             try:
                 source = path.read_text()
                 tree = ast.parse(source)
-            except Exception:
+            except (OSError, SyntaxError, UnicodeDecodeError):
                 continue
 
             for node in ast.iter_child_nodes(tree):
@@ -316,7 +316,7 @@ class TestAnalyzer:
         for test_file in test_files:
             try:
                 source = test_file.read_text()
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 continue
 
             # Look for imports from the main package

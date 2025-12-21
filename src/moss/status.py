@@ -355,7 +355,7 @@ class StatusChecker:
             status.total_files = code_summary.total_files
             status.total_lines = code_summary.total_lines
             status.total_modules = len([f for p in code_summary.packages for f in p.all_files])
-        except Exception:
+        except (OSError, ValueError, TypeError, AttributeError):
             pass
 
         # Get doc summary
@@ -364,7 +364,7 @@ class StatusChecker:
             doc_summary = doc_summarizer.summarize_docs(self.root)
             status.doc_files = len(doc_summary.files)
             status.doc_words = doc_summary.total_words
-        except Exception:
+        except (OSError, ValueError, TypeError, AttributeError):
             pass
 
         # Check docs
@@ -386,7 +386,7 @@ class StatusChecker:
                             file=issue.file,
                         )
                     )
-        except Exception:
+        except (OSError, ValueError, TypeError, AttributeError):
             pass
 
         # Check TODOs
@@ -427,7 +427,7 @@ class StatusChecker:
                         suggestion="Add important TODOs to TODO.md or resolve them",
                     )
                 )
-        except Exception:
+        except (OSError, ValueError, TypeError, AttributeError):
             pass
 
         # Analyze dependencies
@@ -462,7 +462,7 @@ class StatusChecker:
                         suggestion="Consider breaking into smaller modules",
                     )
                 )
-        except Exception:
+        except (OSError, ValueError, TypeError, AttributeError):
             pass
 
         # Structural analysis
@@ -499,7 +499,7 @@ class StatusChecker:
                             suggestion="Consider splitting into smaller modules",
                         )
                     )
-        except Exception:
+        except (OSError, ValueError, TypeError, AttributeError):
             pass
 
         # Test analysis
@@ -535,7 +535,7 @@ class StatusChecker:
                         suggestion="Add tests for untested modules",
                     )
                 )
-        except Exception:
+        except (OSError, ValueError, TypeError, AttributeError):
             pass
 
         # API surface analysis
@@ -583,7 +583,7 @@ class StatusChecker:
                         suggestion="Consider stability guarantees for widely-used exports",
                     )
                 )
-        except Exception:
+        except (OSError, ValueError, TypeError, AttributeError):
             pass
 
         # Identify additional weak spots
