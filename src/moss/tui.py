@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import re
 from enum import Enum, auto
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
+
+from rich.console import RenderableType
 
 try:
     from textual.app import App, ComposeResult
@@ -222,10 +225,45 @@ class HoverTooltip(Static):
     """Tooltip displayed when a node is highlighted."""
 
     content = reactive("")
+    file_path: Path | None = None  # Set when showing file content
 
-    def render(self) -> str:
+    def render(self) -> RenderableType:
+        from rich.text import Text
+
         if not self.content:
             return ""
+
+        header = Text("Details:", style="bold")
+
+        # Try syntax highlighting for file content
+        if self.file_path and self.file_path.suffix in (".py", ".rs", ".js", ".ts", ".go", ".rb"):
+            try:
+                from rich.syntax import Syntax
+
+                # Map suffix to lexer name
+                lexer_map = {
+                    ".py": "python",
+                    ".rs": "rust",
+                    ".js": "javascript",
+                    ".ts": "typescript",
+                    ".go": "go",
+                    ".rb": "ruby",
+                }
+                lexer = lexer_map.get(self.file_path.suffix, "text")
+                syntax = Syntax(
+                    self.content,
+                    lexer,
+                    theme="monokai",
+                    line_numbers=False,
+                    word_wrap=True,
+                )
+                from rich.console import Group
+
+                return Group(header, syntax)
+            except ImportError:
+                # Pygments not installed, fall back to plain text
+                pass
+
         return f"[b]Details:[/b]\n{self.content}"
 
 
@@ -256,7 +294,6 @@ class ProjectTree(Tree[Any]):
 
         # Simple recursive file tree
         import os
-        from pathlib import Path
 
         def add_dir(tree_node: TreeNode[Any], path: Path):
             try:
@@ -532,6 +569,7 @@ class MossTUI(App):
 
         if data["type"] == "file":
             path = data["path"]
+            tooltip.file_path = path  # Enable syntax highlighting
             # Show file skeleton summary in tooltip
             try:
                 skeleton = self.api.skeleton.format(path)
@@ -543,11 +581,13 @@ class MossTUI(App):
             except (OSError, ValueError):
                 tooltip.content = f"File: {path.name}"
         elif data["type"] == "task":
+            tooltip.file_path = None  # No syntax highlighting for tasks
             node = data["node"]
             tooltip.content = f"Goal: {node.goal}\nStatus: {node.status.name}"
             if node.summary:
                 tooltip.content += f"\nSummary: {node.summary}"
         else:
+            tooltip.file_path = None
             tooltip.content = ""
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
