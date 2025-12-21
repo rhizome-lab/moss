@@ -2,12 +2,19 @@
 
 Interface with llama.cpp server (OpenAI-compatible) or llama-cpp-python library.
 Supports local model inference with GGUF models.
+
+Grammar Support:
+    GBNF grammars can be used to constrain output format. Pass the `grammar`
+    parameter to complete() or chat() with a GBNF grammar string.
+
+    from moss.llm.gbnf import GRAMMARS
+    response = provider.complete("Generate JSON", grammar=GRAMMARS["json"])
 """
 
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from moss.llm.protocol import LLMResponse, Message, Role
@@ -31,6 +38,11 @@ class LlamaCppProvider:
             use_server=False
         )
 
+    Grammar-constrained inference:
+        from moss.llm.gbnf import GRAMMARS
+        provider = LlamaCppProvider()
+        response = provider.complete("Output JSON:", grammar=GRAMMARS["json"])
+
     Example:
         provider = LlamaCppProvider()
         response = provider.complete("Hello!")
@@ -44,7 +56,8 @@ class LlamaCppProvider:
     temperature: float = 0.0
     n_gpu_layers: int = -1  # -1 = all layers on GPU
 
-    _llm: Any = None
+    _llm: Any = field(default=None, repr=False)
+    _grammar_cache: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @property
     def llm(self) -> Any:
@@ -137,6 +150,11 @@ class LlamaCppProvider:
             "temperature": kwargs.get("temperature", self.temperature),
         }
 
+        # Add grammar constraint if provided
+        grammar = kwargs.get("grammar")
+        if grammar:
+            payload["grammar"] = grammar
+
         response = httpx.post(url, json=payload, timeout=300)
         response.raise_for_status()
         data = response.json()
@@ -174,12 +192,28 @@ class LlamaCppProvider:
             "temperature": kwargs.get("temperature", self.temperature),
         }
 
+        # Add grammar constraint if provided
+        grammar = kwargs.get("grammar")
+        if grammar:
+            payload["grammar"] = grammar
+
         response = httpx.post(url, json=payload, timeout=300)
         response.raise_for_status()
         data = response.json()
 
         content = data["choices"][0]["message"]["content"]
         return LLMResponse(content=content, model="llama.cpp", raw=data)
+
+    def _get_llama_grammar(self, grammar_str: str) -> Any:
+        """Get or create cached LlamaGrammar object."""
+        if grammar_str in self._grammar_cache:
+            return self._grammar_cache[grammar_str]
+
+        from llama_cpp import LlamaGrammar
+
+        grammar = LlamaGrammar.from_string(grammar_str)
+        self._grammar_cache[grammar_str] = grammar
+        return grammar
 
     def _complete_library(
         self,
@@ -196,12 +230,19 @@ class LlamaCppProvider:
         if system:
             full_prompt = f"{system}\n\n{prompt}"
 
-        output = llm(
-            full_prompt,
-            max_tokens=kwargs.get("max_tokens", self.max_tokens),
-            temperature=kwargs.get("temperature", self.temperature),
-            echo=False,
-        )
+        # Prepare kwargs for llama call
+        call_kwargs: dict[str, Any] = {
+            "max_tokens": kwargs.get("max_tokens", self.max_tokens),
+            "temperature": kwargs.get("temperature", self.temperature),
+            "echo": False,
+        }
+
+        # Add grammar constraint if provided
+        grammar_str = kwargs.get("grammar")
+        if grammar_str:
+            call_kwargs["grammar"] = self._get_llama_grammar(str(grammar_str))
+
+        output = llm(full_prompt, **call_kwargs)
 
         content = output["choices"][0]["text"]
         usage = {
