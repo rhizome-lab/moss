@@ -140,9 +140,9 @@ def _discover_entry_points() -> None:
                 # Only register if not already registered (builtins take precedence)
                 if ep.name not in _PROVIDERS:
                     register_provider(ep.name, provider_class)
-            except Exception:
+            except (ImportError, AttributeError, TypeError):
                 pass  # Skip failed imports
-    except Exception:
+    except (TypeError, StopIteration):
         pass
 
 

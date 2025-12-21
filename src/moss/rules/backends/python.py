@@ -74,7 +74,7 @@ class PythonBackend(BaseBackend):
         """
         try:
             source = file_path.read_text()
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             return BackendResult(
                 backend_name=self.name,
                 errors=[f"Could not read file: {e}"],
@@ -224,14 +224,14 @@ class PythonBackend(BaseBackend):
             return None
         try:
             return ast.unparse(node)
-        except Exception:
+        except ValueError:
             return None
 
     def _get_decorator_name(self, node: ast.expr) -> str:
         """Get string representation of a decorator."""
         try:
             return ast.unparse(node)
-        except Exception:
+        except ValueError:
             if isinstance(node, ast.Name):
                 return node.id
             elif isinstance(node, ast.Attribute):
@@ -242,7 +242,7 @@ class PythonBackend(BaseBackend):
         """Get string representation of a base class."""
         try:
             return ast.unparse(node)
-        except Exception:
+        except ValueError:
             if isinstance(node, ast.Name):
                 return node.id
             return "?"

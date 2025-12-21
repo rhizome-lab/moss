@@ -83,7 +83,7 @@ def load_rules_from_config(directory: Path) -> list[Any]:
                 spec = _rule_from_dict(rule_data)
                 if spec:
                     rules.append(spec)
-        except Exception:
+        except (OSError, tomllib.TOMLDecodeError):
             pass
 
     # Check .moss/rules.toml
@@ -91,7 +91,7 @@ def load_rules_from_config(directory: Path) -> list[Any]:
     if rules_toml.exists():
         try:
             rules.extend(load_rules_from_toml(rules_toml))
-        except Exception:
+        except (OSError, tomllib.TOMLDecodeError):
             pass
 
     # Check pyproject.toml
@@ -104,7 +104,7 @@ def load_rules_from_config(directory: Path) -> list[Any]:
                 spec = _rule_from_dict(rule_data)
                 if spec:
                     rules.append(spec)
-        except Exception:
+        except (OSError, tomllib.TOMLDecodeError):
             pass
 
     return rules

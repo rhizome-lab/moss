@@ -151,7 +151,7 @@ class ContextDetector:
         if source is None:
             try:
                 source = file_path.read_text()
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 source = ""
 
         if source:

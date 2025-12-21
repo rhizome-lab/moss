@@ -126,7 +126,7 @@ class RuleEngine:
         # Read source
         try:
             source = file_path.read_text()
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             if self.config.collect_errors:
                 result.errors.append(f"Could not read {file_path}: {e}")
             return result
@@ -154,7 +154,7 @@ class RuleEngine:
             try:
                 violations = self._run_rule(rule, file_path, source, context, backend_results)
                 result.violations.extend(violations)
-            except Exception as e:
+            except (ValueError, KeyError, TypeError, AttributeError) as e:
                 if self.config.collect_errors:
                     result.errors.append(f"Rule '{rule.name}' failed on {file_path}: {e}")
                 if not self.config.continue_on_error:
@@ -302,7 +302,7 @@ class RuleEngine:
                     # Run without pattern (python backend, etc.)
                     results[backend_name] = backend.analyze(file_path)
 
-            except Exception as e:
+            except (ValueError, KeyError, TypeError, AttributeError, OSError) as e:
                 results[backend_name] = BackendResult(
                     backend_name=backend_name,
                     errors=[str(e)],

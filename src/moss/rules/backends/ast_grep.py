@@ -88,7 +88,7 @@ class AstGrepBackend(BaseBackend):
             else:
                 result = self._run_with_pattern(file_path, pattern, language)  # type: ignore
             return result
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired) as e:
             return BackendResult(
                 backend_name=self.name,
                 matches=[],
@@ -206,7 +206,7 @@ class AstGrepBackend(BaseBackend):
                     "rule": data.get("ruleId"),
                 },
             )
-        except Exception:
+        except (ValueError, KeyError, TypeError):
             return None
 
     def supports_pattern(self, pattern: str) -> bool:

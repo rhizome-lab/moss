@@ -207,7 +207,7 @@ class APISurfaceAnalyzer:
             try:
                 source = py_file.read_text()
                 tree = ast.parse(source)
-            except Exception:
+            except (OSError, UnicodeDecodeError, SyntaxError):
                 continue
 
             for node in ast.walk(tree):
@@ -226,7 +226,7 @@ class APISurfaceAnalyzer:
         try:
             source = path.read_text()
             tree = ast.parse(source)
-        except Exception:
+        except (OSError, UnicodeDecodeError, SyntaxError):
             return
 
         # Get module name

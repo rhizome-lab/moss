@@ -56,7 +56,7 @@ class RegexBackend(BaseBackend):
 
         try:
             source = file_path.read_text()
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             return BackendResult(
                 backend_name=self.name,
                 matches=[],
