@@ -426,7 +426,7 @@ class ComponentGenerator:
                         graph.add_type(return_type)
                         for it in input_types:
                             graph.add_type(it)
-                except Exception:
+                except (SyntaxError, ValueError):
                     pass  # Skip functions we can't analyze
 
         # Add primitives as producers of themselves (identity)

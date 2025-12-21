@@ -384,7 +384,7 @@ class TemplateGenerator:
         try:
             template_obj = string.Template(template)
             return template_obj.safe_substitute(subs)
-        except Exception:
+        except (ValueError, KeyError):
             # Fallback to simple replacement
             result = template
             for key, value in subs.items():

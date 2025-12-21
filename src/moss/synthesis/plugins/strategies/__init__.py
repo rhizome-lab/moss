@@ -144,7 +144,7 @@ class StrategyRegistry:
                 strategy_class = ep.load()
                 strategy = strategy_class()
                 self.register(strategy)
-            except Exception:
+            except (ImportError, AttributeError, TypeError):
                 # Silently skip failed plugins
                 pass
 

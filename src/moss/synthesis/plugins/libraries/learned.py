@@ -601,13 +601,13 @@ class LearnedLibrary(BaseLibrary):
                 if node.returns:
                     try:
                         sig = ast.unparse(node.returns)
-                    except Exception:
+                    except ValueError:
                         pass
 
                 # Extract just this function
                 try:
                     func_code = ast.unparse(node)
-                except Exception:
+                except ValueError:
                     func_code = code
 
                 return Abstraction(
@@ -687,7 +687,7 @@ class LearnedLibrary(BaseLibrary):
             self._persistence_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self._persistence_path, "w") as f:
                 json.dump(data, f, indent=2)
-        except Exception:
+        except OSError:
             pass  # Silently ignore persistence errors
 
     def _load(self) -> None:
@@ -699,7 +699,7 @@ class LearnedLibrary(BaseLibrary):
             with open(self._persistence_path) as f:
                 data = json.load(f)
             self._from_dict(data)
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             pass  # Silently ignore load errors
 
     def _to_dict(self) -> dict[str, Any]:
