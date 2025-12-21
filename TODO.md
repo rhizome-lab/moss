@@ -12,7 +12,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 **When done or stuck, do this:**
 - [ ] **Dogfooding & Agentic Loop Iteration**:
-  1. Run a moss agentic loop on part of the codebase (`moss loop` or `moss agent`)
+  1. Run a moss agentic loop on part of the codebase:
+     - `moss workflow run vanilla --file <file> --arg "task=..."` - minimal loop
+     - `moss workflow run validate-fix --file <file>` - validate and fix errors
+     - `moss agent "task description"` - DWIM-driven agent
+     - `moss loop run simple --file <file>` - simple loop
   2. Evaluate results, log to `logs/dogfood-YYYY-MM-DD.md` (rotate when too long)
   3. Plan improvements to test (loop behavior, infra, prompts)
   4. Repeat
@@ -77,6 +81,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] Variable scoping analysis
 - [ ] Type inference for method calls
 - [ ] Cross-language reference tracking (Python ↔ Rust) (Partially Complete)
+
+## To Consolidate
+
+*From dogfooding session 2025-12-22 (see `logs/dogfood-2025-12-22.md`):*
+- [ ] Agent path resolution fails without full paths (`session_analysis.py` → should find `src/moss/session_analysis.py`)
+- [ ] Agent stuck in retry loop (3x same intent) - needs fallback strategy
+- [ ] Workflow verbose mode - show LLM outputs
+- [ ] Real editing tools in vanilla workflow (not just `patch.apply <description>`)
+- [ ] Connect terse command format to actual tools
+- [ ] Update default model in dwim_loop.py (done: now uses gemini-2.5-flash)
 
 ## Notes
 

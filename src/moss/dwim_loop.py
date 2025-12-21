@@ -76,7 +76,7 @@ class LoopConfig:
     max_turns: int = 50
     stall_threshold: int = 5  # Max turns without progress
     confidence_threshold: float = CLARIFY_THRESHOLD  # Below this, ask for clarification
-    model: str = "gemini/gemini-2.0-flash"
+    model: str = "gemini/gemini-2.5-flash-preview-05-20"
     temperature: float = 0.0
     system_prompt: str = ""
     mock: bool = False
