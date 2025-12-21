@@ -4,6 +4,14 @@
 
 ### Features
 
+**Core Primitive Tool Resolution** (Dec 22 2025)
+- Added `analyze` to CLI passthrough commands (routes to Rust)
+- New `resolve_core_primitive()` function for simple tool resolution
+- CORE_PRIMITIVES: `view`, `edit`, `analyze`, `search` with aliases
+- Basic typo correction using Levenshtein distance (threshold 0.7)
+- NL-dependent tests marked xfail since embeddings were removed
+- Phase 3 (Simplify tool interface) now complete
+
 **Analyze Command & Core API Consolidation** (Dec 21 2025)
 - New `moss analyze [path]` command in Rust CLI:
   - `--health`: Codebase health metrics (files, lines, complexity scores)

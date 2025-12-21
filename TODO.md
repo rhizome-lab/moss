@@ -4,7 +4,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] Simple tool resolution: exact match + basic typo correction for 4 names
 - [ ] Comprehensive Telemetry & Analysis (see Active Backlog)
 
 ## Active Backlog
@@ -51,9 +50,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] `edit <path>` - modify node with `--delete`, `--replace`, `--before`, `--after`, `--prepend`, `--append`, `--move-*`, `--swap`
 - [x] `analyze [path]` - compute properties with `--health`, `--complexity`, `--security`
 
-**Phase 3: Simplify tool interface** (partially complete)
+**Phase 3: Simplify tool interface** (complete)
 - [x] Remove DWIM embedding system (fastembed/bge-small-en dependency removed)
-- [ ] Simple tool resolution: exact match + basic typo correction for 4 names
+- [x] Simple tool resolution: exact match + basic typo correction for 4 names
 - [x] Keep path fuzzy resolution (already in Rust): `view dwim` → `src/moss/dwim.py`
 - [x] Consolidate MossAPI: 30 sub-APIs → 4 primitive APIs matching CLI/MCP
 

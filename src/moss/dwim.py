@@ -36,6 +36,100 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# Core Primitives - Simple Resolution for 4 Primary Tools
+# =============================================================================
+# The 4 core primitives are the primary CLI/MCP interface. They subsume the
+# older tool set (skeleton, anchors, deps, etc.) into a unified tree model.
+
+CORE_PRIMITIVES = {"view", "edit", "analyze", "search"}
+
+# Aliases for core primitives - maps common terms to canonical names
+CORE_ALIASES: dict[str, str] = {
+    # view aliases
+    "show": "view",
+    "look": "view",
+    "see": "view",
+    "display": "view",
+    "read": "view",
+    "skeleton": "view",
+    "tree": "view",
+    "expand": "view",
+    "symbols": "view",
+    # edit aliases
+    "modify": "edit",
+    "change": "edit",
+    "update": "edit",
+    "patch": "edit",
+    "fix": "edit",
+    "replace": "edit",
+    "delete": "edit",
+    "insert": "edit",
+    # analyze aliases
+    "check": "analyze",
+    "health": "analyze",
+    "complexity": "analyze",
+    "security": "analyze",
+    "lint": "analyze",
+    "audit": "analyze",
+    # search aliases
+    "find": "search",
+    "grep": "search",
+    "query": "search",
+    "locate": "search",
+    "lookup": "search",
+}
+
+
+def resolve_core_primitive(name: str) -> tuple[str | None, float]:
+    """Resolve a name to one of the 4 core primitives.
+
+    Uses exact match + basic typo correction (Levenshtein).
+
+    Args:
+        name: Tool name to resolve
+
+    Returns:
+        Tuple of (canonical_name, confidence).
+        Returns (None, 0.0) if no match found.
+    """
+    normalized = name.lower().strip()
+
+    # Exact match
+    if normalized in CORE_PRIMITIVES:
+        return normalized, 1.0
+
+    # Alias match
+    if normalized in CORE_ALIASES:
+        return CORE_ALIASES[normalized], 1.0
+
+    # Typo correction via string similarity
+    best_match = None
+    best_score = 0.0
+
+    for primitive in CORE_PRIMITIVES:
+        score = SequenceMatcher(None, normalized, primitive).ratio()
+        if score > best_score:
+            best_score = score
+            best_match = primitive
+
+    for alias, target in CORE_ALIASES.items():
+        score = SequenceMatcher(None, normalized, alias).ratio()
+        if score > best_score:
+            best_score = score
+            best_match = target
+
+    # Threshold: 0.7 for auto-correct (e.g., "veiw" -> "view" = 0.75)
+    if best_match and best_score >= 0.7:
+        return best_match, best_score
+
+    return None, 0.0
+
+
+# =============================================================================
+# Word Forms and Keyword Expansion
+# =============================================================================
+
 # Word form mappings for better semantic matching (handles stemming-like behavior)
 # Maps variant forms to their canonical form for keyword expansion
 WORD_FORMS: dict[str, list[str]] = {
@@ -1219,6 +1313,8 @@ def get_tool_info(tool_name: str) -> dict | None:
 __all__ = [
     "AUTO_CORRECT_THRESHOLD",
     "CLARIFY_THRESHOLD",
+    "CORE_ALIASES",
+    "CORE_PRIMITIVES",
     "PARAM_ALIASES",
     "SUGGEST_THRESHOLD",
     "TOOL_ALIASES",
@@ -1235,6 +1331,7 @@ __all__ = [
     "normalize_parameters",
     "register_mcp_tool",
     "register_tool",
+    "resolve_core_primitive",
     "resolve_parameter",
     "resolve_tool",
     "suggest_tool",

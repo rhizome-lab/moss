@@ -108,6 +108,7 @@ class TestExactMatches:
         )
 
 
+@pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
 class TestWordOrder:
     """Test that word order doesn't significantly affect matching."""
 
@@ -131,6 +132,7 @@ class TestWordOrder:
         )
 
 
+@pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
 class TestNaturalLanguage:
     """Test natural language query understanding."""
 
@@ -168,6 +170,7 @@ class TestTypoTolerance:
         )
 
 
+@pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
 class TestSynonyms:
     """Test synonym and related term matching."""
 
@@ -199,6 +202,7 @@ class TestNegativeCases:
         )
 
 
+@pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
 class TestTargetInQuery:
     """Test queries that include file paths or targets."""
 

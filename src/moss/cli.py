@@ -6037,6 +6037,7 @@ def main(argv: list[str] | None = None) -> int:
     # Commands that delegate entirely to Rust CLI (no Python parsing needed)
     # Note: summarize kept in Python for directory mode and --docs flag
     RUST_PASSTHROUGH = {
+        "analyze",
         "anchors",
         "callers",
         "callees",

@@ -328,11 +328,16 @@ class TestParameterResolution:
         assert normalized == {"path": "test.py", "inherits": "Parent"}
 
 
+@pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
 class TestNLMarkerProtection:
     """Tests ensuring NL markers (show/find/get) don't hijack queries.
 
     This is critical - common English words at the start of queries
     should NOT match tool names or aliases.
+
+    NOTE: These tests require the embedding-based semantic matching that was
+    removed. They are marked xfail until NL matching is re-implemented or
+    the tests are updated for the simplified 4-primitive system.
     """
 
     def test_show_does_not_match_shadow(self):
@@ -407,6 +412,7 @@ class TestToolRouter:
 
     # === Skeleton/Structure queries ===
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_analyze_intent_skeleton(self):
         """Test analyzing intent for skeleton."""
         router = ToolRouter()
@@ -416,6 +422,7 @@ class TestToolRouter:
         structure_tools = {"skeleton", "context", "search_summarize_module", "view"}
         assert any(t in structure_tools for t in tool_names)
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_skeleton_various_phrasings(self):
         """Test various phrasings for skeleton intent."""
         phrasings = [
@@ -438,6 +445,7 @@ class TestToolRouter:
 
     # === Dependencies queries ===
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_analyze_intent_deps(self):
         """Test analyzing intent for dependencies."""
         router = ToolRouter()
@@ -452,6 +460,7 @@ class TestToolRouter:
         }
         assert any(t in dep_related for t in tool_names), f"Got: {tool_names}"
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_deps_various_phrasings(self):
         """Test various phrasings for dependencies intent."""
         phrasings = [
@@ -485,6 +494,7 @@ class TestToolRouter:
         tool_names = [m.tool for m in matches[:3]]
         assert "query" in tool_names
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_query_various_phrasings(self):
         """Test various phrasings for query intent."""
         phrasings = [
@@ -505,6 +515,7 @@ class TestToolRouter:
 
     # === CFG queries ===
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_analyze_intent_cfg(self):
         """Test analyzing intent for CFG."""
         router = ToolRouter()
@@ -513,6 +524,7 @@ class TestToolRouter:
         tool_names = [m.tool for m in matches[:3]]
         assert "cfg" in tool_names
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_cfg_various_phrasings(self):
         """Test various phrasings for CFG intent."""
         phrasings = [
@@ -534,6 +546,7 @@ class TestToolRouter:
 
     # === Anchors queries ===
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_anchors_various_phrasings(self):
         """Test various phrasings for anchors intent."""
         phrasings = [
@@ -555,6 +568,7 @@ class TestToolRouter:
 
     # === Context queries ===
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_context_various_phrasings(self):
         """Test various phrasings for context intent."""
         phrasings = [
@@ -575,6 +589,7 @@ class TestToolRouter:
 
     # === Tool suggestion ===
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_suggest_tool(self):
         """Test tool suggestion."""
         router = ToolRouter()
@@ -629,6 +644,7 @@ class TestToolRouter:
 class TestModuleFunctions:
     """Tests for module-level convenience functions."""
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_analyze_intent(self):
         """Test analyze_intent function."""
         matches = analyze_intent("show file overview")
@@ -816,6 +832,7 @@ class TestEdgeCases:
 
     # === Case variations ===
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_all_caps_query(self):
         """Test handling all caps query."""
         matches = analyze_intent("SHOW CODE STRUCTURE")
@@ -900,6 +917,7 @@ class TestConfidenceScoring:
         matches = analyze_intent("skelton")
         assert 0.7 < matches[0].confidence < 1.0
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_nl_query_moderate_confidence(self):
         """Test that NL queries get moderate confidence."""
         matches = analyze_intent("show me the code structure please")
@@ -1020,6 +1038,7 @@ class TestWordOrderVariations:
 class TestMultipleToolsInQuery:
     """Tests for queries that could match multiple tools."""
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_ambiguous_query_returns_multiple(self):
         """Test that ambiguous queries return multiple options."""
         matches = analyze_intent("analyze code")
@@ -1110,6 +1129,7 @@ class TestAliasMatching:
             assert matches[0].confidence == 1.0
 
 
+@pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
 class TestNaturalLanguageQueries:
     """Parametrized tests for natural language queries."""
 
@@ -1337,6 +1357,7 @@ class TestKnownGaps:
         tool_names = [m.tool for m in matches[:3]]
         assert "query" in tool_names, f"Got: {tool_names}"
 
+    @pytest.mark.xfail(reason="NL matching requires embeddings which were removed")
     def test_what_packages_finds_deps(self):
         """'what packages are used' should find deps tools."""
         matches = analyze_intent("what packages are used")
@@ -1362,3 +1383,120 @@ class TestKnownGaps:
         """Empty available_tools filter should return no results."""
         matches = analyze_intent("find code", available_tools=[])
         assert len(matches) == 0, f"Got {len(matches)} matches"
+
+
+class TestCorePrimitives:
+    """Tests for the 4 core primitives: view, edit, analyze, search.
+
+    These are the simplified CLI/MCP tools that subsume the older tool set.
+    Resolution uses exact match + basic typo correction.
+    """
+
+    def test_exact_match_all_primitives(self):
+        """Test exact match for all 4 core primitives."""
+        from moss.dwim import CORE_PRIMITIVES, resolve_core_primitive
+
+        for primitive in CORE_PRIMITIVES:
+            result, confidence = resolve_core_primitive(primitive)
+            assert result == primitive
+            assert confidence == 1.0
+
+    def test_alias_view(self):
+        """Test aliases resolve to 'view'."""
+        from moss.dwim import resolve_core_primitive
+
+        aliases = ["show", "look", "see", "display", "read", "skeleton", "tree", "expand"]
+        for alias in aliases:
+            result, confidence = resolve_core_primitive(alias)
+            assert result == "view", f"'{alias}' should resolve to 'view', got '{result}'"
+            assert confidence == 1.0
+
+    def test_alias_edit(self):
+        """Test aliases resolve to 'edit'."""
+        from moss.dwim import resolve_core_primitive
+
+        aliases = ["modify", "change", "update", "patch", "fix", "replace", "delete"]
+        for alias in aliases:
+            result, confidence = resolve_core_primitive(alias)
+            assert result == "edit", f"'{alias}' should resolve to 'edit', got '{result}'"
+            assert confidence == 1.0
+
+    def test_alias_analyze(self):
+        """Test aliases resolve to 'analyze'."""
+        from moss.dwim import resolve_core_primitive
+
+        aliases = ["check", "health", "complexity", "security", "lint", "audit"]
+        for alias in aliases:
+            result, confidence = resolve_core_primitive(alias)
+            assert result == "analyze", f"'{alias}' should resolve to 'analyze', got '{result}'"
+            assert confidence == 1.0
+
+    def test_alias_search(self):
+        """Test aliases resolve to 'search'."""
+        from moss.dwim import resolve_core_primitive
+
+        aliases = ["find", "grep", "query", "locate", "lookup"]
+        for alias in aliases:
+            result, confidence = resolve_core_primitive(alias)
+            assert result == "search", f"'{alias}' should resolve to 'search', got '{result}'"
+            assert confidence == 1.0
+
+    def test_typo_correction_view(self):
+        """Test typo correction for 'view'."""
+        from moss.dwim import resolve_core_primitive
+
+        typos = ["veiw", "viwe", "vew", "veuw"]
+        for typo in typos:
+            result, confidence = resolve_core_primitive(typo)
+            assert result == "view", f"'{typo}' should resolve to 'view', got '{result}'"
+            assert confidence >= 0.7
+
+    def test_typo_correction_edit(self):
+        """Test typo correction for 'edit'."""
+        from moss.dwim import resolve_core_primitive
+
+        typos = ["eidt", "edti", "edi", "editr"]
+        for typo in typos:
+            result, confidence = resolve_core_primitive(typo)
+            assert result == "edit", f"'{typo}' should resolve to 'edit', got '{result}'"
+            assert confidence >= 0.7
+
+    def test_typo_correction_analyze(self):
+        """Test typo correction for 'analyze'."""
+        from moss.dwim import resolve_core_primitive
+
+        typos = ["analize", "analyz", "analyez", "anayze"]
+        for typo in typos:
+            result, confidence = resolve_core_primitive(typo)
+            assert result == "analyze", f"'{typo}' should resolve to 'analyze', got '{result}'"
+            assert confidence >= 0.7
+
+    def test_typo_correction_search(self):
+        """Test typo correction for 'search'."""
+        from moss.dwim import resolve_core_primitive
+
+        typos = ["serach", "saerch", "seach", "searh"]
+        for typo in typos:
+            result, confidence = resolve_core_primitive(typo)
+            assert result == "search", f"'{typo}' should resolve to 'search', got '{result}'"
+            assert confidence >= 0.7
+
+    def test_no_match_gibberish(self):
+        """Test that gibberish returns no match."""
+        from moss.dwim import resolve_core_primitive
+
+        gibberish = ["xyz", "foobar", "asdfgh", "qwerty123"]
+        for word in gibberish:
+            result, confidence = resolve_core_primitive(word)
+            assert result is None, f"'{word}' should not match, got '{result}'"
+            assert confidence == 0.0
+
+    def test_case_insensitive(self):
+        """Test case-insensitive matching."""
+        from moss.dwim import resolve_core_primitive
+
+        cases = ["VIEW", "View", "vIeW", "EDIT", "Edit", "ANALYZE", "SEARCH"]
+        for case in cases:
+            result, confidence = resolve_core_primitive(case)
+            assert result is not None
+            assert confidence == 1.0
