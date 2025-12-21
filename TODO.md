@@ -4,7 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-(empty - work complete)
+- [ ] `anchors` command → delegate to Rust `search` with type filter
+- [ ] `query` command → delegate to Rust `search`
+- [ ] `tree` command → delegate to Rust `view` (directory-level)
+- [ ] Clean up Phase 1 checklist (skeleton/summarize already done)
 
 ## Recently Completed
 
