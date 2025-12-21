@@ -20,12 +20,8 @@
 - `LLM Benchmarking Harness`: Automated cross-model evaluation with markdown report generation
 
 **Recursive improvement loops** (Dec 2025)
-- `Recursive Policy Learning`: Automated distillation of safety rules from successful histories
-- `Agentic Prompt Evolution`: Automated system prompt refinement based on session feedback
 - `Adaptive Loop Strategy Refinement`: History-based switching between DWIM and Structured loops
-- `Agentic Tool Discovery`: Automated search and configuration of new MCP tools
 - `Agentic Workflow Synthesis`: Automatic creation of new workflows from telemetry patterns
-- `Recursive Self-Optimization`: Tuning of structural heuristics based on session outcomes
 
 **Advanced TUI & UX** (Dec 2025)
 - `Extensible Agent Modes`: Plugin-based TUI mode system (PLAN, READ, WRITE, DIFF, SESSION, BRANCH, SWARM, COMMIT)

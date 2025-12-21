@@ -410,6 +410,10 @@ class RefChecker:
         if not path:
             return False
 
+        # Reject paths with invalid filename characters
+        if any(c in path for c in "<>|\"'"):
+            return False
+
         # Valid files/directories
         if path in ("Cargo.toml", "pyproject.toml", "Architecture.md"):
             return True

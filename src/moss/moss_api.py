@@ -195,11 +195,13 @@ class ShadowGitAPI:
 
     async def switch_branch(self, branch_name: str) -> bool:
         """Switch to a different shadow branch."""
+        from moss.shadow_git import GitError
+
         git = self._get_git()
         try:
             await git._run_git("checkout", branch_name)
             return True
-        except Exception:
+        except GitError:
             return False
 
     async def begin_multi_commit(self) -> None:
@@ -961,6 +963,8 @@ class GitAPI:
         Returns:
             Dict with 'success' boolean
         """
+        from moss.shadow_git import GitError
+
         git = self.init()
         # Get current branch to check if we're on the checkpoint
         current = await git._get_current_branch()
@@ -968,7 +972,7 @@ class GitAPI:
             # Switch to main/master before deleting
             try:
                 await git._run_git("checkout", "main")
-            except Exception:
+            except GitError:
                 await git._run_git("checkout", "master")
 
         branch = ShadowBranch(name, git.root)
@@ -2846,7 +2850,7 @@ class SearchAPI(PathResolvingMixin):
             try:
                 source = py_file.read_text()
                 symbols = extract_python_skeleton(source)
-            except Exception:
+            except (OSError, SyntaxError, UnicodeDecodeError):
                 continue
             rel_path = str(py_file.relative_to(self.root))
             for sym in symbols:

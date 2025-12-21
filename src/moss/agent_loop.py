@@ -499,7 +499,8 @@ class AgentLoopRunner:
                     )
                     self._background_tasks.add(task)
                     task.add_done_callback(self._background_tasks.discard)
-            except Exception:
+            except (ImportError, RuntimeError, AttributeError):
+                # Event emission is non-critical, skip if unavailable
                 pass
 
             if step_result.status == StepStatus.SUCCESS:
@@ -675,8 +676,8 @@ class AgentLoopRunner:
             if complexity < 3 and loop.token_budget:
                 loop.token_budget = int(loop.token_budget * 0.9)
 
-        except Exception:
-            # Fallback: do nothing if estimation fails
+        except (ValueError, TypeError, RuntimeError):
+            # Fallback: do nothing if estimation fails (non-critical)
             pass
 
     async def _rebalance_steps(
@@ -697,11 +698,9 @@ class AgentLoopRunner:
             # If complexity still high (> 5) and progress is being made, extend max_steps
             if complexity > 5:
                 loop.max_steps += 5  # Give it 5 more steps
-            elif complexity <= 1:
-                # Almost done, no need to extend
-                pass
 
-        except Exception:
+        except (ValueError, TypeError, RuntimeError):
+            # Non-critical: step adjustment is optional
             pass
 
 
@@ -774,7 +773,8 @@ class HybridLoopRunner:
             logger.info(f"Refined loop strategy proposed: {output}")
             # Clear history after refinement
             self._history = []
-        except Exception:
+        except (ValueError, TypeError, RuntimeError):
+            # Non-critical: strategy refinement is optional
             pass
 
 
@@ -1137,140 +1137,6 @@ def telemetry_optimizer_loop(name: str = "telemetry_optimizer") -> AgentLoop:
     )
 
 
-def policy_optimizer_loop(name: str = "policy_optimizer") -> AgentLoop:
-    """Meta-loop that refines safety policies based on past rejections."""
-    return AgentLoop(
-        name=name,
-        steps=[
-            LoopStep("fetch_data", "telemetry.analyze_all_sessions", step_type=StepType.TOOL),
-            LoopStep(
-                "analyze",
-                "llm.analyze_policy_violations",
-                input_from="fetch_data",
-                step_type=StepType.LLM,
-            ),
-            LoopStep(
-                "propose",
-                "llm.propose_policy_updates",
-                input_from="analyze",
-                step_type=StepType.LLM,
-            ),
-        ],
-        exit_conditions=["propose.success"],
-    )
-
-
-def policy_learning_loop(name: str = "policy_learning") -> AgentLoop:
-    """Meta-loop that learns new safety rules from successful session histories."""
-    return AgentLoop(
-        name=name,
-        steps=[
-            LoopStep("fetch_data", "telemetry.analyze_all_sessions", step_type=StepType.TOOL),
-            LoopStep(
-                "extract",
-                "llm.extract_policy_rules",
-                input_from="fetch_data",
-                step_type=StepType.LLM,
-            ),
-            LoopStep(
-                "refine",
-                "llm.refine_policy_registry",
-                input_from="extract",
-                step_type=StepType.LLM,
-            ),
-        ],
-        exit_conditions=["refine.success"],
-    )
-
-
-def heuristic_optimizer_loop(name: str = "heuristic_optimizer") -> AgentLoop:
-    """Meta-loop that refines structural heuristics based on session performance."""
-    return AgentLoop(
-        name=name,
-        steps=[
-            LoopStep("fetch_data", "telemetry.analyze_all_sessions", step_type=StepType.TOOL),
-            LoopStep(
-                "analyze",
-                "llm.analyze_heuristics",
-                input_from="fetch_data",
-                step_type=StepType.LLM,
-            ),
-            LoopStep(
-                "propose",
-                "llm.propose_heuristic_updates",
-                input_from="analyze",
-                step_type=StepType.LLM,
-            ),
-        ],
-        exit_conditions=["propose.success"],
-    )
-
-
-def tool_discovery_loop(name: str = "tool_discovery") -> AgentLoop:
-    """Meta-loop that searches for and configures new MCP tools."""
-    return AgentLoop(
-        name=name,
-        steps=[
-            LoopStep(
-                "search",
-                "web.search",
-                step_type=StepType.TOOL,
-                parameters={"query": "useful MCP servers Model Context Protocol"},
-            ),
-            LoopStep(
-                "identify",
-                "llm.identify_useful_mcp_servers",
-                input_from="search",
-                step_type=StepType.LLM,
-            ),
-            LoopStep(
-                "scaffold",
-                "llm.scaffold_mcp_config",
-                input_from="identify",
-                step_type=StepType.LLM,
-            ),
-            LoopStep(
-                "save",
-                "edit.write_file",
-                input_from="scaffold",
-                step_type=StepType.TOOL,
-                parameters={"file_path": ".mcp.json"},
-            ),
-        ],
-        exit_conditions=["save.success"],
-    )
-
-
-def prompt_optimizer_loop(name: str = "prompt_optimizer") -> AgentLoop:
-    """Meta-loop that evolves system prompts based on session feedback."""
-    return AgentLoop(
-        name=name,
-        steps=[
-            LoopStep("fetch_data", "telemetry.analyze_all_sessions", step_type=StepType.TOOL),
-            LoopStep(
-                "analyze",
-                "llm.analyze_prompt_effectiveness",
-                input_from="fetch_data",
-                step_type=StepType.LLM,
-            ),
-            LoopStep(
-                "evolve",
-                "llm.evolve_prompt",
-                input_from="analyze",
-                step_type=StepType.LLM,
-            ),
-            LoopStep(
-                "save",
-                "edit.write_file",
-                input_from="evolve",
-                step_type=StepType.TOOL,
-                parameters={"file_path": ".moss/prompts/evolved.txt"},
-            ),
-        ],
-        exit_conditions=["save.success"],
-    )
-
-
 def workflow_synthesis_loop(name: str = "workflow_synthesis") -> AgentLoop:
     """Meta-loop that creates new workflows based on telemetry patterns."""
     return AgentLoop(
@@ -1369,39 +1235,6 @@ def memory_analysis_loop(name: str = "memory_analysis") -> AgentLoop:
             ),
         ],
         exit_conditions=["save.success"],
-    )
-
-
-def contract_diffusion_loop(name: str = "contract_diffusion") -> AgentLoop:
-    """Parallel refactor loop: contracts → implementation (parallel) → reconcile."""
-    return AgentLoop(
-        name=name,
-        steps=[
-            LoopStep(
-                "plan",
-                "llm.generate_contracts",
-                step_type=StepType.LLM,
-            ),
-            LoopStep(
-                "implement",
-                "swarm.fork_join",
-                input_from="plan",
-                step_type=StepType.TOOL,
-            ),
-            LoopStep(
-                "reconcile",
-                "llm.reconcile_implementations",
-                input_from="implement",
-                step_type=StepType.LLM,
-            ),
-            LoopStep(
-                "validate",
-                "validation.validate",
-                input_from="reconcile",
-                step_type=StepType.TOOL,
-            ),
-        ],
-        exit_conditions=["validate.success"],
     )
 
 
@@ -2422,7 +2255,8 @@ class LLMToolExecutor:
             action = Action.create(tool=tool_name, target=target, description=step.name)
             memory_ctx = await self.memory.get_context(state, action)
             return memory_ctx.warnings
-        except Exception:
+        except (ImportError, AttributeError, ValueError, TypeError):
+            # Memory is non-critical, return empty on errors
             return []
 
     async def _record_episode(
@@ -2461,8 +2295,8 @@ class LLMToolExecutor:
                 error_message=error,
                 duration_ms=duration_ms,
             )
-        except Exception:
-            # Don't let memory errors break execution
+        except (ImportError, AttributeError, ValueError, TypeError, OSError):
+            # Memory is non-critical, don't break execution
             pass
 
     async def _execute_llm(
@@ -2575,8 +2409,8 @@ class LLMToolExecutor:
             action = Action.create(tool="llm", description="LLM call")
             memory_ctx = await self.memory.get_context(state, action)
             return memory_ctx.to_text()
-        except Exception:
-            # Don't let memory errors break LLM calls
+        except (ImportError, AttributeError, ValueError, TypeError):
+            # Memory is non-critical, don't break LLM calls
             return ""
 
     def _extract_repair_context(self, context: LoopContext) -> str:
