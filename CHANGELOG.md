@@ -4,6 +4,9 @@
 
 ### Features
 
+**Session Dec 21 2025 (latest)**
+- `Rust Delegation`: expand/callers/callees commands now delegate to Rust CLI with Python fallback
+
 **Session Dec 21 2025 (later)**
 - `Rust Delegation`: skeleton/summarize/search-tree/view delegate to Rust CLI (fail if unavailable)
 - `Rust search-tree fix`: Extension patterns (`.py`, `.rs`) now work correctly

@@ -4,9 +4,14 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Python CLI → Rust CLI delegation**: More commands to delegate (expand, callees, callers)
+(empty - work complete)
 
 ## Recently Completed
+
+- **Session Dec 21 2025 (latest)**:
+  - Rust delegation for expand/callers/callees commands
+  - Added rust_expand, rust_callers, rust_callees to rust_shim.py
+  - Updated CLI to try Rust first with Python fallback
 
 - **Session Dec 21 2025 (later)**:
   - Rust delegation for skeleton/summarize/search-tree/view

@@ -261,3 +261,71 @@ def rust_summarize(file_path: str, root: str | None = None) -> str | None:
         return None
 
     return output
+
+
+def rust_expand(symbol: str, file: str | None = None, root: str | None = None) -> str | None:
+    """Expand a symbol to its full source using Rust CLI.
+
+    Returns source string or None if Rust not available.
+    """
+    if not rust_available():
+        return None
+
+    args = ["expand"]
+    if file:
+        args.extend(["-f", file])
+    if root:
+        args.extend(["-r", root])
+    args.append(symbol)
+
+    code, output = call_rust(args, json_output=False)
+    if code != 0:
+        return None
+
+    return output
+
+
+def rust_callers(symbol: str, root: str | None = None) -> list[dict] | None:
+    """Find callers of a symbol using Rust CLI.
+
+    Returns list of caller info or None if Rust not available.
+    Each item: {"file", "line", "caller", "context"}
+    """
+    if not rust_available():
+        return None
+
+    args = ["callers"]
+    if root:
+        args.extend(["-r", root])
+    args.append(symbol)
+
+    code, output = call_rust(args, json_output=True)
+    if code != 0:
+        return []
+
+    return json.loads(output)
+
+
+def rust_callees(
+    symbol: str, file: str | None = None, root: str | None = None
+) -> list[dict] | None:
+    """Find what a symbol calls using Rust CLI.
+
+    Returns list of callee info or None if Rust not available.
+    Each item: {"name", "line", "column"}
+    """
+    if not rust_available():
+        return None
+
+    args = ["callees"]
+    if file:
+        args.extend(["-f", file])
+    if root:
+        args.extend(["-r", root])
+    args.append(symbol)
+
+    code, output = call_rust(args, json_output=True)
+    if code != 0:
+        return []
+
+    return json.loads(output)

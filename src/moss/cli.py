@@ -734,10 +734,21 @@ def cmd_search_tree(args: Namespace) -> int:
 
 def cmd_expand(args: Namespace) -> int:
     """Show full source of a symbol."""
-    from moss.codebase import build_tree
-
     output = setup_output(args)
     target = normalize_symbol_args(args.target)
+
+    # Try Rust delegation first (faster)
+    if not wants_json(args):
+        from moss.rust_shim import rust_expand
+
+        result = rust_expand(target)
+        if result is not None:
+            output.print(result)
+            return 0
+
+    # Fall back to Python implementation
+    from moss.codebase import build_tree
+
     root = Path.cwd()
 
     tree = build_tree(root)
@@ -772,10 +783,33 @@ def cmd_expand(args: Namespace) -> int:
 
 def cmd_callers(args: Namespace) -> int:
     """Find callers of a symbol."""
-    from moss.codebase import build_tree
-
     output = setup_output(args)
     target = normalize_symbol_args(args.target)
+
+    # Try Rust delegation first (faster)
+    from moss.rust_shim import rust_callers
+
+    result = rust_callers(target)
+    if result is not None:
+        if not result:
+            output.print(f"No callers found for: {target}")
+            return 0
+
+        if wants_json(args):
+            output.data(result)
+        else:
+            output.print(f"Callers of {target}:")
+            for r in result[:30]:
+                loc = f"{r.get('file', '')}:{r.get('line', '')}"
+                caller = r.get("caller", "")
+                output.print(f"  {loc} in {caller}")
+            if len(result) > 30:
+                output.print(f"  ... +{len(result) - 30} more")
+        return 0
+
+    # Fall back to Python implementation
+    from moss.codebase import build_tree
+
     root = Path.cwd()
 
     tree = build_tree(root)
@@ -813,10 +847,30 @@ def cmd_callers(args: Namespace) -> int:
 
 def cmd_callees(args: Namespace) -> int:
     """Find what a symbol calls."""
-    from moss.codebase import build_tree
-
     output = setup_output(args)
     target = normalize_symbol_args(args.target)
+
+    # Try Rust delegation first (faster)
+    from moss.rust_shim import rust_callees
+
+    result = rust_callees(target)
+    if result is not None:
+        if not result:
+            output.print(f"No callees found for: {target}")
+            return 0
+
+        if wants_json(args):
+            output.data(result)
+        else:
+            output.print(f"Callees of {target}:")
+            for c in result:
+                name = c.get("name", c) if isinstance(c, dict) else c
+                output.print(f"  {name}")
+        return 0
+
+    # Fall back to Python implementation
+    from moss.codebase import build_tree
+
     root = Path.cwd()
 
     tree = build_tree(root)
