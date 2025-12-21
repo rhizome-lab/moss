@@ -1025,8 +1025,32 @@ class SwarmCoordinator(EventEmitterMixin):
             results=list(results),
             aggregated=winner,
             duration_ms=duration,
-            success=winner.success,
+            success=winner is not None,
         )
+
+    async def diffusion_refactor(
+        self,
+        contracts: list[str],
+        worker_factory: WorkerFactory,
+    ) -> SwarmResult:
+        """Parallel implementation of multiple components based on contracts.
+
+        Diffusion-like pattern:
+        1. Fork: spawn implementation workers for each contract in parallel
+        2. Join: gather all independent implementations
+
+        Args:
+            contracts: List of component contracts/specifications
+            worker_factory: Creates implementation workers
+
+        Returns:
+            SwarmResult with all implementations
+        """
+        from moss.agents import Ticket
+
+        tickets = [Ticket(task=f"Implement component with contract: {c}") for c in contracts]
+
+        return await self.fork_join(tickets, worker_factory)
 
     async def race(
         self,

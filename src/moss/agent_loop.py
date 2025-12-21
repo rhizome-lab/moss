@@ -1003,6 +1003,39 @@ def memory_search_loop(name: str = "memory_search") -> AgentLoop:
     )
 
 
+def contract_diffusion_loop(name: str = "contract_diffusion") -> AgentLoop:
+    """Parallel refactor loop: contracts → implementation (parallel) → reconcile."""
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep(
+                "plan",
+                "llm.generate_contracts",
+                step_type=StepType.LLM,
+            ),
+            LoopStep(
+                "implement",
+                "swarm.fork_join",
+                input_from="plan",
+                step_type=StepType.TOOL,
+            ),
+            LoopStep(
+                "reconcile",
+                "llm.reconcile_implementations",
+                input_from="implement",
+                step_type=StepType.LLM,
+            ),
+            LoopStep(
+                "validate",
+                "validation.validate",
+                input_from="reconcile",
+                step_type=StepType.TOOL,
+            ),
+        ],
+        exit_conditions=["validate.success"],
+    )
+
+
 def self_improving_docstring_loop(name: str = "self_improve_docstring") -> AgentLoop:
     """Docstring loop that learns from its own performance.
 
@@ -2451,6 +2484,27 @@ class LLMToolExecutor:
                 f"- Relevant constraints or preferences previously established\n\n"
                 f"Memory Content:\n{focus_str}\n\n"
                 f"Output actionable advice for the current task based on this experience."
+            ),
+            "generate_contracts": (
+                f"{structured_context}\n\n"
+                f"Break down the following large-scale refactor into independent components.\n"
+                f"For EACH component, specify a strict interface contract:\n"
+                f"- Function/Class signatures\n"
+                f"- Expected inputs and outputs\n"
+                f"- Side effects and constraints\n\n"
+                f"Task: {focus_str}\n\n"
+                f"Output as a structured list of contracts, one per component."
+            ),
+            "reconcile_implementations": (
+                f"{structured_context}\n\n"
+                f"Reconcile and merge the following independent implementations into a "
+                f"coherent whole.\n"
+                f"Address:\n"
+                f"- Inconsistencies between components\n"
+                f"- Missing glue code or integration logic\n"
+                f"- Redundant functionality\n\n"
+                f"Implementations:\n{focus_str}\n\n"
+                f"Output the final merged code."
             ),
         }
 

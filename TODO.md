@@ -4,15 +4,21 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Parallel Multi-Agent Refactor**: Implement 'diffusion-like' parallel implementation
 - [ ] **Adaptive Context Pruning**: Intelligently elide low-value content from context
+- [ ] **Agentic Workflow Synthesis**: Loop that creates new workflows based on telemetry
+- [ ] **Shadow Git Visualization**: Visual diff and history in TUI
 
 ## Recently Completed
 
+- **Parallel Multi-Agent Refactor** (Dec 2025):
+  - Implemented 'diffusion-like' refactor pattern: contracts → parallel implementation → reconcile
+  - Added `contract_diffusion_loop` template to `AgentLoop`
+  - Integrated `diffusion_refactor` pattern into `SwarmCoordinator`
+  - Added `generate_contracts` and `reconcile_implementations` LLM operations
+
 - **Agentic Memory Search** (Dec 2025):
-  - Implemented `memory_search_loop` for explicit past experience retrieval
-  - Added `analyze_memory` LLM operation to synthesize episodic insights
-  - Integrated with `memory.recall` tool for semantic search over past turns
+
+
 
 - **Self-Correcting Edit Harness** (Dec 2025):
   - Implemented `autofix_loop` for automated syntax error repair
