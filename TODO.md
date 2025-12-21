@@ -4,6 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
+- [ ] **Agentic Prompt Versioning**: Automatically track and compare system prompt evolutions
+- [ ] **Recursive Workflow Learning**: Propose new workflows based on recurrent session patterns
+- [ ] **Adaptive Model Rotation**: Dynamically switch LLM providers based on task latency
 - [ ] **TUI Exit Refinement**: Change exit shortcut to double `Ctrl+C` to avoid conflicts
 - [ ] **Memory & Resource Metrics**: Show context and RAM usage (with breakdown) for every command
 - [ ] **Local Model Constrained Inference**: Implement GBNF (GGML BNF) for structured output from local models
@@ -11,20 +14,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Recently Completed
 
-- **Shadow Git Multi-Commit Dashboard** (Dec 2025):
-  - Added `COMMIT` mode to TUI for reviewing grouped experiment actions
+- **TUI Git Dashboard** (Dec 2025):
+  - Added `BRANCH` and `COMMIT` modes to TUI for multi-experiment management
+  - Implemented `branch-view` and `commit-view` with integrated diff and history
+  - Support for clickable branch switching and grouped action visualization
   - Integrated with `ShadowGit` multi-commit staging logic
-  - Provides integrated view of hunks and diffs for atomic work units
-
-- **Adaptive Loop Strategy Refinement** (Dec 2025):
-  - Added history tracking to `HybridLoopRunner` to record loop outcomes
-  - Implemented `llm.refine_loop_strategy` operation for pattern analysis
-  - Supports automated strategy optimization based on success/failure data
-
-- **Agentic Tool Discovery** (Dec 2025):
-  - Implemented `tool_discovery_loop` to search for and configure new MCP servers
-  - Added `identify_useful_mcp_servers` and `scaffold_mcp_config` LLM operations
-  - Supports automated capabilities expansion by discovering community MCP tools
 
 - **Shadow Git Merging** (Dec 2025):
   - Added `begin_multi_commit` and `finish_multi_commit` to `ShadowGit`
@@ -372,7 +366,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [ ] **Extensible Agent Modes**:
   - Refactor TUI modes (PLAN, READ, WRITE, DIFF, SESSION, BRANCH, SWARM, COMMIT) into a plugin-based system
   - Allow user-defined modes via `.moss/modes/`
-- [ ] **'Diffusion-like' methods for large-scale refactors':
+- [ ] **'Diffusion-like' methods for large-scale refactors**:
+  - Generate contracts/signatures at high levels first
+  - Parallelize implementation of components
+  - Explore reconciliation strategies for independent components
 - [ ] **Small/Local Model Brute Force**: Explore using smaller, faster local models with higher iteration/voting counts
 - [ ] **Fine-tuned Tiny Models**:
   - Explore extreme optimization with models like 100M RWKV
