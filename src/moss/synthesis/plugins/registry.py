@@ -268,7 +268,7 @@ class SynthesisRegistry:
                         self.generators.register(plugin)
                         counts["generators"] += 1
                         logger.info("Discovered generator: %s", ep.name)
-                except Exception as e:
+                except (ImportError, AttributeError, TypeError) as e:
                     logger.warning("Failed to load generator '%s': %s", ep.name, e)
 
             # Discover validators
@@ -279,7 +279,7 @@ class SynthesisRegistry:
                         self.validators.register(plugin)
                         counts["validators"] += 1
                         logger.info("Discovered validator: %s", ep.name)
-                except Exception as e:
+                except (ImportError, AttributeError, TypeError) as e:
                     logger.warning("Failed to load validator '%s': %s", ep.name, e)
 
             # Discover libraries
@@ -290,7 +290,7 @@ class SynthesisRegistry:
                         self.libraries.register(plugin)
                         counts["libraries"] += 1
                         logger.info("Discovered library: %s", ep.name)
-                except Exception as e:
+                except (ImportError, AttributeError, TypeError) as e:
                     logger.warning("Failed to load library '%s': %s", ep.name, e)
 
         except ImportError:

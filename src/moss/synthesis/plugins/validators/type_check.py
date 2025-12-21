@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -135,7 +136,7 @@ class TypeValidator:
         finally:
             try:
                 code_file.unlink()
-            except Exception:
+            except OSError:
                 pass
 
     async def _run_mypy(self, code_file: Path) -> ValidationResult:
@@ -179,7 +180,7 @@ class TypeValidator:
                 success=False,
                 issues=["mypy not found - install with: pip install mypy"],
             )
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             return ValidationResult(
                 success=False,
                 issues=[f"Type checking failed: {e}"],
@@ -253,7 +254,7 @@ class TypeValidator:
                 metadata={"checker": "pyright"},
             )
 
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             return ValidationResult(
                 success=False,
                 issues=[f"Pyright execution failed: {e}"],

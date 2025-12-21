@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -218,7 +219,7 @@ class PytestValidator:
             # Clean up temporary file
             try:
                 test_file.unlink()
-            except Exception:
+            except OSError:
                 pass
 
     async def _run_pytest(self, test_file: Path) -> ValidationResult:
@@ -262,7 +263,7 @@ class PytestValidator:
                 success=False,
                 issues=["pytest not found - install with: pip install pytest"],
             )
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             return ValidationResult(
                 success=False,
                 issues=[f"Test execution failed: {e}"],
@@ -365,7 +366,7 @@ class PytestValidator:
                 },
             )
 
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             return ValidationResult(
                 success=False,
                 issues=[f"Jest execution failed: {e}"],
