@@ -66,3 +66,41 @@ def list_prompts(project_root: Path | None = None) -> list[str]:
             prompts.add(p.stem)
 
     return sorted(prompts)
+
+
+def save_prompt_version(name: str, content: str, project_root: Path | None = None) -> Path:
+    """Save a versioned copy of a prompt.
+
+    Args:
+        name: Prompt name
+        content: Prompt text content
+        project_root: Project root
+
+    Returns:
+        Path to the saved version file.
+    """
+    from datetime import UTC, datetime
+
+    if project_root is None:
+        project_root = Path.cwd()
+
+    version_dir = project_root / ".moss" / "prompts" / "versions" / name
+    version_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    version_path = version_dir / f"{timestamp}.txt"
+    version_path.write_text(content)
+
+    return version_path
+
+
+def list_prompt_versions(name: str, project_root: Path | None = None) -> list[Path]:
+    """List all versioned copies of a prompt."""
+    if project_root is None:
+        project_root = Path.cwd()
+
+    version_dir = project_root / ".moss" / "prompts" / "versions" / name
+    if not version_dir.exists():
+        return []
+
+    return sorted(version_dir.glob("*.txt"), reverse=True)
