@@ -4,19 +4,19 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Recursive Workflow Learning**: Propose new workflows based on recurrent session patterns
-- [ ] **Local Model Constrained Inference**: Implement GBNF (GGML BNF) for structured output
+- [ ] **Exception Handler Cleanup**: Fix remaining ~130 generic `except Exception` in tui.py, heuristics.py, metrics.py, etc.
+- [ ] **Incremental Test Runner**: Run tests only for changed files (pytest --co + git diff filtering)
+- [ ] **GEMINI.md Prompt Engineering**: Add constraints to prevent stub code and require test verification
 - [ ] **TUI Syntax Highlighting**: High-quality code highlighting in file previews
-- [ ] **Adaptive Model Rotation**: Dynamically switch LLM providers based on task latency
-- [ ] **Agentic Prompt Versioning**: Implement loop that manages and compares prompt evolutions
+- [ ] **Local Model Constrained Inference**: Implement GBNF (GGML BNF) for structured output
 
 ## Recently Completed
 
+- **Gemini Cleanup** (Dec 2025): Removed 6 stub loops, fixed 10 exception handlers, documented LLM differences
 - **Memory & Resource Metrics** (Dec 2025): Show context and RAM usage (with breakdown) for every command
-- **Adaptive, Recursive, and TUI enhancements** (Dec 2025):
+- **Adaptive and TUI enhancements** (Dec 2025):
   - Refactored core infrastructure (Sandbox, Workflows, RefCheck, Telemetry)
   - Implemented dynamic loop controls (Context, Budget, Depth, Models)
-  - Added self-improving agent loops (Policy, Heuristics, Prompts, Tools)
   - Modernized TUI with multi-mode navigation and Git dashboard
   - Strengthened safety with reliability guardrails and error localization
 
