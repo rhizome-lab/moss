@@ -4,18 +4,20 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Cross-file Symbol Navigation**: Clickable references in TUI to jump between files
 - [ ] **Agentic Memory Analysis**: Loop that extracts long-term preferences from session logs
 - [ ] **Verification Loops & Heuristics**: Formalize heuristic guardrails before validation (LLM unreliability mitigation)
+- [ ] **Symbol Hover Info**: Show signatures/docstrings on hover in TUI
 
 ## Recently Completed
 
-- **Dynamic Token Budgeting** (Dec 2025):
-  - Added `adaptive_token_budget` option to `AgentLoop`
-  - Implemented dynamic budget rebalancing in `AgentLoopRunner`
-  - Uses `llm.estimate_complexity` to adjust resources based on remaining work
+- **Cross-file Symbol Navigation** (Dec 2025):
+  - Implemented clickable `ProjectTree` in TUI with task and file modes
+  - Added support for file selection with automatic command pre-filling
+  - Refactored `TaskTreeWidget` into a unified `ProjectTree`
 
 - **Extensible Agent Modes** (Dec 2025):
+
+
   - Refactored TUI modes into a plugin-based system using `TUIMode` protocol
   - Implemented `ModeRegistry` for dynamic mode loading and cycling
   - Simplified `MossTUI` logic by delegating mode behavior to plugin classes

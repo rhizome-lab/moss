@@ -5,7 +5,7 @@ Uses Textual for a modern, reactive terminal experience.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 
 try:
     from textual.app import App, ComposeResult
@@ -60,6 +60,7 @@ class PlanMode:
         app.query_one("#log-view").display = True
         app.query_one("#git-view").display = False
         app.query_one("#content-header").update("Agent Log")
+        app._update_tree("task")
 
 
 class ReadMode:
@@ -71,6 +72,7 @@ class ReadMode:
         app.query_one("#log-view").display = True
         app.query_one("#git-view").display = False
         app.query_one("#content-header").update("Agent Log")
+        app._update_tree("file")
 
 
 class WriteMode:
@@ -82,6 +84,7 @@ class WriteMode:
         app.query_one("#log-view").display = True
         app.query_one("#git-view").display = False
         app.query_one("#content-header").update("Agent Log")
+        app._update_tree("file")
 
 
 class DiffMode:
@@ -94,6 +97,7 @@ class DiffMode:
         app.query_one("#git-view").display = True
         app.query_one("#content-header").update("Shadow Git")
         await app._update_git_view()
+        app._update_tree("task")
 
 
 class ModeRegistry:
@@ -132,27 +136,56 @@ class ModeIndicator(Static):
         return f"Mode: [{self.mode_color} b]{self.mode_name}[/]"
 
 
-class TaskTreeWidget(Tree[str]):
-    """Widget for visualizing the task tree."""
+class ProjectTree(Tree[Any]):
+    """Unified tree for task and file navigation."""
 
-    def update_from_tree(self, task_tree: TaskTree) -> None:
-        """Update the widget content from a TaskTree instance."""
+    def update_from_tasks(self, task_tree: TaskTree) -> None:
         self.clear()
         root = self.root
-        root.label = task_tree.root.goal
-        self._add_node(root, task_tree.root)
+        root.label = f"[b]Tasks: {task_tree.root.goal}[/b]"
+        self._add_task_nodes(root, task_tree.root)
         root.expand()
 
-    def _add_node(self, tree_node: TreeNode[str], task_node: TaskNode) -> None:
-        """Recursively add nodes to the tree widget."""
+    def _add_task_nodes(self, tree_node: TreeNode[Any], task_node: TaskNode) -> None:
         for child in task_node.children:
             status_icon = "✓" if child.status.name == "DONE" else "→"
             label = f"{status_icon} {child.goal}"
             if child.summary:
                 label += f" ({child.summary})"
 
-            new_node = tree_node.add(label, expand=True)
-            self._add_node(new_node, child)
+            new_node = tree_node.add(label, expand=True, data={"type": "task", "node": child})
+            self._add_task_nodes(new_node, child)
+
+    def update_from_files(self, api: MossAPI) -> None:
+        self.clear()
+        root = self.root
+        root.label = f"[b]Files: {api.root.name}[/b]"
+
+        # Simple recursive file tree
+        import os
+        from pathlib import Path
+
+        def add_dir(tree_node: TreeNode[Any], path: Path):
+            try:
+                # Limit depth/count for performance
+                entries = sorted(os.listdir(path))
+                for entry in entries:
+                    if entry.startswith(".") and entry != ".moss":
+                        continue
+
+                    full_path = path / entry
+                    if full_path.is_dir():
+                        if entry in ("__pycache__", "node_modules", "target", ".git"):
+                            continue
+                        node = tree_node.add(f"📁 {entry}", data={"type": "dir", "path": full_path})
+                        add_dir(node, full_path)
+                    else:
+                        tree_node.add_leaf(f"📄 {entry}", data={"type": "file", "path": full_path})
+            except Exception:
+                pass
+
+        add_dir(root, api.root)
+        root.expand()
 
 
 class MossTUI(App):
@@ -237,17 +270,17 @@ class MossTUI(App):
         yield Container(
             Horizontal(
                 Vertical(
-                    Static("Task Tree", classes="sidebar-header"),
-                    TaskTreeWidget("Tasks", id="task-tree"),
+                    Static("Navigation", id="sidebar-header"),
+                    ProjectTree("Project", id="project-tree"),
                     id="sidebar",
                 ),
                 Vertical(
                     Static("Agent Log", id="content-header"),
                     Container(id="log-view"),
                     Container(
-                        Static("Shadow Git History", classes="sidebar-header"),
+                        Static("Shadow Git History", id="git-history-header"),
                         Tree("Commits", id="history-tree"),
-                        Static("Diff", classes="sidebar-header"),
+                        Static("Diff", id="diff-header"),
                         RichLog(id="diff-view", highlight=True, markup=True),
                         id="git-view",
                     ),
@@ -280,6 +313,28 @@ class MossTUI(App):
         self.query_one("#command-input").placeholder = mode.placeholder
 
         await mode.on_enter(self)
+
+    def _update_tree(self, tree_type: str = "task") -> None:
+        """Update the sidebar tree."""
+        tree = self.query_one("#project-tree", ProjectTree)
+        if tree_type == "task" and self._task_tree:
+            tree.update_from_tasks(self._task_tree)
+        else:
+            tree.update_from_files(self.api)
+
+    def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
+        """Handle tree node selection (click/enter)."""
+        data = event.node.data
+        if not data:
+            return
+
+        if data["type"] == "file":
+            path = data["path"]
+            self._log(f"Opened file: {path.name}")
+            # Automatically run skeleton command for selected file
+            self.query_one("#command-input").value = f"skeleton {path}"
+            # Focus input so user can press enter
+            self.query_one("#command-input").focus()
 
     def action_next_mode(self) -> None:
         """Switch to the next mode."""
