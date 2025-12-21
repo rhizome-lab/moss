@@ -79,7 +79,13 @@ project/                    # root
 │   │   └── def helper()    # function node
 ```
 
-Uniform addressing: `src/main.py::Foo.bar` addresses a method the same way `src/main.py` addresses a file. Same primitives work at every level.
+Uniform addressing with `/` everywhere:
+- `src/main.py/Foo/bar` - method `bar` in class `Foo` in file `main.py`
+- Resolution uses filesystem as source of truth: check if each segment is file or directory
+- No ambiguity: can't have file and directory with same name in same location
+- Also accept `::` syntax for familiarity: `src/main.py::Foo.bar` normalizes to the same path
+
+Same primitives work at every level.
 
 **Four primitives, not 100 tools:**
 

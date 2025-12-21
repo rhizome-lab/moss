@@ -46,7 +46,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 **Phase 2: Unified tree model** (see `docs/philosophy.md` - Unified Codebase Tree)
 - [ ] Merge filesystem + AST into single tree data structure
-- [ ] Uniform node addressing: `src/main.py::Foo.bar`
+- [ ] Uniform node addressing with `/`: `src/main.py/Foo/bar`
+  - Filesystem is source of truth for file vs directory boundary
+  - Also accept `::` syntax, normalize internally
 - [ ] Depth-based expansion: `--depth 1` (default), `--depth 2`, `--all`
 - [ ] Four primitives replacing 100+ tools:
   - `view [path]` - see node (skeleton, source, tree) with `--deps`, `--summary`
