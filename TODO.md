@@ -6,6 +6,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 - [ ] Add failure mode tests: Rust binary missing, invalid paths, malformed files
 - [ ] Ensure all failure modes have informative error messages
+- [ ] Phase 2: Start unified tree model design (merge filesystem + AST)
+- [ ] Clean up unused Python fallback code in other commands
 
 ## Recently Completed
 
