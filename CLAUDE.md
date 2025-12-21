@@ -11,6 +11,7 @@ ALWAYS NOTE THINGS DOWN. When you discover something important, write it immedia
 - Design decisions → docs/ or code comments
 - Future work → TODO.md
 - Conventions → this file
+- **Areas for improvement** → TODO.md (self-evaluate constantly, note friction points)
 
 ## Negative Constraints
 
@@ -98,6 +99,8 @@ Marathon mode: Work continuously through TODO.md until empty or blocked.
 See `docs/session-modes.md` for Fresh mode (default for normal sessions).
 
 Write while researching, not after. Queue review items in TODO.md, don't block for them.
+
+Self-evaluate constantly: After completing work, note friction points, areas for improvement, and what could be better. Log to TODO.md under "To Consolidate" or directly improve if quick.
 
 Session handoffs: Add "Next Up" section to TODO.md with 3-5 tasks. Goal is to complete ALL of them next session.
 
