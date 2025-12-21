@@ -1026,10 +1026,14 @@ class ToolRouter:
         except ImportError:
             config = None
 
+        # Normalize hyphens to underscores for tool name matching
+        # e.g., "todo-list" -> "todo_list"
+        normalized_query = query.replace("-", "_")
+
         # Fast path: if first word is a recognized tool name or alias, use it directly
         # This prevents "expand Patch" from matching patch tools due to the second word
         # But skip this for natural language queries (detected by common words)
-        query_words = query.lower().split()
+        query_words = normalized_query.lower().split()
         natural_lang_words = {
             "and",
             "or",
@@ -1056,18 +1060,31 @@ class ToolRouter:
 
         if query_words and not is_natural_language:
             first_word = query_words[0]
+            # Join query words with underscore for exact tool name matching
+            # e.g., "todo list" -> "todo_list"
+            joined_query = "_".join(query_words)
+
+            # Check for exact tool name match (entire query)
+            if joined_query in tools:
+                return [ToolMatch(tool=joined_query, confidence=1.0)]
+
             # Check for alias match
             if first_word in TOOL_ALIASES:
                 tool = TOOL_ALIASES[first_word]
                 if tool in tools:
                     return [ToolMatch(tool=tool, confidence=1.0)]
+
             # Check for direct tool name match (first word matches tool base name)
+            # Only use this if there's a single matching tool
+            matching_tools = []
             for tool_name in tools:
                 if tool_name not in TOOL_REGISTRY:
                     continue
                 tool_base = tool_name.split("_")[0]
                 if first_word == tool_base or first_word == tool_name:
-                    return [ToolMatch(tool=tool_name, confidence=1.0)]
+                    matching_tools.append(tool_name)
+            if len(matching_tools) == 1:
+                return [ToolMatch(tool=matching_tools[0], confidence=1.0)]
 
         # Expand query with word form variants for better TF-IDF matching
         # e.g., "summarize" -> "summarize summary summarization summarizing"
@@ -1091,8 +1108,8 @@ class ToolRouter:
         }
 
         # Extract first word (usually the action) for special handling
-        query_words = query.lower().split()
-        first_word = normalize_word(query_words[0]) if query_words else ""
+        norm_words = normalized_query.lower().split()
+        first_word = normalize_word(norm_words[0]) if norm_words else ""
 
         matches = []
         for tool_name in tools:
@@ -1105,23 +1122,23 @@ class ToolRouter:
             tfidf_score = tfidf_scores.get(tool_name, 0.0)
 
             # Keyword matching (includes first-word bonus)
-            keyword_score = keyword_match_score(query, tool_info.keywords)
+            keyword_score = keyword_match_score(normalized_query, tool_info.keywords)
 
             # Apply custom keyword boosts if configured
             custom_boost = 0.0
             if config is not None and tool_name in config.keyword_boosts:
                 boost_config = config.keyword_boosts[tool_name]
                 # Check if any custom keywords match
-                query_words_set = set(query.lower().split())
+                query_words_set = set(normalized_query.lower().split())
                 extra_keywords_set = set(kw.lower() for kw in boost_config.keywords)
                 if query_words_set & extra_keywords_set:
                     custom_boost = boost_config.boost
                     # Also boost keyword score with extra keywords
                     combined_keywords = tool_info.keywords + boost_config.keywords
-                    keyword_score = keyword_match_score(query, combined_keywords)
+                    keyword_score = keyword_match_score(normalized_query, combined_keywords)
 
             # Fuzzy string matching (for typos)
-            name_score = string_similarity(query, tool_name)
+            name_score = string_similarity(normalized_query, tool_name)
             desc_score = string_similarity(query, tool_info.description)
 
             # Exact name match boost: if first word IS the tool name, strong signal
@@ -1133,7 +1150,7 @@ class ToolRouter:
             if first_word == tool_base or first_word == tool_name:
                 if first_word not in common_verbs:
                     exact_name_boost = 0.4  # Full boost for specific tool names
-            elif tool_base in query.lower() and tool_base not in common_verbs:
+            elif tool_base in normalized_query.lower() and tool_base not in common_verbs:
                 exact_name_boost = 0.2
 
             # Combined score (weighted)

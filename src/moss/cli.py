@@ -3645,7 +3645,8 @@ def cmd_dwim(args: Namespace) -> int:
     from moss import MossAPI
 
     output = setup_output(args)
-    query = getattr(args, "query", None)
+    query_parts = getattr(args, "query", None) or []
+    query = " ".join(query_parts) if query_parts else None
     tool_name = getattr(args, "tool", None)
     top_k = getattr(args, "top", 5)
 
@@ -3682,23 +3683,26 @@ def cmd_dwim(args: Namespace) -> int:
     results = api.dwim.analyze_intent(query, top_k=top_k)
 
     if not results:
-        output.warning(f"No tools match: {query}")
+        print(f"No tools match: {query}")
         return 1
 
-    output.info(f"Tools matching '{query}':\n")
-    for r in results:
-        confidence_bar = "█" * int(r.confidence * 10) + "░" * (10 - int(r.confidence * 10))
-        output.info(f"  {r.tool:<25} [{confidence_bar}] {r.confidence:.0%}")
-        if r.message:
-            # Truncate long messages
-            msg = r.message[:60] + "..." if len(r.message) > 60 else r.message
-            output.info(f"    {msg}")
-        output.info("")
+    # High confidence: show single result cleanly
+    top = results[0]
+    if top.confidence >= 0.9:
+        tool_info = api.dwim.get_tool_info(top.tool)
+        cli_name = top.tool.replace("_", "-")
+        if tool_info and tool_info.parameters:
+            params = " ".join(f"[{p}]" for p in tool_info.parameters[:3])
+            print(f"{cli_name} {params}")
+        else:
+            print(cli_name)
+        return 0
 
-    # Show usage hint for top result
-    if results:
-        top = results[0]
-        output.info(f"Try: moss {top.tool.replace('.', ' ').replace('_', '-')} ...")
+    # Lower confidence: show top matches
+    print(f"Matches for '{query}':")
+    for r in results:
+        cli_name = r.tool.replace("_", "-")
+        print(f"  {cli_name:<25} {r.confidence:.0%}")
 
     return 0
 
@@ -5880,7 +5884,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     dwim_parser.add_argument(
         "query",
-        nargs="?",
+        nargs="*",
         help="Natural language description of what you want to do",
     )
     dwim_parser.add_argument(
