@@ -4,12 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Dynamic Token Budgeting**: Adjust per-turn budget based on remaining task complexity
 - [ ] **Cross-file Symbol Navigation**: Clickable references in TUI to jump between files
 - [ ] **Agentic Memory Analysis**: Loop that extracts long-term preferences from session logs
 - [ ] **Verification Loops & Heuristics**: Formalize heuristic guardrails before validation (LLM unreliability mitigation)
 
 ## Recently Completed
+
+- **Dynamic Token Budgeting** (Dec 2025):
+  - Added `adaptive_token_budget` option to `AgentLoop`
+  - Implemented dynamic budget rebalancing in `AgentLoopRunner`
+  - Uses `llm.estimate_complexity` to adjust resources based on remaining work
 
 - **Extensible Agent Modes** (Dec 2025):
   - Refactored TUI modes into a plugin-based system using `TUIMode` protocol

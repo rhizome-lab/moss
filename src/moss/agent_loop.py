@@ -130,6 +130,7 @@ class AgentLoop:
     # Resource limits
     max_steps: int = 10  # Total step executions (not loop passes)
     token_budget: int | None = None
+    adaptive_token_budget: bool = False  # Enable dynamic budget adjustment
     timeout_seconds: float | None = None
 
     def __post_init__(self) -> None:
@@ -414,6 +415,10 @@ class AgentLoopRunner:
             iteration += 1
             metrics.iterations = iteration
 
+            # Adaptive Token Budgeting
+            if loop.adaptive_token_budget and loop.token_budget and iteration % 3 == 0:
+                await self._rebalance_budget(loop, context, metrics)
+
             step = step_map.get(current_step_name)
             if not step:
                 return LoopResult(
@@ -563,6 +568,32 @@ class AgentLoopRunner:
             status=StepStatus.FAILED,
             error=last_error,
         )
+
+    async def _rebalance_budget(
+        self, loop: AgentLoop, context: LoopContext, metrics: LoopMetrics
+    ) -> None:
+        """Dynamically adjust token budget based on remaining complexity."""
+        # Estimate remaining complexity (1-10)
+        try:
+            # Create a dummy step for complexity estimation
+            comp_step = LoopStep("estimate", "llm.estimate_complexity", step_type=StepType.LLM)
+            output, t_in, t_out = await self.executor.execute(
+                "llm.estimate_complexity", context, comp_step
+            )
+            metrics.record_step("rebalance", StepType.LLM, 0, t_in, t_out)
+
+            complexity = int(str(output).strip())
+
+            # Rebalance: if complexity high (> 7), increase budget by 20%
+            # If complexity low (< 3), decrease budget by 10%
+            if complexity > 7 and loop.token_budget:
+                loop.token_budget = int(loop.token_budget * 1.2)
+            elif complexity < 3 and loop.token_budget:
+                loop.token_budget = int(loop.token_budget * 0.9)
+
+        except Exception:
+            # Fallback: do nothing if estimation fails
+            pass
 
 
 class HybridLoopRunner:
@@ -2552,6 +2583,12 @@ class LLMToolExecutor:
                 f"- Include appropriate limits and LLM configuration\n"
                 f"- Ensure steps are logically ordered and use available tools\n\n"
                 f"Output the complete TOML workflow definition."
+            ),
+            "estimate_complexity": (
+                f"Estimate the remaining complexity of the current task on a scale of 1-10.\n"
+                f"1 = Trivial, 10 = extremely complex.\n\n"
+                f"Context: {structured_context}\n\n"
+                f"Output ONLY the integer score."
             ),
         }
 
