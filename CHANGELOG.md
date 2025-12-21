@@ -4,44 +4,47 @@
 
 ### Features
 
-**Adaptive model and context control** (new)
-- `Adaptive Model Selection`: Added `task_models` mapping to `LLMConfig` for task-specific routing
-- `Adaptive Context Control`: Dynamic result preview limits in `DWIMLoop` based on task type
-- `Adaptive Context Pruning`: Heuristic and LLM-driven importance scoring in `EphemeralCache`
-- `LLM Benchmarking Harness`: `AutomatedBenchmark` for cross-model evaluation with markdown reports
+**Adaptive loop capabilities** (Dec 2025)
+- `Adaptive Context Control`: Dynamic result preview limits based on task type (Read vs Write)
+- `Adaptive Context Pruning`: Heuristic and LLM-driven importance scoring for intelligent elision
+- `Adaptive Loop Depth`: Dynamic `max_steps` adjustment in `AgentLoopRunner` based on progress
+- `Dynamic Turn Budgeting`: Per-turn token scaling based on estimated task complexity
+- `Adaptive Model Selection`: Task-specific model routing (e.g., separate models for analysis vs generation)
+- `LLM Benchmarking Harness`: Automated cross-model evaluation with markdown report generation
 
-**Recursive self-improvement** (new)
-- `TelemetryAPI`: Multi-session analysis of token usage, tool patterns, and hotspots
-- `Mistake Detection`: `detect_mistakes` operation for turn-level critical analysis
-- `Recursive Self-Optimization`: `heuristic_optimizer_loop` to refine structural guardrails
-- `Agentic Workflow Synthesis`: `workflow_synthesis_loop` to auto-create workflows from telemetry
-- `Agentic Prompt Evolution`: `prompt_optimizer_loop` for automated prompt refinement
-- `Recursive Policy Learning`: `policy_learning_loop` to distill safety rules from successes
+**Recursive improvement loops** (Dec 2025)
+- `Recursive Policy Learning`: Automated distillation of safety rules from successful histories
+- `Agentic Prompt Evolution`: Automated system prompt refinement based on session feedback
+- `Adaptive Loop Strategy Refinement`: History-based switching between DWIM and Structured loops
+- `Agentic Tool Discovery`: Automated search and configuration of new MCP tools
+- `Agentic Workflow Synthesis`: Automatic creation of new workflows from telemetry patterns
+- `Recursive Self-Optimization`: Tuning of structural heuristics based on session outcomes
 
-**Shadow Git enhancements** (new)
-- `Shadow Git Branching`: `ShadowGitAPI` support for listing and switching experiment branches
-- `Shadow Git Merging`: `smart_merge` with automated 'favor-theirs' conflict resolution
-- `Shadow Git Multi-Commit`: `begin_multi_commit` and `finish_multi_commit` for grouped actions
-- `ShadowGitAPI`: First-class access to diffs, hunks, and surgical rollback
+**Advanced TUI & UX** (Dec 2025)
+- `Extensible Agent Modes`: Plugin-based TUI mode system (PLAN, READ, WRITE, DIFF, SESSION, BRANCH, SWARM, COMMIT)
+- `TUI Git Dashboard`: Integrated view for branches, commits, hunks, and diffs with surgical rollback
+- `TUI Session Resume`: Visual session history with one-click resumption and state recovery
+- `Cross-file Symbol Jump`: Clickable references in TUI for quick navigation between files
+- `Symbol Hover Info`: Metadata tooltips (skeletons, summaries) in the ProjectTree
+- `TUI Exit Refinement`: Double `Ctrl+C` exit to avoid clipboard conflicts
+- `Docs Styling`: Modern glassmorphism and rounded borders at `docs/stylesheets/custom.css`
 
-**Advanced TUI capabilities** (new)
-- `AgentMode`: PLAN, READ, WRITE, DIFF, SESSION, BRANCH, SWARM, COMMIT modes
-- `ModeRegistry`: Extensible, plugin-based mode system with fluid switching (Shift+Tab)
-- `ProjectTree`: Clickable task and file navigation with auto-command pre-filling
-- `HoverTooltip`: Dynamic metadata preview (skeletons, summaries) on highlight
-- `Git Dashboard`: Integrated view for branches, commits, hunks, and diffs
-- `Session Resume`: Visual list of past work units with one-click resumption
-- `Cross-file Navigation`: Regex-based clickable links in Agent Log and History
-
-**Core architecture & UX** (new)
-- `Workflow Loader Abstraction`: `WorkflowLoader` protocol and registry for pluggable formats
-- `Sandbox Scoping`: `TaskNode` level workspace restriction with parent inheritance
-- `Adaptive Workspace Scoping`: `shrink_to_fit` and `expand_to_include` for dynamic sandbox control
-- `LLM Reliability Guardrails`: 'critic-first' execution for high-risk operations
+**Safety & verification** (Dec 2025)
+- `LLM Reliability Guardrails`: 'Critic-first' execution for high-risk operations
+- `Heuristic Error Localization`: Trace-based bug identification from test failures
+- `Mistake Detection`: Dedicated critic steps for turn-level logic analysis
+- `Verification Loops & Heuristics`: Formalized structural guardrails before full validation
+- `Shadow Git Access`: First-class LLM access to diffs, hunks, multi-commits, and smart merging
+- `User Feedback Story`: Agent inbox for mid-task corrections
 - `Editing Tools`: `EditAPI` for direct file manipulation (write, replace, insert)
-- `Vanilla Workflow`: Baseline agent loop refactored into data-driven workflow
-- `RefCheck`: Cross-language tracking for Rust and `Cargo.toml` with deduplication
-- `Docs Styling`: Glassmorphism and rounded borders at `docs/stylesheets/custom.css`
+
+**Agent & Core Infrastructure** (Dec 2025)
+- `Sandbox Scoping`: Task-level workspace restriction with parent inheritance and automatic enforcement
+- `Workflow Loader Abstraction`: Extracted `WorkflowLoader` protocol and `TOMLWorkflowLoader` with registry
+- `Vanilla Workflow`: Minimal baseline agent loop refactored into a data-driven workflow
+- `TelemetryAPI`: Unified analysis of multi-session token usage, tool patterns, and hotspots
+- `Adaptive Workspace Scoping`: Dynamic sandbox control with `shrink_to_fit` and `expand_to_include`
+- `RefCheck`: Cross-language reference tracking for Rust/Cargo with deduplication
 
 **Workflow externalization** (expanded)
 - Design doc for TOML-based workflow/prompt format (`docs/workflow-format.md`)
