@@ -4,11 +4,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **TUI Session Resume**: Ability to select and resume past sessions from TUI
 - [ ] **Adaptive Loop Depth**: Dynamically adjust max steps based on progress rate
 - [ ] **Recursive Self-Optimization**: Loop that refines its own heuristics based on telemetry
+- [ ] **Context Elision Policies**: User-definable rules for eliding specific content types
 
 ## Recently Completed
+
+- **TUI Session Resume** (Dec 2025):
+  - Added `SESSION` mode to TUI for managing past work units
+  - Implemented `session-view` with searchable list of session history
+  - Integrated clickable session IDs for quick resumption and state recovery
+  - Uses `TelemetryAPI` and `SessionManager` for robust data retrieval
 
 - **Heuristic Error Localization** (Dec 2025):
   - Added `localize_bug` to `DiagnosticSet` for trace-based bug identification

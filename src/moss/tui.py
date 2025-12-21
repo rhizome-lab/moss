@@ -5,6 +5,8 @@ Uses Textual for a modern, reactive terminal experience.
 
 from __future__ import annotations
 
+import re
+from enum import Enum, auto
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 
 try:
@@ -100,6 +102,29 @@ class DiffMode:
         app._update_tree("task")
 
 
+class AgentMode(Enum):
+    """Current operating mode of the agent UI."""
+
+    PLAN = auto()  # Planning next steps
+    READ = auto()  # Code exploration and search
+    WRITE = auto()  # Applying changes and refactoring
+    DIFF = auto()  # Reviewing shadow git changes
+    SESSION = auto()  # Managing and resuming sessions
+
+
+class SessionMode:
+    name = "SESSION"
+    color = "yellow"
+    placeholder = "Manage sessions... (resume <id> to continue)"
+
+    async def on_enter(self, app: MossTUI) -> None:
+        app.query_one("#log-view").display = False
+        app.query_one("#git-view").display = False
+        app.query_one("#session-view").display = True
+        app.query_one("#content-header").update("Sessions")
+        await app._update_session_view()
+
+
 class ModeRegistry:
     """Registry for extensible TUI modes."""
 
@@ -109,8 +134,9 @@ class ModeRegistry:
             "READ": ReadMode(),
             "WRITE": WriteMode(),
             "DIFF": DiffMode(),
+            "SESSION": SessionMode(),
         }
-        self._order: list[str] = ["PLAN", "READ", "WRITE", "DIFF"]
+        self._order: list[str] = ["PLAN", "READ", "WRITE", "DIFF", "SESSION"]
 
     def get_mode(self, name: str) -> TUIMode | None:
         return self._modes.get(name)
@@ -239,6 +265,10 @@ class MossTUI(App):
         display: none;
     }
 
+    #session-view {
+        display: none;
+    }
+
     #diff-view {
         height: 1fr;
         border: solid $secondary;
@@ -307,6 +337,11 @@ class MossTUI(App):
                         RichLog(id="diff-view", highlight=True, markup=True),
                         id="git-view",
                     ),
+                    Container(
+                        Static("Past Sessions", classes="sidebar-header"),
+                        Tree("Sessions", id="session-tree"),
+                        id="session-view",
+                    ),
                     id="content-area",
                 ),
                 id="main-container",
@@ -335,6 +370,11 @@ class MossTUI(App):
         indicator.mode_color = mode.color
 
         self.query_one("#command-input").placeholder = mode.placeholder
+
+        # Reset all views before entering new mode
+        self.query_one("#log-view").display = False
+        self.query_one("#git-view").display = False
+        self.query_one("#session-view").display = False
 
         await mode.on_enter(self)
 
@@ -424,6 +464,29 @@ class MossTUI(App):
         except Exception as e:
             self._log(f"Failed to fetch git data: {e}")
 
+    async def _update_session_view(self) -> None:
+        """Fetch and display past sessions."""
+        try:
+            # For this TUI we want the full list, so let's use SessionManager directly
+            from moss.session import SessionManager
+
+            manager = SessionManager(self.api.root / ".moss" / "sessions")
+            sessions = manager.list_sessions()
+
+            tree = self.query_one("#session-tree")
+            tree.clear()
+            root = tree.root
+            root.label = f"Sessions ({len(sessions)})"
+
+            for s in sessions:
+                label = f"[@click=app.navigate('{s.id}')]{s.id}[/]: {s.task[:50]}"
+                if len(s.task) > 50:
+                    label += "..."
+                root.add_leaf(label)
+            root.expand()
+        except Exception as e:
+            self._log(f"Failed to fetch session data: {e}")
+
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle command input."""
         command = event.value.strip()
@@ -448,8 +511,6 @@ class MossTUI(App):
         """Add a message to the log view."""
         log_view = self.query_one("#log-view")
         # Simple heuristic to make paths clickable
-        import re
-
         pattern = r"([a-zA-Z0-9_\-\./]+\.[a-z]{2,4}(?::\d+)?)"
         linked_message = re.sub(pattern, r"[@click=app.navigate('\1')]\1[/]", message)
 
