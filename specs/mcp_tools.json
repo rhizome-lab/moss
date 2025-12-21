@@ -1345,6 +1345,14 @@
     "name": "shadow_git_get_hunks"
   },
   {
+    "description": "List all active shadow branches.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "name": "shadow_git_list_branches"
+  },
+  {
     "description": "Surgically rollback a specific hunk by file and line number.",
     "inputSchema": {
       "properties": {
@@ -1366,6 +1374,21 @@
       "type": "object"
     },
     "name": "shadow_git_rollback_hunk"
+  },
+  {
+    "description": "Switch to a different shadow branch.",
+    "inputSchema": {
+      "properties": {
+        "branch_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch_name"
+      ],
+      "type": "object"
+    },
+    "name": "shadow_git_switch_branch"
   },
   {
     "description": "Get the full source code of a named symbol. Useful for getting complete enum definitions, class bodies, or function implementations when the skeleton isn't enough. Full source code of the symbol, or None if not found # Get full enum definition content = api.skeleton.expand(\"src/agent_loop.py\", \"StepType\") # Returns complete enum with all values",

@@ -165,6 +165,21 @@ class ShadowGitAPI:
             return True
         return False
 
+    async def list_branches(self) -> list[str]:
+        """List all active shadow branches."""
+        git = self._get_git()
+        result = await git._run_git("branch", "--list", "shadow/*")
+        return [b.strip().lstrip("* ") for b in result.stdout.split("\n") if b.strip()]
+
+    async def switch_branch(self, branch_name: str) -> bool:
+        """Switch to a different shadow branch."""
+        git = self._get_git()
+        try:
+            await git._run_git("checkout", branch_name)
+            return True
+        except Exception:
+            return False
+
 
 @dataclass
 class TelemetryAPI:

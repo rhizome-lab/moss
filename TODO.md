@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Shadow Git Branching**: Support for multiple concurrent experiment branches
 - [ ] **Adaptive Workspace Scoping**: Automatically shrink/expand sandbox based on detected drift
 - [ ] **LLM Reliability Guardrails**: Implement 'critic-first' execution for high-risk operations
+- [ ] **Cross-file Symbol Jump**: Command-click support in TUI for quick navigation
 
 ## Recently Completed
+
+- **Shadow Git Branching** (Dec 2025):
+  - Added `list_branches` and `switch_branch` to `ShadowGitAPI`
+  - Exposed `branch` command in `DWIMLoop` for multi-experiment management
+  - Support for concurrent shadow branches per agent session
 
 - **Context Elision Heuristics** (Dec 2025):
   - Implemented `SnippetViewProvider` for intelligent file pruning

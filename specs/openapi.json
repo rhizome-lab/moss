@@ -2367,6 +2367,20 @@
         ]
       }
     },
+    "/shadow_git/list-branches": {
+      "get": {
+        "description": "List all active shadow branches.",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "List all active shadow branches",
+        "tags": [
+          "shadow_git"
+        ]
+      }
+    },
     "/shadow_git/rollback-hunk": {
       "post": {
         "description": "Surgically rollback a specific hunk by file and line number.",
@@ -2405,6 +2419,39 @@
           }
         },
         "summary": "Surgically rollback a specific hunk by file and line number",
+        "tags": [
+          "shadow_git"
+        ]
+      }
+    },
+    "/shadow_git/switch-branch": {
+      "post": {
+        "description": "Switch to a different shadow branch.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "branch_name": {
+                    "description": "",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "branch_name"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "summary": "Switch to a different shadow branch",
         "tags": [
           "shadow_git"
         ]
