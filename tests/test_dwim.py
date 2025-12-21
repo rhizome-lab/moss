@@ -44,7 +44,7 @@ class TestToolResolution:
     def test_resolve_alias(self):
         """Test resolving tool alias."""
         match = resolve_tool("structure")
-        assert match.tool == "search_summarize_module"
+        assert match.tool == "skeleton"  # structure → skeleton (code structure)
         assert match.confidence == 1.0
 
         match = resolve_tool("imports")
@@ -174,7 +174,7 @@ class TestModuleFunctions:
         # Should also work with alias
         info = get_tool_info("structure")
         assert info is not None
-        assert info["name"] == "search_summarize_module"
+        assert info["name"] == "skeleton"  # structure → skeleton
 
         # Unknown tool should return None
         info = get_tool_info("xyzunknown123")

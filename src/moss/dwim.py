@@ -1154,31 +1154,7 @@ class ToolRouter:
         if not words:
             return []
 
-        # === STEP 1: Try exact matching first (works for any query) ===
-        joined = "_".join(words)
-
-        # 1a. Exact tool name match
-        if joined in tools:
-            return [ToolMatch(tool=joined, confidence=1.0)]
-
-        # 1b. Exact alias match
-        if joined in TOOL_ALIASES:
-            target = TOOL_ALIASES[joined]
-            if target in tools:
-                return [ToolMatch(tool=target, confidence=1.0)]
-
-        # 1c. First word is exact tool name (e.g., "skeleton src/main.py")
-        if words[0] in tools:
-            return [ToolMatch(tool=words[0], confidence=1.0)]
-
-        # 1d. First word is exact alias
-        if words[0] in TOOL_ALIASES:
-            target = TOOL_ALIASES[words[0]]
-            if target in tools:
-                return [ToolMatch(tool=target, confidence=1.0)]
-
-        # === STEP 2: Typo correction for tool-like queries ===
-        # Tool-like = short query without many NL markers
+        # NL markers that shouldn't be treated as tool names/aliases
         nl_markers = {
             "and",
             "or",
@@ -1206,6 +1182,33 @@ class ToolRouter:
             "find",
             "get",
         }
+
+        # === STEP 1: Try exact matching first (works for any query) ===
+        joined = "_".join(words)
+
+        # 1a. Exact tool name match
+        if joined in tools:
+            return [ToolMatch(tool=joined, confidence=1.0)]
+
+        # 1b. Exact alias match
+        if joined in TOOL_ALIASES:
+            target = TOOL_ALIASES[joined]
+            if target in tools:
+                return [ToolMatch(tool=target, confidence=1.0)]
+
+        # 1c. First word is exact tool name (e.g., "skeleton src/main.py")
+        # Skip if first word is an NL marker like "find", "show", "get"
+        if words[0] not in nl_markers and words[0] in tools:
+            return [ToolMatch(tool=words[0], confidence=1.0)]
+
+        # 1d. First word is exact alias (skip if NL marker)
+        if words[0] not in nl_markers and words[0] in TOOL_ALIASES:
+            target = TOOL_ALIASES[words[0]]
+            if target in tools:
+                return [ToolMatch(tool=target, confidence=1.0)]
+
+        # === STEP 2: Typo correction for tool-like queries ===
+        # Tool-like = short query without many NL markers
         nl_word_count = sum(1 for w in words if w in nl_markers)
         is_tool_like = len(words) <= 3 and nl_word_count <= 1
 
@@ -1230,14 +1233,15 @@ class ToolRouter:
                     if sim >= 0.8:  # Higher threshold for reversed
                         typo_matches.append((tool_name, sim * 0.95))
 
-            # Check first word as tool base typo
-            for tool_name in tools:
-                if tool_name not in TOOL_REGISTRY:
-                    continue
-                base = tool_name.split("_")[0]
-                sim = string_similarity(words[0], base)
-                if sim >= 0.75 and sim < 1.0:  # Typo, not exact
-                    typo_matches.append((tool_name, sim * 0.9))
+            # Check first word as tool base typo (skip if first word is NL marker)
+            if words[0] not in nl_markers:
+                for tool_name in tools:
+                    if tool_name not in TOOL_REGISTRY:
+                        continue
+                    base = tool_name.split("_")[0]
+                    sim = string_similarity(words[0], base)
+                    if sim >= 0.75 and sim < 1.0:  # Typo, not exact
+                        typo_matches.append((tool_name, sim * 0.9))
 
             # Check aliases for typos
             for alias, target in TOOL_ALIASES.items():

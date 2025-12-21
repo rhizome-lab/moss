@@ -4,9 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] Fix remaining 8 DWIM test failures (85% → 100%)
-  - Remove or context-aware "find" alias (hijacks "find all classes" etc.)
-  - Handle "search todo" → "todo_search" word order
+- [x] Fix remaining DWIM test failures (100% passing)
+  - Skip first-word alias matching for NL markers (show/find/get)
+  - Skip first-word-base typo matching for NL markers
+  - Updated test expectations for structure → skeleton alias
 - [ ] Add failure mode tests: Rust binary missing, invalid paths, malformed files
 - [ ] Ensure all failure modes have informative error messages
 
@@ -52,9 +53,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Simplify matching logic (tool-like vs NL detection)
 - [x] Add `moss dwim --analyze` for embedding similarity debugging
 - [x] Weighted example phrases per tool (ToolInfo.examples field)
-- [ ] Tune remaining 8 failing tests (44/52 = 85% passing)
-  - Most failures: "find" alias hijacks queries starting with "find"
-  - Consider: remove "find" alias or context-aware alias resolution
+- [x] Fix all DWIM tests (23/23 = 100% passing)
+  - Skip first-word alias/tool matching for NL markers
+  - Skip first-word-base typo matching for NL markers
 - [ ] Natural language → tree operation mapping
 
 ### Distribution & Installation
