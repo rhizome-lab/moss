@@ -22,7 +22,10 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [x] `docs/primitives-spec.md` - added `analyze` section
 - [x] `docs/agentic-loop.md` - updated examples for view/edit/analyze
 - [x] `docs/codebase-tree.md` - updated example to show current dwim.py structure
-- [ ] Check remaining docs for outdated references
+- [x] `docs/tools.md` - rewritten for 3 primitives + legacy migration
+- [x] `docs/cli/commands.md` - added view/edit/analyze docs, deprecated health
+- [x] `CLAUDE.md` - updated dogfooding section for 3 primitives
+- [ ] Remaining: prior-art.md, hybrid-loops.md, etc. (lower priority)
 
 **CLI Cleanup:**
 - [ ] `dwim` - may no longer be necessary with 3 primitives
