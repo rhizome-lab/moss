@@ -73,6 +73,7 @@ CATEGORIES: dict[str, list[str]] = {
         "metrics",
         "summarize",
         "analyze-session",
+        "telemetry",
         "extract-preferences",
         "diff-preferences",
     ],
@@ -622,7 +623,19 @@ COMMANDS: dict[str, CommandHelp] = {
         examples=[
             CommandExample("moss analyze-session ~/session.jsonl", "Analyze session"),
         ],
-        see_also=["extract-preferences"],
+        see_also=["telemetry", "extract-preferences"],
+    ),
+    "telemetry": CommandHelp(
+        name="telemetry",
+        summary="Show aggregate telemetry across sessions",
+        description="Analyze session telemetry. Supports moss sessions and Claude Code logs.",
+        examples=[
+            CommandExample("moss telemetry", "Show aggregate stats for all moss sessions"),
+            CommandExample("moss telemetry -s abc123", "Show stats for specific session"),
+            CommandExample("moss telemetry -l *.jsonl", "Analyze Claude Code session logs"),
+            CommandExample("moss telemetry -l logs/ --html", "HTML dashboard output"),
+        ],
+        see_also=["analyze-session", "metrics"],
     ),
     "extract-preferences": CommandHelp(
         name="extract-preferences",

@@ -16,6 +16,8 @@ from moss.output import Output, Verbosity, configure_output, get_output
 if TYPE_CHECKING:
     from argparse import Namespace
 
+    from moss.session_analysis import SessionAnalysis
+
 
 def get_version() -> str:
     """Get the moss version."""
@@ -2225,6 +2227,268 @@ def cmd_analyze_session(args: Namespace) -> int:
         output.print(analysis.to_markdown())
 
     return 0
+
+
+def cmd_telemetry(args: Namespace) -> int:
+    """Show aggregate telemetry across sessions."""
+    from moss.moss_api import MossAPI
+    from moss.session_analysis import analyze_session
+
+    output = setup_output(args)
+    log_paths = [Path(p) for p in getattr(args, "logs", []) or []]
+    session_id = getattr(args, "session", None)
+    html_output = getattr(args, "html", False)
+
+    # Mode 1: Analyze specific moss session
+    if session_id:
+        api = MossAPI.for_project(Path.cwd())
+        stats = api.telemetry.get_session_stats(session_id)
+        if "error" in stats:
+            output.error(stats["error"])
+            return 1
+        if wants_json(args):
+            output.data(stats)
+        else:
+            output.print(_format_session_stats(stats))
+        return 0
+
+    # Mode 2: Analyze external Claude Code session logs
+    if log_paths:
+        for path in log_paths:
+            if not path.exists():
+                output.error(f"Log file not found: {path}")
+                return 1
+
+        analyses = [analyze_session(p) for p in log_paths]
+
+        if len(analyses) == 1:
+            analysis = analyses[0]
+        else:
+            analysis = _aggregate_analyses(analyses)
+
+        if html_output:
+            html = _generate_telemetry_html(analysis)
+            output.print(html)
+        elif wants_json(args):
+            output.data(analysis.to_dict())
+        elif getattr(args, "compact", False):
+            output.print(analysis.to_compact())
+        else:
+            output.print(analysis.to_markdown())
+        return 0
+
+    # Mode 3: Default - aggregate stats across all moss sessions
+    api = MossAPI.for_project(Path.cwd())
+    stats = api.telemetry.analyze_all_sessions()
+
+    if html_output:
+        html = _generate_aggregate_html(stats)
+        output.print(html)
+    elif wants_json(args):
+        output.data(stats)
+    else:
+        output.print(_format_aggregate_stats(stats))
+
+    return 0
+
+
+def _format_session_stats(stats: dict) -> str:
+    """Format session stats for display."""
+    lines = [
+        f"Session: {stats.get('id', 'unknown')}",
+        f"Task: {stats.get('task', 'N/A')}",
+        f"Tokens: {stats.get('tokens', 0):,}",
+        f"LLM Calls: {stats.get('llm_calls', 0)}",
+        f"Tool Calls: {stats.get('tool_calls', 0)}",
+        f"File Changes: {stats.get('file_changes', 0)}",
+        f"Duration: {stats.get('duration', 0):.1f}s",
+    ]
+
+    if stats.get("access_patterns"):
+        lines.append("\nTop Accessed Files:")
+        for path, count in sorted(stats["access_patterns"].items(), key=lambda x: -x[1])[:5]:
+            lines.append(f"  {path}: {count}")
+
+    return "\n".join(lines)
+
+
+def _format_aggregate_stats(stats: dict) -> str:
+    """Format aggregate stats for display."""
+    lines = [
+        "Aggregate Telemetry",
+        "=" * 40,
+        f"Sessions: {stats.get('session_count', 0)}",
+        f"Total Tokens: {stats.get('total_tokens', 0):,}",
+        f"Total LLM Calls: {stats.get('total_llm_calls', 0)}",
+        f"Max Memory: {stats.get('max_memory_bytes', 0) / 1024 / 1024:.1f} MB",
+        f"Max Context: {stats.get('max_context_tokens', 0):,} tokens",
+    ]
+
+    hotspots = stats.get("hotspots", [])
+    if hotspots:
+        lines.append("\nFile Hotspots:")
+        for path, count in hotspots[:10]:
+            lines.append(f"  {path}: {count} accesses")
+
+    return "\n".join(lines)
+
+
+def _aggregate_analyses(analyses: list) -> SessionAnalysis:
+    """Aggregate multiple SessionAnalysis objects."""
+    from moss.session_analysis import SessionAnalysis, TokenStats, ToolStats
+
+    if not analyses:
+        return SessionAnalysis(session_path=Path("."))
+
+    # Combine tool stats
+    combined_tools: dict[str, ToolStats] = {}
+    for analysis in analyses:
+        for name, stats in analysis.tool_stats.items():
+            if name not in combined_tools:
+                combined_tools[name] = ToolStats(name=name)
+            combined_tools[name].calls += stats.calls
+            combined_tools[name].errors += stats.errors
+
+    # Combine token stats
+    combined_tokens = TokenStats()
+    for analysis in analyses:
+        ts = analysis.token_stats
+        combined_tokens.total_input += ts.total_input
+        combined_tokens.total_output += ts.total_output
+        combined_tokens.cache_read += ts.cache_read
+        combined_tokens.cache_create += ts.cache_create
+        combined_tokens.api_calls += ts.api_calls
+        if ts.max_context > combined_tokens.max_context:
+            combined_tokens.max_context = ts.max_context
+        if combined_tokens.min_context == 0 or (
+            ts.min_context > 0 and ts.min_context < combined_tokens.min_context
+        ):
+            combined_tokens.min_context = ts.min_context
+
+    # Combine message counts
+    combined_messages: dict[str, int] = {}
+    for analysis in analyses:
+        for msg_type, count in analysis.message_counts.items():
+            combined_messages[msg_type] = combined_messages.get(msg_type, 0) + count
+
+    result = SessionAnalysis(
+        session_path=Path(f"<{len(analyses)} sessions>"),
+        tool_stats=combined_tools,
+        token_stats=combined_tokens,
+        message_counts=combined_messages,
+        total_turns=sum(a.total_turns for a in analyses),
+        parallel_opportunities=sum(a.parallel_opportunities for a in analyses),
+    )
+
+    return result
+
+
+def _telemetry_css() -> str:
+    """Shared CSS for telemetry HTML dashboards."""
+    return """
+        body { font-family: system-ui, sans-serif; margin: 2rem; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; }
+        h1 { color: #333; }
+        h2 { color: #666; margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #eee; }
+        th { background: #f8f8f8; }
+        .metric { font-size: 2rem; font-weight: bold; color: #2563eb; }
+        .label { color: #666; font-size: 0.9rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+    """
+
+
+def _generate_telemetry_html(analysis: SessionAnalysis) -> str:
+    """Generate HTML dashboard for session analysis."""
+    tool_rows = ""
+    for tool in sorted(analysis.tool_stats.values(), key=lambda t: -t.calls):
+        success_pct = f"{tool.success_rate:.0%}"
+        row = f"<tr><td>{tool.name}</td><td>{tool.calls}</td>"
+        row += f"<td>{tool.errors}</td><td>{success_pct}</td></tr>\n"
+        tool_rows += row
+
+    ts = analysis.token_stats
+    css = _telemetry_css()
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Session Telemetry</title>
+    <style>{css}</style>
+</head>
+<body>
+    <h1>Session Telemetry</h1>
+    <div class="grid">
+        <div class="card">
+            <div class="metric">{analysis.total_tool_calls}</div>
+            <div class="label">Tool Calls</div>
+        </div>
+        <div class="card">
+            <div class="metric">{analysis.overall_success_rate:.0%}</div>
+            <div class="label">Success Rate</div>
+        </div>
+        <div class="card">
+            <div class="metric">{ts.api_calls}</div>
+            <div class="label">API Calls</div>
+        </div>
+        <div class="card">
+            <div class="metric">{ts.avg_context // 1000}K</div>
+            <div class="label">Avg Context</div>
+        </div>
+    </div>
+    <div class="card">
+        <h2>Tool Usage</h2>
+        <table>
+            <tr><th>Tool</th><th>Calls</th><th>Errors</th><th>Success Rate</th></tr>
+            {tool_rows}
+        </table>
+    </div>
+</body>
+</html>"""
+
+
+def _generate_aggregate_html(stats: dict) -> str:
+    """Generate HTML dashboard for aggregate stats."""
+    hotspot_rows = ""
+    for path, count in stats.get("hotspots", [])[:15]:
+        hotspot_rows += f"<tr><td>{path}</td><td>{count}</td></tr>\n"
+
+    css = _telemetry_css()
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Aggregate Telemetry</title>
+    <style>{css}</style>
+</head>
+<body>
+    <h1>Aggregate Telemetry</h1>
+    <div class="grid">
+        <div class="card">
+            <div class="metric">{stats.get("session_count", 0)}</div>
+            <div class="label">Sessions</div>
+        </div>
+        <div class="card">
+            <div class="metric">{stats.get("total_tokens", 0) // 1000}K</div>
+            <div class="label">Total Tokens</div>
+        </div>
+        <div class="card">
+            <div class="metric">{stats.get("total_llm_calls", 0)}</div>
+            <div class="label">LLM Calls</div>
+        </div>
+        <div class="card">
+            <div class="metric">{stats.get("max_context_tokens", 0) // 1000}K</div>
+            <div class="label">Max Context</div>
+        </div>
+    </div>
+    <div class="card">
+        <h2>File Hotspots</h2>
+        <table>
+            <tr><th>File</th><th>Accesses</th></tr>
+            {hotspot_rows}
+        </table>
+    </div>
+</body>
+</html>"""
 
 
 def cmd_extract_preferences(args: Namespace) -> int:
@@ -5469,6 +5733,29 @@ def create_parser() -> argparse.ArgumentParser:
         help="Path to the JSONL session file",
     )
     session_parser.set_defaults(func=cmd_analyze_session)
+
+    # telemetry command
+    telemetry_parser = subparsers.add_parser(
+        "telemetry",
+        help="Show aggregate telemetry across sessions",
+    )
+    telemetry_parser.add_argument(
+        "--session",
+        "-s",
+        help="Show stats for a specific moss session ID",
+    )
+    telemetry_parser.add_argument(
+        "--logs",
+        "-l",
+        nargs="+",
+        help="Analyze Claude Code session logs (supports multiple)",
+    )
+    telemetry_parser.add_argument(
+        "--html",
+        action="store_true",
+        help="Output as HTML dashboard",
+    )
+    telemetry_parser.set_defaults(func=cmd_telemetry)
 
     # extract-preferences command
     extract_prefs_parser = subparsers.add_parser(
