@@ -4,28 +4,23 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Incremental Test Runner**: Run tests only for changed files (pytest --co + git diff filtering)
-- [ ] **GEMINI.md Prompt Engineering**: Add constraints to prevent stub code and require test verification
-- [ ] **TUI Syntax Highlighting**: High-quality code highlighting in file previews
+- [ ] **Symbol Hover Info**: (TUI) Show signatures/docstrings on hover - requires symbol nodes in tree
+- [ ] **Context Elision Heuristics**: (Core) Prune large files while preserving anchors
+- [ ] **Shadow Git Branching**: (Git) Support for multiple concurrent experiment branches
 - [ ] **Local Model Constrained Inference**: Implement GBNF (GGML BNF) for structured output
 
 ## Recently Completed
 
-- **Exception Handler Cleanup** (Dec 2025): Fixed 150+ generic `except Exception` across 40+ files (batches 1-13), remaining 123 are legitimate catch-alls (CLI, servers, dynamic execution)
-- **Gemini Cleanup** (Dec 2025): Removed 6 stub loops, fixed 10 exception handlers, documented LLM differences
-- **Memory & Resource Metrics** (Dec 2025): Show context and RAM usage (with breakdown) for every command
-- **Adaptive and TUI enhancements** (Dec 2025):
-  - Refactored core infrastructure (Sandbox, Workflows, RefCheck, Telemetry)
-  - Implemented dynamic loop controls (Context, Budget, Depth, Models)
-  - Modernized TUI with multi-mode navigation and Git dashboard
-  - Strengthened safety with reliability guardrails and error localization
+- **CLI & Workflow Improvements** (Dec 2025):
+  - CLAUDE.md/GEMINI.md: Prefer CLI over MCP, added anti-stub constraints
+  - Workflow `--arg` option for passing key=value arguments
+  - Incremental test runner (`--incremental`) in watch command
+  - TUI syntax highlighting for file previews (Python, Rust, JS, TS, Go, Ruby)
+- **Exception Handler Cleanup** (Dec 2025): Fixed 150+ generic `except Exception` across 40+ files
+- **Gemini Cleanup** (Dec 2025): Removed 6 stub loops, fixed 10 exception handlers
+- **Memory & Resource Metrics** (Dec 2025): Show context and RAM usage for every command
 
 ## Active Backlog
-
-- Workflow argument passing improvement
-- [ ] **Symbol Hover Info**: (TUI) Show signatures/docstrings on hover (Expanded)
-- [ ] **Context Elision Heuristics**: (Core) Prune large files while preserving anchors (Expanded)
-- [ ] **Shadow Git Branching**: (Git) Support for multiple concurrent experiment branches (Expanded)
 
 **Large:**
 - [ ] **Comprehensive Telemetry & Analysis**: (Partially Complete - see TelemetryAPI)

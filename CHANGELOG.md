@@ -4,6 +4,12 @@
 
 ### Features
 
+**CLI & Workflow Improvements** (Dec 2025)
+- `Workflow Arguments`: `--arg KEY=VALUE` option for passing parameters to workflows
+- `Incremental Test Runner`: `--incremental` flag in watch command runs only related tests
+- `TUI Syntax Highlighting`: Code highlighting in file previews (Python, Rust, JS, TS, Go, Ruby)
+- `GEMINI.md Anti-stub Constraints`: Explicit rules preventing stub code and requiring verification
+
 **Resource Monitoring** (Dec 2025)
 - `Memory & Resource Metrics`: Real-time tracking of RAM usage and context token pressure for every command
 - `Memory Breakdown`: Detailed RSS/VMS/USS breakdown showing exactly where memory is allocated during execution
