@@ -1103,6 +1103,41 @@ def heuristic_optimizer_loop(name: str = "heuristic_optimizer") -> AgentLoop:
     )
 
 
+def tool_discovery_loop(name: str = "tool_discovery") -> AgentLoop:
+    """Meta-loop that searches for and configures new MCP tools."""
+    return AgentLoop(
+        name=name,
+        steps=[
+            LoopStep(
+                "search",
+                "web.search",
+                step_type=StepType.TOOL,
+                parameters={"query": "useful MCP servers Model Context Protocol"},
+            ),
+            LoopStep(
+                "identify",
+                "llm.identify_useful_mcp_servers",
+                input_from="search",
+                step_type=StepType.LLM,
+            ),
+            LoopStep(
+                "scaffold",
+                "llm.scaffold_mcp_config",
+                input_from="identify",
+                step_type=StepType.LLM,
+            ),
+            LoopStep(
+                "save",
+                "edit.write_file",
+                input_from="scaffold",
+                step_type=StepType.TOOL,
+                parameters={"file_path": ".mcp.json"},
+            ),
+        ],
+        exit_conditions=["save.success"],
+    )
+
+
 def prompt_optimizer_loop(name: str = "prompt_optimizer") -> AgentLoop:
     """Meta-loop that evolves system prompts based on session feedback."""
     return AgentLoop(
@@ -2832,6 +2867,24 @@ class LLMToolExecutor:
                 f"- Implicit safety constraints or coding styles\n\n"
                 f"Telemetry Data:\n{focus_str}\n\n"
                 f"Output a set of distilled rules for future agent sessions."
+            ),
+            "identify_useful_mcp_servers": (
+                f"{structured_context}\n\n"
+                f"Analyze the following web search results for new Model Context Protocol "
+                f"(MCP) servers.\n"
+                f"Identify:\n"
+                f"- Servers that provide capabilities currently missing in Moss\n"
+                f"- High-quality, well-documented community servers\n"
+                f"- Potential security or reliability risks\n\n"
+                f"Search Results:\n{focus_str}\n\n"
+                f"Output a list of recommended MCP servers to install."
+            ),
+            "scaffold_mcp_config": (
+                f"{structured_context}\n\n"
+                f"Generate a configuration snippet for the following MCP server to be added "
+                f"to .mcp.json.\n"
+                f"Server Details:\n{focus_str}\n\n"
+                f"Output the JSON configuration object."
             ),
         }
 

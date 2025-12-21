@@ -4,13 +4,18 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Agentic Tool Discovery**: Loop that searches for and registers new MCP tools
 - [ ] **Adaptive Loop Strategy Refinement**: Fine-tune loop switching based on success patterns
-- [ ] **Cross-file Symbol Jump**: Clickable references in TUI to jump between files
+- [ ] **Shadow Git Multi-Commit Dashboard**: Visualize grouped actions in TUI
+- [ ] **Agentic Prompt Versioning**: Automatically track and compare system prompt evolutions
 
 ## Recently Completed
 
-- **Shadow Git Multi-Commit** (Dec 2025):
+- **Agentic Tool Discovery** (Dec 2025):
+  - Implemented `tool_discovery_loop` to search for and configure new MCP servers
+  - Added `identify_useful_mcp_servers` and `scaffold_mcp_config` LLM operations
+  - Supports automated capabilities expansion by discovering community MCP tools
+
+- **Shadow Git Merging** (Dec 2025):
   - Added `begin_multi_commit` and `finish_multi_commit` to `ShadowGit`
   - Enabled grouping of multiple agent actions into single atomic commits
   - Exposed `checkpoint` and `commit` commands in `DWIMLoop`
