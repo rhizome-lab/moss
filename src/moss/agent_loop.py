@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -2537,6 +2538,63 @@ def print_comparison(results: list[BenchmarkResult]) -> str:
     lines.append(f"Winner (fewest LLM calls): **{sorted_results[0].loop_name}**")
 
     return "\n".join(lines)
+
+
+@dataclass
+class MultiModelBenchmarkResult:
+    """Comparison of multiple models on standard tasks."""
+
+    loop_name: str
+    model_results: dict[str, BenchmarkResult]
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def to_markdown(self) -> str:
+        """Format comparison as markdown table."""
+        lines = [f"# Model Benchmark: {self.loop_name}", ""]
+        lines.append("| Model | Success | Avg LLM Calls | Avg Tokens | Time/Task |")
+        lines.append("|-------|---------|---------------|------------|-----------|")
+
+        # Sort models by success rate then LLM calls
+        sorted_models = sorted(
+            self.model_results.items(),
+            key=lambda x: (x[1].success_rate, -x[1].avg_llm_calls),
+            reverse=True,
+        )
+
+        for model, res in sorted_models:
+            avg_tokens = res.total_llm_tokens / res.tasks_run if res.tasks_run > 0 else 0
+            avg_time = res.total_time_seconds / res.tasks_run if res.tasks_run > 0 else 0
+            lines.append(
+                f"| {model} | {res.success_rate:.0%} | "
+                f"{res.avg_llm_calls:.2f} | {avg_tokens:.0f} | {avg_time:.2f}s |"
+            )
+
+        return "\n".join(lines)
+
+
+class AutomatedBenchmark:
+    """Automates benchmarking across multiple models."""
+
+    async def run_comparison(
+        self,
+        loop: AgentLoop,
+        models: list[str],
+        tasks: list[BenchmarkTask],
+    ) -> MultiModelBenchmarkResult:
+        """Run the benchmark for each model and aggregate results."""
+        from moss.agent_loop import LLMConfig, LLMToolExecutor
+
+        model_results = {}
+
+        for model in models:
+            # Create specialized executor for this model
+            llm_config = LLMConfig(model=model)
+            executor = LLMToolExecutor(config=llm_config)
+
+            benchmark = LoopBenchmark(executor)
+            model_results[model] = await benchmark.run(loop, tasks)
+
+        return MultiModelBenchmarkResult(loop_name=loop.name, model_results=model_results)
 
 
 # ============================================================================

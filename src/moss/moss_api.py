@@ -3573,6 +3573,33 @@ class AgentAPI:
         initial_input = {"task": task}
         return await run_workflow("vanilla", initial_input, project_root=self.root)
 
+    async def benchmark_models(
+        self,
+        workflow_name: str,
+        models: list[str],
+        tasks: list[dict[str, Any]],
+    ) -> Any:
+        """Benchmark multiple models on a set of standard tasks.
+
+        Args:
+            workflow_name: Name of the workflow to use
+            models: List of model names to evaluate
+            tasks: List of task definitions (name, input_data)
+
+        Returns:
+            MultiModelBenchmarkResult with comparison data
+        """
+        from moss.agent_loop import AutomatedBenchmark, BenchmarkTask
+        from moss.workflows import load_workflow, workflow_to_agent_loop
+
+        workflow = load_workflow(workflow_name, project_root=self.root)
+        loop = workflow_to_agent_loop(workflow)
+
+        benchmark_tasks = [BenchmarkTask(name=t["name"], input_data=t["input_data"]) for t in tasks]
+
+        benchmark = AutomatedBenchmark()
+        return await benchmark.run_comparison(loop, models, benchmark_tasks)
+
 
 @dataclass
 class DWIMAPI:

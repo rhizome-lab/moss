@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **LLM Benchmarking Harness**: Automate model evaluation across standard tasks
 - [ ] **Shadow Git Visualization**: Visual diff and history in TUI
 - [ ] **Adaptive Loop Strategy**: Automatically switch between DWIM and Structured loops
+- [ ] **Self-Correcting Edit Harness**: Implement loop that auto-fixes its own syntax errors
 
 ## Recently Completed
+
+- **LLM Benchmarking Harness** (Dec 2025):
+  - Implemented `AutomatedBenchmark` for cross-model evaluation
+  - Added `MultiModelBenchmarkResult` with markdown report generation
+  - Integrated `benchmark_models` into `AgentAPI`
 
 - **Cross-Language Reference Tracking** (Dec 2025):
   - Extended `RefChecker` to support Rust files (`.rs`) and `crates/` directory
