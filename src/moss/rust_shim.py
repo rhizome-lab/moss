@@ -329,3 +329,56 @@ def rust_callees(
         return []
 
     return json.loads(output)
+
+
+def rust_anchors(file: str, query: str | None = None, root: str | None = None) -> list[dict] | None:
+    """List code anchors from a file using Rust CLI.
+
+    Returns list of anchor info or None if Rust not available.
+    Each item: {"name", "type", "start_line", "end_line", "signature", "context", "reference"}
+    """
+    if not rust_available():
+        return None
+
+    args = ["anchors"]
+    if root:
+        args.extend(["-r", root])
+    if query:
+        args.extend(["-q", query])
+    args.append(file)
+
+    code, output = call_rust(args, json_output=True)
+    if code != 0:
+        return None
+
+    result = json.loads(output)
+    return result.get("anchors", [])
+
+
+def rust_tree(
+    path: str = ".",
+    depth: int | None = None,
+    dirs_only: bool = False,
+    root: str | None = None,
+) -> dict | None:
+    """Show directory tree using Rust CLI.
+
+    Returns {"root", "tree", "file_count", "dir_count"} or None if Rust not available.
+    """
+    if not rust_available():
+        return None
+
+    args = ["tree"]
+    if root:
+        args.extend(["-r", root])
+    if depth is not None:
+        args.extend(["-d", str(depth)])
+    if dirs_only:
+        args.append("-D")
+    args.append(path)
+
+    code, output = call_rust(args, json_output=True)
+    if code != 0:
+        return None
+
+    return json.loads(output)

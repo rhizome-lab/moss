@@ -352,7 +352,12 @@ class SkeletonAPI(PathResolvingMixin):
         if not rust_available():
             raise RuntimeError("Rust CLI required for skeleton. Build with: cargo build --release")
 
-        result = rust_skeleton(str(path), root=str(self.root))
+        # Pass relative path with explicit root for Rust CLI
+        try:
+            rel_path = path.relative_to(self.root)
+        except ValueError:
+            rel_path = path
+        result = rust_skeleton(str(rel_path), root=str(self.root))
         if result is None:
             return f"Error: Rust CLI failed for {path}"
 

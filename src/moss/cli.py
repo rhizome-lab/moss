@@ -907,8 +907,8 @@ def cmd_callees(args: Namespace) -> int:
 
 
 def cmd_tree(args: Namespace) -> int:
-    """Show git-aware file tree."""
-    from moss import MossAPI
+    """Show directory tree structure."""
+    from moss.rust_shim import rust_tree
 
     output = setup_output(args)
     path = Path(getattr(args, "path", ".")).resolve()
@@ -917,19 +917,22 @@ def cmd_tree(args: Namespace) -> int:
         output.error(f"Path not found: {path}")
         return 1
 
-    api = MossAPI.for_project(path)
-    tracked_only = getattr(args, "tracked", False)
-    gitignore = not getattr(args, "all", False)
+    depth = getattr(args, "depth", None)
+    dirs_only = getattr(args, "dirs_only", False)
 
-    result = api.tree.generate(tracked_only=tracked_only, gitignore=gitignore)
+    result = rust_tree(str(path), depth=depth, dirs_only=dirs_only)
+    if result is None:
+        output.error("Failed to generate tree")
+        return 1
 
-    compact = getattr(args, "compact", False)
-    if compact and not wants_json(args):
-        output.print(result.to_compact())
-    elif wants_json(args):
-        output.data(result.to_dict())
+    if wants_json(args):
+        output.data(result)
     else:
-        output.print(result.to_text())
+        for line in result.get("tree", []):
+            output.print(line)
+        dirs = result.get("dir_count", 0)
+        files = result.get("file_count", 0)
+        output.print(f"\n{dirs} directories, {files} files")
 
     return 0
 
@@ -938,22 +941,17 @@ def cmd_anchors(args: Namespace) -> int:
     """Find anchors (functions, classes, methods) in code."""
     import re
 
-    from moss import MossAPI
+    from moss.rust_shim import rust_anchors
 
     output = setup_output(args)
-    path = Path(args.path).resolve()
+    path = Path(args.path)
 
     if not path.exists():
         output.error(f"Path {path} does not exist")
         return 1
 
-    api = MossAPI.for_project(path if path.is_dir() else path.parent)
-
-    # Filter types
     type_filter = args.type if args.type != "all" else None
     name_pattern = re.compile(args.name) if args.name else None
-
-    results = []
 
     if path.is_file():
         files = [path]
@@ -961,55 +959,38 @@ def cmd_anchors(args: Namespace) -> int:
         pattern = args.pattern or "**/*.py"
         files = list(path.glob(pattern))
 
-    def collect_symbols(symbols: list, file_path: Path, parent: str | None = None) -> None:
-        """Recursively collect symbols from skeleton."""
-        for sym in symbols:
-            kind = sym.kind
-            # Map skeleton kinds to anchor types
-            if type_filter:
-                if type_filter == "function" and kind not in ("function",):
-                    if sym.children:
-                        collect_symbols(sym.children, file_path, sym.name)
-                    continue
-                if type_filter == "class" and kind != "class":
-                    if sym.children:
-                        collect_symbols(sym.children, file_path, sym.name)
-                    continue
-                if type_filter == "method" and kind != "method":
-                    if sym.children:
-                        collect_symbols(sym.children, file_path, sym.name)
-                    continue
+    results = []
+    for file_path in files:
+        # For absolute paths (like temp files), use parent as root
+        # For relative paths, just pass them directly
+        if file_path.is_absolute():
+            root = file_path.parent
+            rel_path = file_path.name
+            anchors = rust_anchors(str(rel_path), query=args.name, root=str(root))
+        else:
+            anchors = rust_anchors(str(file_path), query=args.name)
+        if anchors is None:
+            continue
 
-            # Apply name filter
-            if name_pattern and not name_pattern.search(sym.name):
-                if sym.children:
-                    collect_symbols(sym.children, file_path, sym.name)
+        for anchor in anchors:
+            anchor_type = anchor.get("type", "")
+            if type_filter and anchor_type != type_filter:
+                continue
+            if name_pattern and not name_pattern.search(anchor.get("name", "")):
                 continue
 
-            anchor_info = {
-                "file": str(file_path),
-                "name": sym.name,
-                "type": kind,
-                "line": sym.lineno,
-            }
-            if parent:
-                anchor_info["context"] = parent
-            if sym.signature:
-                anchor_info["signature"] = sym.signature
-            results.append(anchor_info)
+            results.append(
+                {
+                    "file": str(file_path),
+                    "name": anchor.get("name", ""),
+                    "type": anchor_type,
+                    "line": anchor.get("start_line", 0),
+                    "context": anchor.get("context"),
+                    "signature": anchor.get("signature"),
+                }
+            )
 
-            # Recurse into children
-            if sym.children:
-                collect_symbols(sym.children, file_path, sym.name)
-
-    for file_path in files:
-        try:
-            symbols = api.skeleton.extract(file_path)
-            collect_symbols(symbols, file_path)
-        except SyntaxError as e:
-            output.verbose(f"Syntax error in {file_path}: {e}")
-
-    if getattr(args, "json", False):
+    if wants_json(args):
         output_result(results, args)
     else:
         for r in results:
@@ -5193,7 +5174,7 @@ def create_parser() -> argparse.ArgumentParser:
     # ==========================================================================
 
     # tree command
-    tree_parser = subparsers.add_parser("tree", help="Show git-aware file tree")
+    tree_parser = subparsers.add_parser("tree", help="Show directory tree structure")
     tree_parser.add_argument(
         "path",
         nargs="?",
@@ -5201,16 +5182,16 @@ def create_parser() -> argparse.ArgumentParser:
         help="Directory to show (default: current)",
     )
     tree_parser.add_argument(
-        "--tracked",
-        "-t",
-        action="store_true",
-        help="Only show git-tracked files",
+        "--depth",
+        "-d",
+        type=int,
+        help="Maximum depth to display",
     )
     tree_parser.add_argument(
-        "--all",
-        "-a",
+        "--dirs-only",
+        "-D",
         action="store_true",
-        help="Show all files (ignore .gitignore)",
+        help="Show only directories",
     )
     tree_parser.set_defaults(func=cmd_tree)
 

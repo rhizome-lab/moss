@@ -4,11 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] `anchors` command → delegate to Rust `anchors` (direct match)
-- [ ] `tree` command → delegate to Rust `tree` (direct match)
-- [ ] Clean up Phase 1 checklist (outdated - Rust has direct commands now)
+- [ ] Add failure mode tests: Rust binary missing, invalid paths, malformed files
+- [ ] Ensure all failure modes have informative error messages
 
 ## Recently Completed
+
+- **Session Dec 21 2025 (later)**:
+  - Completed Rust delegation for anchors/tree commands
+  - Simplified cmd_anchors and cmd_tree to just call Rust
+  - Removed Python fallback (Rust is required for proper installation)
+  - Phase 1 Rust delegation complete
 
 - **Session Dec 21 2025 (latest)**:
   - Rust delegation for expand/callers/callees commands
@@ -69,15 +74,15 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ### Codebase Tree Consolidation (see `docs/codebase-tree.md`)
 
-**Phase 1: Python CLI delegates to Rust** (mostly done)
+**Phase 1: Python CLI delegates to Rust** (complete)
 - [x] `skeleton` → Rust `skeleton`
 - [x] `summarize` → Rust `summarize`
 - [x] `expand` → Rust `expand`
 - [x] `callers` → Rust `callers`
 - [x] `callees` → Rust `callees`
-- [ ] `anchors` → Rust `anchors`
-- [ ] `tree` → Rust `tree`
-- [ ] `query` - Python-only (rich filtering Rust lacks)
+- [x] `anchors` → Rust `anchors`
+- [x] `tree` → Rust `tree`
+- `query` - Python-only (rich filtering Rust lacks, no delegation needed)
 
 **Phase 2: Unified tree model**
 - [ ] Merge filesystem + AST into single tree data structure
