@@ -1,10 +1,16 @@
-"""Claude Code session log analysis.
+"""Session log analysis with multi-format support.
 
-Parses Claude Code JSONL logs to extract:
+Parses session logs from various agents to extract:
 - Tool call frequency and success rates
 - Error patterns and retry loops
 - Token usage and context growth
 - Parallelization opportunities
+
+Supported formats:
+- Claude Code JSONL
+- Gemini CLI JSONL (planned)
+- Cline/Roo formats (planned)
+- Moss internal sessions (via session.py)
 """
 
 from __future__ import annotations
@@ -12,8 +18,115 @@ from __future__ import annotations
 import json
 from collections import Counter
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Protocol, runtime_checkable
+
+
+class LogFormat(Enum):
+    """Supported session log formats."""
+
+    CLAUDE_CODE = "claude"
+    GEMINI = "gemini"
+    MOSS = "moss"
+    UNKNOWN = "unknown"
+
+
+@runtime_checkable
+class LogParser(Protocol):
+    """Protocol for session log parsers."""
+
+    def analyze(self) -> SessionAnalysis:
+        """Parse and analyze the session log."""
+        ...
+
+
+def detect_log_format(path: Path) -> LogFormat:
+    """Auto-detect the log format from file content.
+
+    Args:
+        path: Path to the session log file
+
+    Returns:
+        Detected LogFormat enum value
+    """
+    if not path.exists():
+        return LogFormat.UNKNOWN
+
+    # Check file extension hints
+    suffix = path.suffix.lower()
+    name = path.name.lower()
+
+    # Moss internal sessions are JSON (not JSONL)
+    if suffix == ".json" and "session" in name:
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+                if "tool_calls" in data and "llm_calls" in data:
+                    return LogFormat.MOSS
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # JSONL formats - peek at first few lines
+    if suffix in (".jsonl", ".json"):
+        try:
+            with open(path, encoding="utf-8") as f:
+                for i, line in enumerate(f):
+                    if i > 5:
+                        break
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        # Claude Code has 'type' field with 'user', 'assistant', 'summary'
+                        if entry.get("type") in ("user", "assistant", "summary"):
+                            return LogFormat.CLAUDE_CODE
+                        # Gemini CLI has different structure (future)
+                        if "gemini" in str(entry).lower():
+                            return LogFormat.GEMINI
+                    except json.JSONDecodeError:
+                        continue
+        except OSError:
+            pass
+
+    return LogFormat.UNKNOWN
+
+
+def get_parser_for_format(path: Path, fmt: LogFormat) -> LogParser:
+    """Get the appropriate parser for a log format.
+
+    Args:
+        path: Path to the session log file
+        fmt: The detected LogFormat
+
+    Returns:
+        LogParser instance for the format
+    """
+    if fmt == LogFormat.CLAUDE_CODE:
+        return ClaudeCodeAnalyzer(path)
+    if fmt == LogFormat.MOSS:
+        return MossSessionAnalyzer(path)
+    # Default to Claude Code parser for unknown formats
+    return ClaudeCodeAnalyzer(path)
+
+
+def analyze_log(path: str | Path) -> SessionAnalysis:
+    """Analyze a session log with auto-format detection.
+
+    This is the recommended entry point for analyzing any session log.
+    It auto-detects the format and uses the appropriate parser.
+
+    Args:
+        path: Path to the session log file
+
+    Returns:
+        SessionAnalysis with all statistics
+    """
+    path = Path(path)
+    fmt = detect_log_format(path)
+    parser = get_parser_for_format(path, fmt)
+    return parser.analyze()
 
 
 @dataclass
@@ -215,8 +328,8 @@ class SessionAnalysis:
         return "\n".join(lines)
 
 
-class SessionAnalyzer:
-    """Analyze Claude Code session logs."""
+class ClaudeCodeAnalyzer:
+    """Analyze Claude Code session logs (JSONL format)."""
 
     def __init__(self, session_path: Path):
         self.session_path = Path(session_path)
@@ -450,17 +563,62 @@ class SessionAnalyzer:
         return single_tool_turns
 
 
+# Backward compatibility alias
+SessionAnalyzer = ClaudeCodeAnalyzer
+
+
+class MossSessionAnalyzer:
+    """Analyze Moss internal session files (JSON format)."""
+
+    def __init__(self, session_path: Path):
+        self.session_path = Path(session_path)
+
+    def analyze(self) -> SessionAnalysis:
+        """Parse and analyze the Moss session."""
+        result = SessionAnalysis(session_path=self.session_path)
+
+        if not self.session_path.exists():
+            return result
+
+        try:
+            with open(self.session_path, encoding="utf-8") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return result
+
+        # Extract tool stats
+        tool_calls = data.get("tool_calls", [])
+        for tc in tool_calls:
+            tool_name = tc.get("tool_name", "unknown")
+            if tool_name not in result.tool_stats:
+                result.tool_stats[tool_name] = ToolStats(name=tool_name)
+            result.tool_stats[tool_name].calls += 1
+            if tc.get("error"):
+                result.tool_stats[tool_name].errors += 1
+
+        # Token stats
+        result.token_stats.total_input = data.get("tokens_in", 0)
+        result.token_stats.total_output = data.get("tokens_out", 0)
+        result.token_stats.api_calls = data.get("llm_calls", 0)
+
+        # Turns
+        result.total_turns = data.get("llm_calls", 0)
+
+        return result
+
+
 def analyze_session(path: str | Path) -> SessionAnalysis:
     """Convenience function to analyze a session log.
 
+    Uses auto-format detection to support multiple log formats.
+
     Args:
-        path: Path to the JSONL session file
+        path: Path to the session file (JSONL or JSON)
 
     Returns:
         SessionAnalysis with all statistics
     """
-    analyzer = SessionAnalyzer(Path(path))
-    return analyzer.analyze()
+    return analyze_log(path)
 
 
 # =============================================================================
