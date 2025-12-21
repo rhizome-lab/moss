@@ -4,16 +4,14 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] UX for "scratch that" / correction in hierarchical agent model
-  - LLM reviews recent changes, recognizes accidental deletions/errors
-  - Not mechanical undo - thoughtful self-correction
-  - Example: "I replaced the block and accidentally dropped existing items"
+- [ ] Implement `--prepend`/`--append` inside symbols (containers)
+  - Currently only works at file level; need to support adding methods to classes
+  - Requires finding the body node and inserting at start/end
 - [ ] Fix unicode path resolution in Rust CLI
   - `view /tmp/日本語/テスト.py` returns "No matches" despite file existing
   - Likely issue with path normalization or index lookup
-- [x] Implement `find` and `edit` primitives to complete the 4-tool set
-  - `view` now has `--type`, `--calls`, `--called-by` filters (find unified into view)
-  - `edit` command with `--delete`, `--replace`, `--before`, `--after`, `--prepend`, `--append`, `--move-*`, `--swap`
+- [ ] Add `--copy-before`/`--copy-after`/`--move-prepend`/`--move-append` to edit
+  - Basic move/swap implemented, but copy and container-relative moves missing
 - [ ] Consolidate MossAPI: 30 sub-APIs → 4 primitive APIs matching CLI/MCP
 - [ ] Clean up broken Python tests (test_cli.py, test_synthesis.py import errors)
 
