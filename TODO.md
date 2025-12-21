@@ -4,10 +4,16 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [x] Fix remaining DWIM test failures (100% passing)
-  - Skip first-word alias matching for NL markers (show/find/get)
-  - Skip first-word-base typo matching for NL markers
-  - Updated test expectations for structure → skeleton alias
+- [ ] Start Phase 2: Unified tree model implementation
+  - Prototype unified node addressing (`src/main.py/Foo/bar`)
+  - Implement `view` primitive with `--depth` option
+- [ ] Start Phase 3: Remove DWIM embedding system
+  - Remove fastembed dependency, TF-IDF, 119-tool registry
+  - Simple 4-tool matching (view/find/edit/analyze)
+- [ ] UX for "scratch that" / correction in hierarchical agent model
+  - LLM reviews recent changes, recognizes accidental deletions/errors
+  - Not mechanical undo - thoughtful self-correction
+  - Example: "I replaced the block and accidentally dropped existing items"
 - [ ] Add failure mode tests: Rust binary missing, invalid paths, malformed files
 - [ ] Ensure all failure modes have informative error messages
 
