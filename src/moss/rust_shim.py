@@ -221,3 +221,43 @@ def rust_overview(root: str | None = None, compact: bool = False) -> dict | None
         return None
 
     return json.loads(output)
+
+
+def rust_skeleton(file_path: str, root: str | None = None) -> str | None:
+    """Extract code skeleton using Rust CLI.
+
+    Returns formatted skeleton string or None if Rust not available.
+    """
+    if not rust_available():
+        return None
+
+    args = ["skeleton"]
+    if root:
+        args.extend(["-r", root])
+    args.append(file_path)
+
+    code, output = call_rust(args, json_output=False)
+    if code != 0:
+        return None
+
+    return output
+
+
+def rust_summarize(file_path: str, root: str | None = None) -> str | None:
+    """Summarize a file using Rust CLI.
+
+    Returns summary string or None if Rust not available.
+    """
+    if not rust_available():
+        return None
+
+    args = ["summarize"]
+    if root:
+        args.extend(["-r", root])
+    args.append(file_path)
+
+    code, output = call_rust(args, json_output=False)
+    if code != 0:
+        return None
+
+    return output

@@ -2348,6 +2348,15 @@ def cmd_summarize(args: Namespace) -> int:
 
     compact = getattr(args, "compact", False)
 
+    # Try Rust delegation for single files (faster, non-JSON only)
+    if path.is_file() and not wants_json(args):
+        from moss.rust_shim import rust_summarize
+
+        result = rust_summarize(str(path))
+        if result is not None:
+            output.print(result)
+            return 0
+
     # Single file mode
     if path.is_file():
         suffix = path.suffix.lower()

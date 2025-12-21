@@ -331,7 +331,7 @@ class SkeletonAPI(PathResolvingMixin):
     def format(self, file_path: str | Path, include_docstrings: bool = True) -> str:
         """Extract and format skeleton as readable text.
 
-        Uses the plugin registry to support multiple file types (Python, Markdown, etc.).
+        Uses Rust CLI when available (faster), falls back to Python plugin system.
 
         Args:
             file_path: Path to the file
@@ -340,15 +340,24 @@ class SkeletonAPI(PathResolvingMixin):
         Returns:
             Formatted string representation of the skeleton
         """
+        path = self._resolve_path(file_path)
+        if not path.exists():
+            return f"File not found: {path}"
+
+        # Try Rust delegation first (faster)
+        from moss.rust_shim import rust_skeleton
+
+        result = rust_skeleton(str(path), root=str(self.root))
+        if result is not None:
+            return result
+
+        # Fall back to Python plugin system
         import asyncio
         import concurrent.futures
 
         from moss.plugins import get_registry
         from moss.views import ViewOptions, ViewTarget
 
-        path = self._resolve_path(file_path)
-        if not path.exists():
-            return f"File not found: {path}"
         target = ViewTarget(path=path)
         registry = get_registry()
         plugin = registry.find_plugin(target, "skeleton")

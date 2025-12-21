@@ -2649,7 +2649,7 @@
     },
     "/skeleton/format": {
       "post": {
-        "description": "Extract and format skeleton as readable text. Uses the plugin registry to support multiple file types (Python, Markdown, etc.). Formatted string representation of the skeleton",
+        "description": "Extract and format skeleton as readable text. Uses Rust CLI when available (faster), falls back to Python plugin system. Formatted string representation of the skeleton",
         "requestBody": {
           "content": {
             "application/json": {

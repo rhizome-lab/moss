@@ -4,6 +4,10 @@
 
 ### Features
 
+**Session Dec 21 2025 (later)**
+- `Rust Delegation`: skeleton/summarize commands delegate to Rust CLI when available
+- `Conversational Loop Research`: Documented as future work for eval comparison
+
 **Session Dec 21 2025 (continued)**
 - `Claude vs Gemini CLI Analysis`: Documented edit paradigm differences (strict matching vs self-correction)
 - `Lazy Imports`: Converted moss.__init__.py to lazy imports for reduced baseline memory

@@ -4,9 +4,14 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [ ] **Codebase Tree Phase 1**: Delegate skeleton/summarize to Rust `view`
+- [ ] **search-tree respects gitignore**: Currently searches through `target/` etc.
 
 ## Recently Completed
+
+- **Session Dec 21 2025 (later)**:
+  - Rust delegation for skeleton/summarize (SkeletonAPI.format → rust_skeleton)
+  - Documented conversational loop pattern as future research
+  - Verified hierarchical (not conversational) agent architecture
 
 - **Session Dec 21 2025 (late)**:
   - Runtime Memory Bounds: streaming LLM responses, context eviction (max_context_steps)
@@ -45,6 +50,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ## Future Work
 
 ### Agent Research & Optimization
+- [ ] **Conversational Loop Pattern**: Add optional conversation-accumulating mode to DWIMLoop
+  - For evals: measure context utilization vs hierarchical approach
+  - Session-wide RAG: retrieve from full session history, not just TaskTree
+  - Compare: hierarchical (current) vs conversational vs hybrid approaches
 - [ ] **YOLO Mode Evaluation**: Evaluate if a "YOLO mode" aligns with Moss architectural principles
 - [ ] **'Diffusion-like' methods for large-scale refactors**:
   - Parallelize implementation of components based on high-level contracts
