@@ -19,14 +19,10 @@ from moss.agent_loop import (
     MCPToolExecutor,
     MossToolExecutor,
     StepType,
-    analysis_loop,
-    critic_loop,
-    docstring_apply_loop,
-    docstring_full_loop,
-    docstring_loop,
-    incremental_loop,
-    simple_loop,
 )
+
+# NOTE: Predefined loops (simple_loop, critic_loop, etc.) removed.
+# Use DWIMLoop or TOML workflows instead. See docs/philosophy.md.
 
 
 class TestLoopStep:
@@ -460,48 +456,6 @@ class TestAgentLoopRunner:
         assert result.status == LoopStatus.BUDGET_EXCEEDED
 
 
-class TestLoopTemplates:
-    """Tests for pre-built loop templates."""
-
-    def test_simple_loop_structure(self):
-        loop = simple_loop()
-        assert loop.name == "simple"
-        assert len(loop.steps) == 3
-        assert loop.steps[0].name == "understand"
-        assert loop.steps[1].name == "act"
-        assert loop.steps[2].name == "validate"
-        assert "validate.success" in loop.exit_conditions
-
-    def test_critic_loop_structure(self):
-        loop = critic_loop()
-        assert loop.name == "critic"
-        assert len(loop.steps) == 4
-        assert loop.steps[1].name == "review"
-        assert loop.steps[1].step_type == StepType.LLM
-
-    def test_incremental_loop_structure(self):
-        loop = incremental_loop()
-        assert loop.name == "incremental"
-        assert any(s.name == "decide" for s in loop.steps)
-
-    def test_analysis_loop_structure(self):
-        loop = analysis_loop()
-        assert loop.name == "analysis"
-        assert len(loop.steps) == 2
-        assert loop.steps[0].name == "skeleton"
-        assert loop.steps[1].name == "analyze"
-        assert loop.steps[1].step_type == StepType.LLM
-        assert "analyze.success" in loop.exit_conditions
-
-    def test_docstring_loop_structure(self):
-        loop = docstring_loop()
-        assert loop.name == "docstring"
-        assert len(loop.steps) == 2
-        assert loop.steps[0].name == "skeleton"
-        assert loop.steps[1].name == "identify"
-        assert loop.steps[1].step_type == StepType.LLM
-
-
 class TestLLMConfig:
     """Tests for LLMConfig."""
 
@@ -680,26 +634,6 @@ class TestLoopBenchmark:
         assert "Success rate" in markdown
 
 
-class TestDocstringFullLoop:
-    """Tests for docstring_full_loop template."""
-
-    def test_docstring_full_loop_structure(self):
-        loop = docstring_full_loop()
-        assert loop.name == "docstring_full"
-        assert len(loop.steps) == 3
-        assert loop.steps[0].name == "skeleton"
-        assert loop.steps[0].tool == "skeleton.format"
-        assert loop.steps[1].name == "identify"
-        assert loop.steps[1].step_type == StepType.LLM
-        assert loop.steps[2].name == "parse"
-        assert loop.steps[2].tool == "parse.docstrings"
-        assert "parse.success" in loop.exit_conditions
-
-    def test_docstring_full_loop_custom_name(self):
-        loop = docstring_full_loop(name="custom_docstring")
-        assert loop.name == "custom_docstring"
-
-
 class TestMossToolExecutor:
     """Tests for MossToolExecutor."""
 
@@ -810,25 +744,6 @@ class TestParseDocstringOutput:
         output = "\n\nFUNC:test|value\n\n"
         result = executor._parse_docstring_output(output)
         assert len(result) == 1
-
-
-class TestDocstringApplyLoop:
-    """Tests for docstring_apply_loop template."""
-
-    def test_docstring_apply_loop_structure(self):
-        loop = docstring_apply_loop()
-        assert loop.name == "docstring_apply"
-        assert len(loop.steps) == 4
-        assert loop.steps[0].name == "skeleton"
-        assert loop.steps[1].name == "identify"
-        assert loop.steps[2].name == "parse"
-        assert loop.steps[3].name == "apply"
-        assert loop.steps[3].tool == "patch.docstrings"
-        assert "apply.success" in loop.exit_conditions
-
-    def test_docstring_apply_loop_custom_name(self):
-        loop = docstring_apply_loop(name="custom_apply")
-        assert loop.name == "custom_apply"
 
 
 class TestApplyDocstrings:
@@ -1119,12 +1034,19 @@ class TestLoopSerialization:
         assert step.max_retries == 3  # default
 
     def test_loop_to_dict(self):
-        loop = simple_loop()
+        loop = AgentLoop(
+            name="test",
+            steps=[
+                LoopStep(name="s1", tool="tool1"),
+                LoopStep(name="s2", tool="tool2"),
+            ],
+            exit_conditions=["s2.success"],
+        )
         d = loop.to_dict()
-        assert d["name"] == "simple"
-        assert len(d["steps"]) == 3
-        assert d["entry"] == "understand"
-        assert "validate.success" in d["exit_conditions"]
+        assert d["name"] == "test"
+        assert len(d["steps"]) == 2
+        assert d["entry"] == "s1"
+        assert "s2.success" in d["exit_conditions"]
 
     def test_loop_from_dict(self):
         d = {
@@ -1142,7 +1064,13 @@ class TestLoopSerialization:
         assert loop.entry == "s1"  # default to first step
 
     def test_loop_roundtrip(self):
-        original = critic_loop()
+        original = AgentLoop(
+            name="roundtrip",
+            steps=[
+                LoopStep(name="s1", tool="tool1"),
+                LoopStep(name="s2", tool="tool2"),
+            ],
+        )
         d = original.to_dict()
         loaded = AgentLoop.from_dict(d)
 
@@ -1157,7 +1085,7 @@ class TestLoopSerialization:
     def test_dump_load_json(self):
         from moss.agent_loop import dump_loop_json, load_loop_json
 
-        loop = simple_loop()
+        loop = AgentLoop(name="json_test", steps=[LoopStep(name="s1", tool="t1")])
         json_str = dump_loop_json(loop)
         loaded = load_loop_json(json_str)
 
@@ -1167,7 +1095,7 @@ class TestLoopSerialization:
     def test_dump_load_yaml(self):
         from moss.agent_loop import dump_loop_yaml, load_loop_yaml
 
-        loop = analysis_loop()
+        loop = AgentLoop(name="yaml_test", steps=[LoopStep(name="s1", tool="t1")])
         yaml_str = dump_loop_yaml(loop)
         loaded = load_loop_yaml(yaml_str)
 
@@ -1177,7 +1105,7 @@ class TestLoopSerialization:
     def test_dump_json_to_file(self, tmp_path):
         from moss.agent_loop import dump_loop_json, load_loop_json
 
-        loop = simple_loop()
+        loop = AgentLoop(name="file_test", steps=[LoopStep(name="s1", tool="t1")])
         path = tmp_path / "loop.json"
         dump_loop_json(loop, path)
 
@@ -1188,7 +1116,7 @@ class TestLoopSerialization:
     def test_dump_yaml_to_file(self, tmp_path):
         from moss.agent_loop import dump_loop_yaml, load_loop_yaml
 
-        loop = critic_loop()
+        loop = AgentLoop(name="yaml_file_test", steps=[LoopStep(name="s1", tool="t1")])
         path = tmp_path / "loop.yaml"
         dump_loop_yaml(loop, path)
 

@@ -34,10 +34,11 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [ ] Interface stays separate (clear intent), plumbing unifies (DRY)
 
 **CLI Cleanup:**
-- [ ] `dwim` - may no longer be necessary with 3 primitives
-- [ ] `workflow` vs `loop` - redundant? consolidate?
-- [ ] `patterns`, `git-hotspots` - slow, consider Rust port
+- [x] `dwim` CLI - REMOVED (module kept for alias resolution)
+- [x] `loop` CLI - REMOVED along with predefined loops (simple, critic, etc.)
+- [ ] `patterns`, `git-hotspots` - slow, consider removal or Rust port
 - [ ] Missing `--compact` mode on `roadmap` and other commands
+- [ ] Large file detection in `analyze --health`
 
 **Keys:** see `.env.example` for ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY
 
