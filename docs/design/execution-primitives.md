@@ -114,9 +114,37 @@ Scope(context=TaskTree) {
    - Simple cases: TOML
    - Complex nesting: Code or DSL
 
-3. **LLM in the loop** - How does "agent" fit?
-   - Agent = Loop where LLM decides next Step
-   - Uses same primitives, just dynamic control flow
+3. **LLM Decision Model** - What does the LLM return?
+
+   Current (simple): Single action string
+   ```python
+   def decide(task, context) -> str:  # "view main.py"
+   ```
+
+   Better: Structured decision with thinking and multiple actions
+   ```python
+   @dataclass
+   class Decision:
+       thinking: str | None = None  # Reasoning/scratchpad
+       actions: list[str] = field(default_factory=list)  # One or more
+       done: bool = False
+
+   def decide(task, context) -> Decision
+   ```
+
+   This enables:
+   - **Thinking**: Visible reasoning before acting
+   - **Planning**: Multiple steps at once
+   - **Parallel execution**: Independent actions run concurrently (fanout)
+
+   TOML representation:
+   ```toml
+   [workflow.llm]
+   strategy = "simple"
+   thinking = true          # Enable chain-of-thought
+   max_actions = 5          # Allow planning multiple steps
+   parallel = true          # Run independent actions concurrently
+   ```
 
 4. **DWIM** - Where does intent parsing fit?
    - Just a function: `parse_intent(text) → Step`
