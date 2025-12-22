@@ -367,9 +367,9 @@ class ActionBar(Static):
 
         return (
             f"[dim]{path_display}[/]  "
-            f"[[@click=app.primitive_view()]V[/]][b]iew[/] ({view_label})  "
-            f"[[@click=app.primitive_edit()]E[/]][b]dit[/]  "
-            f"[[@click=app.primitive_analyze()]A[/]][b]nalyze[/]"
+            f"[@click=app.primitive_view()][[V]][/][b]iew[/] ({view_label})  "
+            f"[@click=app.primitive_edit()][[E]][/][b]dit[/]  "
+            f"[@click=app.primitive_analyze()][[A]][/][b]nalyze[/]"
         )
 
 
