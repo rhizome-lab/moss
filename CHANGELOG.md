@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Bug Fixes
+
+**Test Fixes** (Dec 22 2025)
+- Fixed `TreeSitterSkeletonProvider` call in `get_symbols_at_line` (uses `from_file`)
+- Fixed `ComplexityAnalyzer.analyze` to handle absolute paths (was glob-only)
+- Fixed `SkeletonAPI.extract` to raise `FileNotFoundError` for missing files
+- Fixed Rust `passthrough` to capture output when stdout is redirected (MCP server)
+- Fixed `test_typo_correction_search` expectation ("search" alias resolves to "view")
+- Removed 4 obsolete skipped tests for consolidated CLI commands
+
 ### Features
 
 **TUI Improvements** (Dec 22 2025)

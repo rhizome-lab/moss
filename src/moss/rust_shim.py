@@ -75,10 +75,10 @@ def passthrough(subcommand: str, argv: list[str]) -> int:
     Returns:
         Exit code from Rust CLI.
     """
+    import sys
+
     binary = get_rust_binary()
     if binary is None:
-        import sys
-
         print(
             f"Rust CLI required for {subcommand}. Build with: cargo build --release",
             file=sys.stderr,
@@ -86,6 +86,17 @@ def passthrough(subcommand: str, argv: list[str]) -> int:
         return 1
 
     cmd = [str(binary), subcommand, *argv]
+
+    # Check if stdout is being redirected (e.g., StringIO for MCP server)
+    # In that case, capture output and write to the redirected stream
+    if hasattr(sys.stdout, "getvalue"):
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.stdout:
+            sys.stdout.write(result.stdout)
+        if result.stderr:
+            sys.stderr.write(result.stderr)
+        return result.returncode
+
     result = subprocess.run(cmd)
     return result.returncode
 

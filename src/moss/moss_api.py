@@ -321,10 +321,15 @@ class SkeletonAPI(PathResolvingMixin):
 
         Returns:
             List of Symbol objects representing the code structure
+
+        Raises:
+            FileNotFoundError: If the file does not exist
         """
         from moss.rust_shim import rust_available, rust_skeleton_json
 
         path = self._resolve_path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"File not found: {path}")
 
         # Try Rust CLI first (supports Python, Rust, Markdown)
         if rust_available():

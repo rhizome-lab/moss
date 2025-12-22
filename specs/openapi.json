@@ -2763,7 +2763,7 @@
     },
     "/skeleton/extract": {
       "post": {
-        "description": "Extract skeleton from a file (Python, Rust, Markdown). List of Symbol objects representing the code structure",
+        "description": "Extract skeleton from a file (Python, Rust, Markdown). List of Symbol objects representing the code structure FileNotFoundError: If the file does not exist",
         "requestBody": {
           "content": {
             "application/json": {

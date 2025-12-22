@@ -887,7 +887,7 @@ def get_symbols_at_line(file_path: Path | str, line: int) -> list[str]:
 
     try:
         source = file_path.read_text()
-        skeleton = TreeSitterSkeletonProvider()
+        skeleton = TreeSitterSkeletonProvider.from_file(file_path)
         symbols = skeleton.extract_skeleton(source)
     except (OSError, UnicodeDecodeError, RuntimeError):
         return []

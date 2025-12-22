@@ -1473,13 +1473,14 @@ class TestCorePrimitives:
             assert confidence >= 0.7
 
     def test_typo_correction_search(self):
-        """Test typo correction for 'search'."""
+        """Test typo correction for 'search' (alias for 'view')."""
         from moss.dwim import resolve_core_primitive
 
+        # "search" is an alias for "view", so typos resolve to the target "view"
         typos = ["serach", "saerch", "seach", "searh"]
         for typo in typos:
             result, confidence = resolve_core_primitive(typo)
-            assert result == "search", f"'{typo}' should resolve to 'search', got '{result}'"
+            assert result == "view", f"'{typo}' should resolve to 'view', got '{result}'"
             assert confidence >= 0.7
 
     def test_no_match_gibberish(self):

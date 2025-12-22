@@ -234,7 +234,12 @@ class ComplexityAnalyzer:
         report = ComplexityReport(root=self.root)
 
         try:
-            files = list(self.root.glob(pattern))
+            # Handle absolute paths (not globs)
+            pattern_path = Path(pattern)
+            if pattern_path.is_absolute():
+                files = [pattern_path] if pattern_path.exists() else []
+            else:
+                files = list(self.root.glob(pattern))
             # Exclude common non-source directories
             files = [f for f in files if "__pycache__" not in str(f) and ".venv" not in str(f)]
 
