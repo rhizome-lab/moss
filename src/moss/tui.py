@@ -178,7 +178,7 @@ class ExploreMode:
 
     name = "EXPLORE"
     color = "cyan"
-    placeholder = "view <path> | edit <path> | analyze [--health|--complexity|--security]"
+    placeholder = ""
 
     async def on_enter(self, app: MossTUI) -> None:
         try:
@@ -420,15 +420,12 @@ class HoverTooltip(Static):
                     ".rb": "ruby",
                 }
                 lexer = lexer_map.get(self.file_path.suffix, "text")
-                # Use theme that matches dark/light mode
-                # Note: theme is set at render time, may not perfectly sync
                 syntax = Syntax(
                     self.content,
                     lexer,
-                    theme="github-dark",
+                    theme="monokai",
                     line_numbers=False,
                     word_wrap=True,
-                    background_color="default",
                 )
                 from rich.console import Group
 
@@ -498,7 +495,6 @@ class ProjectTree(Tree[Any]):
 
         def add_dir(tree_node: TreeNode[Any], path: Path):
             try:
-                # Limit depth/count for performance
                 entries = sorted(os.listdir(path))
                 for entry in entries:
                     if entry.startswith(".") and entry != ".moss":
@@ -512,19 +508,8 @@ class ProjectTree(Tree[Any]):
                         add_dir(node, full_path)
                     else:
                         file_data = {"type": "file", "path": full_path}
-                        # Add symbols for Python files
-                        if entry.endswith(".py"):
-                            try:
-                                symbols = api.skeleton.extract(full_path)
-                                if symbols:
-                                    file_node = tree_node.add(f"📄 {entry}", data=file_data)
-                                    add_symbols(file_node, symbols, full_path)
-                                else:
-                                    tree_node.add_leaf(f"📄 {entry}", data=file_data)
-                            except (OSError, ValueError, SyntaxError):
-                                tree_node.add_leaf(f"📄 {entry}", data=file_data)
-                        else:
-                            tree_node.add_leaf(f"📄 {entry}", data=file_data)
+                        # All files are leaves - symbols loaded on expand
+                        tree_node.add_leaf(f"📄 {entry}", data=file_data)
             except OSError:
                 pass
 
@@ -1300,7 +1285,7 @@ class MossTUI(App):
                     # Format symbols as skeleton with syntax highlighting
                     symbols = result.content.get("symbols", [])
                     line_count = result.content.get("line_count", "?")
-                    explore_detail.write(f"[dim]Lines: {line_count}[/]\n\n")
+                    explore_header.update(f"{result.target} ({line_count} lines)")
                     if symbols:
                         skeleton = self._format_symbols_skeleton(symbols)
                         lexer = self._get_lexer_for_path(target)
@@ -1311,7 +1296,6 @@ class MossTUI(App):
                                 skeleton,
                                 lexer,
                                 theme=self._get_syntax_theme(),
-                                background_color="default",
                             )
                             explore_detail.write(syntax)
                         else:
@@ -1332,7 +1316,6 @@ class MossTUI(App):
                                 source,
                                 lexer,
                                 theme=self._get_syntax_theme(),
-                                background_color="default",
                             )
                             explore_detail.write(syntax)
                         else:
