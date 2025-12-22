@@ -12,6 +12,10 @@
   - Tracks failures by normalized operation key (verb:target)
   - `retry_threshold` config (default: 3 failures before fallback)
   - `FallbackStrategy`: SKIP (continue), REPORT (exit), ALTERNATIVE (suggest)
+- Rust shim input validation to prevent OS errors:
+  - `MAX_CMD_LENGTH` (100KB) check prevents "Argument list too long" errors
+  - `MAX_SYMBOLS_PER_REQUEST` (20) truncates multi-symbol view requests
+  - Handles LLM hallucination of many fake symbol names gracefully
 
 **Telemetry Enhancements & Analyze Filters** (Dec 22 2025)
 - Added `--kind` filter to `moss analyze` command (filter by function/method, avoids `-t` conflict)
