@@ -511,8 +511,30 @@ class ProjectTree(Tree[Any]):
                         add_dir(node, full_path)
                     else:
                         file_data = {"type": "file", "path": full_path, "loaded": False}
-                        # Python and markdown files are expandable (symbols loaded on expand)
-                        if entry.endswith(".py") or entry.endswith(".md"):
+                        # Code files are expandable (symbols loaded on expand)
+                        expandable_exts = (
+                            ".py",
+                            ".rs",
+                            ".md",
+                            ".js",
+                            ".mjs",
+                            ".cjs",
+                            ".jsx",
+                            ".ts",
+                            ".mts",
+                            ".cts",
+                            ".tsx",
+                            ".go",
+                            ".java",
+                            ".c",
+                            ".h",
+                            ".cpp",
+                            ".cc",
+                            ".hpp",
+                            ".rb",
+                            ".sh",
+                        )
+                        if entry.endswith(expandable_exts):
                             tree_node.add(f"📄 {entry}", data=file_data)
                         else:
                             # Add padding to align with expandable items (▶ is 2 chars)
@@ -553,8 +575,39 @@ class ProjectTree(Tree[Any]):
                     # Add padding to align with expandable items
                     tree_node.add_leaf(f"  {label}", data=sym_data)
 
-        # Use unified skeleton API for all supported file types (Python, Rust, Markdown)
-        if self._api and path.suffix in (".py", ".rs", ".md"):
+        # Use unified skeleton API for all supported file types
+        supported_exts = (
+            ".py",
+            ".rs",
+            ".md",  # original
+            ".js",
+            ".mjs",
+            ".cjs",
+            ".jsx",  # JavaScript
+            ".ts",
+            ".mts",
+            ".cts",
+            ".tsx",  # TypeScript
+            ".go",  # Go
+            ".java",  # Java
+            ".c",
+            ".h",  # C
+            ".cpp",
+            ".cc",
+            ".cxx",
+            ".hpp",  # C++
+            ".rb",  # Ruby
+            ".sh",
+            ".bash",  # Bash
+            ".json",
+            ".yaml",
+            ".yml",  # Data formats
+            ".html",
+            ".htm",
+            ".css",  # Web
+            ".toml",  # Config
+        )
+        if self._api and path.suffix in supported_exts:
             try:
                 symbols = self._api.skeleton.extract(path)
                 if symbols:
@@ -1038,6 +1091,10 @@ class MossTUI(App):
             tooltip.file_path = None
             tooltip.content = ""
 
+        # Auto-update preview on arrow navigation in EXPLORE mode
+        if self.current_mode_name == "EXPLORE" and data["type"] in ("file", "symbol"):
+            self.action_primitive_view()
+
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         """Handle tree node selection (click/enter)."""
         data = event.node.data
@@ -1463,7 +1520,27 @@ class MossTUI(App):
                         else:
                             explore_detail.write(skeleton)
                     else:
-                        explore_detail.write("[dim](no symbols)[/]")
+                        # No symbols - show the full file content
+                        from pathlib import Path
+
+                        try:
+                            content = Path(target).read_text(errors="replace")
+                            lexer = self._get_lexer_for_path(target)
+                            if lexer:
+                                from rich.syntax import Syntax
+
+                                syntax = Syntax(
+                                    content,
+                                    lexer,
+                                    theme=self._get_syntax_theme(),
+                                    background_color=self._get_syntax_bg(),
+                                    line_numbers=True,
+                                )
+                                explore_detail.write(syntax)
+                            else:
+                                explore_detail.write(content)
+                        except (OSError, UnicodeDecodeError):
+                            explore_detail.write("[dim](unable to read file)[/]")
                 else:  # symbol
                     source = result.content.get("source", "")
                     if source:

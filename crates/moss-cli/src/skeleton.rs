@@ -1369,4 +1369,38 @@ More content.
             all_names
         );
     }
+
+    #[test]
+    fn test_javascript_skeleton() {
+        let mut extractor = SkeletonExtractor::new();
+        let content = r#"function greet(name) {
+  console.log("Hello, " + name);
+}
+
+class Greeter {
+  constructor(name) { this.name = name; }
+  greet() { console.log("Hello, " + this.name); }
+}
+"#;
+        let result = extractor.extract(&PathBuf::from("test.js"), content);
+
+        // Should have function and class
+        assert_eq!(result.symbols.len(), 2, "Should have 2 top-level symbols");
+
+        let greet_fn = &result.symbols[0];
+        assert_eq!(greet_fn.name, "greet");
+        assert_eq!(greet_fn.kind, "function");
+
+        let greeter = &result.symbols[1];
+        assert_eq!(greeter.name, "Greeter");
+        assert_eq!(greeter.kind, "class");
+
+        // Class should have 2 methods: constructor and greet
+        assert_eq!(
+            greeter.children.len(),
+            2,
+            "Greeter class should have 2 methods, got {:?}",
+            greeter.children
+        );
+    }
 }
