@@ -84,7 +84,7 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [x] Data file key extraction: JSON/YAML/TOML keys become symbols (objects=class, values=variable)
 
 **Explore TUI Polish:**
-- [ ] `.moss` folder: don't create automatically (most repos don't have it gitignored)
+- [ ] `.moss` index: support optional external location (not all repos have `.moss` gitignored)
 - [ ] Terminal output sanitization: reset terminal state after nested command output (escape codes leak through)
 
 **Explore TUI Keybinds:**
