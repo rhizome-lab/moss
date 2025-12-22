@@ -462,6 +462,8 @@ class ProjectTree(Tree[Any]):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._api: MossAPI | None = None
+        self._tree_root: Path | None = None
+        self._git_files: set[str] = set()
         self.guide_depth = 2  # Minimal indentation
 
     def update_from_tasks(self, task_tree: TaskTree) -> None:
@@ -504,61 +506,80 @@ class ProjectTree(Tree[Any]):
         ".rb",
         ".sh",
     )
-    # Directories to skip
-    SKIP_DIRS: ClassVar[set[str]] = {
-        "__pycache__",
-        "node_modules",
-        "target",
-        ".git",
-        ".venv",
-        "venv",
-        "dist",
-        "build",
-    }
 
     def update_from_files(self, api: MossAPI, tree_root: Path | None = None) -> None:
         """Update tree from filesystem with lazy loading.
 
-        Only loads immediate children of the root directory.
-        Subdirectories are loaded on expand via on_tree_node_expanded.
+        Uses git ls-files to respect .gitignore. Only loads immediate children
+        of the root directory; subdirectories load on expand.
         """
         self._api = api
+        self._tree_root = tree_root or api.root
+        self._git_files: set[str] = self._get_git_files(self._tree_root)
         self.clear()
         root = self.root
-        tree_root = tree_root or api.root
-        root.label = f"[b]Files: {tree_root.name}[/b]"
-        root.data = {"type": "dir", "path": tree_root, "loaded": True}
+        root.label = f"[b]Files: {self._tree_root.name}[/b]"
+        root.data = {"type": "dir", "path": self._tree_root, "loaded": True}
 
         # Only load immediate children of root
-        self._load_dir_children(root, tree_root)
+        self._load_dir_children(root, self._tree_root)
         root.expand()
+
+    def _get_git_files(self, root: Path) -> set[str]:
+        """Get all files respecting .gitignore via git ls-files."""
+        import subprocess
+
+        try:
+            result = subprocess.run(
+                ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return set(result.stdout.strip().split("\n")) if result.stdout.strip() else set()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return set()  # Not a git repo or git not available
 
     def _load_dir_children(self, tree_node: TreeNode[Any], path: Path) -> None:
         """Load immediate children of a directory into tree node."""
-        import os
-
+        # Get relative path from tree root
         try:
-            entries = sorted(os.listdir(path))
-        except OSError:
+            rel_path = path.relative_to(self._tree_root)
+            prefix = str(rel_path) + "/" if str(rel_path) != "." else ""
+        except ValueError:
             return
 
-        for entry in entries:
-            if entry.startswith(".") and entry != ".moss":
+        # Find immediate children from git files
+        children: dict[str, bool] = {}  # name -> is_dir
+        for f in self._git_files:
+            if not f.startswith(prefix):
                 continue
+            rest = f[len(prefix) :]
+            if "/" in rest:
+                # It's in a subdirectory
+                dir_name = rest.split("/")[0]
+                if dir_name and not dir_name.startswith("."):
+                    children[dir_name] = True  # is_dir
+            elif rest and not rest.startswith("."):
+                children[rest] = False  # is_file
 
+        # Add nodes sorted: directories first, then files
+        dirs = sorted(k for k, is_dir in children.items() if is_dir)
+        files = sorted(k for k, is_dir in children.items() if not is_dir)
+
+        for entry in dirs:
             full_path = path / entry
-            if full_path.is_dir():
-                if entry in self.SKIP_DIRS:
-                    continue
-                # Mark as not loaded - will load children on expand
-                data = {"type": "dir", "path": full_path, "loaded": False}
-                tree_node.add(f"📁 {entry}", data=data)
+            data = {"type": "dir", "path": full_path, "loaded": False}
+            tree_node.add(f"📁 {entry}", data=data)
+
+        for entry in files:
+            full_path = path / entry
+            file_data = {"type": "file", "path": full_path, "loaded": False}
+            if entry.endswith(self.EXPANDABLE_EXTS):
+                tree_node.add(f"📄 {entry}", data=file_data)
             else:
-                file_data = {"type": "file", "path": full_path, "loaded": False}
-                if entry.endswith(self.EXPANDABLE_EXTS):
-                    tree_node.add(f"📄 {entry}", data=file_data)
-                else:
-                    tree_node.add_leaf(f"  📄 {entry}", data=file_data)
+                tree_node.add_leaf(f"  📄 {entry}", data=file_data)
 
     def on_tree_node_expanded(self, event: Tree.NodeExpanded) -> None:
         """Load children lazily when a node is expanded."""

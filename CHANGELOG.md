@@ -7,7 +7,7 @@
 **Explore TUI Instant Startup** (Dec 22 2025)
 - Fixed slow startup on large repos (was scanning ~100k files upfront)
 - Directories now lazy-load children on expand (same as symbols)
-- Added more skip dirs: `.venv`, `venv`, `dist`, `build`
+- Uses `git ls-files` to respect `.gitignore` (no more hardcoded skip dirs)
 
 **Reindexing 20x Faster** (Dec 22 2025)
 - Fixed redundant parsing: `find_callees_for_symbol` takes pre-parsed Symbol
