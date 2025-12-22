@@ -69,10 +69,13 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [ ] Selective import resolution (e.g., `--fisheye=moss.config` to expand only that import)
 
 **Dogfooding Notes (Dec 23):**
-- `--types-only` works well for architectural overview
+- `--types-only` works well for architectural overview (Python and Rust both work)
 - `--fisheye` resolves Python imports and shows imported module skeletons
 - Combined flags (`--types-only --fisheye`) give compact architectural map
 - Updated dwim.toml system prompt to mention new flags
+- Fisheye on Rust files shows normal skeleton (no import resolution - expected, Python-only)
+- Edge case: fuzzy path resolution works (e.g., `view framework.py` finds synthesis/framework.py)
+- Bug FIXED: `workflow list` was looking in cli/workflows not moss/workflows (fixed path)
 
 **Architecture Cleanup:**
 - [x] Consolidate redundant layers discovered Dec 22:

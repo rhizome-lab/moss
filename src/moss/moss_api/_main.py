@@ -3682,7 +3682,7 @@ class AgentAPI:
         from moss.execution import NoLLM, agent_loop, load_workflow
 
         # Load dwim workflow
-        dwim_toml = Path(__file__).parent / "workflows" / "dwim.toml"
+        dwim_toml = Path(__file__).parent.parent / "workflows" / "dwim.toml"
         config = load_workflow(str(dwim_toml))
 
         if mock and config.llm:

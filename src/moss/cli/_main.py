@@ -3222,7 +3222,7 @@ def cmd_workflow(args: Namespace) -> int:
     project_root = Path(getattr(args, "directory", ".")).resolve()
 
     # Workflow directories
-    builtin_dir = Path(__file__).parent / "workflows"
+    builtin_dir = Path(__file__).parent.parent / "workflows"
     user_dir = project_root / ".moss" / "workflows"
 
     def find_workflow(name: str) -> Path | None:
@@ -3360,7 +3360,7 @@ def cmd_workflow(args: Namespace) -> int:
         workflow_path = None
         search_paths = [
             project_root / ".moss" / "workflows" / f"{name}.toml",
-            Path(__file__).parent / "workflows" / f"{name}.toml",
+            Path(__file__).parent.parent / "workflows" / f"{name}.toml",
         ]
         for p in search_paths:
             if p.exists():
@@ -3537,7 +3537,7 @@ def cmd_agent(args: Namespace) -> int:
         return 1
 
     # Load dwim workflow
-    dwim_toml = Path(__file__).parent / "workflows" / "dwim.toml"
+    dwim_toml = Path(__file__).parent.parent / "workflows" / "dwim.toml"
     if not dwim_toml.exists():
         output.error("dwim.toml workflow not found")
         return 1
