@@ -99,14 +99,19 @@ class DocCheckResult:
             parts.append(", ".join(issue_parts))
         return " | ".join(parts)
 
-    def to_markdown(self) -> str:
+    def to_markdown(self, limit: int | None = None) -> str:
+        """Format as markdown.
+
+        Args:
+            limit: Maximum issues to show per category. None for all.
+        """
         lines = ["# Documentation Check Results", ""]
 
-        # Stats
+        # Stats (no bold, compact)
         doc, found = self.modules_documented, self.modules_found
-        lines.append(f"**Coverage:** {self.coverage:.0%} ({doc}/{found} modules)")
-        lines.append(f"**Docs checked:** {self.docs_checked}")
-        lines.append(f"**Issues:** {self.error_count} errors, {self.warning_count} warnings")
+        lines.append(f"Coverage: {self.coverage:.0%} ({doc}/{found} modules)")
+        errs, warns = self.error_count, self.warning_count
+        lines.append(f"Docs: {self.docs_checked} | Issues: {errs} errors, {warns} warnings")
         lines.append("")
 
         if not self.issues:
@@ -118,22 +123,48 @@ class DocCheckResult:
         for issue in self.issues:
             by_category.setdefault(issue.category, []).append(issue)
 
+        # Map category to informative heading
+        headings = {
+            "missing": "Missing Documentation (modules not mentioned in docs)",
+            "stale": "Stale References (in docs but not in code)",
+        }
+
         for category, issues in sorted(by_category.items()):
-            lines.append(f"## {category.title()}")
+            heading = headings.get(category, category.title())
+            lines.append(f"## {heading}")
             lines.append("")
-            for issue in issues:
-                if issue.severity == "error":
-                    icon = "[!]"
-                elif issue.severity == "warning":
-                    icon = "[?]"
-                else:
-                    icon = "[i]"
-                lines.append(f"- {icon} {issue.message}")
-                if issue.file:
-                    loc = f"`{issue.file}`:{issue.line}" if issue.line else f"`{issue.file}`"
-                    lines.append(f"  - File: {loc}")
-                if issue.suggestion:
-                    lines.append(f"  - Suggestion: {issue.suggestion}")
+
+            if category == "stale":
+                # Group stale references by file, include line numbers
+                by_file: dict[Path, list[DocIssue]] = {}
+                for issue in issues:
+                    if issue.file:
+                        by_file.setdefault(issue.file, []).append(issue)
+                    else:
+                        by_file.setdefault(None, []).append(issue)
+
+                files_shown = 0
+                for file, file_issues in by_file.items():
+                    if limit and files_shown >= limit:
+                        remaining = len(by_file) - files_shown
+                        lines.append(f"- ... and {remaining} more files")
+                        break
+                    files_shown += 1
+                    # Format: ref @L123, ref2 @L456
+                    refs = ", ".join(
+                        f"{i.message} @L{i.line}" if i.line else i.message for i in file_issues
+                    )
+                    if file:
+                        lines.append(f"- {file}: {refs}")
+                    else:
+                        lines.append(f"- {refs}")
+            else:
+                # For missing: just list module names
+                shown = issues[:limit] if limit else issues
+                for issue in shown:
+                    lines.append(f"- {issue.message}")
+                if limit and len(issues) > limit:
+                    lines.append(f"- ... and {len(issues) - limit} more")
             lines.append("")
 
         return "\n".join(lines)
@@ -178,7 +209,7 @@ class DocChecker:
                         DocIssue(
                             severity="warning",
                             category="stale",
-                            message=f"Reference to `{ref}` not found in codebase",
+                            message=ref,
                             file=doc_file,
                             line=line,
                             suggestion=f"Remove or update reference to `{ref}`",
@@ -205,7 +236,7 @@ class DocChecker:
                     DocIssue(
                         severity="info",
                         category="missing",
-                        message=f"Module `{module}` not mentioned in documentation",
+                        message=module,
                         suggestion=f"Add documentation for `{module}`",
                     )
                 )

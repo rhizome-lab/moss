@@ -1435,10 +1435,11 @@ class TestCorePrimitives:
         """Test aliases resolve to 'search'."""
         from moss.dwim import resolve_core_primitive
 
-        aliases = ["find", "grep", "query", "locate", "lookup"]
+        # Note: search aliases now fold into view (search is done via view with filters)
+        aliases = ["find", "grep", "query", "locate", "lookup", "search"]
         for alias in aliases:
             result, confidence = resolve_core_primitive(alias)
-            assert result == "search", f"'{alias}' should resolve to 'search', got '{result}'"
+            assert result == "view", f"'{alias}' should resolve to 'view', got '{result}'"
             assert confidence == 1.0
 
     def test_typo_correction_view(self):

@@ -669,12 +669,58 @@ class ProjectTree(Tree[Any]):
             tree_node.allow_expand = False
 
 
+class PathSuggester:
+    """Suggester that provides path completions relative to project root.
+
+    Inherits from Textual's Suggester to provide tab completion for paths.
+    """
+
+    def __init__(self, root: Path, case_sensitive: bool = True):
+        self.root = root
+        self.case_sensitive = case_sensitive
+
+    async def get_suggestion(self, value: str) -> str | None:
+        """Get path completion suggestion."""
+        if not value:
+            return None
+
+        # Extract path portion from command (e.g., "view src/fo" -> "src/fo")
+        parts = value.split()
+        if len(parts) >= 2:
+            path_part = parts[-1]
+        else:
+            path_part = value
+
+        # Try to find matching paths
+        try:
+            target_path = self.root / path_part
+            parent = target_path.parent
+            prefix = target_path.name
+
+            if parent.exists() and parent.is_dir():
+                for item in parent.iterdir():
+                    if item.name.startswith(prefix) and item.name != prefix:
+                        # Return full command with completed path
+                        rel_path = item.relative_to(self.root)
+                        if len(parts) >= 2:
+                            return " ".join(parts[:-1]) + " " + str(rel_path)
+                        return str(rel_path)
+        except (OSError, ValueError):
+            pass
+
+        return None
+
+
 class MossTUI(App):
     """The main Moss TUI application."""
 
     CSS = """
     Screen {
         background: $surface;
+    }
+
+    Screen.transparent {
+        background: transparent;
     }
 
     #main-container {
@@ -688,10 +734,26 @@ class MossTUI(App):
         background: $surface-darken-1;
     }
 
+    .transparent #sidebar {
+        background: transparent 50%;
+    }
+
     #breadcrumb {
         height: auto;
         padding: 0 1;
         background: $surface-darken-2;
+    }
+
+    .transparent #breadcrumb {
+        background: transparent 30%;
+    }
+
+    .transparent #explore-header {
+        background: transparent 30%;
+    }
+
+    .transparent HoverTooltip {
+        background: transparent 50%;
     }
 
     #content-area {
@@ -786,8 +848,11 @@ class MossTUI(App):
         padding-left: 0;
     }
 
-    CommandPalette Input {
+    CommandPalette > #--container > #--input {
         height: 3;
+    }
+
+    CommandPalette CommandInput {
         border: none;
     }
     """
@@ -925,7 +990,11 @@ class MossTUI(App):
                 id="main-container",
             ),
             # ActionBar removed - actions shown in footer bindings
-            Input(placeholder="Enter command...", id="command-input"),
+            Input(
+                placeholder="Enter command...",
+                id="command-input",
+                suggester=PathSuggester(self.api.root),
+            ),
             HoverTooltip(id="hover-tooltip"),
         )
         yield KeybindBar()
@@ -939,8 +1008,9 @@ class MossTUI(App):
         # Track selected node for action bar
         self._selected_path: str = ""
         self._selected_type: str = ""
-        # Load theme preference
+        # Load theme preference and apply transparency
         self._load_settings()
+        self._apply_transparency()
 
         # Subscribe to tool calls to show resources
         from moss.events import Event, EventType
@@ -1238,8 +1308,17 @@ class MossTUI(App):
         """Toggle transparent background for terminal opacity support."""
         self._transparent_bg = not getattr(self, "_transparent_bg", False)
         self._save_settings()
+        self._apply_transparency()
         status = "enabled" if self._transparent_bg else "disabled"
         self._log(f"Transparent background {status}")
+
+    def _apply_transparency(self) -> None:
+        """Apply transparency setting to UI."""
+        screen = self.screen
+        if self._transparent_bg:
+            screen.add_class("transparent")
+        else:
+            screen.remove_class("transparent")
 
     def get_system_commands(self, screen):
         """Add custom commands to the command palette."""
@@ -1586,6 +1665,14 @@ class MossTUI(App):
             if primitive == "view":
                 api = ViewAPI(self.api.root)
                 result = api.view(target=target, depth=kwargs.get("depth", 1))
+
+                # Handle failed resolution
+                if result.kind == "unknown":
+                    explore_header.update(f"Not found: {target}")
+                    explore_detail.write(f"[yellow]Could not resolve: {target}[/]\n")
+                    explore_detail.write("[dim]Check path or try 'view .'[/]")
+                    return
+
                 explore_header.update(f"VIEW: {result.target} ({result.kind})")
 
                 # Format content based on kind
@@ -1711,9 +1798,17 @@ class MossTUI(App):
                         msg = f.get("message", "")
                         explore_detail.write(f"  [[{sev}]] {msg}\n")
 
+        except RuntimeError as e:
+            # Rust CLI not available or failed to start
+            explore_header.update(f"Error: {primitive}")
+            explore_detail.write(f"[red]Rust CLI error: {e}[/]\n")
+            explore_detail.write("[dim]Ensure moss is built: cargo build --release[/]")
+        except (OSError, FileNotFoundError) as e:
+            explore_header.update(f"Error: {primitive}")
+            explore_detail.write(f"[red]File error: {e}[/]")
         except Exception as e:
             explore_header.update(f"Error: {primitive}")
-            explore_detail.write(f"[red]{e}[/]")
+            explore_detail.write(f"[red]{type(e).__name__}: {e}[/]")
 
     def _log(self, message: str) -> None:
         """Add a message to the log view."""

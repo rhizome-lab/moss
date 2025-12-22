@@ -58,7 +58,6 @@ class MossShell:
             "context": self.cmd_context,
             "anchors": self.cmd_anchors,
             "complexity": self.cmd_complexity,
-            "health": self.cmd_health,
             "tree": self.cmd_tree,
         }
 

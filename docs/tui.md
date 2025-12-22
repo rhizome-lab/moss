@@ -40,6 +40,7 @@ Textual uses Rich markup but with its own escaping rules:
 - Add custom commands via `get_system_commands(self, screen)` method
 - Yields `SystemCommand(title, help, callback)` from `textual.app`
 - NOT `DiscoveryHit` - that's for search providers
+- CSS selectors: `CommandInput` (not `Input`), `#--container`, `#--input`, `#--results`
 
 ## Markdown Files
 

@@ -5692,6 +5692,9 @@ def _cmd_analyze_python(argv: list[str]) -> int:
     parser.add_argument("--compact", action="store_true", help="Compact output")
     parser.add_argument("--strict", action="store_true", help="Strict mode (exit 1 on warnings)")
     parser.add_argument("--check-links", action="store_true", help="Check doc links")
+    parser.add_argument("--limit", type=int, default=10, help="Max items per section (default: 10)")
+    parser.add_argument("--all", action="store_true", help="Show all items (override --limit)")
+    parser.add_argument("--changed", action="store_true", help="Only check git-modified files")
     args = parser.parse_args(argv)
 
     root = Path(args.target).resolve()
@@ -5722,14 +5725,46 @@ def _cmd_analyze_python(argv: list[str]) -> int:
             print(result.to_markdown())
         return 0
 
+    # Determine limit: None if --all, otherwise use --limit value
+    limit = None if getattr(args, "all", False) else args.limit
+
+    # Get git-changed files if --changed flag is set
+    changed_files: set[str] | None = None
+    if args.changed:
+        import subprocess
+
+        try:
+            # Get modified files (staged + unstaged + untracked)
+            result_git = subprocess.run(
+                ["git", "status", "--porcelain"],
+                capture_output=True,
+                text=True,
+                cwd=root,
+            )
+            if result_git.returncode == 0:
+                changed_files = set()
+                for line in result_git.stdout.splitlines():
+                    if len(line) > 3:
+                        # Extract path from git status output (format: "XY filename")
+                        path = line[3:].strip()
+                        # Handle renamed files
+                        if " -> " in path:
+                            path = path.split(" -> ")[1]
+                        changed_files.add(str(root / path))
+        except (subprocess.SubprocessError, OSError):
+            pass
+
     if args.check_docs:
         result = api.health.check_docs(check_links=args.check_links)
+        # Filter to changed files if requested
+        if changed_files is not None:
+            result.issues = [i for i in result.issues if i.file and str(i.file) in changed_files]
         if args.json:
             print(json.dumps(result.to_dict(), indent=2))
         elif args.compact:
             print(result.to_compact())
         else:
-            print(result.to_markdown())
+            print(result.to_markdown(limit=limit))
         if result.has_errors:
             return 1
         if args.strict and result.has_warnings:
@@ -5738,12 +5773,17 @@ def _cmd_analyze_python(argv: list[str]) -> int:
 
     if args.check_todos:
         result = api.health.check_todos()
+        # Filter to changed files if requested
+        if changed_files is not None:
+            result.code_todos = [
+                t for t in result.code_todos if str(root / t.source) in changed_files
+            ]
         if args.json:
             print(json.dumps(result.to_dict(), indent=2))
         elif args.compact:
             print(result.to_compact())
         else:
-            print(result.to_markdown())
+            print(result.to_markdown(limit=limit))
         if args.strict and result.orphan_count > 0:
             return 1
         return 0

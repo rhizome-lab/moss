@@ -100,7 +100,12 @@ class TodoCheckResult:
             parts.append(", ".join(issues))
         return " | ".join(parts)
 
-    def to_markdown(self) -> str:
+    def to_markdown(self, limit: int | None = None) -> str:
+        """Format as markdown.
+
+        Args:
+            limit: Maximum items to show per section. None for all.
+        """
         lines = ["# TODO Check Results", ""]
 
         # Stats
@@ -119,10 +124,13 @@ class TodoCheckResult:
             lines.append("")
             lines.append("Items marked done in TODO.md but still have TODOs in code:")
             lines.append("")
-            for item in self.tracked_items:
-                if item.status == TodoStatus.STALE:
-                    lines.append(f"- [ ] {item.text}")
-                    lines.append(f"  - Source: {item.source}:{item.line}")
+            stale_items = [i for i in self.tracked_items if i.status == TodoStatus.STALE]
+            shown = stale_items[:limit] if limit else stale_items
+            for item in shown:
+                lines.append(f"- [ ] {item.text}")
+                lines.append(f"  - Source: {item.source}:{item.line}")
+            if limit and len(stale_items) > limit:
+                lines.append(f"- ... and {len(stale_items) - limit} more")
             lines.append("")
 
         # Orphaned TODOs
@@ -131,10 +139,13 @@ class TodoCheckResult:
             lines.append("")
             lines.append("TODOs in code not tracked in TODO.md:")
             lines.append("")
-            for item in self.code_todos:
-                if item.status == TodoStatus.ORPHAN:
-                    lines.append(f"- {item.marker}: {item.text}")
-                    lines.append(f"  - File: `{item.source}`:{item.line}")
+            orphan_items = [i for i in self.code_todos if i.status == TodoStatus.ORPHAN]
+            shown = orphan_items[:limit] if limit else orphan_items
+            for item in shown:
+                lines.append(f"- {item.marker}: {item.text}")
+                lines.append(f"  - File: `{item.source}`:{item.line}")
+            if limit and len(orphan_items) > limit:
+                lines.append(f"- ... and {len(orphan_items) - limit} more")
             lines.append("")
 
         # Summary by category
