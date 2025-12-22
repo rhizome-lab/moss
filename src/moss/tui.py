@@ -358,15 +358,21 @@ class KeybindBar(Static):
 
     def render(self) -> str:
         binds = [
-            "[u]Q[/u]uit",
-            "[u]T[/u]heme",
-            "[u]V[/u]iew",
-            "[u]E[/u]dit",
-            "[u]A[/u]nalyze",
-            "[dim]-[/dim]Up",
-            "[dim]/[/dim]Cmd",
+            "[@click=app.quit][u]Q[/u]uit[/]",
+            "[@click=app.toggle_dark][u]T[/u]heme[/]",
+            "[@click=app.primitive_view][u]V[/u]iew[/]",
+            "[@click=app.primitive_edit][u]E[/u]dit[/]",
+            "[@click=app.primitive_analyze][u]A[/u]nalyze[/]",
+            "[@click=app.cd_up][dim]-[/dim]Up[/]",
+            "[@click=app.toggle_command][dim]/[/dim]Cmd[/]",
         ]
-        return "  ".join(binds)
+        left = "  ".join(binds)
+        right = "[@click=app.action_command_palette][dim]Ctrl+P[/dim] Palette[/]"
+        # Pad to push palette right
+        width = self.size.width if self.size.width > 0 else 80
+        left_len = 45  # approximate
+        padding = max(1, width - left_len - 15)
+        return f"{left}{' ' * padding}{right}"
 
 
 class Breadcrumb(Static):
