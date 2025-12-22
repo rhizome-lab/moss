@@ -1094,9 +1094,9 @@ class MossTUI(App):
             path = data["path"]
             self._selected_path = str(path)
             self._selected_type = "dir"
-            # Just select - use Enter again or cd command to navigate
+            # Navigate into directory on select
             if self.current_mode_name == "EXPLORE":
-                self.action_primitive_view()
+                self.cd_to(str(path))
         elif data["type"] == "symbol":
             symbol = data["symbol"]
             path = data["path"]
