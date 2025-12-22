@@ -373,6 +373,20 @@ class ActionBar(Static):
         )
 
 
+class Breadcrumb(Static):
+    """Breadcrumb navigation showing path from project root."""
+
+    path_parts: reactive[list[tuple[str, Path]]] = reactive(list)
+
+    def render(self) -> str:
+        if not self.path_parts:
+            return "[dim]/ (project root)[/]"
+        parts = []
+        for name, path in self.path_parts:
+            parts.append(f"[@click=app.cd_to('{path}')]{name}[/]")
+        return "[dim]/[/] " + " [dim]/[/] ".join(parts)
+
+
 class HoverTooltip(Static):
     """Tooltip displayed when a node is highlighted."""
 
@@ -439,10 +453,17 @@ class ProjectTree(Tree[Any]):
             new_node = tree_node.add(label, expand=True, data={"type": "task", "node": child})
             self._add_task_nodes(new_node, child)
 
-    def update_from_files(self, api: MossAPI) -> None:
+    def update_from_files(self, api: MossAPI, tree_root: Path | None = None) -> None:
+        """Update tree from filesystem.
+
+        Args:
+            api: The MossAPI instance
+            tree_root: Root directory to show (defaults to api.root)
+        """
         self.clear()
         root = self.root
-        root.label = f"[b]Files: {api.root.name}[/b]"
+        tree_root = tree_root or api.root
+        root.label = f"[b]Files: {tree_root.name}[/b]"
 
         # Symbol kind icons
         kind_icons = {
@@ -500,7 +521,7 @@ class ProjectTree(Tree[Any]):
             except OSError:
                 pass
 
-        add_dir(root, api.root)
+        add_dir(root, tree_root)
         root.expand()
 
 
@@ -525,6 +546,12 @@ class MossTUI(App):
         height: 1fr;
         border-right: tall $primary;
         background: $surface-darken-1;
+    }
+
+    #breadcrumb {
+        height: auto;
+        padding: 0 1;
+        background: $surface-darken-2;
     }
 
     #content-area {
@@ -613,6 +640,7 @@ class MossTUI(App):
         ("h", "toggle_tooltip", "Toggle Tooltip"),
         ("v", "primitive_view", "View"),
         ("e", "primitive_edit", "Edit"),
+        ("minus", "cd_up", "Go Up"),
         ("a", "primitive_analyze", "Analyze"),
     ]
 
@@ -624,6 +652,7 @@ class MossTUI(App):
         self._task_tree: TaskTree | None = None
         self._mode_registry = ModeRegistry()
         self._last_ctrl_c: float = 0
+        self._tree_root: Path = api.root  # Current root for file tree
 
     def action_handle_ctrl_c(self) -> None:
         """Handle Ctrl+C with double-tap to exit."""
@@ -646,6 +675,7 @@ class MossTUI(App):
             Horizontal(
                 Vertical(
                     Static("Navigation", id="sidebar-header"),
+                    Breadcrumb(id="breadcrumb"),
                     ProjectTree("Project", id="project-tree"),
                     id="sidebar",
                 ),
@@ -777,7 +807,37 @@ class MossTUI(App):
         if tree_type == "task" and self._task_tree:
             tree.update_from_tasks(self._task_tree)
         else:
-            tree.update_from_files(self.api)
+            tree.update_from_files(self.api, self._tree_root)
+        self._update_breadcrumb()
+
+    def _update_breadcrumb(self) -> None:
+        """Update breadcrumb to reflect current tree root."""
+        breadcrumb = self.query_one("#breadcrumb", Breadcrumb)
+        if self._tree_root == self.api.root:
+            breadcrumb.path_parts = []
+        else:
+            # Build path parts from project root to current
+            parts = []
+            current = self._tree_root
+            while current != self.api.root and current != current.parent:
+                parts.insert(0, (current.name, current))
+                current = current.parent
+            breadcrumb.path_parts = parts
+
+    def cd_to(self, path: str) -> None:
+        """Navigate to a specific directory."""
+        target = Path(path)
+        if target.is_dir():
+            self._tree_root = target
+            self._update_tree("file")
+            self._log(f"Changed to: {target.name}")
+
+    def action_cd_up(self) -> None:
+        """Navigate up one directory."""
+        if self._tree_root != self.api.root:
+            self._tree_root = self._tree_root.parent
+            self._update_tree("file")
+            self._log(f"Changed to: {self._tree_root.name}")
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
         """Handle node highlight (hover/selection movement)."""
@@ -874,7 +934,8 @@ class MossTUI(App):
             self._selected_path = str(path)
             self._selected_type = "dir"
             if self.current_mode_name == "EXPLORE":
-                self.action_primitive_view()
+                # Navigate into directory on select
+                self.cd_to(str(path))
         elif data["type"] == "symbol":
             symbol = data["symbol"]
             path = data["path"]
@@ -1029,6 +1090,17 @@ class MossTUI(App):
                 elif arg in ("--security", "-s"):
                     flags["security"] = True
             self._execute_primitive("analyze", target, **flags)
+        elif cmd == "cd":
+            if not args or args[0] == "..":
+                self.action_cd_up()
+            else:
+                target_path = Path(args[0])
+                if not target_path.is_absolute():
+                    target_path = self._tree_root / args[0]
+                if target_path.is_dir():
+                    self.cd_to(str(target_path))
+                else:
+                    self._log(f"[red]Not a directory: {args[0]}[/]")
         else:
             # Try as implicit view (just a path)
             self._selected_path = command
