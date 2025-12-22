@@ -32,6 +32,8 @@ strategy = "simple"
 model = "gemini/gemini-2.0-flash"
 system_prompt = """Commands:
 - view [path] - tree, file skeleton, or symbol (e.g. view cli.py/func)
+  - --types-only: show only types (class, struct, enum) for architectural overview
+  - --fisheye: show file + imported module skeletons
 - edit <file> "task" - LLM edit (-s SYMBOL to target function/class)
 - analyze [--health|--complexity|--security] [-t N]
 - done

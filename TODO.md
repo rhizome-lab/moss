@@ -65,6 +65,14 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [ ] `--visibility public|all` or `--exported` filter for semantic zoom
 - [ ] Barrel file hoisting: detect `export * from` and surface re-exported symbols
 - [ ] Useless docstring detection: skip "Sets the user id" on `setUserId()`
+- [ ] Fisheye for Rust/TypeScript (currently Python-only import resolution)
+- [ ] Selective import resolution (e.g., `--fisheye=moss.config` to expand only that import)
+
+**Dogfooding Notes (Dec 23):**
+- `--types-only` works well for architectural overview
+- `--fisheye` resolves Python imports and shows imported module skeletons
+- Combined flags (`--types-only --fisheye`) give compact architectural map
+- Updated dwim.toml system prompt to mention new flags
 
 **Architecture Cleanup:**
 - [x] Consolidate redundant layers discovered Dec 22:
