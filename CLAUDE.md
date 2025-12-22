@@ -2,6 +2,7 @@
 
 Behavioral rules for Claude Code working in this repository.
 Design philosophy: `docs/philosophy.md`. Key tenets: Generalize Don't Multiply, Separate Interface/Unify Plumbing, Minimize LLM usage, Structure > Text. Three primitives: view, edit, analyze.
+Rust/Python boundary: `docs/rust-python-boundary.md`. Rust = plumbing (fast, deterministic), Python = interface (LLM, orchestration).
 TUI conventions: `docs/tui.md`. Textual framework quirks and lessons learned.
 
 ## Core Rule

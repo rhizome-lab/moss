@@ -17,6 +17,13 @@
 - Recursive step parsing in load_workflow for nested TOML structures
 - Design doc for multi-agent communication: docs/nested-execution.md
 
+### Documentation
+
+**Architecture Boundary** (Dec 23 2025)
+- Added docs/rust-python-boundary.md: decision framework for Rust vs Python features
+- Rust = plumbing (deterministic, performance-critical, syntax-aware)
+- Python = interface (LLM, orchestration, TUI, plugins)
+
 ### Refactoring
 
 **Code Cleanup** (Dec 23 2025)

@@ -49,6 +49,8 @@ This gives us:
 
 The interface serves the user's mental model. The plumbing stays unified.
 
+**Rust/Python boundary:** Rust is the plumbing (fast, deterministic, syntax-aware). Python is the interface (LLM integration, orchestration, TUI). See `docs/rust-python-boundary.md` for the full decision framework.
+
 ### Minimize LLM Usage
 
 LLM calls are expensive (cost) and slow (latency). Design everything to reduce them:
