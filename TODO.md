@@ -46,16 +46,10 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 ## Next Up
 
-- [x] Design: Composable execution architecture
-  - [x] Primitives: Scope, strategies (context/cache/retry/llm) - docs/design/execution-primitives.md
-  - [x] Prototype: src/moss/execution/__init__.py (~800 lines)
-  - [x] Decision model: inline CoT, multiple actions, parse_decision()
-  - [x] Phase 2: Parallel execution (Decision.parallel + ThreadPoolExecutor)
-  - [x] Phase 3: dwim.toml + load_workflow() + run_workflow()
-  - [x] Phase 4: Retry wired into Scope.run()
-  - [x] CLI: `moss agent` now uses execution primitives by default
-  - [x] Removed: dwim_loop.py (1151 lines → 0)
+- [ ] Nested steps: step type that runs sub-steps (for grouping in workflows)
+- [ ] rust_shim naming: rename `rust_skeleton` → `rust_view` (calls `view` not `skeleton`)
 - [ ] Explore TUI: modal keybinds, jump-to-node shortcut
+- [ ] Python edit cleanup: redundant with agent, consider removing
 
 ## Backlog
 
