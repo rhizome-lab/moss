@@ -46,6 +46,11 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 ## Next Up
 
+- [ ] Explore TUI verification (from this session):
+  - Command palette input still too big (CSS selector may be wrong)
+  - Verify palette button shows on right side of footer
+  - Test command palette commands work (SystemCommand fix)
+  - Test syntax highlighting matches theme (transparent bg)
 - [ ] Explore TUI polish:
   - Add autocomplete for paths in command input
   - Error handling for Rust CLI failures in _execute_primitive
