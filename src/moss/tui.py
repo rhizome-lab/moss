@@ -14,6 +14,7 @@ from rich.console import RenderableType
 
 try:
     from textual.app import App, ComposeResult
+    from textual.binding import Binding
     from textual.containers import Container, Horizontal, Vertical
     from textual.reactive import reactive
     from textual.widgets import Footer, Header, Input, Static, Tree
@@ -367,9 +368,9 @@ class ActionBar(Static):
 
         return (
             f"[dim]{path_display}[/]  "
-            f"[@click=app.primitive_view()][[V]][/][b]iew[/] ({view_label})  "
-            f"[@click=app.primitive_edit()][[E]][/][b]dit[/]  "
-            f"[@click=app.primitive_analyze()][[A]][/][b]nalyze[/]"
+            f"[@click=app.primitive_view()][b]View[/b][/] ({view_label})  "
+            f"[@click=app.primitive_edit()][b]Edit[/b][/]  "
+            f"[@click=app.primitive_analyze()][b]Analyze[/b][/]"
         )
 
 
@@ -377,14 +378,17 @@ class Breadcrumb(Static):
     """Breadcrumb navigation showing path from project root."""
 
     path_parts: reactive[list[tuple[str, Path]]] = reactive(list)
+    project_name: reactive[str] = reactive("")
 
     def render(self) -> str:
+        # Always show clickable project root
+        root_link = f"[@click=app.cd_root()]{self.project_name or 'root'}[/]"
         if not self.path_parts:
-            return "[dim]/ (project root)[/]"
-        parts = []
+            return root_link
+        parts = [root_link]
         for name, path in self.path_parts:
             parts.append(f"[@click=app.cd_to('{path}')]{name}[/]")
-        return "[dim]/[/] " + " [dim]/[/] ".join(parts)
+        return " [dim]/[/] ".join(parts)
 
 
 class HoverTooltip(Static):
@@ -537,10 +541,6 @@ class MossTUI(App):
         height: 1fr;
     }
 
-    #header-bar {
-        height: auto;
-    }
-
     #sidebar {
         width: 30%;
         height: 1fr;
@@ -588,6 +588,13 @@ class MossTUI(App):
         height: 1fr;
     }
 
+    #explore-header {
+        height: auto;
+        padding: 0 1;
+        background: $surface-darken-1;
+        text-style: bold;
+    }
+
     #explore-detail {
         height: 1fr;
         border: solid $secondary;
@@ -613,14 +620,6 @@ class MossTUI(App):
         border: solid $secondary;
     }
 
-    ModeIndicator {
-        background: $surface-lighten-1;
-        padding: 0 1;
-        text-align: center;
-        border: round $primary;
-        margin: 0 1;
-    }
-
     HoverTooltip {
         dock: right;
         width: 25%;
@@ -633,15 +632,16 @@ class MossTUI(App):
     }
     """
 
-    BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
-        ("ctrl+c", "handle_ctrl_c", "Quit"),
-        ("d", "toggle_dark", "Toggle Dark Mode"),
-        ("shift+tab", "next_mode", "Next Mode"),
-        ("h", "toggle_tooltip", "Toggle Tooltip"),
-        ("v", "primitive_view", "View"),
-        ("e", "primitive_edit", "Edit"),
-        ("minus", "cd_up", "Go Up"),
-        ("a", "primitive_analyze", "Analyze"),
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("q", "quit", "Quit", show=True),
+        Binding("ctrl+c", "handle_ctrl_c", "Interrupt", show=False),
+        Binding("d", "toggle_dark", "Dark", show=True),
+        Binding("tab", "next_mode", "Mode", show=True),
+        Binding("v", "primitive_view", "View", show=True),
+        Binding("e", "primitive_edit", "Edit", show=True),
+        Binding("a", "primitive_analyze", "Analyze", show=True),
+        Binding("minus", "cd_up", "Up", show=True),
+        Binding("enter", "enter_dir", "Enter", show=False),
     ]
 
     current_mode_name = reactive("EXPLORE")
@@ -670,7 +670,6 @@ class MossTUI(App):
         from textual.widgets import RichLog
 
         yield Header(show_clock=True)
-        yield Horizontal(ModeIndicator(id="mode-indicator"), id="header-bar")
         yield Container(
             Horizontal(
                 Vertical(
@@ -700,6 +699,7 @@ class MossTUI(App):
                         id="swarm-view",
                     ),
                     Container(
+                        Static("", id="explore-header"),
                         RichLog(id="explore-detail", highlight=True, markup=True),
                         id="explore-view",
                     ),
@@ -759,9 +759,8 @@ class MossTUI(App):
         if not mode:
             return
 
-        indicator = self.query_one("#mode-indicator")
-        indicator.mode_name = mode.name
-        indicator.mode_color = mode.color
+        # Update subtitle with mode
+        self.sub_title = f"{self.api.root.name} | {mode.name}"
 
         self.query_one("#command-input").placeholder = mode.placeholder
 
@@ -813,6 +812,7 @@ class MossTUI(App):
     def _update_breadcrumb(self) -> None:
         """Update breadcrumb to reflect current tree root."""
         breadcrumb = self.query_one("#breadcrumb", Breadcrumb)
+        breadcrumb.project_name = self.api.root.name
         if self._tree_root == self.api.root:
             breadcrumb.path_parts = []
         else:
@@ -838,6 +838,18 @@ class MossTUI(App):
             self._tree_root = self._tree_root.parent
             self._update_tree("file")
             self._log(f"Changed to: {self._tree_root.name}")
+
+    def cd_root(self) -> None:
+        """Navigate back to project root."""
+        if self._tree_root != self.api.root:
+            self._tree_root = self.api.root
+            self._update_tree("file")
+            self._log("Changed to project root")
+
+    def action_enter_dir(self) -> None:
+        """Enter selected directory (navigate into it)."""
+        if self._selected_type == "dir" and self._selected_path:
+            self.cd_to(self._selected_path)
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
         """Handle node highlight (hover/selection movement)."""
@@ -933,9 +945,9 @@ class MossTUI(App):
             path = data["path"]
             self._selected_path = str(path)
             self._selected_type = "dir"
+            # Just select - use Enter again or cd command to navigate
             if self.current_mode_name == "EXPLORE":
-                # Navigate into directory on select
-                self.cd_to(str(path))
+                self.action_primitive_view()
         elif data["type"] == "symbol":
             symbol = data["symbol"]
             path = data["path"]
@@ -1192,10 +1204,37 @@ class MossTUI(App):
                 lines.append(f"{prefix}{sig}")
         return "\n".join(lines)
 
+    def _get_lexer_for_path(self, path: str) -> str | None:
+        """Get pygments lexer name for a file path."""
+        suffix_map = {
+            ".py": "python",
+            ".rs": "rust",
+            ".js": "javascript",
+            ".ts": "typescript",
+            ".go": "go",
+            ".rb": "ruby",
+            ".java": "java",
+            ".c": "c",
+            ".cpp": "cpp",
+            ".h": "c",
+            ".hpp": "cpp",
+            ".sh": "bash",
+            ".yaml": "yaml",
+            ".yml": "yaml",
+            ".json": "json",
+            ".toml": "toml",
+            ".md": "markdown",
+        }
+        for suffix, lexer in suffix_map.items():
+            if path.endswith(suffix):
+                return lexer
+        return None
+
     def _execute_primitive(self, primitive: str, target: str, **kwargs) -> None:
         """Execute a primitive (view/edit/analyze) and display results."""
         from moss.core_api import AnalyzeAPI, ViewAPI
 
+        explore_header = self.query_one("#explore-header", Static)
         explore_detail = self.query_one("#explore-detail")
         explore_detail.clear()
 
@@ -1203,7 +1242,8 @@ class MossTUI(App):
             if primitive == "view":
                 api = ViewAPI(self.api.root)
                 result = api.view(target=target, depth=kwargs.get("depth", 1))
-                explore_detail.write(f"[b]VIEW: {result.target}[/] ({result.kind})\n\n")
+                explore_header.update(f"VIEW: {result.target} ({result.kind})")
+
                 # Format content based on kind
                 if result.kind == "directory":
                     files = result.content.get("files", [])
@@ -1213,38 +1253,53 @@ class MossTUI(App):
                     if len(files) > 20:
                         explore_detail.write(f"  ... and {len(files) - 20} more\n")
                 elif result.kind == "file":
-                    # Format symbols as skeleton
+                    # Format symbols as skeleton with syntax highlighting
                     symbols = result.content.get("symbols", [])
+                    line_count = result.content.get("line_count", "?")
+                    explore_detail.write(f"[dim]Lines: {line_count}[/]\n\n")
                     if symbols:
-                        line_count = result.content.get("line_count", "?")
-                        explore_detail.write(f"Lines: {line_count}\n\n")
-                        explore_detail.write(self._format_symbols_skeleton(symbols))
+                        skeleton = self._format_symbols_skeleton(symbols)
+                        lexer = self._get_lexer_for_path(target)
+                        if lexer:
+                            from rich.syntax import Syntax
+
+                            syntax = Syntax(skeleton, lexer, theme="monokai")
+                            explore_detail.write(syntax)
+                        else:
+                            explore_detail.write(skeleton)
                     else:
-                        # No symbols - show basic info
-                        line_count = result.content.get("line_count", "?")
-                        explore_detail.write(f"Lines: {line_count}\n(no symbols)")
+                        explore_detail.write("[dim](no symbols)[/]")
                 else:  # symbol
                     source = result.content.get("source", "")
                     if source:
-                        explore_detail.write(source)
+                        # Syntax highlight the source
+                        # Get file path from target (e.g., src/foo.py/Bar -> src/foo.py)
+                        file_path = target.rsplit("/", 1)[0] if "/" in target else target
+                        lexer = self._get_lexer_for_path(file_path)
+                        if lexer:
+                            from rich.syntax import Syntax
+
+                            syntax = Syntax(source, lexer, theme="monokai")
+                            explore_detail.write(syntax)
+                        else:
+                            explore_detail.write(source)
                     else:
-                        # Fallback to signature if no source
                         sig = result.content.get("signature", "")
                         if sig:
                             explore_detail.write(sig)
                         else:
-                            explore_detail.write("(no source available)")
+                            explore_detail.write("[dim](no source available)[/]")
 
             elif primitive == "analyze":
                 api = AnalyzeAPI(self.api.root)
-                # Pass through analyze flags
                 result = api.analyze(
                     target=target,
                     health=kwargs.get("health", False),
                     complexity=kwargs.get("complexity", False),
                     security=kwargs.get("security", False),
                 )
-                explore_detail.write(f"[b]ANALYZE: {result.target}[/]\n\n")
+                explore_header.update(f"ANALYZE: {result.target}")
+
                 if result.health:
                     explore_detail.write("[b]Health:[/]\n")
                     for k, v in result.health.items():
@@ -1264,10 +1319,11 @@ class MossTUI(App):
                     for f in findings[:5]:
                         sev = f.get("severity", "?")
                         msg = f.get("message", "")
-                        explore_detail.write(f"  [{sev}] {msg}\n")
+                        explore_detail.write(f"  [[{sev}]] {msg}\n")
 
         except Exception as e:
-            explore_detail.write(f"[red]Error: {e}[/]")
+            explore_header.update(f"Error: {primitive}")
+            explore_detail.write(f"[red]{e}[/]")
 
     def _log(self, message: str) -> None:
         """Add a message to the log view."""
