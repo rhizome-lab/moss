@@ -464,7 +464,7 @@ class ProjectTree(Tree[Any]):
         super().__init__(*args, **kwargs)
         self._api: MossAPI | None = None
         self._tree_root: Path | None = None
-        self._git_files: set[str] = set()
+        self._indexed_files: set[str] = set()
         self.guide_depth = 2  # Minimal indentation
 
     def update_from_tasks(self, task_tree: TaskTree) -> None:
@@ -516,7 +516,7 @@ class ProjectTree(Tree[Any]):
         """
         self._api = api
         self._tree_root = tree_root or api.root
-        self._git_files: set[str] = self._get_git_files(self._tree_root)
+        self._indexed_files: set[str] = self._get_indexed_files(self._tree_root)
         self.clear()
         root = self.root
         root.label = f"[b]Files: {self._tree_root.name}[/b]"
@@ -526,8 +526,26 @@ class ProjectTree(Tree[Any]):
         self._load_dir_children(root, self._tree_root)
         root.expand()
 
-    def _get_git_files(self, root: Path) -> set[str]:
-        """Get all files respecting .gitignore via git ls-files."""
+    def _get_indexed_files(self, root: Path) -> set[str]:
+        """Get all files from Rust index database.
+
+        Uses .moss/index.db which is created by `moss reindex`.
+        Falls back to git ls-files if index not available.
+        """
+        import sqlite3
+
+        index_path = root / ".moss" / "index.db"
+        if index_path.exists():
+            try:
+                conn = sqlite3.connect(str(index_path))
+                cursor = conn.execute("SELECT path FROM files WHERE is_dir = 0")
+                files = {row[0] for row in cursor.fetchall()}
+                conn.close()
+                return files
+            except sqlite3.Error:
+                pass
+
+        # Fallback to git ls-files
         import subprocess
 
         try:
@@ -540,7 +558,7 @@ class ProjectTree(Tree[Any]):
             )
             return set(result.stdout.strip().split("\n")) if result.stdout.strip() else set()
         except (subprocess.CalledProcessError, FileNotFoundError):
-            return set()  # Not a git repo or git not available
+            return set()
 
     def _load_dir_children(self, tree_node: TreeNode[Any], path: Path) -> None:
         """Load immediate children of a directory into tree node."""
@@ -551,9 +569,9 @@ class ProjectTree(Tree[Any]):
         except ValueError:
             return
 
-        # Find immediate children from git files
+        # Find immediate children from indexed files
         children: dict[str, bool] = {}  # name -> is_dir
-        for f in self._git_files:
+        for f in self._indexed_files:
             if not f.startswith(prefix):
                 continue
             rest = f[len(prefix) :]
