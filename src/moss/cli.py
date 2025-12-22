@@ -3205,53 +3205,6 @@ def cmd_rag(args: Namespace) -> int:
         return 1
 
 
-def _dump_workflow_toml(data: dict[str, Any]) -> str:
-    """Dump workflow dictionary to TOML string."""
-    lines = []
-
-    def format_value(v: Any) -> str:
-        if isinstance(v, str):
-            return f'"{v}"'
-        elif isinstance(v, bool):
-            return str(v).lower()
-        elif isinstance(v, (int, float)):
-            return str(v)
-        elif isinstance(v, list):
-            return "[" + ", ".join(format_value(x) for x in v) + "]"
-        return str(v)
-
-    wf = data["workflow"]
-
-    lines.append("[workflow]")
-    for k, v in wf.items():
-        if k not in ("limits", "llm", "steps") and not isinstance(v, (dict, list)):
-            lines.append(f"{k} = {format_value(v)}")
-    lines.append("")
-
-    if "limits" in wf:
-        lines.append("[workflow.limits]")
-        for k, v in wf["limits"].items():
-            lines.append(f"{k} = {format_value(v)}")
-        lines.append("")
-
-    if "llm" in wf:
-        lines.append("[workflow.llm]")
-        for k, v in wf["llm"].items():
-            if v is not None:
-                lines.append(f"{k} = {format_value(v)}")
-        lines.append("")
-
-    if "steps" in wf:
-        for step in wf["steps"]:
-            lines.append("[[workflow.steps]]")
-            for k, v in step.items():
-                if v is not None and v != 0 and v != "":  # Skip defaults/empty
-                    lines.append(f"{k} = {format_value(v)}")
-            lines.append("")
-
-    return "\n".join(lines)
-
-
 def cmd_workflow(args: Namespace) -> int:
     """Manage and run TOML-based workflows.
 
@@ -3262,27 +3215,41 @@ def cmd_workflow(args: Namespace) -> int:
     - generate: Auto-create workflows based on project
     - new: Scaffold a new workflow from template
     """
-    import asyncio
-
-    from moss.workflows import (
-        list_workflows,
-        load_workflow,
-        workflow_to_agent_loop,
-    )
+    import tomllib
 
     output = setup_output(args)
     action = getattr(args, "action", "list")
     project_root = Path(getattr(args, "directory", ".")).resolve()
 
+    # Workflow directories
+    builtin_dir = Path(__file__).parent / "workflows"
+    user_dir = project_root / ".moss" / "workflows"
+
+    def find_workflow(name: str) -> Path | None:
+        """Find workflow TOML by name."""
+        for d in [user_dir, builtin_dir]:
+            p = d / f"{name}.toml"
+            if p.exists():
+                return p
+        return None
+
     if action == "list":
         output.header("Available Workflows")
-        workflows = list_workflows(project_root)
+        workflows: set[str] = set()
+        for d in [builtin_dir, user_dir]:
+            if d.exists():
+                for p in d.glob("*.toml"):
+                    workflows.add(p.stem)
         if not workflows:
             output.print("  (none found)")
-        for name in workflows:
+        for name in sorted(workflows):
             try:
-                wf = load_workflow(name, project_root)
-                output.print(f"  {name}: {wf.description or '(no description)'}")
+                path = find_workflow(name)
+                if path:
+                    with path.open("rb") as f:
+                        data = tomllib.load(f)
+                    desc = data.get("workflow", {}).get("description", "(no description)")
+                    output.print(f"  {name}: {desc}")
             except Exception as e:
                 output.print(f"  {name}: (error loading: {e})")
         return 0
@@ -3304,7 +3271,7 @@ def cmd_workflow(args: Namespace) -> int:
                 output.error("Workflow name required")
                 return 1
 
-        template_name = getattr(args, "template", "standard")
+        template_name = getattr(args, "template", "agentic")
         template_content = TEMPLATES.get(template_name)
         if not template_content:
             output.error(f"Unknown template: {template_name}")
@@ -3329,75 +3296,57 @@ def cmd_workflow(args: Namespace) -> int:
         output.info(f"  2. Run with: moss workflow run {name} --file <file>")
         return 0
 
-    elif action == "generate":
-        from moss.workflows.generator import WorkflowGenerator
-
-        force = getattr(args, "force", False)
-        generator = WorkflowGenerator(project_root)
-        workflows = generator.generate()
-
-        if not workflows:
-            output.info("No workflows generated based on current project structure.")
-            return 0
-
-        workflow_dir = project_root / ".moss" / "workflows"
-        workflow_dir.mkdir(parents=True, exist_ok=True)
-
-        created_count = 0
-        for wf in workflows:
-            path = workflow_dir / f"{wf.name}.toml"
-            if path.exists() and not force:
-                output.warning(f"Workflow '{wf.name}' already exists. Use --force to overwrite.")
-                continue
-
-            # Serialize
-            data = {"workflow": wf.to_dict()}
-            content = _dump_workflow_toml(data)
-            path.write_text(content)
-            output.success(f"Created {path}")
-            created_count += 1
-
-        if created_count > 0:
-            output.info(f"Generated {created_count} workflows.")
-        else:
-            output.info("No new workflows created.")
-        return 0
-
     elif action == "show":
         name = getattr(args, "workflow_name", None)
         if not name:
             output.error("Workflow name required")
             return 1
 
-        try:
-            wf = load_workflow(name, project_root)
-        except FileNotFoundError:
+        workflow_path = find_workflow(name)
+        if not workflow_path:
             output.error(f"Workflow not found: {name}")
             return 1
 
+        try:
+            with workflow_path.open("rb") as f:
+                data = tomllib.load(f)
+        except Exception as e:
+            output.error(f"Failed to load workflow: {e}")
+            return 1
+
+        wf = data.get("workflow", {})
+
         if wants_json(args):
-            output.data(wf.to_dict())
+            output.data(data)
         else:
-            output.header(f"Workflow: {wf.name}")
-            output.print(f"Description: {wf.description or '(none)'}")
-            output.print(f"Version: {wf.version}")
-            output.print(f"Max steps: {wf.limits.max_steps}")
-            output.print(f"Token budget: {wf.limits.token_budget}")
-            output.print(f"Timeout: {wf.limits.timeout_seconds}s")
-            output.print(f"Model: {wf.llm.model}")
-            output.print("")
-            output.header("Steps")
-            for i, step in enumerate(wf.steps, 1):
-                output.print(f"  {i}. {step.name} ({step.tool})")
-                if step.input_from:
-                    output.print(f"     input_from: {step.input_from}")
-                if step.on_error:
-                    output.print(f"     on_error: {step.on_error}")
+            output.header(f"Workflow: {wf.get('name', name)}")
+            output.print(f"Description: {wf.get('description', '(none)')}")
+            output.print(f"Version: {wf.get('version', '1.0')}")
+
+            # Limits
+            limits = wf.get("limits", {})
+            output.print(f"Max turns: {limits.get('max_turns', 20)}")
+            if timeout := limits.get("timeout_seconds"):
+                output.print(f"Timeout: {timeout}s")
+
+            # LLM config
+            if llm := wf.get("llm"):
+                output.print(f"LLM strategy: {llm.get('strategy', 'simple')}")
+                if model := llm.get("model"):
+                    output.print(f"Model: {model}")
+
+            # Steps (for step-based workflows)
+            if steps := data.get("steps"):
+                output.print("")
+                output.header("Steps")
+                for i, step in enumerate(steps, 1):
+                    step_name = step.get("name", "unnamed")
+                    step_action = step.get("action", "?")
+                    output.print(f"  {i}. {step_name} ({step_action})")
         return 0
 
     elif action == "run":
         name = getattr(args, "workflow_name", None)
-        file_path_arg = getattr(args, "file", None)
         mock = getattr(args, "mock", False)
         verbose = getattr(args, "verbose", False)
         workflow_args = getattr(args, "workflow_args", None) or []
@@ -3406,97 +3355,88 @@ def cmd_workflow(args: Namespace) -> int:
             output.error("Workflow name required")
             return 1
 
-        try:
-            wf = load_workflow(name, project_root)
-        except FileNotFoundError:
+        # Find workflow TOML file
+        # Check: .moss/workflows/{name}.toml, then src/moss/workflows/{name}.toml
+        workflow_path = None
+        search_paths = [
+            project_root / ".moss" / "workflows" / f"{name}.toml",
+            Path(__file__).parent / "workflows" / f"{name}.toml",
+        ]
+        for p in search_paths:
+            if p.exists():
+                workflow_path = p
+                break
+
+        if not workflow_path:
             output.error(f"Workflow not found: {name}")
+            output.info(f"Searched: {', '.join(str(p) for p in search_paths)}")
             return 1
 
-        # Use file path if provided, otherwise default to project root
-        if file_path_arg:
-            target_path = Path(file_path_arg).resolve()
-            if not target_path.exists():
-                output.error(f"File not found: {target_path}")
-                return 1
-            output.info(f"Running workflow '{name}' on {target_path.name}...")
-            initial_input = {"file_path": str(target_path)}
-            # If it's a file, root should be its parent
-            # If it's a directory, root is itself
-            executor_root = target_path.parent if target_path.is_file() else target_path
-        else:
-            target_path = project_root
-            output.info(f"Running workflow '{name}' on codebase: {project_root.name}...")
-            initial_input = {"directory": str(project_root)}
-            executor_root = project_root
-
-        # Parse and merge additional arguments
+        # Parse arguments
+        extra_args: dict[str, str] = {}
         for arg in workflow_args:
             if "=" not in arg:
                 output.error(f"Invalid argument format: {arg} (expected KEY=VALUE)")
                 return 1
             key, value = arg.split("=", 1)
-            initial_input[key] = value
+            extra_args[key] = value
 
-        # Convert and run
-        from moss.agent_loop import AgentLoopRunner, LLMConfig, LLMToolExecutor
-
-        loop = workflow_to_agent_loop(wf)
-        config = LLMConfig(
-            model=wf.llm.model,
-            temperature=wf.llm.temperature,
-            system_prompt=wf.llm.system_prompt,
-            mock=mock,
+        # Load and run using execution primitives
+        from moss.execution import (
+            NoLLM,
+            agent_loop,
+            step_loop,
         )
-        executor = LLMToolExecutor(config=config, root=executor_root)
-        runner = AgentLoopRunner(executor)
+        from moss.execution import (
+            load_workflow as load_exec_workflow,
+        )
 
-        async def do_run():
-            return await runner.run(loop, initial_input=initial_input)
+        config = load_exec_workflow(str(workflow_path))
+        if mock and config.llm:
+            config.llm = NoLLM(actions=["view README.md", "done"])
 
-        result = asyncio.run(do_run())
+        # Get task from args (for agentic workflows)
+        task = extra_args.pop("task", extra_args.pop("instruction", ""))
 
-        if wants_json(args):
-            output.data(
-                {
-                    "workflow": name,
-                    "status": result.status.name,
-                    "success": result.success,
-                    "metrics": {
-                        "llm_calls": result.metrics.llm_calls,
-                        "llm_tokens": result.metrics.llm_tokens_in + result.metrics.llm_tokens_out,
-                        "tool_calls": result.metrics.tool_calls,
-                        "wall_time": result.metrics.wall_time_seconds,
-                    },
-                    "error": result.error,
-                }
-            )
-        else:
-            status = "✓" if result.success else "✗"
-            output.print(f"{status} {result.status.name}")
-            output.print(
-                f"  LLM: {result.metrics.llm_calls} calls, "
-                f"{result.metrics.llm_tokens_in + result.metrics.llm_tokens_out} tokens"
-            )
-            output.print(f"  Tools: {result.metrics.tool_calls} calls")
-            output.print(f"  Time: {result.metrics.wall_time_seconds:.2f}s")
-            if result.error:
-                output.error(f"  Error: {result.error}")
+        output.info(f"Running workflow '{name}'" + (f": {task}" if task else ""))
+        if verbose:
+            output.info(f"Path: {workflow_path}")
+            if config.context:
+                output.info(f"Context: {type(config.context).__name__}")
+            if config.llm:
+                output.info(f"LLM: {type(config.llm).__name__}")
+        output.info("")
 
-            if verbose and result.step_results:
-                output.print("")
-                output.header("Step Details")
-                for i, step in enumerate(result.step_results, 1):
-                    output.print(f"--- Step {i}: {step.step_name} ---")
-                    if step.error:
-                        output.warning(f"Error: {step.error}")
-                    if step.output:
-                        out_str = str(step.output)
-                        if len(out_str) > 500:
-                            out_str = out_str[:500] + "..."
-                        output.print(f"Output: {out_str}")
-                    output.print("")
+        try:
+            # Run directly with loaded config (supports mock)
+            if config.steps:
+                result = step_loop(
+                    steps=config.steps,
+                    context=config.context,
+                    cache=config.cache,
+                    retry=config.retry,
+                    initial_context=extra_args if extra_args else None,
+                )
+            else:
+                result = agent_loop(
+                    task=task,
+                    context=config.context,
+                    cache=config.cache,
+                    retry=config.retry,
+                    llm=config.llm,
+                    max_turns=config.max_turns,
+                )
+            output.success("\nCompleted!")
+            if verbose:
+                output.info(f"Final context:\n{result}")
+            return 0
+        except Exception as e:
+            output.error(f"Workflow failed: {e}")
+            if verbose:
+                import traceback
 
-        return 0 if result.success else 1
+                output.info(traceback.format_exc())
+            return 1
 
     else:
         output.error(f"Unknown action: {action}")
@@ -3576,23 +3516,19 @@ def cmd_toml(args: Namespace) -> int:
 
 
 def cmd_agent(args: Namespace) -> int:
-    """Run DWIM-driven agent loop on a task.
+    """Run DWIM agent on a task. Alias for 'moss workflow run dwim'.
 
-    Uses context-excluded model: each turn gets path + notes + last result,
-    not conversation history. Supports task breakdown, notes with TTL.
+    Uses composable execution primitives with task tree context.
     """
-    import asyncio
-
-    from moss import MossAPI
-    from moss.dwim import analyze_intent
+    from moss.execution import (
+        NoLLM,
+        agent_loop,
+        load_workflow,
+    )
 
     output = setup_output(args)
     task = getattr(args, "task", None)
-    model = getattr(args, "model", None)
-    max_turns = getattr(args, "max_turns", 50)
     verbose = getattr(args, "verbose", False)
-    dry_run = getattr(args, "dry_run", False)
-    use_vanilla = getattr(args, "vanilla", False)
     mock = getattr(args, "mock", False)
 
     if not task:
@@ -3600,127 +3536,35 @@ def cmd_agent(args: Namespace) -> int:
         output.info('Example: moss agent "Fix the type error in Patch.apply"')
         return 1
 
-    api = MossAPI.for_project(Path.cwd())
+    # Load dwim workflow
+    dwim_toml = Path(__file__).parent / "workflows" / "dwim.toml"
+    if not dwim_toml.exists():
+        output.error("dwim.toml workflow not found")
+        return 1
 
-    # Dry-run mode: show what would happen without executing
-    if dry_run:
-        output.info(f"Task: {task}")
-        output.info(f"Mode: {'Vanilla' if use_vanilla else 'DWIM'}")
-        output.info("")
-
-        # Show DWIM suggestions for the task
-        if not use_vanilla:
-            matches = analyze_intent(task)
-            if matches:
-                output.info("Tool suggestions:")
-                for m in matches[:5]:
-                    conf_pct = int(m.confidence * 100)
-                    output.info(f"  {m.tool} ({conf_pct}%)")
-            else:
-                output.info("No specific tools matched. Agent would use LLM guidance.")
-
-        output.info("")
-        output.info(f"Would run with model: {model or 'gemini/gemini-3-flash-preview'}")
-        output.info(f"Max turns: {max_turns}")
-        return 0
-
-    if use_vanilla:
-        from moss.workflows import run_workflow
-
-        output.info(f"Starting Vanilla agent workflow: {task}")
-        if verbose:
-            output.info(f"Max turns: {max_turns}")
-        output.info("")
-
-        try:
-            initial_input = {"task": task}
-            result = asyncio.run(
-                run_workflow("vanilla", initial_input, project_root=api.root, mock=mock)
-            )
-        except ImportError as e:
-            output.error(f"Missing dependency: {e}")
-            output.info("Install with: pip install 'moss[llm]'")
-            return 1
-        except Exception as e:
-            output.error(f"Vanilla agent failed: {e}")
-            return 1
-
-        # Show Vanilla results
-        if verbose:
-            output.info(f"\nSteps: {len(result.step_results)}")
-            output.info(f"LLM Calls: {result.metrics.llm_calls}")
-            for i, step in enumerate(result.step_results, 1):
-                output.info(f"\n--- Step {i}: {step.step_name} ---")
-                if step.error:
-                    output.warning(f"Error: {step.error}")
-                elif step.output:
-                    out_str = str(step.output)[:200]
-                    output.info(f"Output: {out_str}...")
-
-        if result.success:
-            output.success(f"\nCompleted in {len(result.step_results)} steps")
-            if result.final_output:
-                output.info(f"Final: {str(result.final_output)[:500]}")
-            return 0
-        else:
-            output.error(f"\nFailed: {result.error}")
-            return 1
-
-    # Composable execution primitives
-    from pathlib import Path as P
-
-    from moss.execution import (
-        ExponentialRetry,
-        InMemoryCache,
-        NoLLM,
-        SimpleLLM,
-        TaskTreeContext,
-        load_workflow,
-    )
-    from moss.execution import (
-        agent_loop as exec_agent_loop,
-    )
-
-    # Find dwim.toml
-    dwim_toml = P(__file__).parent / "workflows" / "dwim.toml"
+    config = load_workflow(str(dwim_toml))
+    if mock and config.llm:
+        config.llm = NoLLM(actions=["view README.md", "done"])
 
     output.info(f"Starting agent: {task}")
-
-    # Load workflow config if available
-    if dwim_toml.exists():
-        config = load_workflow(str(dwim_toml))
-        context = config.context
-        cache = config.cache
-        retry = config.retry
-        llm = config.llm if not mock else NoLLM(actions=["view README.md", "done"])
-        workflow_max_turns = config.max_turns
-    else:
-        # Fallback defaults
-        context = TaskTreeContext()
-        cache = InMemoryCache()
-        retry = ExponentialRetry(max_attempts=3)
-        llm = NoLLM(actions=["view README.md", "done"]) if mock else SimpleLLM()
-        workflow_max_turns = max_turns
-
     if verbose:
-        output.info(f"Context: {type(context).__name__}")
-        output.info(f"Cache: {type(cache).__name__}")
-        output.info(f"Retry: {type(retry).__name__}")
-        output.info(f"LLM: {type(llm).__name__}")
-        output.info(f"Max turns: {workflow_max_turns}")
+        output.info(f"Context: {type(config.context).__name__}")
+        output.info(f"LLM: {type(config.llm).__name__}")
+        output.info(f"Max turns: {config.max_turns}")
     output.info("")
 
     try:
-        result = exec_agent_loop(
+        result = agent_loop(
             task=task,
-            context=context,
-            cache=cache,
-            retry=retry,
-            llm=llm,
-            max_turns=workflow_max_turns,
+            context=config.context,
+            cache=config.cache,
+            retry=config.retry,
+            llm=config.llm,
+            max_turns=config.max_turns,
         )
         output.success("\nCompleted!")
-        output.info(f"Final context:\n{result}")
+        if verbose:
+            output.info(f"Final context:\n{result}")
         return 0
     except Exception as e:
         output.error(f"Agent failed: {e}")
@@ -5434,8 +5278,8 @@ def create_parser() -> argparse.ArgumentParser:
         "action",
         nargs="?",
         default="list",
-        choices=["list", "show", "run", "generate", "new"],
-        help="Action: list, show, run, generate (auto-create), new (scaffold)",
+        choices=["list", "show", "run", "new"],
+        help="Action: list, show, run, new (scaffold)",
     )
     workflow_parser.add_argument(
         "workflow_name",
@@ -5472,9 +5316,9 @@ def create_parser() -> argparse.ArgumentParser:
     workflow_parser.add_argument(
         "--template",
         "-t",
-        default="standard",
-        choices=["minimal", "standard"],
-        help="Template for new workflow (default: standard)",
+        default="agentic",
+        choices=["agentic", "step"],
+        help="Template for new workflow (default: agentic)",
     )
     workflow_parser.add_argument(
         "--arg",
@@ -5631,40 +5475,19 @@ def create_parser() -> argparse.ArgumentParser:
     eval_parser.set_defaults(func=cmd_eval)
 
     # agent command - DWIM-driven agent loop
-    agent_parser = subparsers.add_parser("agent", help="Run DWIM-driven agent loop on a task")
+    agent_parser = subparsers.add_parser(
+        "agent", help="Run DWIM agent (alias for 'workflow run dwim')"
+    )
     agent_parser.add_argument(
         "task",
         nargs="?",
         help="Task description in natural language",
     )
     agent_parser.add_argument(
-        "--model",
-        "-m",
-        help="LLM model to use (default: gemini/gemini-3-flash-preview)",
-    )
-    agent_parser.add_argument(
-        "--max-turns",
-        "-n",
-        type=int,
-        default=50,
-        help="Maximum turns before stopping (default: 50)",
-    )
-    agent_parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
-        help="Show detailed turn-by-turn output",
-    )
-    agent_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        dest="dry_run",
-        help="Show what would be executed without running",
-    )
-    agent_parser.add_argument(
-        "--vanilla",
-        action="store_true",
-        help="Run minimal vanilla agent loop instead of DWIM loop",
+        help="Show detailed output",
     )
     agent_parser.add_argument(
         "--mock",

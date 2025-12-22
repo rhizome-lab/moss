@@ -61,16 +61,15 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 **Architecture Cleanup (High Priority):**
 - [ ] Stop and plan before adding more features
-- [ ] Consolidate redundant layers discovered Dec 22:
+- [x] Consolidate redundant layers discovered Dec 22:
   - [x] SkeletonAPI.expand → now uses `view path/symbol` via rust_shim
   - rust_shim naming: `rust_skeleton` → should be `rust_view` (calls `view` not `skeleton`)
-  - [ ] Unify under `moss workflow run`:
-    - `moss workflow run dwim "task"` - agentic (dwim is just a workflow)
-    - `moss workflow run validate-fix` - step-based
-    - `moss agent` becomes alias for `moss workflow run dwim`
-    - Nested steps (step type that runs sub-steps) - for grouping
-    - State machine workflows (states + transitions) - see design doc
-    - Then: remove AgentLoop, MossToolExecutor, old workflow loader
+  - [x] Unify under `moss workflow run`:
+    - [x] `moss workflow run dwim --arg task="..."` - agentic
+    - [x] `moss agent` is now alias for workflow run dwim
+    - [x] Removed: AgentLoop, MossToolExecutor, old workflow loader (2742 lines)
+    - [ ] Nested steps (step type that runs sub-steps) - for grouping
+    - [ ] State machine workflows (states + transitions) - see design doc
   - [x] DWIMLoop removed - replaced by composable execution primitives (src/moss/execution/)
   - Python edit → redundant with agent, remove
   - Rust edit vs Python edit → same name, different behavior
@@ -139,6 +138,7 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [ ] Terminal output sanitization: reset terminal state after nested command output (escape codes leak through)
 
 ### Agent Research
+- [ ] Research https://ampcode.com/ (agent coding tool)
 - [ ] Conversational loop pattern (vs hierarchical)
 - [ ] YOLO mode evaluation
 - [ ] Diffusion-like parallel refactors

@@ -1,49 +1,12 @@
 [
   {
-    "description": "Benchmark multiple models on a set of standard tasks. MultiModelBenchmarkResult with comparison data",
+    "description": "Run DWIM agent on a task. Uses composable execution primitives with task tree context. Final context string from agent execution",
     "inputSchema": {
       "properties": {
-        "models": {
-          "description": "List of model names to evaluate",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "tasks": {
-          "description": "List of task definitions (name, input_data)",
-          "items": {
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "workflow_name": {
-          "description": "Name of the workflow to use",
-          "type": "string"
-        }
-      },
-      "required": [
-        "workflow_name",
-        "models",
-        "tasks"
-      ],
-      "type": "object"
-    },
-    "name": "agent_benchmark_models"
-  },
-  {
-    "description": "Run a minimal vanilla agent loop on a task. Uses TaskTree for state and terse intents for communication. Refactored to use the data-driven workflow system. LoopResult with execution history and final output",
-    "inputSchema": {
-      "properties": {
-        "max_turns": {
-          "default": 20,
-          "description": "Maximum number of agent turns",
-          "type": "integer"
-        },
-        "model": {
-          "default": "gemini/gemini-3-flash-preview",
-          "description": "LLM model to use",
-          "type": "string"
+        "mock": {
+          "default": false,
+          "description": "Use mock LLM for testing",
+          "type": "boolean"
         },
         "task": {
           "description": "Task description",
@@ -55,7 +18,7 @@
       ],
       "type": "object"
     },
-    "name": "agent_run_vanilla"
+    "name": "agent_run_dwim"
   },
   {
     "description": "Analyze codebase health, complexity, and security. AnalyzeResult with analysis data",

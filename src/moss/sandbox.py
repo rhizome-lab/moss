@@ -568,14 +568,9 @@ class SandboxedToolExecutor:
 
     Example:
         from moss.sandbox import SandboxedToolExecutor, SandboxedExecutorConfig
-        from moss.agent_loop import AgentLoopRunner
 
         config = SandboxedExecutorConfig(workspace=Path.cwd())
         executor = SandboxedToolExecutor(config)
-
-        # Use with DWIMLoop or custom AgentLoop
-        runner = AgentLoopRunner(executor)
-        result = await runner.run(loop, input_data)
     """
 
     def __init__(

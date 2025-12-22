@@ -6,66 +6,18 @@
   },
   "openapi": "3.0.3",
   "paths": {
-    "/agent/benchmark-models": {
+    "/agent/run-dwim": {
       "post": {
-        "description": "Benchmark multiple models on a set of standard tasks. MultiModelBenchmarkResult with comparison data",
+        "description": "Run DWIM agent on a task. Uses composable execution primitives with task tree context. Final context string from agent execution",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "properties": {
-                  "models": {
-                    "description": "List of model names to evaluate",
-                    "type": "array"
-                  },
-                  "tasks": {
-                    "description": "List of task definitions (name, input_data)",
-                    "type": "array"
-                  },
-                  "workflow_name": {
-                    "description": "Name of the workflow to use",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "workflow_name",
-                  "models",
-                  "tasks"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "summary": "Benchmark multiple models on a set of standard tasks",
-        "tags": [
-          "agent"
-        ]
-      }
-    },
-    "/agent/run-vanilla": {
-      "post": {
-        "description": "Run a minimal vanilla agent loop on a task. Uses TaskTree for state and terse intents for communication. Refactored to use the data-driven workflow system. LoopResult with execution history and final output",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "max_turns": {
-                    "default": 20,
-                    "description": "Maximum number of agent turns",
-                    "type": "integer"
-                  },
-                  "model": {
-                    "default": "gemini/gemini-3-flash-preview",
-                    "description": "LLM model to use",
-                    "type": "string"
+                  "mock": {
+                    "default": false,
+                    "description": "Use mock LLM for testing",
+                    "type": "boolean"
                   },
                   "task": {
                     "description": "Task description",
@@ -86,7 +38,7 @@
             "description": "Successful response"
           }
         },
-        "summary": "Run a minimal vanilla agent loop on a task",
+        "summary": "Run DWIM agent on a task",
         "tags": [
           "agent"
         ]
@@ -3770,7 +3722,7 @@
   },
   "tags": [
     {
-      "description": "API for agent orchestration and loops. Provides access to various agent loop implementations for autonomous task execution.",
+      "description": "API for agent orchestration and loops. Provides access to agent execution using composable execution primitives.",
       "name": "agent"
     },
     {

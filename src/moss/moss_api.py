@@ -3662,63 +3662,40 @@ class ToolListResult:
 class AgentAPI:
     """API for agent orchestration and loops.
 
-    Provides access to various agent loop implementations for
-    autonomous task execution.
+    Provides access to agent execution using composable execution primitives.
     """
 
     root: Path
 
-    async def run_vanilla(
-        self,
-        task: str,
-        model: str = "gemini/gemini-3-flash-preview",
-        max_turns: int = 20,
-    ) -> Any:
-        """Run a minimal vanilla agent loop on a task.
+    def run_dwim(self, task: str, mock: bool = False) -> str:
+        """Run DWIM agent on a task.
 
-        Uses TaskTree for state and terse intents for communication.
-        Refactored to use the data-driven workflow system.
+        Uses composable execution primitives with task tree context.
 
         Args:
             task: Task description
-            model: LLM model to use
-            max_turns: Maximum number of agent turns
+            mock: Use mock LLM for testing
 
         Returns:
-            LoopResult with execution history and final output
+            Final context string from agent execution
         """
-        from moss.workflows import run_workflow
+        from moss.execution import NoLLM, agent_loop, load_workflow
 
-        # initial_input needs to be what the loop expects
-        initial_input = {"task": task}
-        return await run_workflow("vanilla", initial_input, project_root=self.root)
+        # Load dwim workflow
+        dwim_toml = Path(__file__).parent / "workflows" / "dwim.toml"
+        config = load_workflow(str(dwim_toml))
 
-    async def benchmark_models(
-        self,
-        workflow_name: str,
-        models: list[str],
-        tasks: list[dict[str, Any]],
-    ) -> Any:
-        """Benchmark multiple models on a set of standard tasks.
+        if mock and config.llm:
+            config.llm = NoLLM(actions=["view README.md", "done"])
 
-        Args:
-            workflow_name: Name of the workflow to use
-            models: List of model names to evaluate
-            tasks: List of task definitions (name, input_data)
-
-        Returns:
-            MultiModelBenchmarkResult with comparison data
-        """
-        from moss.agent_loop import AutomatedBenchmark, BenchmarkTask
-        from moss.workflows import load_workflow, workflow_to_agent_loop
-
-        workflow = load_workflow(workflow_name, project_root=self.root)
-        loop = workflow_to_agent_loop(workflow)
-
-        benchmark_tasks = [BenchmarkTask(name=t["name"], input_data=t["input_data"]) for t in tasks]
-
-        benchmark = AutomatedBenchmark()
-        return await benchmark.run_comparison(loop, models, benchmark_tasks)
+        return agent_loop(
+            task=task,
+            context=config.context,
+            cache=config.cache,
+            retry=config.retry,
+            llm=config.llm,
+            max_turns=config.max_turns,
+        )
 
 
 @dataclass

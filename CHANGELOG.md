@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Refactoring
+
+**Workflow Unification** (Dec 23 2025)
+- Unified `moss agent` and `moss workflow run` under execution primitives
+- `moss agent "task"` is now an alias for `moss workflow run dwim --arg task="..."`
+- Removed old workflow system: AgentLoop, MossToolExecutor (2742 lines deleted)
+- Removed old workflow files: generator.py, examples.py, validate-fix.toml, vanilla.toml
+- Simplified workflows/__init__.py (697 → 9 lines)
+- Updated workflow templates to new execution primitives format (agentic, step)
+- Updated AgentAPI.run_dwim to use execution primitives instead of old workflows
+- Removed obsolete tests: test_agent_loop.py, test_workflows.py, test_dwim_loop.py
+
 ### Bug Fixes
 
 **Test Fixes** (Dec 22 2025)

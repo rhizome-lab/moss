@@ -30,6 +30,7 @@ Do not:
 - Catch generic `Exception` - catch specific errors
 - Leave work uncommitted
 - Create special cases - design to avoid them; if stuck, ask user rather than special-casing
+- Deprecate things - no users, just remove; deprecation is for backwards compatibility we don't need
 
 Our system prompt for sub-agents (`src/moss/agent_loop.py:LLMConfig.system_prompt`):
 "Be terse. No preamble, no summary, no markdown formatting. Plain text only. For analysis: short bullet points, max 5 items, no code."
