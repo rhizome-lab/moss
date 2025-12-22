@@ -87,6 +87,11 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [ ] `.moss` index: support optional external location (not all repos have `.moss` gitignored)
 - [ ] Terminal output sanitization: reset terminal state after nested command output (escape codes leak through)
 
+**Session Analysis / Self-Improvement:**
+- [ ] Correction pattern detection: extract first 2-3 words of assistant responses, flag patterns like "You're right", "Good point", "Ah yes", "My bad", etc.
+- [ ] Could be a `moss analyze-session` tool or part of telemetry
+- [ ] Use detected corrections to identify friction points, improve prompts/tools
+
 **Explore TUI Keybinds:**
 - [ ] Modal keybinds like Blender (mode-specific keys that change based on context)
 - [ ] Live footer keybind updates when mode/context changes
