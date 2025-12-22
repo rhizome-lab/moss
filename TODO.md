@@ -55,7 +55,7 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
   - Add autocomplete for paths in command input
   - Error handling for Rust CLI failures in _execute_primitive
   - Fix duplicate keybind issue (h for toggle_tooltip conflicts with navigation)
-- [ ] ViewAPI markdown support: Rust CLI to extract headings as symbols, enable `moss view README.md/Quick_Start`
+- [x] ViewAPI markdown support: Rust CLI to extract headings as symbols, enable `moss view README.md/Quick_Start`
 - [ ] Analyze output improvements:
   - Default `--limit 10` for check-docs/check-todos, `--all` to override
   - `--changed` flag: only check git-modified files

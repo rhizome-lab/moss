@@ -4,6 +4,13 @@
 
 ### Features
 
+**Markdown Support** (Dec 22 2025)
+- Added tree-sitter-md to Rust CLI for proper markdown parsing
+- `moss skeleton README.md` extracts headings as nested symbols
+- `moss view README.md/Heading_Name` shows specific section content
+- TUI uses unified skeleton API for Python, Rust, and Markdown files
+- Removed Python heuristic extraction (was buggy with code blocks)
+
 **Explore TUI** (Dec 22 2025)
 - New `moss explore` command with tree + primitives paradigm
 - `ExploreMode` is now default TUI mode (replaces READ/WRITE)
