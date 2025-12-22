@@ -414,7 +414,7 @@ class SkeletonAPI(PathResolvingMixin):
         implementations when the skeleton isn't enough.
 
         Args:
-            file_path: Path to the Python file
+            file_path: Path to the file
             symbol_name: Name of the symbol to expand (e.g., "StepType", "my_function")
 
         Returns:
@@ -425,11 +425,20 @@ class SkeletonAPI(PathResolvingMixin):
             content = api.skeleton.expand("src/agent_loop.py", "StepType")
             # Returns complete enum with all values
         """
-        from moss.skeleton import expand_symbol
+        from moss.rust_shim import call_rust
 
         path = self._resolve_path(file_path)
-        source = path.read_text()
-        return expand_symbol(source, symbol_name)
+        try:
+            rel_path = path.relative_to(self.root)
+        except ValueError:
+            rel_path = path
+
+        # Use Rust view with path/symbol syntax
+        symbol_path = f"{rel_path}/{symbol_name}"
+        exit_code, output = call_rust(["view", symbol_path, "-r", str(self.root)])
+        if exit_code == 0 and output:
+            return output.strip()
+        return None
 
     def get_enum_values(self, file_path: str | Path, enum_name: str) -> list[str] | None:
         """Extract enum member names from an Enum class.

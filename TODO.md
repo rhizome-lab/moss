@@ -62,11 +62,9 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 **Architecture Cleanup (High Priority):**
 - [ ] Stop and plan before adding more features
 - [ ] Consolidate redundant layers discovered Dec 22:
-  - SkeletonAPI wrappers → use rust_shim directly:
-    - `skeleton.format` → `rust_shim.passthrough("view", [path])`
-    - `skeleton.expand` → `rust_shim.passthrough("view", [path/symbol])`
-    - `skeleton.extract` → same with `--json`
-  - MossToolExecutor → call rust_shim directly
+  - [x] SkeletonAPI.expand → now uses `view path/symbol` via rust_shim
+  - SkeletonAPI.format/extract already use rust_shim (rust_skeleton, rust_skeleton_json)
+  - MossToolExecutor: only used by old AgentLoop/workflows path; new execution primitives bypass entirely
   - [x] DWIMLoop removed - replaced by composable execution primitives (src/moss/execution/)
   - AgentLoop: generic step executor - consider renaming to StepExecutor
   - Python edit → redundant with agent, remove

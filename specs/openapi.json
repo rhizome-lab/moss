@@ -2732,7 +2732,7 @@
               "schema": {
                 "properties": {
                   "file_path": {
-                    "description": "Path to the Python file",
+                    "description": "Path to the file",
                     "type": "string"
                   },
                   "symbol_name": {
