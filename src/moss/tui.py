@@ -17,7 +17,7 @@ try:
     from textual.binding import Binding
     from textual.containers import Container, Horizontal, Vertical
     from textual.reactive import reactive
-    from textual.widgets import Footer, Input, Static, Tree
+    from textual.widgets import Input, Static, Tree
     from textual.widgets.tree import TreeNode
 except ImportError:
     # TUI dependencies not installed
@@ -344,6 +344,31 @@ class ModeIndicator(Static):
         return f"Mode: [{self.mode_color} b]{self.mode_name}[/]"
 
 
+class KeybindBar(Static):
+    """Footer showing keybindings with underlined hotkey letters."""
+
+    DEFAULT_CSS = """
+    KeybindBar {
+        dock: bottom;
+        width: 100%;
+        height: 1;
+        background: $surface-darken-1;
+    }
+    """
+
+    def render(self) -> str:
+        binds = [
+            "[u]Q[/u]uit",
+            "[u]T[/u]heme",
+            "[u]V[/u]iew",
+            "[u]E[/u]dit",
+            "[u]A[/u]nalyze",
+            "[dim]-[/dim]Up",
+            "[dim]/[/dim]Cmd",
+        ]
+        return "  ".join(binds)
+
+
 class Breadcrumb(Static):
     """Breadcrumb navigation showing path from project root."""
 
@@ -586,7 +611,10 @@ class MossTUI(App):
 
     #command-input {
         dock: bottom;
-        margin: 1;
+        display: none;
+        height: 1;
+        margin: 0 1;
+        padding: 0;
     }
 
     .log-entry {
@@ -669,15 +697,17 @@ class MossTUI(App):
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
-        Binding("q", "quit", "Quit"),
+        Binding("q", "quit", "Quit", show=False),
         Binding("ctrl+c", "handle_ctrl_c", "Interrupt", show=False),
-        Binding("t", "app.toggle_dark", "Theme"),
-        Binding("tab", "next_mode", "Mode"),
-        Binding("v", "primitive_view", "View"),
-        Binding("e", "primitive_edit", "Edit"),
-        Binding("a", "primitive_analyze", "Analyze"),
-        Binding("minus", "cd_up", "Up", key_display="-"),
+        Binding("t", "app.toggle_dark", "Theme", show=False),
+        Binding("tab", "next_mode", "Mode", show=False),
+        Binding("v", "primitive_view", "View", show=False),
+        Binding("e", "primitive_edit", "Edit", show=False),
+        Binding("a", "primitive_analyze", "Analyze", show=False),
+        Binding("minus", "cd_up", "Up", show=False),
         Binding("enter", "enter_dir", "Enter", show=False),
+        Binding("slash", "toggle_command", "Cmd", show=False),
+        Binding("escape", "hide_command", show=False),
     ]
 
     current_mode_name = reactive("EXPLORE")
@@ -798,7 +828,7 @@ class MossTUI(App):
             Input(placeholder="Enter command...", id="command-input"),
             HoverTooltip(id="hover-tooltip"),
         )
-        yield Footer()
+        yield KeybindBar()
 
     def on_mount(self) -> None:
         """Called when the app is mounted."""
@@ -888,8 +918,10 @@ class MossTUI(App):
     def navigate_branch(self, branch_name: str) -> None:
         """Switch to a specific branch and update view."""
         self._log(f"Switching to branch: {branch_name}")
-        self.query_one("#command-input").value = f"branch {branch_name}"
-        self.query_one("#command-input").focus()
+        cmd = self.query_one("#command-input")
+        cmd.value = f"branch {branch_name}"
+        cmd.display = True
+        cmd.focus()
 
     def _update_tree(self, tree_type: str = "task") -> None:
         """Update the sidebar tree."""
@@ -941,6 +973,24 @@ class MossTUI(App):
         """Enter selected directory (navigate into it)."""
         if self._selected_type == "dir" and self._selected_path:
             self.cd_to(self._selected_path)
+
+    def action_toggle_command(self) -> None:
+        """Toggle command input visibility."""
+        cmd_input = self.query_one("#command-input")
+        if cmd_input.display:
+            cmd_input.display = False
+            self.query_one("#project-tree").focus()
+        else:
+            cmd_input.display = True
+            cmd_input.focus()
+
+    def action_hide_command(self) -> None:
+        """Hide command input (Escape)."""
+        cmd_input = self.query_one("#command-input")
+        if cmd_input.display:
+            cmd_input.display = False
+            cmd_input.value = ""
+            self.query_one("#project-tree").focus()
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
         """Handle node highlight (hover/selection movement)."""
@@ -1013,8 +1063,10 @@ class MossTUI(App):
                 self.action_primitive_view()
             else:
                 self._log(f"Opened file: {path.name}")
-                self.query_one("#command-input").value = f"view {path}"
-                self.query_one("#command-input").focus()
+                cmd = self.query_one("#command-input")
+                cmd.value = f"view {path}"
+                cmd.display = True
+                cmd.focus()
         elif data["type"] == "dir":
             path = data["path"]
             self._selected_path = str(path)
@@ -1120,10 +1172,13 @@ class MossTUI(App):
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle command input."""
         command = event.value.strip()
+        cmd_input = self.query_one("#command-input")
+        cmd_input.value = ""
+        cmd_input.display = False
+        self.query_one("#project-tree").focus()
+
         if not command:
             return
-
-        self.query_one("#command-input").value = ""
 
         if command == "exit":
             self.exit()
