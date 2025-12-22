@@ -94,6 +94,66 @@ class TaskListContext(ContextStrategy):
         return TaskListContext()
 
 
+class TaskTreeContext(ContextStrategy):
+    """Hierarchical task tree - path from root to current.
+
+    Tracks nested tasks like:
+        Root: "fix all issues"
+        └── Current: "fix type errors"
+            └── Sub: "fix error in main.py"
+
+    Context shows the path, giving LLM awareness of where it is
+    in the overall task hierarchy.
+    """
+
+    def __init__(self, parent: TaskTreeContext | None = None):
+        self._parent = parent
+        self.task: str | None = None
+        self.notes: list[str] = []  # Observations at this level
+        self.children: list[TaskTreeContext] = []
+
+    def add(self, key: str, value: Any) -> None:
+        if key == "task":
+            self.task = str(value)
+        elif key == "note":
+            self.notes.append(str(value))
+        elif key == "result":
+            # Keep last result as note
+            self.notes.append(f"Result: {value}")
+            if len(self.notes) > 3:
+                self.notes.pop(0)
+
+    def get_context(self) -> str:
+        """Return path from root to current."""
+        path = self._get_path()
+        if not path:
+            return ""
+        lines = []
+        for i, node in enumerate(path):
+            indent = "  " * i
+            prefix = "└── " if i > 0 else ""
+            if node.task:
+                lines.append(f"{indent}{prefix}{node.task}")
+            for note in node.notes[-2:]:  # Last 2 notes per level
+                lines.append(f"{indent}    • {note}")
+        return "\n".join(lines)
+
+    def _get_path(self) -> list[TaskTreeContext]:
+        """Get path from root to self."""
+        path = []
+        node: TaskTreeContext | None = self
+        while node is not None:
+            path.append(node)
+            node = node._parent
+        return list(reversed(path))
+
+    def child(self) -> ContextStrategy:
+        """Create child node in tree."""
+        child_ctx = TaskTreeContext(parent=self)
+        self.children.append(child_ctx)
+        return child_ctx
+
+
 # =============================================================================
 # Cache Strategies
 # =============================================================================
@@ -199,14 +259,13 @@ class Scope:
     def run(self, action: str) -> str:
         """Execute an action in this scope.
 
-        For now, just returns placeholder. Real implementation would:
         1. Parse action (DWIM)
-        2. Execute tool
+        2. Execute tool via Rust CLI
         3. Cache result if large
         4. Update context
         """
-        # Placeholder - real impl would call tools
-        result = f"[executed: {action}]"
+        intent = parse_intent(action)
+        result = execute_intent(intent)
 
         # Cache if needed
         preview, _cache_id = self.cache.preview(result)
@@ -215,6 +274,88 @@ class Scope:
         self.context.add("result", preview)
 
         return preview
+
+
+# =============================================================================
+# Intent Parsing (simplified from dwim_loop.py)
+# =============================================================================
+
+# Verb aliases → canonical verb
+VERBS = {
+    # View/explore
+    "view": "view",
+    "show": "view",
+    # Analyze
+    "analyze": "analyze",
+    "check": "analyze",
+    # Edit
+    "edit": "edit",
+    "fix": "edit",
+    # Done
+    "done": "done",
+    "finished": "done",
+}
+
+
+@dataclass
+class Intent:
+    """Parsed intent from LLM output."""
+
+    verb: str  # Canonical verb (view, edit, analyze, done)
+    target: str | None  # Path or symbol
+    args: str | None  # Additional arguments
+    raw: str  # Original text
+
+
+def parse_intent(text: str) -> Intent:
+    """Parse 'view foo.py' → Intent(verb='view', target='foo.py').
+
+    ~20 lines vs dwim_loop.py's 50. Same functionality.
+    """
+    text = text.strip()
+    if not text:
+        return Intent(verb="", target=None, args=None, raw=text)
+
+    parts = text.split(None, 2)
+    first = parts[0].lower()
+
+    verb = VERBS.get(first, "unknown")
+    target = parts[1] if len(parts) > 1 else None
+    args = parts[2] if len(parts) > 2 else None
+
+    return Intent(verb=verb, target=target, args=args, raw=text)
+
+
+def execute_intent(intent: Intent) -> str:
+    """Execute an intent via Rust CLI.
+
+    Returns result string.
+    """
+    if intent.verb == "done":
+        return "done"
+
+    if intent.verb == "unknown":
+        return f"Unknown command: {intent.raw}"
+
+    # Build CLI args
+    cmd = intent.verb
+    args = []
+    if intent.target:
+        args.append(intent.target)
+    if intent.args:
+        args.extend(intent.args.split())
+
+    # Call Rust CLI
+    try:
+        from moss.rust_shim import passthrough
+
+        exit_code = passthrough(cmd, args)
+        if exit_code == 0:
+            return f"[{cmd} {' '.join(args)}] OK"
+        else:
+            return f"[{cmd} {' '.join(args)}] Failed (exit {exit_code})"
+    except Exception as e:
+        return f"Error: {e}"
 
 
 # =============================================================================

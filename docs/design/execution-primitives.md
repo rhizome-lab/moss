@@ -178,31 +178,141 @@ scope TaskTree:
 
 **Recommendation:** Start with Python (it's already there), add TOML for simple cases.
 
+## TOML vs Code: What Can Each Express?
+
+### TOML works for: Sequences and State Machines
+
+```toml
+[workflow]
+name = "validate-fix"
+context = "flat"
+cache = "ephemeral"
+
+# Linear sequence
+[[workflow.steps]]
+action = "analyze --health"
+
+[[workflow.steps]]
+action = "edit {file} 'fix issues'"
+
+[[workflow.steps]]
+action = "analyze --health"  # verify
+```
+
+State machines are also expressible:
+
+```toml
+[[states]]
+name = "analyzing"
+action = "analyze --health"
+
+[[states.transitions]]
+condition = "has_errors"
+next = "fixing"
+
+[[states.transitions]]
+condition = "success"
+next = "done"
+
+[[states]]
+name = "fixing"
+action = "edit {file} 'fix issues'"
+
+[[states.transitions]]
+next = "analyzing"  # always loop back
+```
+
+### TOML awkward for: Nested scopes
+
+```toml
+[[workflow.steps]]
+action = "analyze"
+
+[[workflow.steps]]
+type = "scope"
+context = "task_list"  # different strategy
+
+[[workflow.steps.scope.steps]]  # deeply nested, ugly
+action = "fix issue 1"
+```
+
+### TOML can't express: Computed values
+
+```python
+# Agent: LLM decides next step
+while not done:
+    action = llm.decide(context)  # Can't put LLM call in TOML
+    result = run(action)
+
+# Dynamic iteration
+for issue in find_issues():  # Result of function call
+    run(f"fix {issue}")
+
+# Computed conditions
+if len(errors) > threshold:  # Python expression
+    run("escalate")
+```
+
+### Potential: Inline Python in TOML?
+
+```toml
+[[workflow.steps]]
+action = "analyze"
+condition = "python:len(context.errors) > 0"  # Embedded expression
+
+[[workflow.steps]]
+for_each = "python:find_issues()"  # Iterator expression
+action = "fix {item}"
+```
+
+This bridges the gap but adds complexity. Evaluate whether simpler
+"just use Python" is better than hybrid TOML+Python.
+
+### Conclusion
+
+| Use Case | Representation |
+|----------|----------------|
+| Linear recipe | TOML |
+| State machine | TOML |
+| Nested scopes | TOML (verbose) or Python |
+| Computed values/LLM | Python (or TOML+inline Python) |
+
+**Key insight:** The dividing line is computed values, not control flow.
+TOML can express arbitrary static control flow (including state machines).
+Python is needed when values are computed at runtime.
+
 ## Prototype Status
 
-Implemented in `src/moss/execution/__init__.py` (~200 lines):
+Implemented in `src/moss/execution/__init__.py` (~300 lines):
 
 - [x] Scope with pluggable ContextStrategy
-- [x] Context strategies: FlatContext, TaskListContext
+- [x] Context strategies: FlatContext, TaskListContext, TaskTreeContext
 - [x] Cache strategies: NoCache, InMemoryCache
 - [x] Nested scopes with different strategies
 - [x] Basic agent_loop using primitives
+- [x] parse_intent() - DWIM verb parsing (~20 lines)
+- [x] execute_intent() - routes to rust_shim.passthrough()
+- [x] Scope.run() wired to real execution
 
 Works:
 ```python
-with Scope(context=FlatContext()) as outer:
-    outer.run('analyze')
-    with outer.child(context=TaskListContext()) as inner:
-        # Different strategy for sub-tasks
-        inner.context.add('task', 'fix issue 1')
-    outer.run('verify')
+# Nested TaskTree context
+with Scope(context=TaskTreeContext()) as outer:
+    outer.context.add('task', 'fix all issues')
+    with outer.child() as inner:
+        inner.context.add('task', 'fix type errors')
+        # Context shows hierarchical path:
+        # fix all issues
+        #   └── fix type errors
+
+# Intent parsing
+parse_intent('view main.py')  # → Intent(verb='view', target='main.py')
+parse_intent('fix foo.py')    # → Intent(verb='edit', target='foo.py')
 ```
 
 ## Next Steps
 
-- [ ] Wire up real tool execution (rust_shim.passthrough)
 - [ ] Wire up real LLM calls
-- [ ] Add parse_intent() as simple function
-- [ ] Add TaskTree strategy (hierarchical)
-- [ ] Test with real tasks
+- [ ] Test with real tasks end-to-end
 - [ ] Compare to DWIMLoop output
+- [ ] Replace DWIMLoop with new primitives
