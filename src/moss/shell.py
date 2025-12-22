@@ -609,31 +609,6 @@ class MossShell:
             loc = f"{func.file}:{func.line}"
             self.output.info(f"  {func.name} ({loc}) - {func.complexity} [{grade}]")
 
-    def cmd_health(self, args: list[str]) -> None:
-        """Show project health summary."""
-        from moss.status import check_project_status
-
-        try:
-            status = check_project_status(self.workspace)
-        except (OSError, ValueError) as e:
-            self.output.error(f"Health check failed: {e}")
-            return
-
-        self.output.header(f"Health: {status.health_grade} ({status.health_score}/100)")
-        self.output.blank()
-
-        # Stats
-        self.output.info(f"Python files: {status.stats.get('python_files', 0)}")
-        self.output.info(f"Total lines: {status.stats.get('total_lines', 0)}")
-        self.output.info(f"Doc coverage: {status.stats.get('doc_coverage', 0)}%")
-
-        # Next actions
-        if status.next_actions:
-            self.output.blank()
-            self.output.step("Next actions:")
-            for action in status.next_actions[:5]:
-                self.output.info(f"  - {action}")
-
     def cmd_tree(self, args: list[str]) -> None:
         """Show file tree."""
         path = self._resolve_path(args[0]) if args else self.workspace

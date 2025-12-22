@@ -17,7 +17,11 @@ Moss has **three core primitives**:
 
 Content search (`grep "pattern"`) should eventually become `view --contains "pattern"`. Currently the Rust CLI has a separate `grep` command for performance, but conceptually it's a view filter.
 
-**Legacy commands**: `health`, `summarize`, `check-docs`, `check-todos` predate the 3-primitive design. Use `analyze --health` instead of `health`. Others may be folded into analyze in future.
+**Folded into analyze**: Former standalone commands are now analyze flags:
+- `--health` - codebase health metrics (also in Rust CLI)
+- `--summary` - generate file/directory summary
+- `--check-docs` - check documentation freshness
+- `--check-todos` - check TODO.md accuracy
 
 ---
 
@@ -169,6 +173,10 @@ moss analyze [target] [options]
 | `--health` | Codebase health metrics |
 | `--complexity` | Cyclomatic complexity per function |
 | `--security` | Security vulnerability scanning |
+| `--summary` | Generate file/directory summary |
+| `--check-docs` | Check documentation freshness |
+| `--check-todos` | Check TODO.md accuracy |
+| `--strict` | Exit 1 on warnings (for --check-docs/--check-todos) |
 
 ### Examples
 
@@ -181,130 +189,16 @@ moss analyze --complexity
 
 # Analyze specific file
 moss analyze src/moss/cli.py --security
+
+# Summarize a file
+moss analyze src/moss/cli.py --summary
+
+# Check documentation freshness
+moss analyze --check-docs
+
+# Check TODOs (strict mode for CI)
+moss analyze --check-todos --strict
 ```
-
-## moss summarize
-
-Generate a hierarchical summary of a codebase.
-
-```bash
-moss summarize [directory] [options]
-```
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--include-private`, `-p` | Include private (_prefixed) modules and symbols |
-| `--include-tests`, `-t` | Include test files |
-| `--docs`, `-d` | Summarize documentation files instead of code |
-| `--json`, `-j` | Output as JSON |
-
-### Examples
-
-```bash
-# Summarize current directory
-moss summarize
-
-# Summarize specific project
-moss summarize ~/projects/myapp
-
-# Include everything
-moss summarize --include-private --include-tests
-
-# Summarize documentation instead of code
-moss summarize --docs
-
-# Get JSON for further processing
-moss summarize --json | jq .stats
-```
-
-## moss check-docs
-
-Verify documentation freshness against the codebase.
-
-```bash
-moss check-docs [directory] [options]
-```
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--strict`, `-s` | Exit with error on warnings (not just errors) |
-| `--check-links`, `-l` | Check for broken internal links |
-| `--json`, `-j` | Output as JSON |
-
-### What it checks
-
-- **Stale references**: Documentation mentions code that doesn't exist
-- **Missing documentation**: Code not mentioned in docs
-- **Outdated statistics**: Line counts in README don't match reality
-- **Broken links** (with `-l`): Internal links that point to non-existent files
-
-### Examples
-
-```bash
-# Check current project
-moss check-docs
-
-# Strict mode for CI
-moss check-docs --strict
-
-# Include link verification
-moss check-docs --check-links
-
-# Get structured output
-moss check-docs --json | jq .stats.coverage
-```
-
-## moss check-todos
-
-Verify TODO.md accuracy against implementation and code comments.
-
-```bash
-moss check-todos [directory] [options]
-```
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--strict`, `-s` | Exit with error on orphaned TODOs |
-| `--json`, `-j` | Output as JSON |
-
-### What it checks
-
-- **Tracked items**: Checkbox items in TODO.md with status
-- **Code TODOs**: TODO/FIXME/HACK/XXX comments in source
-- **Orphaned TODOs**: Code TODOs not tracked in TODO.md
-- **Categories**: Groups items by markdown headers
-
-### Examples
-
-```bash
-# Check current project
-moss check-todos
-
-# Strict mode for CI
-moss check-todos --strict
-
-# Get completion stats
-moss check-todos --json | jq .stats
-```
-
-## moss health
-
-**Deprecated**: Use `moss analyze --health` instead.
-
-Show project health and what needs attention.
-
-```bash
-moss health [directory] [options]
-```
-
-Note: This command is deprecated. Prefer `moss analyze --health` for consistency
-with the 3 primitives (view, edit, analyze).
 
 ## Environment Variables
 

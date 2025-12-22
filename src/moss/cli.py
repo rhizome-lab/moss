@@ -1781,226 +1781,6 @@ def cmd_diff(args: Namespace) -> int:
     return 0
 
 
-def cmd_summarize(args: Namespace) -> int:
-    """Generate hierarchical codebase summary."""
-    output = setup_output(args)
-    path = Path(getattr(args, "path", ".")).resolve()
-
-    if not path.exists():
-        output.error(f"Path not found: {path}")
-        return 1
-
-    compact = getattr(args, "compact", False)
-
-    # Try Rust delegation for single files (faster, non-JSON only)
-    if path.is_file() and not wants_json(args):
-        from moss.rust_shim import rust_summarize
-
-        result = rust_summarize(str(path))
-        if result is not None:
-            output.print(result)
-            return 0
-
-    # Single file mode
-    if path.is_file():
-        suffix = path.suffix.lower()
-
-        # Documentation file (markdown, rst, txt)
-        if suffix in (".md", ".rst", ".txt"):
-            from moss.summarize import DocSummarizer
-
-            summarizer = DocSummarizer()
-            summary = summarizer.summarize_file(path)
-
-            if summary is None:
-                output.error(f"Failed to read file: {path}")
-                return 1
-
-            if compact and not wants_json(args):
-                output.print(summary.to_compact())
-            elif wants_json(args):
-                output.data(summary.to_dict())
-            else:
-                output.print(summary.to_markdown())
-
-            return 0
-
-        # Python file
-        elif suffix == ".py":
-            from moss.summarize import Summarizer
-
-            summarizer = Summarizer(
-                include_private=getattr(args, "include_private", False),
-                include_tests=True,  # Include if explicitly targeting a test file
-            )
-            summary = summarizer.summarize_file(path)
-
-            if summary is None:
-                output.error(f"Failed to summarize: {path}")
-                return 1
-
-            if compact and not wants_json(args):
-                # Compact format for single Python file
-                lines_fmt = (
-                    f"{summary.line_count / 1000:.0f}K"
-                    if summary.line_count >= 1000
-                    else str(summary.line_count)
-                )
-                parts = [f"{summary.module_name}.py"]
-                parts.append(f"{lines_fmt} lines")
-                parts.append(f"{len(summary.classes)} classes, {len(summary.functions)} funcs")
-                output.print(" | ".join(parts))
-            elif wants_json(args):
-                output.data(
-                    {
-                        "module": summary.module_name,
-                        "path": str(summary.path),
-                        "docstring": summary.docstring,
-                        "line_count": summary.line_count,
-                        "classes": [
-                            {"name": c.name, "docstring": c.docstring} for c in summary.classes
-                        ],
-                        "functions": [
-                            {"name": f.name, "signature": f.signature, "docstring": f.docstring}
-                            for f in summary.functions
-                        ],
-                    }
-                )
-            else:
-                output.print(summary.to_markdown())
-
-            return 0
-
-        else:
-            output.error(f"Unsupported file type: {suffix}")
-            return 1
-
-    # Directory mode
-    # Check if --docs mode
-    if getattr(args, "docs", False):
-        from moss.summarize import DocSummarizer
-
-        output.info(f"Summarizing documentation in {path.name}...")
-        summarizer = DocSummarizer()
-
-        try:
-            summary = summarizer.summarize_docs(path)
-        except Exception as e:
-            output.error(f"Failed to summarize docs: {e}")
-            return 1
-
-        if compact and not wants_json(args):
-            output.print(summary.to_compact())
-        elif wants_json(args):
-            output.data(summary.to_dict())
-        else:
-            output.print(summary.to_markdown())
-
-        return 0
-
-    # Default: summarize code
-    from moss.summarize import Summarizer
-
-    output.info(f"Summarizing {path.name}...")
-
-    summarizer = Summarizer(
-        include_private=getattr(args, "include_private", False),
-        include_tests=getattr(args, "include_tests", False),
-    )
-
-    try:
-        summary = summarizer.summarize_project(path)
-    except Exception as e:
-        output.error(f"Failed to summarize: {e}")
-        return 1
-
-    # Output format
-    if compact and not wants_json(args):
-        output.print(summary.to_compact())
-    elif wants_json(args):
-        output.data(summary.to_dict())
-    else:
-        output.print(summary.to_markdown())
-
-    return 0
-
-
-def cmd_check_docs(args: Namespace) -> int:
-    """Check documentation freshness against codebase."""
-    from moss import MossAPI
-
-    output = setup_output(args)
-    root = Path(getattr(args, "directory", ".")).resolve()
-
-    if not root.exists():
-        output.error(f"Directory not found: {root}")
-        return 1
-
-    output.info(f"Checking docs in {root.name}...")
-
-    api = MossAPI.for_project(root)
-
-    try:
-        result = api.health.check_docs(check_links=getattr(args, "check_links", False))
-    except Exception as e:
-        output.error(f"Failed to check docs: {e}")
-        return 1
-
-    # Output format
-    compact = getattr(args, "compact", False)
-    if compact and not wants_json(args):
-        output.print(result.to_compact())
-    elif wants_json(args):
-        output.data(result.to_dict())
-    else:
-        output.print(result.to_markdown())
-
-    # Exit code based on issues
-    if result.has_errors:
-        return 1
-    if getattr(args, "strict", False) and result.has_warnings:
-        return 1
-
-    return 0
-
-
-def cmd_check_todos(args: Namespace) -> int:
-    """Check TODOs against implementation status."""
-    from moss import MossAPI
-
-    output = setup_output(args)
-    root = Path(getattr(args, "directory", ".")).resolve()
-
-    if not root.exists():
-        output.error(f"Directory not found: {root}")
-        return 1
-
-    output.info(f"Checking TODOs in {root.name}...")
-
-    api = MossAPI.for_project(root)
-
-    try:
-        result = api.health.check_todos()
-    except Exception as e:
-        output.error(f"Failed to check TODOs: {e}")
-        return 1
-
-    # Output format
-    compact = getattr(args, "compact", False)
-    if compact and not wants_json(args):
-        output.print(result.to_compact())
-    elif wants_json(args):
-        output.data(result.to_dict())
-    else:
-        output.print(result.to_markdown())
-
-    # Exit code based on issues
-    if getattr(args, "strict", False) and result.orphan_count > 0:
-        return 1
-
-    return 0
-
-
 def cmd_mutate(args: Namespace) -> int:
     """Run mutation testing to find undertested code."""
     import asyncio
@@ -3768,103 +3548,6 @@ def cmd_toml(args: Namespace) -> int:
     return 0
 
 
-def cmd_health(args: Namespace) -> int:
-    """Show project health and what needs attention."""
-    from moss import MossAPI
-
-    output = setup_output(args)
-    root = Path(getattr(args, "directory", ".")).resolve()
-
-    if not root.exists():
-        output.error(f"Directory not found: {root}")
-        return 1
-
-    output.info(f"Analyzing {root.name}...")
-
-    # Get filter args
-    focus = getattr(args, "focus", "all")
-    if focus == "all":
-        focus = None
-    severity = getattr(args, "severity", "low")
-
-    try:
-        api = MossAPI.for_project(root)
-        status = api.health.check(focus=focus, severity=severity)
-    except Exception as e:
-        output.error(f"Failed to analyze project: {e}")
-        return 1
-
-    # Output format
-    compact = getattr(args, "compact", False)
-    if compact and not wants_json(args):
-        output.print(status.to_compact())
-    elif wants_json(args):
-        output.data(status.to_dict())
-    else:
-        output.print(_format_concise_health(status))
-
-    # CI mode exit codes
-    if getattr(args, "ci", False):
-        grade = status.health_grade
-        if grade in ("A", "B"):
-            return 0  # Healthy
-        elif grade in ("C", "D"):
-            return 1  # Warnings
-        else:
-            return 2  # Critical
-
-    return 0
-
-
-def _format_concise_health(status) -> str:
-    """Format health status concisely for terminal display."""
-    lines = []
-
-    # Header with grade
-    grade = status.health_grade
-    score = status.health_score
-    lines.append(f"# {status.name}: {grade} ({score}/100)")
-    lines.append("")
-
-    # Compact stats line
-    stats = []
-    stats.append(f"{status.total_files} files")
-    if status.doc_coverage > 0:
-        stats.append(f"{status.doc_coverage:.0%} doc coverage")
-    if status.test_files > 0:
-        stats.append(f"{status.test_ratio:.1f}x test ratio")
-    if status.dep_circular > 0:
-        stats.append(f"{status.dep_circular} circular deps")
-    if status.struct_hotspots > 0:
-        stats.append(f"{status.struct_hotspots} hotspots")
-    lines.append(" | ".join(stats))
-    lines.append("")
-
-    # Show only high-severity issues by default
-    high_issues = [w for w in status.weak_spots if w.severity == "high"]
-    if high_issues:
-        lines.append("## Issues")
-        for w in high_issues[:5]:
-            lines.append(f"- [!] {w.category}: {w.message}")
-        if len(high_issues) > 5:
-            lines.append(f"  ... and {len(high_issues) - 5} more")
-        lines.append("")
-
-    # Next actions (top 3)
-    if status.next_actions:
-        lines.append("## Next Up")
-        for action in sorted(status.next_actions, key=lambda a: a.priority)[:3]:
-            lines.append(f"- {action.description}")
-        lines.append("")
-
-    # Hint for more details
-    if len(status.weak_spots) > len(high_issues):
-        other = len(status.weak_spots) - len(high_issues)
-        lines.append(f"Run `moss report` for full details ({other} more issues)")
-
-    return "\n".join(lines)
-
-
 def cmd_agent(args: Namespace) -> int:
     """Run DWIM-driven agent loop on a task.
 
@@ -5209,99 +4892,6 @@ def create_parser() -> argparse.ArgumentParser:
     )
     edit_parser.set_defaults(func=cmd_edit)
 
-    # summarize command
-    summarize_parser = subparsers.add_parser(
-        "summarize", help="Summarize code or documentation files"
-    )
-    summarize_parser.add_argument(
-        "path",
-        nargs="?",
-        default=".",
-        help="File or directory to summarize (default: current directory)",
-    )
-    summarize_parser.add_argument(
-        "--include-private",
-        "-p",
-        action="store_true",
-        dest="include_private",
-        help="Include private (_prefixed) modules and symbols",
-    )
-    summarize_parser.add_argument(
-        "--include-tests",
-        "-t",
-        action="store_true",
-        dest="include_tests",
-        help="Include test files",
-    )
-    summarize_parser.add_argument(
-        "--json",
-        "-j",
-        action="store_true",
-        help="Output as JSON",
-    )
-    summarize_parser.add_argument(
-        "--docs",
-        "-d",
-        action="store_true",
-        help="Summarize documentation files instead of code",
-    )
-    summarize_parser.set_defaults(func=cmd_summarize)
-
-    # check-docs command
-    check_docs_parser = subparsers.add_parser(
-        "check-docs", help="Check documentation freshness against codebase"
-    )
-    check_docs_parser.add_argument(
-        "directory",
-        nargs="?",
-        default=".",
-        help="Directory to check (default: current)",
-    )
-    check_docs_parser.add_argument(
-        "--strict",
-        "-s",
-        action="store_true",
-        help="Exit with error on warnings (not just errors)",
-    )
-    check_docs_parser.add_argument(
-        "--json",
-        "-j",
-        action="store_true",
-        help="Output as JSON",
-    )
-    check_docs_parser.add_argument(
-        "--check-links",
-        "-l",
-        action="store_true",
-        dest="check_links",
-        help="Check for broken internal links in documentation",
-    )
-    check_docs_parser.set_defaults(func=cmd_check_docs)
-
-    # check-todos command
-    check_todos_parser = subparsers.add_parser(
-        "check-todos", help="Check TODOs against implementation status"
-    )
-    check_todos_parser.add_argument(
-        "directory",
-        nargs="?",
-        default=".",
-        help="Directory to check (default: current)",
-    )
-    check_todos_parser.add_argument(
-        "--strict",
-        "-s",
-        action="store_true",
-        help="Exit with error on orphaned TODOs",
-    )
-    check_todos_parser.add_argument(
-        "--json",
-        "-j",
-        action="store_true",
-        help="Output as JSON",
-    )
-    check_todos_parser.set_defaults(func=cmd_check_todos)
-
     # mutate command
     mutate_parser = subparsers.add_parser(
         "mutate", help="Run mutation testing to find undertested code"
@@ -5417,43 +5007,6 @@ def create_parser() -> argparse.ArgumentParser:
         help="Check license compatibility (exit 1 if issues found)",
     )
     external_deps_parser.set_defaults(func=cmd_external_deps)
-
-    # health command
-    health_parser = subparsers.add_parser(
-        "health", help="Show project health and what needs attention"
-    )
-    health_parser.add_argument(
-        "directory",
-        nargs="?",
-        default=".",
-        help="Directory to analyze (default: current)",
-    )
-    health_parser.add_argument(
-        "--json",
-        "-j",
-        action="store_true",
-        help="Output as JSON",
-    )
-    health_parser.add_argument(
-        "--focus",
-        "-f",
-        choices=["deps", "tests", "complexity", "api", "all"],
-        default="all",
-        help="Focus on specific analysis area",
-    )
-    health_parser.add_argument(
-        "--severity",
-        "-s",
-        choices=["low", "medium", "high"],
-        default="low",
-        help="Minimum severity to show (default: low = show all)",
-    )
-    health_parser.add_argument(
-        "--ci",
-        action="store_true",
-        help="CI mode: exit 0=healthy, 1=warnings, 2=critical",
-    )
-    health_parser.set_defaults(func=cmd_health)
 
     # report command (verbose health)
     report_parser = subparsers.add_parser(
@@ -6091,6 +5644,84 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _cmd_analyze_python(argv: list[str]) -> int:
+    """Handle Python-only analyze flags (--summary, --check-docs, --check-todos)."""
+    import argparse
+    import json
+
+    from moss import MossAPI
+
+    parser = argparse.ArgumentParser(prog="moss analyze")
+    parser.add_argument("target", nargs="?", default=".", help="Target path")
+    parser.add_argument("--summary", action="store_true", help="Generate summary")
+    parser.add_argument("--check-docs", action="store_true", help="Check documentation")
+    parser.add_argument("--check-todos", action="store_true", help="Check TODOs")
+    parser.add_argument("--json", action="store_true", help="JSON output")
+    parser.add_argument("--compact", action="store_true", help="Compact output")
+    parser.add_argument("--strict", action="store_true", help="Strict mode (exit 1 on warnings)")
+    parser.add_argument("--check-links", action="store_true", help="Check doc links")
+    args = parser.parse_args(argv)
+
+    root = Path(args.target).resolve()
+    if not root.exists():
+        print(f"Error: Path not found: {root}", file=sys.stderr)
+        return 1
+
+    api = MossAPI.for_project(root)
+
+    if args.summary:
+        from moss.summarize import Summarizer
+
+        summarizer = Summarizer()
+        if root.is_file():
+            result = summarizer.summarize_file(root)
+        else:
+            result = summarizer.summarize_directory(root)
+
+        if result is None:
+            print(f"Error: Failed to summarize {root}", file=sys.stderr)
+            return 1
+
+        if args.json:
+            print(json.dumps(result.to_dict(), indent=2))
+        elif args.compact:
+            print(result.to_compact())
+        else:
+            print(result.to_markdown())
+        return 0
+
+    if args.check_docs:
+        result = api.health.check_docs(check_links=args.check_links)
+        if args.json:
+            print(json.dumps(result.to_dict(), indent=2))
+        elif args.compact:
+            print(result.to_compact())
+        else:
+            print(result.to_markdown())
+        if result.has_errors:
+            return 1
+        if args.strict and result.has_warnings:
+            return 1
+        return 0
+
+    if args.check_todos:
+        result = api.health.check_todos()
+        if args.json:
+            print(json.dumps(result.to_dict(), indent=2))
+        elif args.compact:
+            print(result.to_compact())
+        else:
+            print(result.to_markdown())
+        if args.strict and result.orphan_count > 0:
+            return 1
+        return 0
+
+    # Fallback to Rust for other flags
+    from moss.rust_shim import passthrough
+
+    return passthrough("analyze", argv)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point."""
     if argv is None:
@@ -6098,7 +5729,6 @@ def main(argv: list[str] | None = None) -> int:
 
     # Commands that delegate entirely to Rust CLI (no Python parsing needed)
     # Core primitives: view, edit (structural), analyze
-    # Note: summarize kept in Python for directory mode and --docs flag
     # Note: Python edit kept for LLM-based intelligent editing
     RUST_PASSTHROUGH = {
         # Core primitives
@@ -6114,7 +5744,6 @@ def main(argv: list[str] | None = None) -> int:
         "deps",
         "expand",
         "grep",
-        "health",
         "overview",
         "path",
         "search-tree",
@@ -6122,8 +5751,15 @@ def main(argv: list[str] | None = None) -> int:
         "tree",
     }
 
+    # Python-only analyze flags (intercept before Rust passthrough)
+    PYTHON_ANALYZE_FLAGS = {"--summary", "--check-docs", "--check-todos"}
+
     # Check for passthrough before argparse to avoid double-parsing
     if argv and argv[0] in RUST_PASSTHROUGH:
+        # Intercept analyze with Python-only flags
+        if argv[0] == "analyze" and any(f in argv for f in PYTHON_ANALYZE_FLAGS):
+            return _cmd_analyze_python(argv[1:])
+
         from moss.rust_shim import passthrough
 
         return passthrough(argv[0], argv[1:])
