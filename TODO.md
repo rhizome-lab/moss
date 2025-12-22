@@ -64,10 +64,11 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [ ] Consolidate redundant layers discovered Dec 22:
   - [x] SkeletonAPI.expand → now uses `view path/symbol` via rust_shim
   - rust_shim naming: `rust_skeleton` → should be `rust_view` (calls `view` not `skeleton`)
-  - [ ] Merge `moss agent` and `moss workflow run`:
-    - `moss agent "task"` - agentic (LLM decides steps, uses dwim.toml)
-    - `moss agent --workflow name` - step-based (uses predefined workflow)
-    - Requires: extend execution primitives to support step-based workflows
+  - [ ] Unify under `moss workflow run`:
+    - `moss workflow run dwim "task"` - agentic (dwim is just a workflow)
+    - `moss workflow run validate-fix` - step-based
+    - `moss agent` becomes alias for `moss workflow run dwim`
+    - Requires: extend execution primitives for step-based workflows
     - Then: remove AgentLoop, MossToolExecutor, old workflow loader
   - [x] DWIMLoop removed - replaced by composable execution primitives (src/moss/execution/)
   - Python edit → redundant with agent, remove
