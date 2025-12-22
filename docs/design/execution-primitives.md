@@ -362,7 +362,7 @@ with Scope(context=TaskTreeContext()) as outer:
 DWIMLoop should not be a special class. It should be a predefined workflow:
 
 ```toml
-# What DWIMLoop becomes - just a TOML workflow:
+# Agentic workflow - LLM decides steps dynamically
 [workflow]
 name = "dwim"
 
@@ -382,6 +382,27 @@ strategy = "simple"
 provider = "anthropic"
 model = "claude-3-haiku"
 system_prompt = "..." # or reference a file
+```
+
+Note: No `workflow.steps` - the LLM generates steps dynamically.
+For non-agentic workflows, replace `workflow.llm` with explicit steps:
+
+```toml
+# Non-agentic workflow - predefined steps
+[workflow]
+name = "validate-fix"
+
+[workflow.context]
+strategy = "flat"
+
+[[workflow.steps]]
+action = "analyze --health"
+
+[[workflow.steps]]
+action = "edit {file} 'fix issues'"
+
+[[workflow.steps]]
+action = "analyze --health"
 ```
 
 Python equivalent (for programmatic use):
