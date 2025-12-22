@@ -11,6 +11,8 @@
 - Extensible via `CONDITION_PLUGINS` registry
 - Example workflow: `validate-fix.toml` (analyze → fix → verify loop)
 - State lifecycle hooks: `on_entry` (when entering state), `on_exit` (before leaving)
+- Parallel state execution: `parallel` (list of states) + `join` (target state)
+- Fork/join semantics via ThreadPoolExecutor, results collected as `parallel_result`
 
 **Nested Steps** (Dec 23 2025)
 - WorkflowStep now supports compound steps (with sub-steps)
@@ -19,6 +21,9 @@
 - Design doc for multi-agent communication: docs/nested-execution.md
 - Context modes for compound steps: `isolated` (default), `shared`, `inherited`
 - InheritedContext wrapper: child sees parent context (read), writes to own storage
+- `summarize` option for compound steps: generates child result summary for parent
+- StepResult dataclass with success, summary, child_results
+- _summarize_children for TaskTreeContext and generic context summarization
 
 **Explore TUI** (Dec 23 2025)
 - Ctrl+P opens command palette with Goto File, View, Analyze commands
@@ -32,6 +37,12 @@
 - Added docs/rust-python-boundary.md: decision framework for Rust vs Python features
 - Rust = plumbing (deterministic, performance-critical, syntax-aware)
 - Python = interface (LLM, orchestration, TUI, plugins)
+
+**Modal Keybinds Design** (Dec 23 2025)
+- Complete design in docs/tui.md for mode-specific keybindings
+- TUIMode.bindings property for mode-specific bindings
+- active_bindings merges global + mode bindings (mode overrides on conflict)
+- KeybindBar refresh on mode change
 
 ### Refactoring
 
