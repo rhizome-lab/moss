@@ -383,10 +383,10 @@ class KeybindBar(Static):
         # Palette uses Textual's built-in command_palette action
         right = "\\[^p] Palette"
         # Calculate padding to right-align palette
-        # Approximate visible length (markup tags don't count)
-        left_len = (
-            sum(len(b.description) + 3 for b in self.app.BINDINGS if b.show) if self.app else 0
-        )
+        # Visible length: description + 3 chars for brackets (e.g., "[Q]uit")
+        # Plus spaces between items
+        shown = [b for b in self.app.BINDINGS if b.show] if self.app else []
+        left_len = sum(len(b.description) + 3 for b in shown) + max(0, len(shown) - 1)
         right_len = len("[^p] Palette")
         width = self.size.width if self.size.width > 0 else 80
         padding = max(1, width - left_len - right_len - 2)
@@ -607,13 +607,19 @@ class ProjectTree(Tree[Any]):
             ".css",  # Web
             ".toml",  # Config
         )
+        symbols_found = False
         if self._api and path.suffix in supported_exts:
             try:
                 symbols = self._api.skeleton.extract(path)
                 if symbols:
                     add_symbols(event.node, symbols, path)
+                    symbols_found = True
             except (OSError, ValueError, SyntaxError):
                 pass
+
+        # Hide expand arrow if no symbols were loaded
+        if not symbols_found:
+            event.node.allow_expand = False
 
 
 class MossTUI(App):
@@ -751,6 +757,8 @@ class MossTUI(App):
         Binding("tab", "next_mode", "Mode", show=False),
         Binding("enter", "enter_dir", "Enter", show=False),
         Binding("escape", "hide_command", show=False),
+        Binding("left", "tree_collapse", "Collapse", show=False),
+        Binding("right", "tree_expand", "Expand", show=False),
     ]
 
     current_mode_name = reactive("EXPLORE")
@@ -763,6 +771,8 @@ class MossTUI(App):
         self._last_ctrl_c: float = 0
         self._tree_root: Path = api.root  # Current root for file tree
         self._transparent_bg: bool = False  # For terminal opacity support
+        self._last_preview_update: float = 0  # Throttle preview updates
+        self._preview_throttle_ms: int = 100  # Min ms between updates
 
     def action_handle_ctrl_c(self) -> None:
         """Handle Ctrl+C with double-tap to exit."""
@@ -1017,6 +1027,22 @@ class MossTUI(App):
         if self._selected_type == "dir" and self._selected_path:
             self.action_cd_to(self._selected_path)
 
+    def action_tree_expand(self) -> None:
+        """Expand the current tree node."""
+        tree = self.query_one("#project-tree", ProjectTree)
+        if tree.cursor_node and tree.cursor_node.allow_expand:
+            tree.cursor_node.expand()
+
+    def action_tree_collapse(self) -> None:
+        """Collapse the current tree node or go to parent."""
+        tree = self.query_one("#project-tree", ProjectTree)
+        if tree.cursor_node:
+            if tree.cursor_node.is_expanded:
+                tree.cursor_node.collapse()
+            elif tree.cursor_node.parent:
+                # If already collapsed, go to parent node
+                tree.select_node(tree.cursor_node.parent)
+
     def action_toggle_command(self) -> None:
         """Toggle command input visibility."""
         cmd_input = self.query_one("#command-input")
@@ -1091,9 +1117,14 @@ class MossTUI(App):
             tooltip.file_path = None
             tooltip.content = ""
 
-        # Auto-update preview on arrow navigation in EXPLORE mode
+        # Auto-update preview on arrow navigation in EXPLORE mode (throttled)
         if self.current_mode_name == "EXPLORE" and data["type"] in ("file", "symbol"):
-            self.action_primitive_view()
+            import time
+
+            now = time.time() * 1000  # ms
+            if now - self._last_preview_update >= self._preview_throttle_ms:
+                self._last_preview_update = now
+                self.action_primitive_view()
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         """Handle tree node selection (click/enter)."""
@@ -1399,6 +1430,16 @@ class MossTUI(App):
             explore_detail.write("[dim](no section data)[/]")
             return
 
+        # For headings with children, show tree structure
+        children = getattr(symbol, "children", [])
+        if children:
+            explore_header.update(f"{symbol.signature} ({len(children)} subsections)")
+            # Build tree view of children
+            lines = [f"[b]{symbol.name}[/b]"]
+            self._format_heading_tree(children, lines, indent=1)
+            explore_detail.write("\n".join(lines))
+            return
+
         try:
             content = file_path.read_text()
             lines = content.splitlines()
@@ -1420,6 +1461,15 @@ class MossTUI(App):
             explore_detail.write(md)
         except OSError as e:
             explore_detail.write(f"[red]Error: {e}[/]")
+
+    def _format_heading_tree(self, symbols: list, lines: list[str], indent: int) -> None:
+        """Format markdown headings as a tree structure."""
+        prefix = "  " * indent
+        for sym in symbols:
+            lines.append(f"{prefix}├─ {sym.name}")
+            children = getattr(sym, "children", [])
+            if children:
+                self._format_heading_tree(children, lines, indent + 1)
 
     def action_primitive_edit(self) -> None:
         """Edit the currently selected node."""
@@ -1520,11 +1570,22 @@ class MossTUI(App):
                         else:
                             explore_detail.write(skeleton)
                     else:
-                        # No symbols - show the full file content
+                        # No symbols - show the full file content (limited for large data files)
                         from pathlib import Path
 
+                        # Data files and lockfiles can be huge - limit preview
+                        data_exts = (".json", ".yaml", ".yml", ".toml", ".lock", ".lockb")
+                        is_data_file = any(target.endswith(ext) for ext in data_exts)
+                        max_lines = 50 if is_data_file else 500
+
                         try:
-                            content = Path(target).read_text(errors="replace")
+                            file_path = Path(target)
+                            content = file_path.read_text(errors="replace")
+                            lines = content.splitlines()
+                            truncated = len(lines) > max_lines
+                            if truncated:
+                                content = "\n".join(lines[:max_lines])
+
                             lexer = self._get_lexer_for_path(target)
                             if lexer:
                                 from rich.syntax import Syntax
@@ -1539,6 +1600,11 @@ class MossTUI(App):
                                 explore_detail.write(syntax)
                             else:
                                 explore_detail.write(content)
+
+                            if truncated:
+                                explore_detail.write(
+                                    f"\n[dim]... truncated ({len(lines) - max_lines} more lines)[/]"
+                                )
                         except (OSError, UnicodeDecodeError):
                             explore_detail.write("[dim](unable to read file)[/]")
                 else:  # symbol
