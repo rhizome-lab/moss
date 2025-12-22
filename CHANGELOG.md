@@ -21,9 +21,10 @@
 - InheritedContext wrapper: child sees parent context (read), writes to own storage
 
 **Explore TUI** (Dec 23 2025)
-- Jump-to-node shortcut: press `g` for fuzzy file navigation
-- Fuzzy matching prioritizes: exact name > starts-with > contains in name > in path
-- Shows alternative matches when multiple files match
+- Ctrl+P opens command palette with Goto File, View, Analyze commands
+- Goto uses Rust index (`find-symbols`) for symbol search - works without git
+- Tree file listing uses new `list-files` Rust command (no more git ls-files dependency)
+- `g` shortcut still works as hidden alias for quick goto
 
 ### Documentation
 
