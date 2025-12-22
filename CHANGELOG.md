@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Features
+
+**External Index Location** (Dec 22 2025)
+- New `MOSS_INDEX_DIR` environment variable for custom data/index location
+- Absolute path: uses directory directly (`MOSS_INDEX_DIR=/tmp/moss`)
+- Relative path: uses `$XDG_DATA_HOME/moss/<path>` (`MOSS_INDEX_DIR=myproject`)
+- Falls back to `.moss` in project root if not set
+- Useful for repos that don't have `.moss` in `.gitignore`
+
+**Multi-Language Call Graphs** (Dec 22 2025)
+- Added call extraction for TypeScript, JavaScript, Java, and Go
+- TS/JS: extracts function calls with qualifiers (e.g., `obj.method()`)
+- Java: handles method invocations with object qualifiers
+- Go: handles both package calls and method calls
+- Centralized SOURCE_EXTENSIONS constant for consistent file filtering
+
 ### Performance
 
 **Explore TUI Instant Startup** (Dec 22 2025)
