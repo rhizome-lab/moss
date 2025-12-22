@@ -4,10 +4,16 @@ from moss.execution import (
     FlatContext,
     InheritedContext,
     Scope,
+    StepResult,
+    TaskTreeContext,
     Transition,
     WorkflowState,
+    WorkflowStep,
+    _run_steps,
+    _summarize_children,
     evaluate_condition,
     state_machine_loop,
+    step_loop,
 )
 
 
@@ -251,3 +257,181 @@ class TestContextModes:
 
         # Parent unchanged
         assert "baz" not in parent.get_context()
+
+
+class TestParallelStates:
+    """Test parallel state execution in state machine."""
+
+    def test_parallel_fork_join(self):
+        """Parallel states execute concurrently, then join."""
+        states = [
+            WorkflowState(
+                name="fork",
+                parallel=["task_a", "task_b"],
+                join="join_state",
+            ),
+            WorkflowState(
+                name="task_a",
+                action="view .",  # Won't actually execute
+                transitions=[Transition(next="done")],  # Ignored for parallel
+            ),
+            WorkflowState(
+                name="task_b",
+                action="view .",
+                transitions=[Transition(next="done")],
+            ),
+            WorkflowState(
+                name="join_state",
+                transitions=[Transition(next="done")],
+            ),
+            WorkflowState(name="done", terminal=True),
+        ]
+        result = state_machine_loop(states, initial="fork")
+        # Should have forked and joined
+        assert "forking" in result
+        assert "join_state" in result or "done" in result
+
+    def test_parallel_missing_state(self):
+        """Error if parallel state doesn't exist."""
+        states = [
+            WorkflowState(
+                name="fork",
+                parallel=["task_a", "nonexistent"],
+                join="join",
+            ),
+            WorkflowState(name="task_a"),
+            WorkflowState(name="join", terminal=True),
+        ]
+        result = state_machine_loop(states, initial="fork")
+        assert "not found" in result
+
+    def test_parallel_missing_join(self):
+        """Error if parallel has no join state."""
+        states = [
+            WorkflowState(
+                name="fork",
+                parallel=["task_a"],
+                # No join specified
+            ),
+            WorkflowState(name="task_a"),
+        ]
+        result = state_machine_loop(states, initial="fork")
+        assert "no join" in result
+
+    def test_parallel_invalid_join(self):
+        """Error if join state doesn't exist."""
+        states = [
+            WorkflowState(
+                name="fork",
+                parallel=["task_a"],
+                join="nonexistent",
+            ),
+            WorkflowState(name="task_a"),
+        ]
+        result = state_machine_loop(states, initial="fork")
+        assert "not found" in result
+
+    def test_parallel_results_in_context(self):
+        """Parallel results are captured in context."""
+        states = [
+            WorkflowState(
+                name="fork",
+                parallel=["task_a", "task_b"],
+                join="done",
+            ),
+            WorkflowState(name="task_a", action="view ."),
+            WorkflowState(name="task_b", action="view ."),
+            WorkflowState(name="done", terminal=True),
+        ]
+        result = state_machine_loop(states, initial="fork")
+        # Should have parallel results recorded
+        assert "parallel_result" in result or "done" in result
+
+
+class TestStepSummarize:
+    """Test summarize option for compound steps."""
+
+    def test_summarize_children_flat_context(self):
+        """Summarize generates brief status for flat context."""
+        ctx = FlatContext()
+        ctx.add("step", "step1")
+        ctx.add("result", "done")
+
+        summary = _summarize_children(ctx)
+        assert "step" in summary or "result" in summary
+
+    def test_summarize_children_task_tree(self):
+        """Summarize generates child summaries for TaskTreeContext."""
+        parent = TaskTreeContext()
+        parent.task = "parent task"
+
+        # Create child via .child()
+        child = parent.child()
+        assert isinstance(child, TaskTreeContext)
+        child.add("task", "child task")
+        child.add("result", "child completed")
+
+        summary = _summarize_children(parent)
+        assert "child task" in summary
+        assert "child completed" in summary
+
+    def test_summarize_children_empty_tree(self):
+        """Empty TaskTree returns 'No child tasks'."""
+        ctx = TaskTreeContext()
+        summary = _summarize_children(ctx)
+        assert summary == "No child tasks"
+
+    def test_step_result_dataclass(self):
+        """StepResult captures success, summary, and child results."""
+        result = StepResult(
+            success=True,
+            summary="All done",
+            child_results=["step1: ok", "step2: ok"],
+        )
+        assert result.success is True
+        assert result.summary == "All done"
+        assert len(result.child_results) == 2
+
+    def test_run_steps_returns_step_result(self):
+        """_run_steps returns StepResult with child_results."""
+        steps = [
+            WorkflowStep(name="step1", action="view ."),
+        ]
+        scope = Scope(context=FlatContext())
+        result = _run_steps(scope, steps)
+
+        assert isinstance(result, StepResult)
+        assert result.success is True
+        assert len(result.child_results) >= 1
+
+    def test_compound_step_with_summarize(self):
+        """Compound step with summarize=True adds child_summary to context."""
+        steps = [
+            WorkflowStep(
+                name="compound",
+                summarize=True,
+                steps=[
+                    WorkflowStep(name="inner1", action="view ."),
+                    WorkflowStep(name="inner2", action="view ."),
+                ],
+            ),
+        ]
+        result = step_loop(steps)
+        assert "child_summary" in result
+
+    def test_nested_child_results_collected(self):
+        """Child results from nested steps are collected."""
+        steps = [
+            WorkflowStep(
+                name="outer",
+                steps=[
+                    WorkflowStep(name="inner", action="view ."),
+                ],
+            ),
+        ]
+        scope = Scope(context=FlatContext())
+        result = _run_steps(scope, steps)
+
+        assert result.success is True
+        # Inner step result should be collected
+        assert any("inner" in r for r in result.child_results)

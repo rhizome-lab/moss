@@ -244,13 +244,11 @@ def _run_steps(scope, steps):
 
 ## Open Questions
 
-1. **TOML representation**: How to express `context_mode` and `summarize` in TOML workflows?
+1. **TOML representation**: ~~How to express `context_mode` and `summarize` in TOML workflows?~~
+   IMPLEMENTED: Both are parsed from step config in load_workflow().
 
-2. **Parallel steps**: Should compound steps support parallel execution of sub-steps?
-   ```python
-   steps: list[WorkflowStep] | None = None
-   parallel: bool = False  # Run steps in parallel?
-   ```
+2. **Parallel steps**: ~~Should compound steps support parallel execution of sub-steps?~~
+   IMPLEMENTED: State machine has `parallel` and `join` fields for fork/join patterns.
 
 3. **Conditional steps**: Should sub-steps support conditions?
    ```python
@@ -272,9 +270,9 @@ Phase 2: Context modes
 - [x] Document when to use each mode (see WorkflowStep docstring)
 
 Phase 3: Feedback
-- [ ] Add `summarize` option to compound steps
-- [ ] Expose child results to parent
-- [ ] Add summary generation for TaskTree children
+- [x] Add `summarize` option to compound steps
+- [x] Expose child results to parent (StepResult.child_results)
+- [x] Add summary generation for TaskTree children (_summarize_children)
 
 Phase 4: Advanced patterns
 - [ ] Parallel step execution

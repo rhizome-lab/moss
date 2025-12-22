@@ -809,6 +809,18 @@ def evaluate_condition(condition: str, context: str, result: str) -> bool:
 
 
 @dataclass
+class StepResult:
+    """Result from a compound step execution.
+
+    Contains child results for parent access.
+    """
+
+    success: bool
+    summary: str = ""
+    child_results: list[str] = field(default_factory=list)
+
+
+@dataclass
 class WorkflowStep:
     """A predefined step in a workflow.
 
@@ -819,6 +831,9 @@ class WorkflowStep:
     - isolated: Child gets fresh context via context.child() (default)
     - shared: Child uses same context object as parent
     - inherited: Child sees parent context (read), writes to own
+
+    Feedback control:
+    - summarize: If True, generate a summary of child results for parent context
     """
 
     name: str
@@ -827,6 +842,7 @@ class WorkflowStep:
     on_error: str = "fail"  # "fail", "skip", "retry"
     max_retries: int = 1
     context_mode: str = "isolated"  # "isolated", "shared", "inherited"
+    summarize: bool = False  # Summarize child results for parent
 
 
 @dataclass
@@ -843,8 +859,13 @@ class WorkflowState:
 
     Lifecycle hooks run in this order:
     1. on_entry (when entering state)
-    2. action (main state logic)
+    2. action (main state logic) OR parallel states
     3. on_exit (before transitioning out)
+
+    Parallel execution:
+    If `parallel` is set, the state forks into parallel sub-states.
+    All parallel states execute concurrently, then join back.
+    The `join` field specifies which state to transition to after all complete.
     """
 
     name: str
@@ -853,6 +874,8 @@ class WorkflowState:
     terminal: bool = False  # End state?
     on_entry: str | None = None  # Run when entering state
     on_exit: str | None = None  # Run before leaving state
+    parallel: list[str] | None = None  # State names to execute in parallel
+    join: str | None = None  # State to transition to after parallel completion
 
 
 @dataclass
@@ -954,6 +977,7 @@ def load_workflow(path: str) -> WorkflowConfig:
                     on_error=step_cfg.get("on_error", "fail"),
                     max_retries=step_cfg.get("max_retries", 1),
                     context_mode=step_cfg.get("context_mode", "isolated"),
+                    summarize=step_cfg.get("summarize", False),
                 )
             )
         return result
@@ -984,6 +1008,8 @@ def load_workflow(path: str) -> WorkflowConfig:
                     terminal=state_cfg.get("terminal", False),
                     on_entry=state_cfg.get("on_entry"),
                     on_exit=state_cfg.get("on_exit"),
+                    parallel=state_cfg.get("parallel"),
+                    join=state_cfg.get("join"),
                 )
             )
         return result
@@ -1007,7 +1033,31 @@ def load_workflow(path: str) -> WorkflowConfig:
     )
 
 
-def _run_steps(scope: Scope, steps: list[WorkflowStep]) -> bool:
+def _summarize_children(context: ContextStrategy) -> str:
+    """Generate a summary of child results from a context.
+
+    For TaskTreeContext, summarizes child nodes.
+    For other contexts, returns a brief status.
+    """
+    if isinstance(context, TaskTreeContext):
+        if not context.children:
+            return "No child tasks"
+        summaries = []
+        for child in context.children:
+            task = child.task or "unnamed"
+            notes = child.notes[-1] if child.notes else "completed"
+            summaries.append(f"- {task}: {notes}")
+        return "\n".join(summaries)
+
+    # Generic fallback
+    ctx = context.get_context()
+    lines = ctx.strip().split("\n")
+    if len(lines) <= 3:
+        return ctx
+    return "\n".join(lines[-3:]) + f"\n... ({len(lines)} total items)"
+
+
+def _run_steps(scope: Scope, steps: list[WorkflowStep]) -> StepResult:
     """Run steps in a scope, handling both simple and compound steps.
 
     Args:
@@ -1015,8 +1065,10 @@ def _run_steps(scope: Scope, steps: list[WorkflowStep]) -> bool:
         steps: List of workflow steps to execute
 
     Returns:
-        True if all steps succeeded, False if stopped on error
+        StepResult with success status, summary, and child results
     """
+    child_results: list[str] = []
+
     for step in steps:
         scope.context.add("step", step.name)
 
@@ -1024,7 +1076,9 @@ def _run_steps(scope: Scope, steps: list[WorkflowStep]) -> bool:
             if step.steps:
                 # Compound step: create child scope and run sub-steps
                 with scope.child(mode=step.context_mode) as child_scope:
-                    if not _run_steps(child_scope, step.steps):
+                    child_result = _run_steps(child_scope, step.steps)
+
+                    if not child_result.success:
                         # Sub-step failed with on_error="fail"
                         if step.on_error == "skip":
                             scope.context.add("skipped", f"{step.name}: sub-step failed")
@@ -1032,11 +1086,26 @@ def _run_steps(scope: Scope, steps: list[WorkflowStep]) -> bool:
                         elif step.on_error != "fail":
                             continue
                         else:
-                            return False
+                            return StepResult(
+                                success=False,
+                                summary=f"Failed at {step.name}",
+                                child_results=child_results,
+                            )
+
+                    # Collect child results
+                    child_results.extend(child_result.child_results)
+
+                    # Generate summary if requested
+                    if step.summarize:
+                        summary = _summarize_children(child_scope.context)
+                        scope.context.add("child_summary", f"{step.name}:\n{summary}")
+                        child_results.append(f"{step.name}: {summary}")
+
             elif step.action:
                 # Simple step: execute action
                 result = scope.run(step.action)
                 scope.context.add("result", result)
+                child_results.append(f"{step.name}: {result[:100]}")
             else:
                 # Neither action nor steps - skip
                 scope.context.add("skipped", f"{step.name}: no action or steps")
@@ -1054,18 +1123,31 @@ def _run_steps(scope: Scope, steps: list[WorkflowStep]) -> bool:
                         if step.action:
                             result = scope.run(step.action)
                             scope.context.add("result", result)
+                            child_results.append(f"{step.name}: {result[:100]}")
                             success = True
                             break
                     except Exception:
                         continue
                 if not success:
                     scope.context.add("error", f"{step.name}: {e}")
-                    return False
+                    return StepResult(
+                        success=False,
+                        summary=f"Failed at {step.name}: {e}",
+                        child_results=child_results,
+                    )
             else:
                 scope.context.add("error", f"{step.name}: {e}")
-                return False
+                return StepResult(
+                    success=False,
+                    summary=f"Failed at {step.name}: {e}",
+                    child_results=child_results,
+                )
 
-    return True
+    return StepResult(
+        success=True,
+        summary=f"Completed {len(steps)} steps",
+        child_results=child_results,
+    )
 
 
 def step_loop(
@@ -1104,6 +1186,49 @@ def step_loop(
     return scope.context.get_context()
 
 
+def _execute_state(
+    state: WorkflowState,
+    scope: Scope,
+    state_map: dict[str, WorkflowState],
+    prev_state: WorkflowState | None,
+) -> tuple[str, str]:
+    """Execute a single state and return (result, next_state_name or empty).
+
+    Returns:
+        Tuple of (action result, next state name or "" if terminal/no transition)
+    """
+    scope.context.add("state", state.name)
+
+    # Run on_entry hook (if entering new state)
+    if state.on_entry and state != prev_state:
+        scope.run(state.on_entry)
+
+    if state.terminal:
+        scope.context.add("result", "Terminal state reached")
+        return "", ""
+
+    # Execute state action
+    result = ""
+    if state.action:
+        result = scope.run(state.action)
+
+    # Find matching transition
+    next_state_name = ""
+    for t in state.transitions:
+        if t.condition is None:
+            next_state_name = t.next
+            break
+        if evaluate_condition(t.condition, scope.context.get_context(), result):
+            next_state_name = t.next
+            break
+
+    # Run on_exit hook before transitioning
+    if next_state_name and state.on_exit:
+        scope.run(state.on_exit)
+
+    return result, next_state_name
+
+
 def state_machine_loop(
     states: list[WorkflowState],
     initial: str,
@@ -1114,6 +1239,10 @@ def state_machine_loop(
     initial_context: dict[str, str] | None = None,
 ) -> str:
     """Execute state machine until terminal state or limit.
+
+    Supports parallel state execution: if a state has `parallel` set,
+    all listed states execute concurrently via ThreadPoolExecutor,
+    then transition to the `join` state.
 
     Args:
         states: List of workflow states
@@ -1127,6 +1256,8 @@ def state_machine_loop(
     Returns:
         Final context string
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     scope = Scope(
         context=context or FlatContext(),
         cache=cache or InMemoryCache(),
@@ -1146,47 +1277,71 @@ def state_machine_loop(
         return scope.context.get_context()
 
     current = state_map[initial]
-
     prev_state: WorkflowState | None = None
 
     for _ in range(max_transitions):
-        scope.context.add("state", current.name)
+        # Check for parallel execution
+        if current.parallel:
+            # Validate parallel states exist
+            missing = [s for s in current.parallel if s not in state_map]
+            if missing:
+                scope.context.add("error", f"Parallel states not found: {missing}")
+                break
 
-        # Run on_entry hook (if entering new state)
-        if current.on_entry and current != prev_state:
-            scope.run(current.on_entry)
+            if not current.join:
+                scope.context.add("error", f"State '{current.name}' has parallel but no join")
+                break
+
+            if current.join not in state_map:
+                scope.context.add("error", f"Join state '{current.join}' not found")
+                break
+
+            scope.context.add("state", f"{current.name} (forking)")
+
+            # Run on_entry for the fork state
+            if current.on_entry and current != prev_state:
+                scope.run(current.on_entry)
+
+            # Execute parallel states concurrently
+            parallel_states = [state_map[s] for s in current.parallel]
+
+            def run_parallel_state(pstate: WorkflowState) -> tuple[str, str, str]:
+                """Run a state in parallel, return (name, result, next)."""
+                with scope.child() as child_scope:
+                    result, next_name = _execute_state(pstate, child_scope, state_map, None)
+                    return pstate.name, result, next_name
+
+            results: list[tuple[str, str, str]] = []
+            with ThreadPoolExecutor(max_workers=len(parallel_states)) as executor:
+                futures = {executor.submit(run_parallel_state, ps): ps for ps in parallel_states}
+                for future in as_completed(futures):
+                    results.append(future.result())
+
+            # Record parallel results
+            for name, result, _ in results:
+                scope.context.add("parallel_result", f"{name}: {result[:100]}")
+
+            # Run on_exit for the fork state
+            if current.on_exit:
+                scope.run(current.on_exit)
+
+            prev_state = current
+            current = state_map[current.join]
+            continue
+
+        # Normal sequential execution
+        result, next_state_name = _execute_state(current, scope, state_map, prev_state)
 
         if current.terminal:
-            scope.context.add("result", "Terminal state reached")
             break
 
-        # Execute state action
-        result = ""
-        if current.action:
-            result = scope.run(current.action)
-
-        # Find matching transition
-        next_state_name = None
-        for t in current.transitions:
-            if t.condition is None:
-                # No condition = always take this transition
-                next_state_name = t.next
-                break
-            if evaluate_condition(t.condition, scope.context.get_context(), result):
-                next_state_name = t.next
-                break
-
-        if next_state_name is None:
+        if not next_state_name:
             scope.context.add("error", f"No valid transition from state '{current.name}'")
             break
 
         if next_state_name not in state_map:
             scope.context.add("error", f"Target state '{next_state_name}' not found")
             break
-
-        # Run on_exit hook before transitioning
-        if current.on_exit:
-            scope.run(current.on_exit)
 
         prev_state = current
         current = state_map[next_state_name]

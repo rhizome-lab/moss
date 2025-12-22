@@ -50,66 +50,88 @@ Textual uses Rich markup but with its own escaping rules:
 - Store symbol object when selected for later use (can't recover from path string)
 - Show section content from heading line to next same-or-higher level heading
 
-## Modal Keybinds (NEEDS DESIGN)
+## Modal Keybinds
 
-Future feature: context-aware keybinds that change based on mode or selection.
+Context-aware keybinds that change based on mode.
 
-### Current Architecture
+### Design
 
-Keybinds are global class-level `BINDINGS` on `MossTUI` (tui.py:860-874):
-```python
-BINDINGS: ClassVar[list[Binding]] = [
-    Binding("q", "quit", "Quit"),
-    Binding("v", "primitive_view", "View"),
-    # ... all bindings defined here, globally
-]
-```
+**Principle:** Mode bindings extend global bindings. Same key in mode overrides global.
 
-Footer (`KeybindBar` widget, lines 347-393):
-- Iterates `self.app.BINDINGS`, filters by `binding.show=True`
-- Transforms key names ("minus" → "-", "slash" → "/")
-- Renders as clickable text: `\[Q]uit`, `\[-] Up`
-- NOT mode-aware - shows same bindings regardless of mode
-
-Modes (lines 60-194) implement `TUIMode` protocol:
-- Define `name`, `color`, `placeholder`
-- Call `on_enter()` to reconfigure UI layout
-- NO provision for mode-specific keybinds
-
-### Contexts Where Keybinds Could Differ
-
-1. **Mode**: Different bindings for Explore vs Diff vs Plan mode
-2. **Node type**: Different for file vs directory vs symbol selection
-3. **Input focus**: Different when command input is active vs tree navigation
-4. **View state**: Different for expanded vs collapsed views
-
-### Design Questions
-
-1. How to define mode-specific bindings? Property on TUIMode? Separate registry?
-2. How to merge/override? Mode bindings extend or replace global?
-3. How to update footer reactively when context changes?
-4. How to handle conflicts between contexts?
-
-### Potential Implementation
-
+**Protocol extension:**
 ```python
 class TUIMode(Protocol):
-    @property
-    def bindings(self) -> list[Binding]:
-        """Mode-specific bindings (extend global)."""
-        ...
+    name: str
+    color: str
+    placeholder: str
+    bindings: list[Binding]  # NEW: mode-specific bindings (optional, default [])
 
-class MossTUI(App):
-    @property
-    def active_bindings(self) -> list[Binding]:
-        """Computed: global + mode + context bindings."""
-        ...
+    async def on_enter(self, app: MossTUI) -> None: ...
 ```
 
-Footer would watch `active_bindings` and re-render on change.
+**MossTUI changes:**
+```python
+class MossTUI(App):
+    BINDINGS: ClassVar[list[Binding]] = [...]  # Global bindings (unchanged)
+    _current_mode: TUIMode
 
-### References
+    @property
+    def active_bindings(self) -> list[Binding]:
+        """Merge global + mode bindings. Mode overrides global on key conflict."""
+        mode_bindings = getattr(self._current_mode, 'bindings', [])
+        if not mode_bindings:
+            return self.BINDINGS
 
-- Blender-style modal keybinds (mode-specific keys)
-- Vim-style modal editing (normal/insert/visual modes)
-- VS Code keybind contexts ("when" clauses)
+        # Build lookup: key -> binding
+        result = {b.key: b for b in self.BINDINGS}
+        for b in mode_bindings:
+            result[b.key] = b  # Override on conflict
+        return list(result.values())
+```
+
+**KeybindBar changes:**
+```python
+class KeybindBar(Static):
+    def render(self) -> str:
+        # Use active_bindings instead of BINDINGS
+        for binding in self.app.active_bindings:
+            ...
+
+    def watch_mode(self) -> None:
+        """Re-render when mode changes."""
+        self.refresh()
+```
+
+**Reactive update:** MossTUI.set_mode() calls KeybindBar.refresh() after mode change.
+
+### Example Mode Bindings
+
+```python
+class DiffMode:
+    name = "DIFF"
+    color = "magenta"
+    placeholder = "Review changes..."
+    bindings = [
+        Binding("r", "revert_hunk", "Revert"),
+        Binding("a", "accept_hunk", "Accept"),
+        Binding("n", "next_hunk", "Next"),
+        Binding("p", "prev_hunk", "Prev"),
+    ]
+```
+
+### Implementation Steps
+
+1. Add `bindings: list[Binding] = []` to all mode classes
+2. Add `active_bindings` property to MossTUI
+3. Update KeybindBar to use `active_bindings`
+4. Add refresh call in mode switching logic
+5. Define mode-specific bindings for each mode
+
+### Contexts Not Yet Addressed
+
+These could be future extensions:
+- **Node type**: Different for file vs directory vs symbol
+- **Input focus**: Different when command input is active
+- **View state**: Different for expanded vs collapsed
+
+For now, mode-level bindings cover the primary use case.

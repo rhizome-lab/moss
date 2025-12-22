@@ -46,9 +46,9 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 ## Next Up
 
-- [ ] State machine: parallel state execution
-- [ ] Nested execution Phase 3: summarize option + expose child results to parent
-- [ ] Modal keybinds (NEEDS DESIGN - see docs/tui.md "Modal Keybinds" section)
+- [ ] Implement modal keybinds (design complete - see docs/tui.md)
+- [ ] State machine: nested state machines
+- [ ] State machine: LLM-driven state selection
 
 ## Backlog
 
@@ -69,7 +69,7 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [x] Define clear boundaries: what's Rust, what's Python, why → docs/rust-python-boundary.md
 
 **Workflow Enhancements:**
-- [ ] State machine: parallel state execution
+- [x] State machine: parallel state execution (fork/join with `parallel` and `join` fields)
 - [ ] State machine: nested state machines
 - [ ] State machine: LLM-driven state selection (hybrid with agent_loop)
 
@@ -109,7 +109,7 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [ ] Use detected corrections to identify friction points, improve prompts/tools
 
 **Explore TUI Keybinds:**
-- [ ] Modal keybinds (NEEDS DESIGN - see docs/tui.md "Modal Keybinds" section)
+- [ ] Modal keybinds (design complete - see docs/tui.md)
 - [x] Jump-to-node shortcut (fuzzy search to quickly navigate tree) - 'g' key
 - [ ] View/Edit/Analyze: mode indicator (bottom right, near palette) OR tabbed content view
 - [ ] Remove theme keybind (T) - wasteful, only toggles light/dark
