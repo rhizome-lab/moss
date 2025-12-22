@@ -978,6 +978,9 @@ class MossTUI(App):
             self._update_tree("file")
             self._log(f"Changed to: {target.name}")
 
+    # Action wrapper for @click handlers
+    action_cd_to = cd_to
+
     def action_cd_up(self) -> None:
         """Navigate up one directory."""
         if self._tree_root != self.api.root:
@@ -985,12 +988,15 @@ class MossTUI(App):
             self._update_tree("file")
             self._log(f"Changed to: {self._tree_root.name}")
 
-    def cd_root(self) -> None:
+    def action_cd_root(self) -> None:
         """Navigate back to project root."""
         if self._tree_root != self.api.root:
             self._tree_root = self.api.root
             self._update_tree("file")
             self._log("Changed to project root")
+
+    # Keep non-action alias for internal use
+    cd_root = action_cd_root
 
     def action_enter_dir(self) -> None:
         """Enter selected directory (navigate into it)."""
