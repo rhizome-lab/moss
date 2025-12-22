@@ -1947,13 +1947,14 @@ def cmd_roadmap(args: Namespace) -> int:
         return 1
 
     # Determine display mode
-    # --plain explicitly sets plain text (good for LLMs)
+    # --plain/--compact explicitly sets plain text (good for LLMs)
     # --tui explicitly sets TUI
     # Default: TUI if stdout is a TTY, plain otherwise
     use_tui = getattr(args, "tui", False)
     use_plain = getattr(args, "plain", False)
+    use_compact = getattr(args, "compact", False)
 
-    if use_plain:
+    if use_plain or use_compact:
         tui = False
     elif use_tui:
         tui = True
@@ -5106,6 +5107,11 @@ def create_parser() -> argparse.ArgumentParser:
         type=int,
         default=0,
         help="Max items per section (0 = unlimited, default: 0)",
+    )
+    roadmap_parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="Compact output (same as --plain)",
     )
     roadmap_parser.set_defaults(func=cmd_roadmap)
 
