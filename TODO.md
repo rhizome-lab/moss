@@ -70,11 +70,11 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
   - `skeleton.extract` → same with `--json`
   - MossToolExecutor could use rust_shim directly
 - [ ] CLI simplification: Too many overlapping commands
-  - Target: 4 commands (view, edit, analyze, agent)
-  - Remove Python `edit` - redundant with `moss agent "fix the bug"`
-  - Keep Rust `edit` as structural primitive (--delete, --replace, etc.)
-  - Merge `workflow` into agent: `moss agent --workflow <name>`
-  - agent = dynamic LLM, workflow = predefined steps, same underlying engine
+  - Target: 5 commands (view, edit, analyze, run, agent)
+  - `view`, `edit`, `analyze` - Rust primitives
+  - `run <workflow>` - predefined steps, no LLM required (rename from `workflow`)
+  - `agent <task>` - LLM-driven dynamic execution
+  - Remove Python `edit` - redundant with `agent`
 
 **Call Graph Improvements:**
 - [x] Call extraction for Python, Rust, TypeScript, JavaScript, Java, Go
