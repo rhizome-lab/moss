@@ -17,6 +17,7 @@ try:
     from textual.binding import Binding
     from textual.containers import Container, Horizontal, Vertical
     from textual.reactive import reactive
+    from textual.suggester import Suggester
     from textual.widgets import Input, Static, Tree
     from textual.widgets.tree import TreeNode
 except ImportError:
@@ -669,15 +670,12 @@ class ProjectTree(Tree[Any]):
             tree_node.allow_expand = False
 
 
-class PathSuggester:
-    """Suggester that provides path completions relative to project root.
-
-    Inherits from Textual's Suggester to provide tab completion for paths.
-    """
+class PathSuggester(Suggester):
+    """Suggester that provides path completions relative to project root."""
 
     def __init__(self, root: Path, case_sensitive: bool = True):
+        super().__init__(case_sensitive=case_sensitive)
         self.root = root
-        self.case_sensitive = case_sensitive
 
     async def get_suggestion(self, value: str) -> str | None:
         """Get path completion suggestion."""
@@ -864,9 +862,11 @@ class MossTUI(App):
         Binding("v", "primitive_view", "View"),
         Binding("e", "primitive_edit", "Edit"),
         Binding("a", "primitive_analyze", "Analyze"),
-        Binding("g", "goto_node", "Goto"),
+        Binding("ctrl+p", "goto_node", "Goto", priority=True),
+        Binding("ctrl+shift+p", "toggle_command", "Cmd", priority=True),
         Binding("minus", "cd_up", "Up"),
-        Binding("slash", "toggle_command", "Cmd"),
+        Binding("slash", "toggle_command", "Cmd", show=False),  # Keep as alias
+        Binding("g", "goto_node", "Goto", show=False),  # Keep as alias
         Binding("tab", "next_mode", "Mode", show=False),
         Binding("enter", "enter_dir", "Enter", show=False),
         Binding("escape", "hide_command", show=False),
