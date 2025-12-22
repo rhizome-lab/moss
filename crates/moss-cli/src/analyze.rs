@@ -390,55 +390,36 @@ pub fn analyze(
         _ => k,
     });
 
-    // Determine what we're analyzing
-    let is_file = if let Some(t) = target {
-        let resolved = path_resolve::resolve(t, root);
-        resolved
-            .first()
-            .map(|f| f.kind == "file")
-            .unwrap_or(false)
+    // Use unified path resolution to handle file/symbol paths
+    let (file_path, symbol_path, is_file) = if let Some(t) = target {
+        if let Some(unified) = path_resolve::resolve_unified(t, root) {
+            (
+                Some(unified.file_path),
+                unified.symbol_path,
+                !unified.is_directory,
+            )
+        } else {
+            // Fallback to plain resolve for backwards compat
+            let resolved = path_resolve::resolve(t, root);
+            let is_file = resolved.first().map(|f| f.kind == "file").unwrap_or(false);
+            (resolved.first().map(|f| f.path.clone()), vec![], is_file)
+        }
     } else {
-        false
+        (None, vec![], false)
     };
 
-    let health = if run_health && !is_file {
-        // Health is codebase-wide
-        let analysis_root = if let Some(t) = target {
-            root.join(t)
+    // Symbol targeting only makes sense for complexity
+    let has_symbol_target = !symbol_path.is_empty();
+
+    let health = if run_health && !is_file && !has_symbol_target {
+        // Health is codebase-wide, skip if targeting a symbol
+        let analysis_root = if let Some(ref fp) = file_path {
+            root.join(fp)
         } else {
             root.to_path_buf()
         };
-        Some(analyze_health(&analysis_root))
-    } else {
-        None
-    };
-
-    let complexity = if run_complexity && is_file {
-        // Complexity for single file
-        if let Some(t) = target {
-            let resolved = path_resolve::resolve(t, root);
-            if let Some(file_match) = resolved.first() {
-                let file_path = root.join(&file_match.path);
-                let mut report = analyze_file_complexity(&file_path);
-
-                // Apply threshold filter
-                if let (Some(ref mut r), Some(threshold)) = (&mut report, complexity_threshold) {
-                    r.functions.retain(|f| f.complexity >= threshold);
-                }
-
-                // Apply kind filter (function = no parent, method = has parent)
-                if let (Some(ref mut r), Some(k)) = (&mut report, &kind) {
-                    match *k {
-                        "function" => r.functions.retain(|f| f.parent.is_none()),
-                        "method" => r.functions.retain(|f| f.parent.is_some()),
-                        _ => {} // Unknown kind, don't filter
-                    }
-                }
-
-                report
-            } else {
-                None
-            }
+        if analysis_root.is_dir() {
+            Some(analyze_health(&analysis_root))
         } else {
             None
         }
@@ -446,9 +427,63 @@ pub fn analyze(
         None
     };
 
-    let security = if run_security {
-        let analysis_root = if let Some(t) = target {
-            root.join(t)
+    let complexity = if run_complexity && is_file {
+        // Complexity for single file
+        if let Some(ref fp) = file_path {
+            let full_path = root.join(fp);
+            let mut report = analyze_file_complexity(&full_path);
+
+            // Apply symbol filter if targeting a specific symbol
+            if let Some(ref mut r) = report {
+                if has_symbol_target {
+                    let target_name = symbol_path.last().unwrap();
+                    let target_parent = if symbol_path.len() > 1 {
+                        Some(symbol_path[symbol_path.len() - 2].as_str())
+                    } else {
+                        None
+                    };
+
+                    r.functions.retain(|f| {
+                        // Match by name
+                        if f.name != *target_name {
+                            return false;
+                        }
+                        // If parent specified in path, match that too
+                        if let Some(tp) = target_parent {
+                            f.parent.as_ref().map(|p| p == tp).unwrap_or(false)
+                        } else {
+                            true
+                        }
+                    });
+                }
+            }
+
+            // Apply threshold filter
+            if let (Some(ref mut r), Some(threshold)) = (&mut report, complexity_threshold) {
+                r.functions.retain(|f| f.complexity >= threshold);
+            }
+
+            // Apply kind filter (function = no parent, method = has parent)
+            if let (Some(ref mut r), Some(k)) = (&mut report, &kind) {
+                match *k {
+                    "function" => r.functions.retain(|f| f.parent.is_none()),
+                    "method" => r.functions.retain(|f| f.parent.is_some()),
+                    _ => {} // Unknown kind, don't filter
+                }
+            }
+
+            report
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let security = if run_security && !has_symbol_target {
+        // Security doesn't apply to single symbols
+        let analysis_root = if let Some(ref fp) = file_path {
+            root.join(fp)
         } else {
             root.to_path_buf()
         };
