@@ -138,6 +138,27 @@ Scope(context=TaskTree) {
    - **Planning**: Multiple steps at once
    - **Execution mode**: LLM indicates if actions are independent (parallel) or ordered (sequential)
 
+   **Sub-question: Prose between commands?**
+
+   Options:
+   1. **Strict mode**: Commands only, no prose (easier to parse)
+   2. **Prose allowed**: Extract commands from natural language (flexible but noisy)
+   3. **Structured output**: XML/JSON tags delineate commands vs prose
+
+   ```
+   # Option 3 example:
+   <thinking>Need to check the main file first</thinking>
+   <action>view main.py</action>
+   <action>view utils.py</action>
+   <note>These are independent, can run in parallel</note>
+   ```
+
+   Prose could capture:
+   - Intent explanation (why this action?)
+   - Observations (what did we learn?)
+   - Questions (need clarification?)
+   - Notes for context tracking
+
    TOML representation:
    ```toml
    [workflow.llm]
