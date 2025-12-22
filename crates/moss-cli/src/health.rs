@@ -138,6 +138,32 @@ impl HealthReport {
 /// Threshold for "large" files
 const LARGE_FILE_THRESHOLD: usize = 500;
 
+/// Check if a path is a lockfile (generated, not a code smell)
+fn is_lockfile(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    matches!(
+        name,
+        "uv.lock"
+            | "Cargo.lock"
+            | "package-lock.json"
+            | "yarn.lock"
+            | "pnpm-lock.yaml"
+            | "poetry.lock"
+            | "Pipfile.lock"
+            | "Gemfile.lock"
+            | "composer.lock"
+            | "go.sum"
+            | "flake.lock"
+            | "packages.lock.json" // NuGet
+            | "paket.lock"
+            | "pubspec.lock" // Dart/Flutter
+            | "mix.lock" // Elixir
+            | "rebar.lock" // Erlang
+            | "Podfile.lock" // CocoaPods
+            | "shrinkwrap.yaml" // pnpm
+    )
+}
+
 /// Per-file analysis result for parallel aggregation
 struct FileStats {
     path: String,
@@ -233,7 +259,7 @@ pub fn analyze_health(root: &Path) -> HealthReport {
             max_complexity = stat.max_complexity;
         }
         high_risk_functions += stat.high_risk;
-        if stat.lines >= LARGE_FILE_THRESHOLD {
+        if stat.lines >= LARGE_FILE_THRESHOLD && !is_lockfile(&stat.path) {
             large_files.push(LargeFile {
                 path: stat.path,
                 lines: stat.lines,
