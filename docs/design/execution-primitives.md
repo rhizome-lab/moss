@@ -316,11 +316,12 @@ For computed values: plugins extend TOML, or use Python directly.
 
 ## Prototype Status
 
-Implemented in `src/moss/execution/__init__.py` (~400 lines):
+Implemented in `src/moss/execution/__init__.py` (~450 lines):
 
 - [x] Scope with pluggable ContextStrategy
 - [x] Context strategies: FlatContext, TaskListContext, TaskTreeContext
 - [x] Cache strategies: NoCache, InMemoryCache
+- [x] Retry strategies: NoRetry, FixedRetry, ExponentialRetry
 - [x] LLM strategies: NoLLM (testing), SimpleLLM (production)
 - [x] Nested scopes with different strategies
 - [x] agent_loop() with pluggable LLM
@@ -354,4 +355,4 @@ with Scope(context=TaskTreeContext()) as outer:
 - [ ] Test with real LLM end-to-end
 - [ ] Compare output to DWIMLoop
 - [ ] Replace DWIMLoop with new primitives
-- [ ] Implement retry strategy
+- [ ] Wire retry strategy into Scope.run()

@@ -358,6 +358,70 @@ def execute_intent(intent: Intent) -> str:
 
 
 # =============================================================================
+# Retry Strategies
+# =============================================================================
+
+
+class RetryStrategy(ABC):
+    """Base class for retry strategies."""
+
+    @abstractmethod
+    def should_retry(self, attempt: int, error: str) -> bool:
+        """Return True if should retry after this error."""
+        ...
+
+    @abstractmethod
+    def get_delay(self, attempt: int) -> float:
+        """Return delay in seconds before next retry."""
+        ...
+
+
+class NoRetry(RetryStrategy):
+    """No retries - fail immediately."""
+
+    def should_retry(self, attempt: int, error: str) -> bool:
+        return False
+
+    def get_delay(self, attempt: int) -> float:
+        return 0.0
+
+
+class FixedRetry(RetryStrategy):
+    """Fixed delay retries."""
+
+    def __init__(self, max_attempts: int = 3, delay: float = 1.0):
+        self.max_attempts = max_attempts
+        self.delay = delay
+
+    def should_retry(self, attempt: int, error: str) -> bool:
+        return attempt < self.max_attempts
+
+    def get_delay(self, attempt: int) -> float:
+        return self.delay
+
+
+class ExponentialRetry(RetryStrategy):
+    """Exponential backoff retries."""
+
+    def __init__(
+        self,
+        max_attempts: int = 5,
+        base_delay: float = 1.0,
+        max_delay: float = 60.0,
+    ):
+        self.max_attempts = max_attempts
+        self.base_delay = base_delay
+        self.max_delay = max_delay
+
+    def should_retry(self, attempt: int, error: str) -> bool:
+        return attempt < self.max_attempts
+
+    def get_delay(self, attempt: int) -> float:
+        delay = self.base_delay * (2**attempt)
+        return min(delay, self.max_delay)
+
+
+# =============================================================================
 # LLM Strategy
 # =============================================================================
 
