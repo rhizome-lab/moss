@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Performance
+
+**Reindexing 20x Faster** (Dec 22 2025)
+- Fixed redundant parsing: `find_callees_for_symbol` takes pre-parsed Symbol
+- Added parallel file processing with rayon (uses all CPU cores)
+- Added prepared statements for batch SQL inserts
+- Result: 20+ seconds → ~1 second on large repos (18k files, 66k symbols)
+
 ### Features
 
 **Multi-Language Symbol Support** (Dec 22 2025)
