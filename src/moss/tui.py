@@ -369,16 +369,18 @@ class KeybindBar(Static):
                     key = "/"
                 desc = binding.description
                 action = binding.action.replace("app.", "")
-                # Find key in description and style it bold
+                # Wrap the key in brackets within description
+                # Use [[ and ]] to escape literal brackets in Rich markup
                 idx = desc.lower().find(key.lower())
                 if idx >= 0:
-                    styled = f"{desc[:idx]}[b]{desc[idx]}[/]{desc[idx + 1 :]}"
+                    # Key found in description - wrap it in brackets
+                    styled = f"{desc[:idx]}[[{desc[idx]}]]{desc[idx + 1 :]}"
                 else:
-                    # Key not in description, prefix it
-                    styled = f"[b]{key}[/] {desc}"
+                    # Key not in description, prefix with [key]
+                    styled = f"[[{key}]] {desc}"
                 parts.append(f"[@click=app.{action}]{styled}[/]")
         left = " ".join(parts)
-        right = "[@click=app.action_command_palette][b]^p[/] Palette[/]"
+        right = "[@click=app.action_command_palette][[^p]] Palette[/]"
         width = self.size.width if self.size.width > 0 else 80
         padding = max(1, width - 50)
         return f"{left}{' ' * padding}{right}"
