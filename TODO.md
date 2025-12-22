@@ -59,6 +59,12 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 ## Backlog
 
+**Indexing Performance:**
+- [x] Slow reindexing on large repos - FIXED (20s → 1s on ~/git/enso/)
+  - Fixed redundant parsing (find_callees_for_symbol avoids re-parse)
+  - Added parallel file processing with rayon
+  - Added prepared statements for batch SQL inserts
+
 **Rust Crate Consolidation:**
 - [x] Extract shared code from moss-cli and moss-daemon into moss-core crate
 - [x] Share: tree-sitter parsers, Language detection, SymbolKind types

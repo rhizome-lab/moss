@@ -1101,7 +1101,17 @@ impl SymbolParser {
             Some(s) => s,
             None => return Vec::new(),
         };
+        self.find_callees_for_symbol(path, content, &symbol)
+    }
 
+    /// Find callees for a pre-parsed symbol (avoids re-parsing the file)
+    /// Use this when you already have the Symbol from parse_file()
+    pub fn find_callees_for_symbol(
+        &mut self,
+        path: &Path,
+        content: &str,
+        symbol: &Symbol,
+    ) -> Vec<(String, usize, Option<String>)> {
         let lines: Vec<&str> = content.lines().collect();
         let start = symbol.start_line.saturating_sub(1);
         let end = symbol.end_line.min(lines.len());

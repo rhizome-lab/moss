@@ -1,9 +1,21 @@
 use ignore::WalkBuilder;
+use rayon::prelude::*;
 use rusqlite::{params, Connection};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::symbols::{Import, Symbol, SymbolParser};
+
+/// Parsed data for a single file, ready for database insertion
+struct ParsedFileData {
+    file_path: String,
+    /// (name, kind, start_line, end_line, parent)
+    symbols: Vec<(String, String, usize, usize, Option<String>)>,
+    /// (caller_symbol, callee_name, callee_qualifier, line)
+    calls: Vec<(String, String, Option<String>, usize)>,
+    /// imports (for Python files only)
+    imports: Vec<Import>,
+}
 
 // Not yet public - just delete .moss/index.sqlite on schema changes
 const SCHEMA_VERSION: i64 = 2;
@@ -856,6 +868,7 @@ impl FileIndex {
 
     /// Refresh the call graph by parsing all supported source files
     /// This is more expensive than file refresh since it parses every file
+    /// Uses parallel processing for parsing, sequential insertion for SQLite
     pub fn refresh_call_graph(&mut self) -> rusqlite::Result<(usize, usize, usize)> {
         // Get all indexed source files BEFORE starting transaction
         let files: Vec<String> = {
@@ -878,56 +891,92 @@ impl FileIndex {
             files
         };
 
+        // Parse all files in parallel
+        // Each thread gets its own SymbolParser (tree-sitter parsers have mutable state)
+        let root = self.root.clone();
+        let parsed_data: Vec<ParsedFileData> = files
+            .par_iter()
+            .filter_map(|file_path| {
+                let full_path = root.join(file_path);
+                let content = std::fs::read_to_string(&full_path).ok()?;
+
+                // Each thread creates its own parser
+                let mut parser = SymbolParser::new();
+                let symbols = parser.parse_file(&full_path, &content);
+
+                let mut sym_data = Vec::with_capacity(symbols.len());
+                let mut call_data = Vec::new();
+
+                for sym in &symbols {
+                    sym_data.push((
+                        sym.name.clone(),
+                        sym.kind.as_str().to_string(),
+                        sym.start_line,
+                        sym.end_line,
+                        sym.parent.clone(),
+                    ));
+
+                    // Only index calls for functions/methods
+                    let kind = sym.kind.as_str();
+                    if kind == "function" || kind == "method" {
+                        let calls = parser.find_callees_for_symbol(&full_path, &content, sym);
+                        for (callee_name, line, qualifier) in calls {
+                            call_data.push((sym.name.clone(), callee_name, qualifier, line));
+                        }
+                    }
+                }
+
+                // Parse imports for Python files
+                let imports = if file_path.ends_with(".py") {
+                    parser.parse_python_imports(&content)
+                } else {
+                    Vec::new()
+                };
+
+                Some(ParsedFileData {
+                    file_path: file_path.clone(),
+                    symbols: sym_data,
+                    calls: call_data,
+                    imports,
+                })
+            })
+            .collect();
+
+        // Insert all data in a single transaction with prepared statements
         let tx = self.conn.transaction()?;
         tx.execute("DELETE FROM symbols", [])?;
         tx.execute("DELETE FROM calls", [])?;
         tx.execute("DELETE FROM imports", [])?;
 
-        let mut parser = SymbolParser::new();
         let mut symbol_count = 0;
         let mut call_count = 0;
         let mut import_count = 0;
 
-        for file_path in files {
-            let full_path = self.root.join(&file_path);
-            let content = match std::fs::read_to_string(&full_path) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
+        // Pre-compile statements for batch insertion (much faster than tx.execute per row)
+        {
+            let mut sym_stmt = tx.prepare_cached(
+                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"
+            )?;
+            let mut call_stmt = tx.prepare_cached(
+                "INSERT INTO calls (caller_file, caller_symbol, callee_name, callee_qualifier, line) VALUES (?1, ?2, ?3, ?4, ?5)"
+            )?;
+            let mut import_stmt = tx.prepare_cached(
+                "INSERT INTO imports (file, module, name, alias, line) VALUES (?1, ?2, ?3, ?4, ?5)"
+            )?;
 
-            let symbols = parser.parse_file(&full_path, &content);
-
-            // Insert symbols
-            for sym in &symbols {
-                tx.execute(
-                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                    params![file_path, sym.name, sym.kind.as_str(), sym.start_line, sym.end_line, sym.parent],
-                )?;
-                symbol_count += 1;
-
-                // Only index calls for functions/methods, not classes
-                // Classes don't make calls - their methods do
-                let kind = sym.kind.as_str();
-                if kind == "function" || kind == "method" {
-                    let calls = parser.find_callees_with_lines(&full_path, &content, &sym.name);
-                    for (callee_name, line, qualifier) in calls {
-                        tx.execute(
-                            "INSERT INTO calls (caller_file, caller_symbol, callee_name, callee_qualifier, line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                            params![file_path, sym.name, callee_name, qualifier, line],
-                        )?;
-                        call_count += 1;
-                    }
+            for data in &parsed_data {
+                for (name, kind, start_line, end_line, parent) in &data.symbols {
+                    sym_stmt.execute(params![data.file_path, name, kind, start_line, end_line, parent])?;
+                    symbol_count += 1;
                 }
-            }
 
-            // Index imports for Python files
-            if file_path.ends_with(".py") {
-                let imports = parser.parse_python_imports(&content);
-                for imp in imports {
-                    tx.execute(
-                        "INSERT INTO imports (file, module, name, alias, line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                        params![file_path, imp.module, imp.name, imp.alias, imp.line],
-                    )?;
+                for (caller_symbol, callee_name, qualifier, line) in &data.calls {
+                    call_stmt.execute(params![data.file_path, caller_symbol, callee_name, qualifier, line])?;
+                    call_count += 1;
+                }
+
+                for imp in &data.imports {
+                    import_stmt.execute(params![data.file_path, imp.module, imp.name, imp.alias, imp.line])?;
                     import_count += 1;
                 }
             }
@@ -1000,7 +1049,7 @@ impl FileIndex {
 
                 let kind = sym.kind.as_str();
                 if kind == "function" || kind == "method" {
-                    let calls = parser.find_callees_with_lines(&full_path, &content, &sym.name);
+                    let calls = parser.find_callees_for_symbol(&full_path, &content, sym);
                     for (callee_name, line, qualifier) in calls {
                         tx.execute(
                             "INSERT INTO calls (caller_file, caller_symbol, callee_name, callee_qualifier, line) VALUES (?1, ?2, ?3, ?4, ?5)",
