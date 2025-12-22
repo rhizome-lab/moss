@@ -46,6 +46,11 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 ## Next Up
 
+- [ ] Analyze output improvements:
+  - Default `--limit 10` for check-docs/check-todos, `--all` to override
+  - `--changed` flag: only check git-modified files
+  - ANSI formatting for PTY, token-efficient for pipes
+  - Add analyzers to `moss tui` for interactive exploration
 - [ ] Python edit uses separate file/symbol targeting (LLM-based, intentionally different)
 
 ## Backlog
