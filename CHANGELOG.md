@@ -8,11 +8,15 @@
 - New `moss explore` command with tree + primitives paradigm
 - `ExploreMode` is now default TUI mode (replaces READ/WRITE)
 - Tree navigation with files + symbols (lazy-loaded)
-- Action bar with context-sensitive [V]iew, [E]dit, [A]nalyze buttons
 - Keyboard shortcuts: `v`, `e`, `a` to apply primitives to selected node
 - Command input supports both explicit (`view foo.py`) and implicit (`foo.py`)
 - Detail panel shows view output, edit preview, or analyze reports
 - Mode set now: EXPLORE (default), PLAN, DIFF, SESSION, BRANCH, SWARM, COMMIT
+- Subdirectory navigation with breadcrumbs (`cd`, `-` to go up, Enter to navigate)
+- Syntax highlighting for code in detail panel
+- Leaf nodes no longer show expand arrows
+- Mode indicator moved to subtitle (compact header)
+- Action bar shows clickable View/Edit/Analyze buttons
 
 **Unified Resolution & Agent Improvements** (Dec 22 2025)
 - `moss analyze` now uses unified path resolution for symbol targeting
