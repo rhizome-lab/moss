@@ -2,6 +2,8 @@
 
 Hybrid loops use `CompositeToolExecutor` to route tool calls to different backends based on prefix. This enables loops that combine local structural tools with external MCP servers and LLM calls.
 
+Note: For declarative workflow definitions, see `moss workflow` which uses TOML files. This doc covers the low-level `AgentLoop` execution primitives.
+
 ## Architecture
 
 ```
@@ -39,18 +41,17 @@ composite = CompositeToolExecutor(
         "moss.": moss_executor,
         "llm.": llm_executor,
     },
-    default=moss_executor,  # Fallback for unprefixed tools
+    default=moss_executor,
 )
 
 # Define a loop using prefixed tool names
 loop = AgentLoop(
     name="hybrid_analysis",
     steps=[
-        LoopStep(name="skeleton", tool="moss.skeleton.format"),
-        LoopStep(name="analyze", tool="llm.analyze", input_from="skeleton"),
+        LoopStep(name="view_file", tool="moss.skeleton.format"),
+        LoopStep(name="analyze", tool="llm.analyze", input_from="view_file"),
     ],
-    entry="skeleton",
-    exit_conditions=["analyze.complete"],
+    exit_conditions=["analyze.success"],
 )
 
 # Run
@@ -109,50 +110,32 @@ The `CompositeToolExecutor` automatically strips the prefix before passing to th
 
 ## Available MossAPI Tools
 
-Tools available via `MossToolExecutor` (use with `moss.` prefix):
+Tools available via `MossToolExecutor` (use with `moss.` prefix). These are internal Python wrappers that shell out to the Rust CLI. For direct CLI usage, prefer `moss view`, `moss edit`, `moss analyze`.
 
-- `skeleton.format` - Get structural overview of a file
-- `skeleton.extract` - Extract skeleton data structure
+- `skeleton.format` - Extract file skeleton as text (wraps `moss view`)
+- `skeleton.extract` - Extract skeleton as data structure
+- `skeleton.expand` - Get full source of a symbol
 - `validation.validate` - Run syntax and linting checks
 - `patch.apply` - Apply a patch to a file
 - `patch.apply_with_fallback` - Apply patch with text fallback
 - `anchor.find` / `anchor.resolve` - Find code anchors
-- `dependencies.format` - Get dependency information
 - `complexity.analyze` - Analyze code complexity
-- `dwim.analyze_intent` - Find tools for a task
 
-## Serialization
+Note: The `skeleton.*` tools are historical from before the Rust rewrite. They exist for backwards compatibility with agent loops.
 
-Hybrid loops can be serialized to YAML/JSON for version control:
+## Exit Conditions
+
+Exit conditions use the format `{step_name}.success`. The loop exits successfully when the named step completes:
 
 ```python
-from moss.agent_loop import dump_loop_yaml, load_loop_yaml
-
-# Save loop definition
-yaml_str = dump_loop_yaml(loop)
-dump_loop_yaml(loop, "loops/hybrid_analysis.yaml")
-
-# Load loop definition
-loop = load_loop_yaml("loops/hybrid_analysis.yaml")
+loop = AgentLoop(
+    name="example",
+    steps=[...],
+    exit_conditions=["final_step.success"],  # Exit when final_step succeeds
+)
 ```
 
-Example YAML:
-
-```yaml
-name: hybrid_analysis
-steps:
-- name: skeleton
-  tool: moss.skeleton.format
-  step_type: tool
-- name: analyze
-  tool: llm.analyze
-  step_type: llm
-  input_from: skeleton
-entry: skeleton
-exit_conditions:
-- analyze.complete
-max_steps: 10
-```
+If no exit conditions are specified, the loop exits after all steps complete.
 
 ## Best Practices
 
