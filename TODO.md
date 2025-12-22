@@ -28,9 +28,9 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [ ] Remaining: prior-art.md, hybrid-loops.md, etc. (lower priority)
 
 **Unified Plumbing for 3 Primitives:**
-- [x] Path resolution unified: `path_resolve::resolve_unified` used by view, edit (Rust), analyze
+- [x] Path resolution unified: `path_resolve::resolve_unified` used by view, edit, analyze
 - [x] Add `--kind` filter to analyze (uses `--kind` to avoid `-t` conflict with `--threshold`)
-- [ ] Add `--calls`, `--called-by` filters to analyze (currently view-only)
+- [x] Analyze uses unified resolution for symbol targeting (`analyze cli.py/func --complexity`)
 - [ ] Python edit uses separate file/symbol targeting (LLM-based, intentionally different)
 
 **CLI Cleanup:**
@@ -46,7 +46,6 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 
 - [ ] Symbol-level token tracking in telemetry (extend file tokens to symbol paths)
 - [ ] Agent stuck in retry loop fallback strategy (see Known Issues above)
-- [ ] Add filters to analyze: `--calls`, `--called-by` (currently view-only)
 
 ## Backlog
 

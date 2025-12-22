@@ -324,15 +324,15 @@ class SessionAnalysis:
                 lines.append(f"- **Cache create**: {ts.cache_create:,} tokens")
             lines.append("")
 
-        # File token hotspots
+        # Path token hotspots (files and symbols)
         if self.file_tokens:
-            lines.append("## File Token Hotspots")
+            lines.append("## Token Hotspots")
             lines.append("")
-            lines.append("| File | Tokens |")
+            lines.append("| Path | Tokens |")
             lines.append("|------|--------|")
-            sorted_files = sorted(self.file_tokens.items(), key=lambda x: -x[1])[:10]
-            for file_path, tokens in sorted_files:
-                lines.append(f"| {file_path} | {tokens:,} |")
+            sorted_paths = sorted(self.file_tokens.items(), key=lambda x: -x[1])[:10]
+            for path, tokens in sorted_paths:
+                lines.append(f"| {path} | {tokens:,} |")
             lines.append("")
 
         # Error patterns
@@ -554,11 +554,31 @@ class ClaudeCodeAnalyzer:
             return "Import error"
         return "Other"
 
-    def _analyze_file_tokens(self, entries: list[dict]) -> dict[str, int]:
-        """Analyze token usage per file.
+    def _extract_symbol_paths_from_bash(self, command: str) -> list[str]:
+        """Extract symbol paths from bash commands like 'moss view cli.py/Foo'."""
+        import re
 
-        For each assistant turn, identify files accessed via tool calls
-        and distribute the output tokens among those files.
+        paths = []
+        # Match: moss view <path> or uv run moss view <path>
+        # Symbol paths look like: file.py/Symbol or file.py/Class/method
+        pattern = r"(?:uv run )?moss (?:view|analyze)\s+([^\s]+)"
+        for match in re.finditer(pattern, command):
+            path = match.group(1)
+            # Skip flags
+            if path.startswith("-"):
+                continue
+            # Check if it looks like a symbol path (has / after file extension)
+            if re.search(r"\.\w+/\w", path):
+                paths.append(path)
+        return paths
+
+    def _analyze_file_tokens(self, entries: list[dict]) -> dict[str, int]:
+        """Analyze token usage per file/symbol.
+
+        For each assistant turn, identify files/symbols accessed via tool calls
+        and distribute the output tokens among them.
+
+        Tracks both file paths and symbol paths (e.g., cli.py/cmd_telemetry).
         """
         file_tokens: dict[str, int] = {}
 
@@ -573,7 +593,7 @@ class ClaudeCodeAnalyzer:
             content = message.get("content", [])
 
             if request_id not in requests:
-                requests[request_id] = {"files": set(), "output_tokens": 0}
+                requests[request_id] = {"paths": set(), "output_tokens": 0}
 
             # Track output tokens (take max due to streaming)
             output = usage.get("output_tokens", 0)
@@ -581,40 +601,51 @@ class ClaudeCodeAnalyzer:
                 requests[request_id]["output_tokens"], output
             )
 
-            # Extract files from tool calls
+            # Extract files/symbols from tool calls
             if isinstance(content, list):
                 for block in content:
                     if not isinstance(block, dict):
                         continue
                     if block.get("type") == "tool_use":
+                        tool_name = block.get("name", "")
                         tool_input = block.get("input", {})
+
+                        # Bash: extract symbol paths from moss view/analyze commands
+                        if tool_name == "Bash" and "command" in tool_input:
+                            cmd = tool_input["command"]
+                            if isinstance(cmd, str):
+                                symbol_paths = self._extract_symbol_paths_from_bash(cmd)
+                                requests[request_id]["paths"].update(symbol_paths)
+
                         # Read, Edit, Write have file_path
                         if "file_path" in tool_input:
                             fp = tool_input["file_path"]
                             if isinstance(fp, str):
-                                requests[request_id]["files"].add(fp)
+                                requests[request_id]["paths"].add(fp)
+
                         # Glob has pattern (extract directory)
-                        if block.get("name") == "Glob" and "pattern" in tool_input:
+                        if tool_name == "Glob" and "pattern" in tool_input:
                             pat = tool_input["pattern"]
                             if isinstance(pat, str) and "/" in pat:
                                 dir_part = pat.rsplit("/", 1)[0]
                                 if not dir_part.startswith("*"):
-                                    requests[request_id]["files"].add(dir_part)
+                                    requests[request_id]["paths"].add(dir_part)
+
                         # Grep has path
                         if "path" in tool_input:
                             p = tool_input["path"]
                             if isinstance(p, str):
-                                requests[request_id]["files"].add(p)
+                                requests[request_id]["paths"].add(p)
 
-        # Distribute tokens to files
+        # Distribute tokens to paths
         for req in requests.values():
-            files = req["files"]
+            paths = req["paths"]
             tokens = req["output_tokens"]
-            if files and tokens > 0:
-                per_file = tokens // len(files)
-                for f in files:
+            if paths and tokens > 0:
+                per_path = tokens // len(paths)
+                for p in paths:
                     # Normalize path (remove absolute prefix if present)
-                    norm_path = f
+                    norm_path = p
                     if norm_path.startswith("/"):
                         # Try to make relative
                         parts = norm_path.split("/")
@@ -623,7 +654,7 @@ class ClaudeCodeAnalyzer:
                             if part in ("src", "lib", "crates", "tests", "docs"):
                                 norm_path = "/".join(parts[i:])
                                 break
-                    file_tokens[norm_path] = file_tokens.get(norm_path, 0) + per_file
+                    file_tokens[norm_path] = file_tokens.get(norm_path, 0) + per_path
 
         return file_tokens
 
