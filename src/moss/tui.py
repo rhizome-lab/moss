@@ -893,7 +893,6 @@ class MossTUI(App):
         Binding("q", "quit", "Quit"),
         Binding("ctrl+c", "handle_ctrl_c", "Interrupt", show=False),
         Binding("ctrl+p", "command_palette", "Palette", priority=True),
-        Binding("t", "toggle_dark", "Theme"),
         Binding("v", "primitive_view", "View"),
         Binding("e", "primitive_edit", "Edit"),
         Binding("a", "primitive_analyze", "Analyze"),

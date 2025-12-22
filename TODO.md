@@ -137,7 +137,7 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - [x] Modal keybinds (TUIMode.bindings, active_bindings property, KeybindBar refresh)
 - [x] Jump-to-node shortcut (fuzzy search to quickly navigate tree) - 'g' key
 - [ ] View/Edit/Analyze: mode indicator (bottom right, near palette) OR tabbed content view
-- [ ] Remove theme keybind (T) - wasteful, only toggles light/dark
+- [x] Remove theme keybind (T) - wasteful, only toggles light/dark
 
 **Editor Integration:**
 - [ ] LSP refactor actions (rename symbol across files via language server)
