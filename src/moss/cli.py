@@ -3669,9 +3669,11 @@ def cmd_agent(args: Namespace) -> int:
             output.error(f"\nFailed: {result.error}")
             return 1
 
-    # New composable execution primitives
-    use_primitives = getattr(args, "primitives", False)
-    if use_primitives:
+    # Check for legacy mode
+    use_legacy = getattr(args, "legacy", False)
+
+    if not use_legacy:
+        # Default: composable execution primitives
         from pathlib import Path as P
 
         from moss.execution import (
@@ -3689,7 +3691,7 @@ def cmd_agent(args: Namespace) -> int:
         # Find dwim.toml
         dwim_toml = P(__file__).parent / "workflows" / "dwim.toml"
 
-        output.info(f"Starting agent (primitives): {task}")
+        output.info(f"Starting agent: {task}")
 
         # Load workflow config if available
         if dwim_toml.exists():
@@ -3735,6 +3737,7 @@ def cmd_agent(args: Namespace) -> int:
                 output.info(traceback.format_exc())
             return 1
 
+    # Legacy mode: DWIMLoop
     config = LoopConfig(max_turns=max_turns, mock=mock)
     if model:
         config.model = model
@@ -5727,9 +5730,9 @@ def create_parser() -> argparse.ArgumentParser:
         help="Use mock LLM responses (for testing)",
     )
     agent_parser.add_argument(
-        "--primitives",
+        "--legacy",
         action="store_true",
-        help="Use new composable execution primitives (experimental)",
+        help="Use legacy DWIMLoop instead of composable execution primitives",
     )
     agent_parser.set_defaults(func=cmd_agent)
 

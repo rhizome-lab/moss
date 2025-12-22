@@ -53,7 +53,9 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
   - [x] Phase 2: Parallel execution (Decision.parallel + ThreadPoolExecutor)
   - [x] Phase 3: dwim.toml + load_workflow() + run_workflow()
   - [x] Phase 4: Retry wired into Scope.run()
-  - [ ] Final: Remove DWIMLoop class, use dwim.toml instead
+  - [x] CLI: `moss agent --primitives` wired to new execution
+  - [ ] Graduate: Make --primitives default, deprecate DWIMLoop
+  - [ ] Remove: Delete dwim_loop.py (1151 lines → 0)
 - [ ] Explore TUI: modal keybinds, jump-to-node shortcut
 
 ## Backlog
