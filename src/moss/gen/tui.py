@@ -316,13 +316,12 @@ class TUIGenerator:
                         row.compose_add_child(input_widget)
                         params_container.mount(row)
 
-                    # Add execute button
-                    btn = Button("Execute (Ctrl+X)", id="execute-btn", variant="primary")
-                    params_container.mount(btn)
                 else:
                     params_container.mount(Static("No parameters required"))
-                    btn = Button("Execute (Ctrl+X)", id="execute-btn", variant="primary")
-                    params_container.mount(btn)
+
+                # Add execute button (outside if/else to avoid duplicate IDs)
+                btn = Button("Execute (Ctrl+X)", id="execute-btn", variant="primary")
+                params_container.mount(btn)
 
             def on_button_pressed(self, event: Button.Pressed) -> None:
                 """Handle button press."""
