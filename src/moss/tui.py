@@ -456,6 +456,7 @@ class ProjectTree(Tree[Any]):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._api: MossAPI | None = None
+        self.guide_depth = 2  # Minimal indentation
 
     def update_from_tasks(self, task_tree: TaskTree) -> None:
         self.clear()
@@ -730,10 +731,6 @@ class MossTUI(App):
         padding-left: 0;
     }
 
-    Tree.-compact .tree--guides {
-        width: 2;
-    }
-
     CommandPalette > .command-palette--input {
         height: 1;
         padding: 0 1;
@@ -836,7 +833,7 @@ class MossTUI(App):
                 Vertical(
                     Static("Navigation", id="sidebar-header"),
                     Breadcrumb(id="breadcrumb"),
-                    ProjectTree("Project", id="project-tree", classes="-compact"),
+                    ProjectTree("Project", id="project-tree"),
                     id="sidebar",
                 ),
                 Vertical(
@@ -1412,7 +1409,16 @@ class MossTUI(App):
                         break
             section = "\n".join(lines[start:end])
             explore_header.update(f"{symbol.signature} ({end - start} lines)")
-            explore_detail.write(section)
+            # Syntax highlight markdown
+            from rich.syntax import Syntax
+
+            syntax = Syntax(
+                section,
+                "markdown",
+                theme=self._get_syntax_theme(),
+                background_color=self._get_syntax_bg(),
+            )
+            explore_detail.write(syntax)
         except OSError as e:
             explore_detail.write(f"[red]Error: {e}[/]")
 
