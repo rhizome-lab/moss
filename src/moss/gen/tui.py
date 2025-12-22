@@ -148,7 +148,6 @@ class TUIGenerator:
             from textual.binding import Binding
             from textual.containers import Container, Horizontal, Vertical
             from textual.widgets import (
-                Button,
                 Footer,
                 Header,
                 Input,
@@ -226,15 +225,17 @@ class TUIGenerator:
                 padding: 0;
             }
 
-            #execute-btn {
-                dock: bottom;
-                height: 3;
-                margin: 0;
-                padding: 0;
-            }
-
             Tree {
                 scrollbar-gutter: stable;
+            }
+
+            .execute-hint {
+                height: 1;
+                text-align: center;
+            }
+
+            .execute-hint:hover {
+                background: $primary;
             }
             """
 
@@ -318,12 +319,6 @@ class TUIGenerator:
 
                 # Clear and rebuild params container
                 params_container = self.query_one("#params-container", Container)
-                # Explicitly remove execute button if it exists (avoid duplicate ID)
-                try:
-                    old_btn = self.query_one("#execute-btn", Button)
-                    old_btn.remove()
-                except Exception:
-                    pass
                 params_container.remove_children()
                 self.param_inputs.clear()
 
@@ -356,13 +351,14 @@ class TUIGenerator:
                 else:
                     params_container.mount(Static("No parameters required"))
 
-                # Add execute button (outside if/else to avoid duplicate IDs)
-                btn = Button("Execute (Ctrl+X)", id="execute-btn", variant="primary")
-                params_container.mount(btn)
+                # Clickable execute hint (single line, not a full button)
+                params_container.mount(
+                    Static("[bold cyan]▶ Execute (Ctrl+X)[/]", classes="execute-hint", markup=True)
+                )
 
-            def on_button_pressed(self, event: Button.Pressed) -> None:
-                """Handle button press."""
-                if event.button.id == "execute-btn":
+            def on_click(self, event) -> None:
+                """Handle clicks on execute hint."""
+                if hasattr(event, "widget") and "execute-hint" in event.widget.classes:
                     self.action_execute()
 
             def action_execute(self) -> None:
