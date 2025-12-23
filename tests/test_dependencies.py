@@ -6,8 +6,11 @@ import pytest
 
 from moss_intelligence.dependencies import (
     PythonDependencyProvider,
+    expand_import_context,
     extract_dependencies,
     format_dependencies,
+    format_import_context,
+    resolve_relative_import,
 )
 from moss_intelligence.views import ViewTarget, ViewType
 
@@ -188,3 +191,150 @@ class App:
 
         assert "Parse error" in view.content
         assert "error" in view.metadata
+
+
+class TestResolveRelativeImport:
+    """Tests for resolve_relative_import."""
+
+    @pytest.fixture
+    def project(self, tmp_path: Path) -> Path:
+        """Create a sample project structure."""
+        pkg = tmp_path / "mypackage"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("")
+        (pkg / "models.py").write_text("class User: pass")
+        (pkg / "api.py").write_text("from .models import User")
+
+        subpkg = pkg / "sub"
+        subpkg.mkdir()
+        (subpkg / "__init__.py").write_text("")
+        (subpkg / "utils.py").write_text("from ..models import User")
+
+        return tmp_path
+
+    def test_resolve_same_package(self, project: Path):
+        """Resolve from .models import User in api.py."""
+        info = extract_dependencies("from .models import User")
+        current_file = project / "mypackage" / "api.py"
+
+        resolved = resolve_relative_import(info.imports[0], current_file, project)
+
+        assert resolved is not None
+        assert resolved.name == "models.py"
+        assert resolved.exists()
+
+    def test_resolve_parent_package(self, project: Path):
+        """Resolve from ..models import User in sub/utils.py."""
+        info = extract_dependencies("from ..models import User")
+        current_file = project / "mypackage" / "sub" / "utils.py"
+
+        resolved = resolve_relative_import(info.imports[0], current_file, project)
+
+        assert resolved is not None
+        assert resolved.name == "models.py"
+
+    def test_resolve_non_relative_returns_none(self, project: Path):
+        """Non-relative imports return None."""
+        info = extract_dependencies("import os")
+        current_file = project / "mypackage" / "api.py"
+
+        resolved = resolve_relative_import(info.imports[0], current_file, project)
+
+        assert resolved is None
+
+    def test_resolve_missing_module(self, project: Path):
+        """Missing modules return None."""
+        info = extract_dependencies("from .nonexistent import Foo")
+        current_file = project / "mypackage" / "api.py"
+
+        resolved = resolve_relative_import(info.imports[0], current_file, project)
+
+        assert resolved is None
+
+
+class TestExpandImportContext:
+    """Tests for expand_import_context."""
+
+    @pytest.fixture
+    def project(self, tmp_path: Path) -> Path:
+        """Create a sample project with imports."""
+        pkg = tmp_path / "mypackage"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("")
+        (pkg / "models.py").write_text("""
+class User:
+    id: int
+    email: str
+
+    def validate(self) -> bool:
+        return True
+
+class Session:
+    token: str
+""")
+        (pkg / "api.py").write_text("""
+from .models import User, Session
+
+def get_user(user_id: int) -> User:
+    pass
+""")
+        return tmp_path
+
+    def test_expands_imported_symbols(self, project: Path):
+        """Expands imported symbols to their skeletons."""
+        api_file = project / "mypackage" / "api.py"
+
+        context = expand_import_context(api_file, project)
+
+        # Should have entries for User and Session
+        assert len(context) == 2
+        assert any("User" in k for k in context.keys())
+        assert any("Session" in k for k in context.keys())
+
+    def test_skeleton_contains_signature(self, project: Path):
+        """Skeleton includes class signature."""
+        api_file = project / "mypackage" / "api.py"
+
+        context = expand_import_context(api_file, project)
+
+        # Find User skeleton
+        user_key = next(k for k in context if "User" in k)
+        assert "class User" in context[user_key]
+
+    def test_handles_nonexistent_file(self, tmp_path: Path):
+        """Returns empty dict for nonexistent files."""
+        context = expand_import_context(tmp_path / "nonexistent.py", tmp_path)
+
+        assert context == {}
+
+    def test_handles_no_imports(self, tmp_path: Path):
+        """Returns empty dict for files with no relative imports."""
+        f = tmp_path / "standalone.py"
+        f.write_text("import os\ndef hello(): pass")
+
+        context = expand_import_context(f, tmp_path)
+
+        assert context == {}
+
+
+class TestFormatImportContext:
+    """Tests for format_import_context."""
+
+    def test_formats_context(self):
+        """Formats context as commented text."""
+        context = {
+            "models:User": "class User:\n    ...",
+            "auth:Token": "class Token:\n    ...",
+        }
+
+        output = format_import_context(context)
+
+        assert "# Imported Types:" in output
+        assert "# models:User" in output
+        assert "# auth:Token" in output
+
+    def test_empty_context(self):
+        """Empty context returns empty string."""
+        output = format_import_context({})
+
+        assert output == ""

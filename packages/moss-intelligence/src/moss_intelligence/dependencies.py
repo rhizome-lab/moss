@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .views import View, ViewOptions, ViewProvider, ViewTarget, ViewType
@@ -223,6 +224,140 @@ def find_reverse_dependencies(
             continue
 
     return results
+
+
+def resolve_relative_import(
+    import_info: Import,
+    current_file: Path,
+    root: Path,
+) -> Path | None:
+    """Resolve a relative import to an actual file path.
+
+    Args:
+        import_info: The import to resolve
+        current_file: Path of the file containing the import
+        root: Project root directory
+
+    Returns:
+        Path to the imported module, or None if not found
+    """
+    if not import_info.is_relative:
+        return None  # Only handles relative imports
+
+    # Start from current file's directory
+    current_dir = current_file.parent
+
+    # Go up 'level' directories (level=1 means current package, level=2 means parent package)
+    for _ in range(import_info.level - 1):
+        current_dir = current_dir.parent
+
+    # Add the module path
+    if import_info.module:
+        module_parts = import_info.module.split(".")
+        target = current_dir / "/".join(module_parts)
+    else:
+        target = current_dir
+
+    # Try as a file first, then as a package
+    if (target.with_suffix(".py")).exists():
+        return target.with_suffix(".py")
+    if (target / "__init__.py").exists():
+        return target / "__init__.py"
+
+    return None
+
+
+def expand_import_context(
+    file_path: Path,
+    root: Path,
+    symbols_only: bool = True,
+) -> dict[str, str]:
+    """Expand imports to their skeleton context.
+
+    This implements Phase 1 of "File Boundaries Don't Exist":
+    imports ARE context, automatically include skeleton of imported symbols.
+
+    Args:
+        file_path: Path to the file to analyze
+        root: Project root directory
+        symbols_only: If True, only include imported symbols (not full module)
+
+    Returns:
+        Dict mapping "module:symbol" to skeleton text
+
+    Example:
+        >>> context = expand_import_context(Path("api.py"), Path("."))
+        >>> print(context["models:User"])
+        class User:
+            id: int
+            email: str
+            def validate(self) -> bool: ...
+    """
+    from .skeleton import extract_python_skeleton, format_skeleton
+
+    try:
+        source = file_path.read_text()
+        deps = extract_dependencies(source)
+    except (OSError, SyntaxError):
+        return {}
+
+    context: dict[str, str] = {}
+
+    for imp in deps.imports:
+        # Only handle relative imports for now (internal project files)
+        if not imp.is_relative:
+            continue
+
+        resolved = resolve_relative_import(imp, file_path, root)
+        if resolved is None or not resolved.exists():
+            continue
+
+        try:
+            module_source = resolved.read_text()
+            all_symbols = extract_python_skeleton(module_source)
+        except (OSError, SyntaxError):
+            continue
+
+        # Get module name for the key
+        rel_path = resolved.relative_to(root)
+        module_name = str(rel_path.with_suffix("")).replace("/", ".").replace("\\", ".")
+
+        if symbols_only and imp.names:
+            # Only include the specific imported symbols
+            for name in imp.names:
+                matching = [s for s in all_symbols if s.name == name]
+                if matching:
+                    key = f"{module_name}:{name}"
+                    context[key] = format_skeleton(matching, include_docstrings=False)
+        else:
+            # Include all exported symbols from the module
+            key = module_name
+            context[key] = format_skeleton(all_symbols, include_docstrings=False)
+
+    return context
+
+
+def format_import_context(context: dict[str, str]) -> str:
+    """Format expanded import context as text.
+
+    Args:
+        context: Dict from expand_import_context()
+
+    Returns:
+        Formatted text suitable for LLM context
+    """
+    if not context:
+        return ""
+
+    lines = ["# Imported Types:"]
+    for key, skeleton in sorted(context.items()):
+        lines.append(f"# {key}")
+        # Indent the skeleton
+        for line in skeleton.split("\n"):
+            lines.append(f"# {line}" if line.strip() else "#")
+        lines.append("")
+
+    return "\n".join(lines).rstrip()
 
 
 def format_dependencies(info: DependencyInfo, include_exports: bool = True) -> str:

@@ -63,14 +63,28 @@ class User:
 def verify_token(token: str) -> User | None: ...
 ```
 
-### Phase 2: Suggested Import Context
+### Phase 2: Available Modules Summary
 
-When agent suggests adding an import:
-```python
-# Agent suggests: from .cache import CacheManager
+**Problem**: Agent doesn't know what exists in the codebase. It might:
+- Reimplement something that already exists
+- Miss an obvious utility function
+- Create duplicate patterns
+
+**Solution**: Show "Available Modules" summary BEFORE the agent writes code.
+
+When editing `api.py`, include a summary of sibling modules:
+```
+# Available in this package:
+# cache.py: CacheManager, cache_key(), invalidate()
+# models.py: User, Session, Token
+# auth.py: verify_token(), create_token(), hash_password()
+# utils.py: retry(), timeout(), log_call()
 ```
 
-Automatically pull in `CacheManager` skeleton before the edit, so the agent understands what it's importing.
+This is NOT full skeletons - just module → exported symbols mapping.
+Agent knows what's available, can choose to import instead of reimplement.
+
+**Implementation**: Use `dependencies.extract_dependencies()` on sibling files to get exports, format as compact list.
 
 ### Phase 3: Transitive Context (Limited Depth)
 

@@ -5,6 +5,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 ## Next Up
 
 - Push v0.1.0 release: `git push && git push --tags` (tag created, needs push)
+- File Boundaries Phase 1: Implicit import context
+- Test Coverage Heuristics: autodetect missing tests
+- TUI: ScopesAPI for public/private symbol stats
+- Call Graph: wire FunctionComplexity.short_name() into output
 
 Test Status: 2098 passing, 0 failing, 42 skipped (all optional deps)
 
@@ -25,7 +29,7 @@ Test Status: 2098 passing, 0 failing, 42 skipped (all optional deps)
 **File Boundaries Don't Exist:**
 - See `docs/file-boundaries.md` for design
 - Phase 1: Implicit import context (expand imports when viewing/editing)
-- Phase 2: Suggested import context (expand before agent adds import)
+- Phase 2: Available modules summary (show what's importable BEFORE writing)
 - Phase 3: Transitive context with depth limit
 
 **Test Coverage Heuristics:**
