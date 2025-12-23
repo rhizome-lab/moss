@@ -4,6 +4,29 @@
 
 ### Features
 
+**TUI Redesign Phase 3** (Dec 23 2025)
+- Edit modal: press `e` on file to open modal dialog
+  - Enter edit task description in modal
+  - No command input needed for editing
+- Contextual footer actions:
+  - Footer shows context-specific hints (sub-view nav in Analysis, Resume in Tasks)
+  - Updates dynamically when selection changes
+
+**TUI Redesign Phase 2** (Dec 23 2025)
+- Simplified to three modes: Code, Analysis, Tasks
+  - Removed: PLAN, READ, WRITE, DIFF, BRANCH, SWARM, COMMIT modes
+  - Backwards compatibility aliases for old mode names
+- Analysis sub-views with `[` and `]` navigation:
+  - Complexity: cyclomatic complexity ranking
+  - Security: vulnerability scanning
+  - Scopes: public/private symbol visibility
+  - Imports: dependency graph with circular dep detection
+- Shadow branches for tasks:
+  - `Session.start()` creates `shadow/task-{id}` branch
+  - `Session.resume()` checks out task's shadow branch
+  - `Session.get_diff()` returns changes vs base branch
+- Task diff view: click task to see its changes
+
 **TUI Redesign Phase 1** (Dec 23 2025)
 - Unified Task model: sessions, workflows, and agents are all "tasks"
   - Each task has: parent_id, children, shadow_branch, driver (user/agent)

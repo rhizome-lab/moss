@@ -11,26 +11,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 - Generic execution loop that works with any driver
 - Migrate existing agent_loop, step_loop, state_machine_loop
 
-**TUI Redesign Phase 2** (see `docs/tui-design.md`)
-
-Simplify panels:
-- Remove redundant modes (PLAN, READ, WRITE, DIFF, BRANCH, SWARM, COMMIT)
-- Three panels: Code, Analysis, Tasks
-- Analysis has sub-views: Complexity, Security, Scopes, Imports
-- Diff is accessed through task's changes, not separate mode
-
-Wire shadow branches:
-- Create shadow branch when task starts
-- Checkout shadow branch when resuming task
-- Show task's diff in Tasks panel detail view
-
-**TUI Redesign Phase 3**
-
-No commands:
-- Remove command input
-- Direct manipulation only (navigate + contextual actions)
-- Footer shows available actions for current context
-- `e` on file opens edit task input (modal, not command line)
+**TUI Remaining Work**
+- Wire async edit execution (currently just queues task)
+- Test shadow branch workflow end-to-end
+- Remove remaining command input usages from code paths
 
 ## Implementation Notes
 
