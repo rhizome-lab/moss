@@ -29,6 +29,8 @@ except ImportError:
 
 
 if TYPE_CHECKING:
+    from textual.widgets import RichLog
+
     from moss.moss_api import MossAPI
     from moss.task_tree import TaskNode, TaskTree
 
@@ -103,9 +105,11 @@ class AnalysisMode:
             app.query_one("#session-view").display = False
             app.query_one("#swarm-view").display = False
             app.query_one("#explore-view").display = False
-            sub_view = getattr(app, "_analysis_sub_view", "Complexity")
+            sub_view = app._analysis_sub_view
             app.query_one("#content-header").update(f"Analysis: {sub_view}")
             app._update_tree("file")
+            # Run initial analysis for current sub-view
+            app._run_analysis(sub_view)
         except Exception:
             pass
 
@@ -839,9 +843,12 @@ class MossTUI(App):
         Binding("escape", "hide_command", show=False),
         Binding("left", "tree_collapse", "Collapse", show=False),
         Binding("right", "tree_expand", "Expand", show=False),
+        Binding("bracketleft", "prev_subview", "[Prev", show=False),
+        Binding("bracketright", "next_subview", "Next]", show=False),
     ]
 
     current_mode_name = reactive("Code")
+    _analysis_sub_view = reactive("Complexity")
 
     @property
     def active_bindings(self) -> list[Binding]:
@@ -1317,6 +1324,156 @@ class MossTUI(App):
         next_mode = self._mode_registry.next_mode(self.current_mode_name)
         self.current_mode_name = next_mode.name
         self._log(f"Switched to {self.current_mode_name} mode")
+
+    def action_prev_subview(self) -> None:
+        """Cycle to previous sub-view (Analysis mode only)."""
+        if self.current_mode_name != "Analysis":
+            return
+        sub_views = AnalysisMode._sub_views
+        idx = sub_views.index(self._analysis_sub_view)
+        self._analysis_sub_view = sub_views[(idx - 1) % len(sub_views)]
+        self._update_analysis_view()
+
+    def action_next_subview(self) -> None:
+        """Cycle to next sub-view (Analysis mode only)."""
+        if self.current_mode_name != "Analysis":
+            return
+        sub_views = AnalysisMode._sub_views
+        idx = sub_views.index(self._analysis_sub_view)
+        self._analysis_sub_view = sub_views[(idx + 1) % len(sub_views)]
+        self._update_analysis_view()
+
+    def _update_analysis_view(self) -> None:
+        """Update Analysis mode display for current sub-view."""
+        try:
+            self.query_one("#content-header").update(f"Analysis: {self._analysis_sub_view}")
+            self._run_analysis(self._analysis_sub_view)
+        except Exception:
+            pass
+
+    def _run_analysis(self, sub_view: str) -> None:
+        """Run analysis for the specified sub-view."""
+        log_view = self.query_one("#log-view", expect_type=RichLog)
+        log_view.clear()
+
+        if sub_view == "Complexity":
+            self._run_complexity_analysis(log_view)
+        elif sub_view == "Security":
+            self._run_security_analysis(log_view)
+        elif sub_view == "Scopes":
+            self._run_scopes_analysis(log_view)
+        elif sub_view == "Imports":
+            self._run_imports_analysis(log_view)
+
+    def _run_complexity_analysis(self, log_view: RichLog) -> None:
+        """Run complexity analysis on codebase."""
+        try:
+            from moss.complexity import analyze_complexity
+
+            log_view.write("[bold]Complexity Analysis[/]\n")
+            report = analyze_complexity(self.api.root)
+            if report.functions:
+                # Sort by complexity descending, take top 20
+                sorted_funcs = sorted(report.functions, key=lambda f: -f.complexity)[:20]
+                for fc in sorted_funcs:
+                    if fc.complexity >= 10:
+                        color = "red"
+                    elif fc.complexity >= 5:
+                        color = "yellow"
+                    else:
+                        color = "green"
+                    log_view.write(
+                        f"[{color}]{fc.complexity:3}[/] {fc.qualified_name} ({fc.file}:{fc.lineno})"
+                    )
+            else:
+                log_view.write("[dim]No functions analyzed[/]")
+        except Exception as e:
+            log_view.write(f"[red]Error: {e}[/]")
+
+    def _run_security_analysis(self, log_view: RichLog) -> None:
+        """Run security analysis on codebase."""
+        try:
+            from moss.security import SecurityAnalyzer
+
+            log_view.write("[bold]Security Analysis[/]\n")
+            analyzer = SecurityAnalyzer(self.api.root)
+            analysis = analyzer.analyze()
+            if analysis.findings:
+                for finding in analysis.findings[:20]:
+                    severity_colors = {"high": "red", "medium": "yellow", "low": "blue"}
+                    color = severity_colors.get(finding.severity, "dim")
+                    log_view.write(f"[{color}]{finding.severity.upper():6}[/] {finding.message}")
+                    log_view.write(f"       {finding.file}:{finding.line}")
+            else:
+                log_view.write("[dim]No security issues found[/]")
+        except Exception as e:
+            log_view.write(f"[red]Error: {e}[/]")
+
+    def _run_scopes_analysis(self, log_view: RichLog) -> None:
+        """Run scopes analysis (symbol visibility)."""
+        try:
+            log_view.write("[bold]Scopes Analysis[/]\n")
+            # Show public vs private symbols
+            from moss.skeleton import SkeletonExtractor
+
+            extractor = SkeletonExtractor(self.api.root)
+            stats = {"public": 0, "private": 0, "files": 0}
+            for path in self.api.root.rglob("*.py"):
+                if ".git" in path.parts or "__pycache__" in path.parts:
+                    continue
+                try:
+                    symbols = extractor.extract(path)
+                    stats["files"] += 1
+                    for sym in symbols:
+                        if sym.name.startswith("_"):
+                            stats["private"] += 1
+                        else:
+                            stats["public"] += 1
+                except Exception:
+                    continue
+            log_view.write(f"Files analyzed: {stats['files']}")
+            log_view.write(f"Public symbols: {stats['public']}")
+            log_view.write(f"Private symbols: {stats['private']}")
+        except Exception as e:
+            log_view.write(f"[red]Error: {e}[/]")
+
+    def _run_imports_analysis(self, log_view: RichLog) -> None:
+        """Run imports analysis (dependency graph)."""
+        try:
+            from moss.dependency_analysis import DependencyAnalyzer
+
+            log_view.write("[bold]Imports Analysis[/]\n")
+            analyzer = DependencyAnalyzer(self.api.root)
+            analysis = analyzer.analyze()
+
+            if analysis.module_metrics:
+                mods = analysis.total_modules
+                edges = analysis.total_edges
+                log_view.write(f"\n{mods} modules, {edges} imports")
+                log_view.write(f"Coupling density: {analysis.coupling_density:.1%}\n")
+
+                # Show god modules (high fan-in)
+                if analysis.god_modules:
+                    log_view.write("[bold]High fan-in modules:[/]")
+                    for m in analysis.god_modules[:5]:
+                        log_view.write(f"  {m.fan_in:3} imports -> {m.name}")
+
+                # Show circular dependencies
+                if analysis.circular_deps:
+                    n_cycles = len(analysis.circular_deps)
+                    log_view.write(f"\n[yellow]Circular dependencies ({n_cycles}):[/]")
+                    for cd in analysis.circular_deps[:5]:
+                        log_view.write(f"  {cd.description}")
+
+                # Show orphan modules
+                if analysis.orphan_modules:
+                    log_view.write(f"\n[dim]Orphan modules ({len(analysis.orphan_modules)}):[/]")
+                    for orph in analysis.orphan_modules[:5]:
+                        log_view.write(f"  {orph}")
+            else:
+                log_view.write("[dim]No imports analyzed[/]")
+        except Exception as e:
+            log_view.write(f"[red]Error: {e}[/]")
 
     def action_resume_task(self, task_id: str) -> None:
         """Resume a task by ID."""
