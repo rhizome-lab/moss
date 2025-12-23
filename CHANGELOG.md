@@ -4,6 +4,21 @@
 
 ### Features
 
+**TUI Redesign Phase 1** (Dec 23 2025)
+- Unified Task model: sessions, workflows, and agents are all "tasks"
+  - Each task has: parent_id, children, shadow_branch, driver (user/agent)
+  - Shadow branch naming: `shadow/task-{id}` (persistent, never deleted)
+  - Type aliases: `Task = Session`, `TaskManager = SessionManager`
+- Tasks panel (renamed from Sessions):
+  - Shows hierarchical task tree with parent/children
+  - Color-coded by driver: cyan=user, magenta=agent
+  - Status icons: ○ created, ● running, ◐ paused, ✓ completed, ✗ failed
+  - Click to resume task (stub implementation)
+- TUI fixes:
+  - Graceful handling when Shadow Git not initialized
+  - Mode names in Title case (was UPPERCASE)
+- Design doc: `docs/tui-design.md`
+
 **Distribution** (Dec 23 2025)
 - GitHub Actions workflow for building release binaries
   - Linux (x86_64, aarch64, musl)

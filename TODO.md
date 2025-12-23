@@ -4,29 +4,26 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 ## Next Up
 
-**TUI Redesign** (see `docs/tui-design.md`)
+**TUI Redesign Phase 2** (see `docs/tui-design.md`)
 
-Phase 1 - Unified task model:
-- Unify session/workflow/swarm into "task" concept
-- Each task gets shadow branch `shadow/task-{id}`
-- Task tree shows all work (active, paused, completed)
-- Tasks are persistent, shadow branches never deleted
-
-Phase 2 - Simplify panels:
-- Remove redundant modes (PLAN, READ, WRITE, DIFF, SESSION, BRANCH, SWARM, COMMIT)
+Simplify panels:
+- Remove redundant modes (PLAN, READ, WRITE, DIFF, BRANCH, SWARM, COMMIT)
 - Three panels: Code, Analysis, Tasks
 - Analysis has sub-views: Complexity, Security, Scopes, Imports
 - Diff is accessed through task's changes, not separate mode
 
-Phase 3 - No commands:
+Wire shadow branches:
+- Create shadow branch when task starts
+- Checkout shadow branch when resuming task
+- Show task's diff in Tasks panel detail view
+
+**TUI Redesign Phase 3**
+
+No commands:
 - Remove command input
 - Direct manipulation only (navigate + contextual actions)
 - Footer shows available actions for current context
-- `e` on file opens edit task input (the one text input we need)
-
-Immediate fixes (while redesigning):
-- Gracefully handle missing Shadow Git in current DIFF mode
-- Mode names to title case (temporary until modes removed)
+- `e` on file opens edit task input (modal, not command line)
 
 ## Implementation Notes
 
