@@ -4,13 +4,19 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 ## Next Up
 
-**1. Distribution**
-- Auto-updates
-- Portable single binary
-- Pre-built binaries (GitHub Actions)
+**1. Distribution (in progress)**
+- [x] Auto-updates (`moss update` command)
+- [x] GitHub Actions release workflow
+- [ ] Test cross-platform builds
+- [ ] Add self-update binary replacement
 
 **2. TUI Integration**
-- Better integration of primitives into TUI workflow
+- Quick access to new primitives:
+  - `moss scopes` for variable/scope inspection
+  - `moss imports --graph` for dependency visualization
+  - `moss imports --who-imports` for reverse lookups
+- Type-aware code navigation (use inferred types for jump-to-definition)
+- Scope-aware autocomplete suggestions
 
 ## Backlog
 
