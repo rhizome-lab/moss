@@ -12,7 +12,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 **2. TUI Integration**
 - Better integration of primitives into TUI workflow
-- Suppress dead code warnings from daemon Request/Response types (serde false positives)
 
 **3. Distribution**
 - Auto-updates
