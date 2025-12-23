@@ -8,12 +8,14 @@
 - `--types-only` flag: filters skeleton to show only type definitions (class, struct, enum, interface)
   - Strips methods/functions for architectural overview
   - Works with all skeleton output (Python, Rust, TypeScript, etc.)
-- `--fisheye` mode: shows target file at full detail, plus skeletons of imported modules
+- `--fisheye[=module]` mode: shows target file at full detail, plus skeletons of imported modules
   - Resolves Python imports (relative and absolute) to local files
   - Resolves Rust crate-local imports (`crate::`, `self::`, `super::`)
   - Resolves TypeScript/JavaScript imports (relative paths with extension inference)
   - Shows imported module skeletons at signature level (depth 1)
   - Barrel file hoisting: traces through re-exports (`export * from`, `export { x } from`)
+  - Selective filtering: `--fisheye=models` only expands matching imports
+  - Useless docstring detection: skips docstrings that just repeat function name
   - Combines with `--types-only` for types-only fisheye view
 - `--resolve-imports`: shows only the specific imported symbols (more focused than fisheye)
   - Lists each imported symbol with its signature, grouped by module
