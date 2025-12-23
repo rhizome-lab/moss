@@ -11,10 +11,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 - Generic execution loop that works with any driver
 - Migrate existing agent_loop, step_loop, state_machine_loop
 
-**TUI Remaining Work**
-- Wire async edit execution (currently just queues task)
-- Test shadow branch workflow end-to-end
-- Remove remaining command input usages from code paths
 
 ## Implementation Notes
 

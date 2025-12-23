@@ -4,6 +4,17 @@
 
 ### Features
 
+**TUI Cleanup** (Dec 23 2025)
+- Removed command input usage from code paths:
+  - `navigate_branch` now calls `switch_branch` API directly
+  - File/symbol selection calls `action_primitive_view()` uniformly
+  - `navigate()` calls `_expand_and_select_path` directly
+  - Directory double-click works in all modes
+- Wired async edit execution:
+  - Edit primitive now executes using `edit()` from `moss/edit.py`
+  - Shows real-time progress and results in explore panel
+  - Background task execution with proper lifecycle management
+
 **TUI Redesign Phase 3** (Dec 23 2025)
 - Edit modal: press `e` on file to open modal dialog
   - Enter edit task description in modal
