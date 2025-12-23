@@ -412,6 +412,18 @@ class KeybindBar(Static):
                     # Key not in description, prefix with [key]
                     text = f"\\[{key}] {desc}"
                 parts.append(f"[@click=app.{action}]{text}[/]")
+
+            # Add contextual actions based on mode and selection
+            mode_name = getattr(self.app, "current_mode_name", "Code")
+            selected_type = getattr(self.app, "_selected_type", "")
+
+            if mode_name == "Analysis":
+                # Show sub-view navigation
+                sub_view = getattr(self.app, "_analysis_sub_view", "Complexity")
+                parts.append(f"\\[<>] {sub_view}")
+            elif mode_name == "Tasks" and selected_type == "task":
+                # Show task-specific actions
+                parts.append("\\[Enter] Resume")
         left = " ".join(parts)
 
         # Mode indicator + Palette on the right
@@ -1393,6 +1405,9 @@ class MossTUI(App):
                 self.query_one("#command-input").value = f"view {symbol_path}"
                 self.query_one("#command-input").focus()
         elif data["type"] == "task":
+            self._selected_type = "task"
+            self._selected_task_id = data["task_id"]
+            self._refresh_footer()
             # Show task's diff in the diff view
             self._show_task_diff(data["task_id"])
 
@@ -2319,6 +2334,13 @@ class MossTUI(App):
         except Exception as e:
             explore_header.update(f"Error: {primitive}")
             explore_detail.write(f"[red]{type(e).__name__}: {e}[/]")
+
+    def _refresh_footer(self) -> None:
+        """Refresh the footer to show contextual actions."""
+        try:
+            self.query_one(KeybindBar).refresh()
+        except Exception:
+            pass
 
     def _log(self, message: str) -> None:
         """Add a message to the log view."""
