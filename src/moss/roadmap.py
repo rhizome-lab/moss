@@ -110,28 +110,38 @@ def parse_todo_md(path: Path) -> Roadmap:
         line = lines[i]
 
         # Section headers
-        if line.startswith("## In Progress"):
+        if line.startswith("## In Progress") or line.startswith("## Next Up"):
             current_section = "in_progress"
             i += 1
             continue
-        elif line.startswith("## Future"):
+        elif line.startswith("## Future") or line.startswith("## Backlog"):
             current_section = "future"
             i += 1
             continue
-        elif line.startswith("## ") and current_section:
-            # End of roadmap sections
-            break
+        elif line.startswith("## "):
+            # Unknown section - reset current_section and continue looking
+            current_section = None
+            i += 1
+            continue
 
         # Phase headers - handle multiple formats:
         # - "### Phase X: Title" -> id=X, title=Title
         # - "### Title" -> id="", title=Title
         # - "### Title ✅" -> id="", title=Title, complete
+        # - "**Title:**" -> id="", title=Title (backlog format)
+        header_content = None
+        is_complete = False
+
         if line.startswith("### "):
             header_content = line[4:].strip()
             is_complete = header_content.endswith("✅")
             if is_complete:
                 header_content = header_content[:-1].strip()
+        elif current_section and line.startswith("**") and line.rstrip().endswith(":**"):
+            # Backlog format: **Title:**
+            header_content = line.strip()[2:-3]  # Remove ** and :**
 
+        if header_content:
             # Check for "Phase X:" format
             phase_id_match = re.match(r"^Phase (\w+):\s*(.+)$", header_content)
             if phase_id_match:
