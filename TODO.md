@@ -4,28 +4,19 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 ## Next Up
 
-**Package Consolidation** (see `docs/restructuring-plan.md`, `docs/api-boundaries.md`)
+**Package Migration** (see `docs/restructuring-plan.md`, `docs/api-boundaries.md`)
 
-Packages scaffolded in `packages/`:
-- moss-intelligence: Code analysis (skeleton, complexity, security, deps)
-- moss-context: Working memory (domain-agnostic)
-- moss-orchestration: Agent loops, sessions, drivers
-- moss-llm: litellm adapters (LLMSummarizer, LLMDecider)
-- moss-mcp, moss-lsp, moss-tui, moss-acp: Frontend wrappers
+Sub-packages are source of truth. Move implementation FROM `src/moss/` TO `packages/`:
+- [ ] Move skeleton extraction to `moss-intelligence`
+- [ ] Move working memory to `moss-context`
+- [ ] Update internal imports to use sub-packages (not `moss.*`)
+- [ ] Make `src/moss/` a thin meta-package (re-exports only)
 
-Remaining work:
-- [x] Fix internal imports in moss-orchestration (converted to relative)
-- [x] Add uv workspace configuration for local development
-- [x] Integration tests for package boundaries (tests/test_packages.py)
-
-**Migration strategy** (sub-packages currently wrap moss.* imports):
-1. Sub-packages provide API structure, delegate to main moss
-2. Incrementally move implementation from moss to sub-packages
-3. When fully migrated: factor infrastructure to moss-base, make moss meta-package
+Current state: sub-packages delegate to `moss.*` (temporary, invert this)
 
 **Deferred:**
-- Driver Integration improvements
-- Call Graph language support
+- Driver integration improvements
+- Call graph language support
 
 ## Implementation Notes
 

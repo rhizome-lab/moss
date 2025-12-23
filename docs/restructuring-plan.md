@@ -2,6 +2,25 @@
 
 Based on the layered architecture from `docs/langgraph-evaluation.md`.
 
+## Architecture Principle: No Monolith
+
+**Sub-packages are the source of truth.** Implementation lives in `packages/`:
+- `moss-intelligence` - code understanding (skeleton, complexity, security, deps)
+- `moss-context` - working memory (domain-agnostic)
+- `moss-orchestration` - agent loops, sessions, drivers
+- `moss-llm` - LLM adapters (litellm-based)
+- `moss-mcp`, `moss-lsp`, `moss-tui`, `moss-acp` - frontends
+
+**The `moss` package is a meta-package only:**
+- Convenience re-exports for external users: `from moss import Intelligence`
+- CLI entry point
+- **Never used internally** - all internal imports go to sub-packages
+
+**Migration direction:**
+- Move implementation FROM `src/moss/` TO `packages/moss-*/`
+- `src/moss/` shrinks over time until it's just re-exports
+- Never add new functionality to `src/moss/`
+
 ## Key Insight
 
 Two orthogonal concerns, both differentiators:
