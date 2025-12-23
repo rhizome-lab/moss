@@ -15,10 +15,13 @@ Packages scaffolded in `packages/`:
 
 Remaining work:
 - [x] Fix internal imports in moss-orchestration (converted to relative)
-- [ ] Migrate infrastructure modules to base package (events, handles, output, etc.)
-- [ ] Update main moss to re-export from sub-packages
-- [ ] Add workspace configuration for local development
+- [x] Add uv workspace configuration for local development
 - [ ] Integration tests for package boundaries
+
+**Migration strategy** (sub-packages currently wrap moss.* imports):
+1. Sub-packages provide API structure, delegate to main moss
+2. Incrementally move implementation from moss to sub-packages
+3. When fully migrated: factor infrastructure to moss-base, make moss meta-package
 
 **Deferred:**
 - Driver Integration improvements
