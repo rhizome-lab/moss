@@ -29,9 +29,7 @@ Completed:
 - [x] MCP server refactored to use moss_intelligence directly (MossAPI removed)
 - [x] MCP server tests updated to use new tool names and APIs
 - [x] CLI commands refactored to remove MossAPI (cmd_deps, cmd_context, cmd_query, cmd_cfg)
-
-Remaining:
-- [ ] Telemetry: migrate session stats to new architecture (currently stubbed)
+- [x] Telemetry: session stats migrated to use SessionManager from moss_orchestration
 
 Test Status: 2106 passing, 0 failing, 82 skipped, 51 xfailed, 21 xpassed
 

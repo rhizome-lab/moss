@@ -2036,6 +2036,7 @@ def cmd_analyze_session(args: Namespace) -> int:
 
 def cmd_telemetry(args: Namespace) -> int:
     """Show aggregate telemetry across sessions."""
+    from moss_orchestration.session import SessionManager
     from moss_orchestration.session_analysis import analyze_session
 
     output = setup_output(args)
@@ -2044,11 +2045,23 @@ def cmd_telemetry(args: Namespace) -> int:
     html_output = getattr(args, "html", False)
     watch_mode = getattr(args, "watch", False)
 
-    # Mode 1: Analyze specific moss session (not yet migrated)
+    # Mode 1: Analyze specific moss session
     if session_id:
-        output.error("Session telemetry not yet migrated to new architecture")
-        output.info("Use --logs to analyze external session logs instead")
-        return 1
+        manager = SessionManager()
+        session = manager.load(session_id)
+        if not session:
+            output.error(f"Session not found: {session_id}")
+            output.info(f"Sessions are stored in: {manager.storage_dir}")
+            return 1
+
+        stats = _extract_session_stats(session)
+        if wants_json(args):
+            output.data(stats)
+        elif html_output:
+            output.print(_generate_session_html(stats))
+        else:
+            output.print(_format_session_stats(stats))
+        return 0
 
     # Mode 2: Analyze external Claude Code session logs
     if log_paths:
@@ -2078,10 +2091,24 @@ def cmd_telemetry(args: Namespace) -> int:
             output.print(analysis.to_markdown())
         return 0
 
-    # Mode 3: Default - aggregate stats across all moss sessions (not yet migrated)
-    output.error("Aggregate session telemetry not yet migrated to new architecture")
-    output.info("Use --logs <path> to analyze external session logs")
-    return 1
+    # Mode 3: Default - aggregate stats across all moss sessions
+    manager = SessionManager()
+    sessions = manager.list_sessions(limit=1000)
+
+    if not sessions:
+        output.warning("No moss sessions found")
+        output.info(f"Sessions are stored in: {manager.storage_dir}")
+        output.info("Use --logs <path> to analyze external session logs")
+        return 0
+
+    aggregate = _aggregate_session_stats(sessions)
+    if wants_json(args):
+        output.data(aggregate)
+    elif html_output:
+        output.print(_generate_aggregate_html(aggregate))
+    else:
+        output.print(_format_aggregate_stats(aggregate))
+    return 0
 
 
 def _telemetry_watch_loop(
@@ -2191,11 +2218,68 @@ def _format_watch_output(analysis: Any) -> str:
     return "\n".join(lines)
 
 
+def _extract_session_stats(session: Any) -> dict:
+    """Extract stats from a Session object."""
+    duration = 0.0
+    if session.created_at and session.updated_at:
+        duration = (session.updated_at - session.created_at).total_seconds()
+
+    return {
+        "id": session.id,
+        "task": session.task,
+        "status": session.status.value if hasattr(session.status, "value") else str(session.status),
+        "tokens": session.llm_tokens_in + session.llm_tokens_out,
+        "tokens_in": session.llm_tokens_in,
+        "tokens_out": session.llm_tokens_out,
+        "llm_calls": session.llm_calls,
+        "tool_calls": len(session.tool_calls),
+        "file_changes": len(session.file_changes),
+        "duration": duration,
+        "access_patterns": dict(session.access_patterns),
+        "created_at": session.created_at.isoformat() if session.created_at else None,
+        "updated_at": session.updated_at.isoformat() if session.updated_at else None,
+        "tags": session.tags,
+    }
+
+
+def _aggregate_session_stats(sessions: list) -> dict:
+    """Aggregate stats from multiple sessions."""
+    from collections import Counter
+
+    total_tokens = 0
+    total_llm_calls = 0
+    total_tool_calls = 0
+    total_file_changes = 0
+    access_counter: Counter = Counter()
+
+    for session in sessions:
+        total_tokens += session.llm_tokens_in + session.llm_tokens_out
+        total_llm_calls += session.llm_calls
+        total_tool_calls += len(session.tool_calls)
+        total_file_changes += len(session.file_changes)
+        access_counter.update(session.access_patterns)
+
+    # Get top hotspots
+    hotspots = access_counter.most_common(20)
+
+    return {
+        "session_count": len(sessions),
+        "total_tokens": total_tokens,
+        "total_llm_calls": total_llm_calls,
+        "total_tool_calls": total_tool_calls,
+        "total_file_changes": total_file_changes,
+        "hotspots": hotspots,
+        "max_memory_bytes": 0,  # Not tracked in current session model
+        "max_context_tokens": 0,  # Not tracked in current session model
+    }
+
+
 def _format_session_stats(stats: dict) -> str:
     """Format session stats for display."""
     lines = [
         f"Session: {stats.get('id', 'unknown')}",
         f"Task: {stats.get('task', 'N/A')}",
+        f"Status: {stats.get('status', 'unknown')}",
         f"Tokens: {stats.get('tokens', 0):,}",
         f"LLM Calls: {stats.get('llm_calls', 0)}",
         f"Tool Calls: {stats.get('tool_calls', 0)}",
@@ -2219,9 +2303,15 @@ def _format_aggregate_stats(stats: dict) -> str:
         f"Sessions: {stats.get('session_count', 0)}",
         f"Total Tokens: {stats.get('total_tokens', 0):,}",
         f"Total LLM Calls: {stats.get('total_llm_calls', 0)}",
-        f"Max Memory: {stats.get('max_memory_bytes', 0) / 1024 / 1024:.1f} MB",
-        f"Max Context: {stats.get('max_context_tokens', 0):,} tokens",
+        f"Total Tool Calls: {stats.get('total_tool_calls', 0)}",
+        f"Total File Changes: {stats.get('total_file_changes', 0)}",
     ]
+
+    # Only show memory/context if tracked
+    if stats.get("max_memory_bytes", 0) > 0:
+        lines.append(f"Max Memory: {stats.get('max_memory_bytes', 0) / 1024 / 1024:.1f} MB")
+    if stats.get("max_context_tokens", 0) > 0:
+        lines.append(f"Max Context: {stats.get('max_context_tokens', 0):,} tokens")
 
     hotspots = stats.get("hotspots", [])
     if hotspots:
@@ -2303,6 +2393,112 @@ def _telemetry_css() -> str:
         .label { color: #666; font-size: 0.9rem; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
     """
+
+
+def _generate_session_html(stats: dict) -> str:
+    """Generate HTML for a single session's stats."""
+    access_rows = ""
+    for path, count in sorted(stats.get("access_patterns", {}).items(), key=lambda x: -x[1])[:10]:
+        access_rows += f"<tr><td>{path}</td><td>{count}</td></tr>\n"
+
+    css = _telemetry_css()
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Session {stats.get('id', 'unknown')}</title>
+    <style>{css}</style>
+</head>
+<body>
+    <div class="container">
+        <h1>Session: {stats.get('id', 'unknown')}</h1>
+        <p>Task: {stats.get('task', 'N/A')}</p>
+        <p>Status: {stats.get('status', 'unknown')}</p>
+
+        <div class="grid card">
+            <div>
+                <div class="metric">{stats.get('tokens', 0):,}</div>
+                <div class="label">Total Tokens</div>
+            </div>
+            <div>
+                <div class="metric">{stats.get('llm_calls', 0)}</div>
+                <div class="label">LLM Calls</div>
+            </div>
+            <div>
+                <div class="metric">{stats.get('tool_calls', 0)}</div>
+                <div class="label">Tool Calls</div>
+            </div>
+            <div>
+                <div class="metric">{stats.get('file_changes', 0)}</div>
+                <div class="label">File Changes</div>
+            </div>
+            <div>
+                <div class="metric">{stats.get('duration', 0):.1f}s</div>
+                <div class="label">Duration</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Accessed Files</h2>
+            <table>
+                <tr><th>File</th><th>Access Count</th></tr>
+                {access_rows}
+            </table>
+        </div>
+    </div>
+</body>
+</html>"""
+
+
+def _generate_aggregate_html(stats: dict) -> str:
+    """Generate HTML for aggregate session stats."""
+    hotspot_rows = ""
+    for path, count in stats.get("hotspots", [])[:20]:
+        hotspot_rows += f"<tr><td>{path}</td><td>{count}</td></tr>\n"
+
+    css = _telemetry_css()
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Aggregate Telemetry</title>
+    <style>{css}</style>
+</head>
+<body>
+    <div class="container">
+        <h1>Aggregate Telemetry</h1>
+
+        <div class="grid card">
+            <div>
+                <div class="metric">{stats.get('session_count', 0)}</div>
+                <div class="label">Sessions</div>
+            </div>
+            <div>
+                <div class="metric">{stats.get('total_tokens', 0):,}</div>
+                <div class="label">Total Tokens</div>
+            </div>
+            <div>
+                <div class="metric">{stats.get('total_llm_calls', 0)}</div>
+                <div class="label">Total LLM Calls</div>
+            </div>
+            <div>
+                <div class="metric">{stats.get('total_tool_calls', 0)}</div>
+                <div class="label">Total Tool Calls</div>
+            </div>
+            <div>
+                <div class="metric">{stats.get('total_file_changes', 0)}</div>
+                <div class="label">Total File Changes</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>File Hotspots</h2>
+            <table>
+                <tr><th>File</th><th>Access Count</th></tr>
+                {hotspot_rows}
+            </table>
+        </div>
+    </div>
+</body>
+</html>"""
 
 
 def _generate_telemetry_html(analysis: SessionAnalysis) -> str:
