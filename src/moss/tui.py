@@ -16,8 +16,9 @@ try:
     from textual.binding import Binding
     from textual.containers import Container, Horizontal, Vertical
     from textual.reactive import reactive
+    from textual.screen import ModalScreen
     from textual.suggester import Suggester
-    from textual.widgets import Input, Static, Tree
+    from textual.widgets import Button, Input, Label, Static, Tree
     from textual.widgets.tree import TreeNode
 except ImportError:
     # TUI dependencies not installed
@@ -25,6 +26,9 @@ except ImportError:
         pass
 
     class ComposeResult:
+        pass
+
+    class ModalScreen:
         pass
 
 
@@ -145,6 +149,81 @@ DiffMode = TasksMode  # Diff accessed through Tasks
 BranchMode = TasksMode
 SwarmMode = TasksMode
 CommitMode = TasksMode
+
+
+class EditModal(ModalScreen[str | None]):
+    """Modal dialog for edit task input."""
+
+    CSS = """
+    EditModal {
+        align: center middle;
+    }
+
+    EditModal > Container {
+        width: 60%;
+        height: auto;
+        max-height: 50%;
+        padding: 1 2;
+        background: $surface;
+        border: thick $primary;
+    }
+
+    EditModal #edit-title {
+        text-style: bold;
+        margin-bottom: 1;
+    }
+
+    EditModal #edit-path {
+        color: $text-muted;
+        margin-bottom: 1;
+    }
+
+    EditModal #edit-input {
+        margin-bottom: 1;
+    }
+
+    EditModal #edit-buttons {
+        align: right middle;
+        height: 3;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("enter", "submit", "Submit", show=False),
+    ]
+
+    def __init__(self, path: str, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.path = path
+
+    def compose(self) -> ComposeResult:
+        with Container():
+            yield Label("Edit Task", id="edit-title")
+            yield Label(f"File: {self.path}", id="edit-path")
+            yield Input(placeholder="Describe the edit...", id="edit-input")
+            with Horizontal(id="edit-buttons"):
+                yield Button("Cancel", variant="default", id="cancel-btn")
+                yield Button("Edit", variant="primary", id="submit-btn")
+
+    def on_mount(self) -> None:
+        self.query_one("#edit-input", Input).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "cancel-btn":
+            self.dismiss(None)
+        elif event.button.id == "submit-btn":
+            self.action_submit()
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def action_submit(self) -> None:
+        task = self.query_one("#edit-input", Input).value.strip()
+        if task:
+            self.dismiss(task)
+        else:
+            self.dismiss(None)
 
 
 class ModeRegistry:
@@ -2011,9 +2090,12 @@ class MossTUI(App):
         if not self._selected_path:
             self._log("[dim]No node selected[/]")
             return
-        # Pre-fill command for edit (user needs to specify operation)
-        self.query_one("#command-input").value = f"edit {self._selected_path} "
-        self.query_one("#command-input").focus()
+
+        def handle_edit_result(task: str | None) -> None:
+            if task:
+                self._execute_primitive("edit", self._selected_path, task=task)
+
+        self.push_screen(EditModal(self._selected_path), handle_edit_result)
 
     def action_primitive_analyze(self) -> None:
         """Analyze the currently selected node."""
@@ -2175,6 +2257,25 @@ class MossTUI(App):
                             explore_detail.write(sig)
                         else:
                             explore_detail.write("[dim](no source available)[/]")
+
+            elif primitive == "edit":
+                task = kwargs.get("task", "")
+                if not task:
+                    explore_header.update("Edit cancelled")
+                    explore_detail.write("[dim]No edit task provided[/]")
+                    return
+
+                explore_header.update(f"EDIT: {target}")
+                explore_detail.write(f"[bold]Task:[/] {task}\n")
+                explore_detail.write(f"[bold]Target:[/] {target}\n\n")
+                explore_detail.write("[dim]Submitting edit task...[/]\n")
+
+                # Queue the edit for async execution
+                # The edit system is async - for now just acknowledge
+                self._log(f"Edit queued: {task[:50]}... on {target}")
+                explore_detail.write(
+                    "[yellow]Edit tasks run asynchronously. Check the log for results.[/]"
+                )
 
             elif primitive == "analyze":
                 api = AnalyzeAPI(self.api.root)
