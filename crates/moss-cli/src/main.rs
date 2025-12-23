@@ -2339,12 +2339,14 @@ fn cmd_callees(symbol: &str, file: Option<&str>, root: Option<&Path>, json: bool
                 return 1;
             }
         }
-        match idx.refresh_call_graph() {
+        match idx.incremental_call_graph_refresh() {
             Ok((symbols, calls, imports)) => {
-                eprintln!(
-                    "Indexed {} symbols, {} calls, {} imports",
-                    symbols, calls, imports
-                );
+                if symbols > 0 || calls > 0 || imports > 0 {
+                    eprintln!(
+                        "Indexed {} symbols, {} calls, {} imports",
+                        symbols, calls, imports
+                    );
+                }
 
                 // Retry with index
                 let file_path = if let Some(file) = file {
@@ -2433,8 +2435,8 @@ fn cmd_callers(symbol: &str, root: Option<&Path>, json: bool, profiler: &mut Pro
     }
     profiler.mark("index_miss");
 
-    // Index empty - auto-reindex (faster than file scan)
-    eprintln!("Call graph not indexed. Building now (one-time)...");
+    // Index empty or stale - auto-reindex (incremental is faster)
+    eprintln!("Call graph not indexed. Building now...");
 
     if let Ok(mut idx) = index::FileIndex::open(&root) {
         // Ensure file index is populated first
@@ -2446,8 +2448,8 @@ fn cmd_callers(symbol: &str, root: Option<&Path>, json: bool, profiler: &mut Pro
         }
         profiler.mark("file_index");
 
-        // Now build call graph
-        match idx.refresh_call_graph() {
+        // Now build call graph (incremental uses mtime to skip unchanged files)
+        match idx.incremental_call_graph_refresh() {
             Ok((symbols, calls, imports)) => {
                 eprintln!(
                     "Indexed {} symbols, {} calls, {} imports",
@@ -2498,14 +2500,13 @@ fn cmd_tree(
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    // Resolve the path if it's not "."
+    // Resolve the path using unified resolution (handles trailing slashes)
     let target_dir = if path == "." {
         root.clone()
     } else {
-        let matches = path_resolve::resolve(path, &root);
-        match matches.iter().find(|m| m.kind == "directory") {
-            Some(m) => root.join(&m.path),
-            None => {
+        match path_resolve::resolve_unified(path, &root) {
+            Some(u) if u.is_directory => root.join(&u.file_path),
+            _ => {
                 // Maybe it's an exact path
                 let exact = root.join(path);
                 if exact.is_dir() {
