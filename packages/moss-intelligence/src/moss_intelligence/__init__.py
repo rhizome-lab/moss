@@ -17,14 +17,12 @@ Example:
 """
 
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING
 
-
-@runtime_checkable
-class ViewResult(Protocol):
-    """Protocol for view results."""
-    content: str
-    path: Path
+if TYPE_CHECKING:
+    from .skeleton import Symbol
+    from .complexity import ComplexityReport
+    from .dependency_analysis import DependencyAnalysis
 
 
 class Intelligence:
@@ -46,29 +44,30 @@ class Intelligence:
         if not self.root.is_dir():
             raise ValueError(f"Not a directory: {self.root}")
 
+    def _resolve_path(self, path: str | Path) -> Path:
+        """Resolve path relative to project root."""
+        p = Path(path)
+        if not p.is_absolute():
+            p = self.root / p
+        return p
+
     # === Views ===
 
-    def view(self, locator: str) -> str:
-        """View code at a locator (path, symbol, or pattern).
-
-        Args:
-            locator: File path, symbol name, or pattern
-
-        Returns:
-            Formatted view of the code
-        """
-        raise NotImplementedError("TODO: implement view")
-
-    def skeleton(self, path: str | Path) -> list:
+    def skeleton(self, path: str | Path, include_private: bool = False) -> "list[Symbol]":
         """Extract skeleton (signatures only) from a file.
 
         Args:
             path: Path to file (relative to root or absolute)
+            include_private: Include private (_prefixed) symbols
 
         Returns:
             List of Symbol objects
         """
-        raise NotImplementedError("TODO: implement skeleton")
+        from .skeleton import extract_python_skeleton
+
+        resolved = self._resolve_path(path)
+        source = resolved.read_text()
+        return extract_python_skeleton(source, include_private=include_private)
 
     def tree(self, path: str | Path = ".", depth: int = 2) -> str:
         """Get tree view of directory structure.
@@ -80,33 +79,28 @@ class Intelligence:
         Returns:
             Formatted tree string
         """
-        raise NotImplementedError("TODO: implement tree")
+        from .tree import format_tree
+
+        resolved = self._resolve_path(path)
+        return format_tree(resolved, max_depth=depth)
 
     # === Analysis ===
 
-    def analyze(self, target: str | Path) -> dict:
-        """Run comprehensive analysis on target.
-
-        Args:
-            target: File or directory to analyze
-
-        Returns:
-            Analysis results dict
-        """
-        raise NotImplementedError("TODO: implement analyze")
-
-    def complexity(self, path: str | Path) -> dict:
+    def complexity(self, path: str | Path = ".") -> "ComplexityReport":
         """Analyze cyclomatic complexity.
 
         Args:
             path: File or directory to analyze
 
         Returns:
-            Complexity report
+            ComplexityReport with per-function metrics
         """
-        raise NotImplementedError("TODO: implement complexity")
+        from .complexity import analyze_complexity
 
-    def security(self, path: str | Path) -> dict:
+        resolved = self._resolve_path(path)
+        return analyze_complexity(resolved)
+
+    def security(self, path: str | Path = ".") -> dict:
         """Run security analysis.
 
         Args:
@@ -115,44 +109,60 @@ class Intelligence:
         Returns:
             Security findings
         """
-        raise NotImplementedError("TODO: implement security")
+        from .security import SecurityAnalyzer
 
-    def dependencies(self, path: str | Path) -> dict:
+        resolved = self._resolve_path(path)
+        analyzer = SecurityAnalyzer(resolved)
+        return analyzer.analyze()
+
+    def dependencies(self, path: str | Path) -> "DependencyAnalysis":
         """Analyze dependencies and imports.
 
         Args:
             path: File or directory to analyze
 
         Returns:
-            Dependency graph
+            DependencyAnalysis with graph and metrics
         """
-        raise NotImplementedError("TODO: implement dependencies")
+        from .dependency_analysis import DependencyAnalyzer
 
-    # === Search ===
+        resolved = self._resolve_path(path)
+        analyzer = DependencyAnalyzer(resolved)
+        return analyzer.analyze()
 
-    def symbols(self, pattern: str) -> list:
-        """Search for symbols matching pattern.
+    def clones(self, path: str | Path = ".", level: int = 0) -> dict:
+        """Detect code clones/duplicates.
 
         Args:
-            pattern: Glob or regex pattern
+            path: Directory to analyze
+            level: Elision level (0-3)
 
         Returns:
-            List of matching symbols
+            Clone analysis results
         """
-        raise NotImplementedError("TODO: implement symbols")
+        from .clones import detect_clones, ElisionLevel
 
-    def references(self, symbol: str) -> list:
-        """Find references to a symbol.
+        resolved = self._resolve_path(path)
+        return detect_clones(resolved, level=ElisionLevel(level))
+
+    # === Summaries ===
+
+    def summarize(self, path: str | Path = ".") -> dict:
+        """Generate project summary.
 
         Args:
-            symbol: Fully qualified symbol name
+            path: Directory to summarize
 
         Returns:
-            List of reference locations
+            ProjectSummary with hierarchical structure
         """
-        raise NotImplementedError("TODO: implement references")
+        from .summarize import Summarizer
 
-    # === Edit (structural, no LLM) ===
+        resolved = self._resolve_path(path)
+        summarizer = Summarizer()
+        return summarizer.summarize_project(resolved)
+
+    # === Structural Edit ===
 
     def edit(self, path: str | Path, changes: dict) -> dict:
         """Apply structural edits to a file.
@@ -164,7 +174,23 @@ class Intelligence:
         Returns:
             Edit result with diff
         """
-        raise NotImplementedError("TODO: implement edit")
+        from .edit import EditAPI
+
+        resolved = self._resolve_path(path)
+        api = EditAPI(self.root)
+        # TODO: translate changes dict to EditAPI calls
+        raise NotImplementedError("Structural edit API pending")
 
 
-__all__ = ["Intelligence", "ViewResult"]
+# Re-export key types
+from .skeleton import Symbol
+from .complexity import ComplexityReport, FunctionComplexity
+from .dependency_analysis import DependencyAnalysis
+
+__all__ = [
+    "Intelligence",
+    "Symbol",
+    "ComplexityReport",
+    "FunctionComplexity",
+    "DependencyAnalysis",
+]
