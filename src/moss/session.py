@@ -185,12 +185,20 @@ class Checkpoint:
         )
 
 
+class TaskDriver(Enum):
+    """Who is driving the task."""
+
+    USER = auto()  # User interactive session
+    AGENT = auto()  # Autonomous agent workflow
+
+
 @dataclass
 class Session:
-    """A resumable, observable work unit.
+    """A resumable, observable work unit (unified Task model).
 
-    Sessions track all agent activity including tool calls, file changes,
-    and checkpoints. They can be saved and resumed later.
+    Sessions (Tasks) track all agent activity including tool calls, file changes,
+    and checkpoints. They can be saved and resumed later. Every task gets its own
+    shadow branch for tracking changes.
 
     Example:
         session = Session.create(workspace=Path.cwd(), task="Fix the login bug")
@@ -213,6 +221,12 @@ class Session:
     status: SessionStatus = SessionStatus.CREATED
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    # Task hierarchy (unified model)
+    parent_id: str | None = None
+    children: list[str] = field(default_factory=list)
+    shadow_branch: str | None = None  # shadow/task-{id}
+    driver: TaskDriver = TaskDriver.USER
 
     # Work records
     tool_calls: list[ToolCall] = field(default_factory=list)
@@ -240,24 +254,32 @@ class Session:
         workspace: Path | None = None,
         task: str = "",
         session_id: str | None = None,
+        parent_id: str | None = None,
+        driver: TaskDriver = TaskDriver.USER,
         event_bus: EventBus | None = None,
         on_update: Callable[[Session], None] | None = None,
         **metadata: Any,
     ) -> Session:
-        """Create a new session.
+        """Create a new session (task).
 
         Args:
             workspace: Working directory for the session
             task: Description of the task
             session_id: Optional ID (auto-generated if not provided)
+            parent_id: Optional parent task ID for subtasks
+            driver: Who is driving this task (USER or AGENT)
             event_bus: Optional event bus for emitting events
             on_update: Optional callback on session updates
             **metadata: Additional metadata
         """
+        task_id = session_id or str(uuid.uuid4())[:8]
         return cls(
-            id=session_id or str(uuid.uuid4())[:8],
+            id=task_id,
             workspace=workspace or Path.cwd(),
             task=task,
+            parent_id=parent_id,
+            driver=driver,
+            shadow_branch=f"shadow/task-{task_id}",
             metadata=metadata,
             _event_bus=event_bus,
             _on_update=on_update,
@@ -329,6 +351,12 @@ class Session:
         self.status = SessionStatus.CANCELLED
         self.metadata["cancel_reason"] = reason
         self._notify_update()
+
+    def add_child(self, child_id: str) -> None:
+        """Add a child task ID."""
+        if child_id not in self.children:
+            self.children.append(child_id)
+            self._notify_update()
 
     def record_tool_call(
         self,
@@ -472,6 +500,12 @@ class Session:
             "status": self.status.name.lower(),
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
+            # Task hierarchy (unified model)
+            "parent_id": self.parent_id,
+            "children": self.children,
+            "shadow_branch": self.shadow_branch,
+            "driver": self.driver.name.lower(),
+            # Work records
             "tool_calls": [tc.to_dict() for tc in self.tool_calls],
             "file_changes": [fc.to_dict() for fc in self.file_changes],
             "checkpoints": [cp.to_dict() for cp in self.checkpoints],
@@ -488,6 +522,7 @@ class Session:
     def from_dict(cls, data: dict[str, Any]) -> Session:
         """Deserialize session from dictionary."""
         status_name = data.get("status", "created").upper()
+        driver_name = data.get("driver", "user").upper()
         return cls(
             id=data["id"],
             workspace=Path(data["workspace"]),
@@ -495,6 +530,12 @@ class Session:
             status=SessionStatus[status_name],
             created_at=datetime.fromisoformat(data["created_at"]),
             updated_at=datetime.fromisoformat(data["updated_at"]),
+            # Task hierarchy
+            parent_id=data.get("parent_id"),
+            children=data.get("children", []),
+            shadow_branch=data.get("shadow_branch"),
+            driver=TaskDriver[driver_name],
+            # Work records
             tool_calls=[ToolCall.from_dict(tc) for tc in data.get("tool_calls", [])],
             file_changes=[FileChange.from_dict(fc) for fc in data.get("file_changes", [])],
             checkpoints=[Checkpoint.from_dict(cp) for cp in data.get("checkpoints", [])],
@@ -552,21 +593,66 @@ class SessionManager:
         task: str = "",
         workspace: Path | None = None,
         session_id: str | None = None,
+        parent_id: str | None = None,
+        driver: TaskDriver = TaskDriver.USER,
         tags: list[str] | None = None,
         **metadata: Any,
     ) -> Session:
-        """Create a new session."""
+        """Create a new task (session).
+
+        Args:
+            task: Description of the task
+            workspace: Working directory
+            session_id: Optional ID (auto-generated if not provided)
+            parent_id: Optional parent task ID for subtasks
+            driver: Who is driving this task (USER or AGENT)
+            tags: Optional tags
+            **metadata: Additional metadata
+        """
         session = Session.create(
             workspace=workspace,
             task=task,
             session_id=session_id,
+            parent_id=parent_id,
+            driver=driver,
             event_bus=self.event_bus,
             **metadata,
         )
         if tags:
             session.tags = tags
         self._active_sessions[session.id] = session
+
+        # Update parent's children list
+        if parent_id:
+            parent = self.get(parent_id)
+            if parent:
+                parent.add_child(session.id)
+                self.save(parent)
+
         return session
+
+    def create_subtask(
+        self,
+        parent: Session,
+        task: str,
+        driver: TaskDriver = TaskDriver.AGENT,
+        **metadata: Any,
+    ) -> Session:
+        """Create a subtask under a parent task.
+
+        Args:
+            parent: Parent task
+            task: Description of the subtask
+            driver: Who drives this subtask (default: AGENT)
+            **metadata: Additional metadata
+        """
+        return self.create(
+            task=task,
+            workspace=parent.workspace,
+            parent_id=parent.id,
+            driver=driver,
+            **metadata,
+        )
 
     def save(self, session: Session) -> Path:
         """Save a session to storage."""
@@ -653,6 +739,41 @@ class SessionManager:
 
         return removed
 
+    def list_root_tasks(
+        self,
+        status: SessionStatus | None = None,
+        limit: int = 50,
+    ) -> list[Session]:
+        """List root tasks (tasks with no parent)."""
+        all_sessions = self.list_sessions(status=status, limit=limit * 2)
+        return [s for s in all_sessions if s.parent_id is None][:limit]
+
+    def get_children(self, parent_id: str) -> list[Session]:
+        """Get all child tasks of a parent."""
+        parent = self.get(parent_id)
+        if not parent:
+            return []
+        return [s for s in (self.get(cid) for cid in parent.children) if s is not None]
+
+    def get_task_tree(self, root_id: str) -> dict[str, Any]:
+        """Get a task and all its descendants as a tree structure.
+
+        Returns:
+            Dict with 'task' (Session) and 'children' (list of subtrees)
+        """
+        root = self.get(root_id)
+        if not root:
+            return {}
+
+        def build_tree(task: Session) -> dict[str, Any]:
+            children = self.get_children(task.id)
+            return {
+                "task": task,
+                "children": [build_tree(c) for c in children],
+            }
+
+        return build_tree(root)
+
     @property
     def active_sessions(self) -> list[Session]:
         """Get all currently active sessions."""
@@ -678,3 +799,10 @@ def create_session(
     """
     manager = SessionManager(storage_dir=storage_dir)
     return manager.create(task=task, workspace=workspace, **metadata)
+
+
+# Type aliases for unified task model
+# Session and Task are the same thing - use whichever name fits context
+Task = Session
+TaskManager = SessionManager
+TaskStatus = SessionStatus
