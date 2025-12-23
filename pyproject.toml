@@ -1,130 +1,9 @@
-[project]
-name = "moss"
-version = "0.1.0"
-description = "Tooling orchestration with structural awareness"
-readme = "README.md"
-requires-python = ">=3.13"
-dependencies = [
-    "psutil>=6.0.0",
-    "moss-intelligence",
-    "moss-context",
-    "moss-orchestration",
-    "moss-llm",
-]
-
-[project.scripts]
-moss = "moss.cli:main"
-moss-server = "moss.server.app:main"
-moss-daemon = "moss.server.daemon:main"
-moss-mcp = "moss.mcp_server:main"
-moss-mcp-full = "moss.mcp_server_full:main"
-
-[project.entry-points."moss.plugins"]
-python-skeleton = "moss_intelligence.skeleton:PythonSkeletonPlugin"
-python-dependency = "moss.dependencies:PythonDependencyPlugin"
-python-cfg = "moss.cfg:PythonCFGPlugin"
-tree-sitter-skeleton = "moss.plugins.tree_sitter:TreeSitterSkeletonPlugin"
-markdown-structure = "moss.plugins.markdown:MarkdownStructurePlugin"
-json-schema = "moss.plugins.data_files:JSONSchemaPlugin"
-yaml-schema = "moss.plugins.data_files:YAMLSchemaPlugin"
-toml-schema = "moss.plugins.data_files:TOMLSchemaPlugin"
-
-# Synthesis plugin entry points
-[project.entry-points."moss.synthesis.generators"]
-placeholder = "moss.synthesis.generators:PlaceholderGenerator"
-template = "moss.synthesis.generators:TemplateGenerator"
-llm = "moss.synthesis.generators.llm:LLMGenerator"
-
-[project.entry-points."moss.synthesis.validators"]
-pytest = "moss.synthesis.validators:TestValidator"
-mypy = "moss.synthesis.validators:TypeValidator"
-
-[project.entry-points."moss.synthesis.libraries"]
-memory = "moss.synthesis.libraries:MemoryLibrary"
-learned = "moss.synthesis.libraries:LearnedLibrary"
-
-[project.entry-points."moss.synthesis.strategies"]
-type_driven = "moss.synthesis.strategies:TypeDrivenDecomposition"
-test_driven = "moss.synthesis.strategies:TestDrivenDecomposition"
-pattern_based = "moss.synthesis.strategies:PatternBasedDecomposition"
-
-# Linter plugin entry points
-[project.entry-points."moss.linters"]
-ruff = "moss.plugins.linters:RuffPlugin"
-mypy = "moss.plugins.linters:MypyPlugin"
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0",
-    "pytest-asyncio>=0.24",
-    "pytest-cov>=7.0.0",
-    "ruff>=0.8.0",
-    "basedpyright>=1.22.0",
-    "mutmut>=3.0.0",
-]
-docs = [
-    "mkdocs>=1.6",
-    "mkdocs-material>=9.5",
-    "mkdocstrings[python]>=0.27",
-    "mkdocs-gen-files>=0.5",
-    "mkdocs-literate-nav>=0.6",
-]
-tree-sitter = [
-    "tree-sitter>=0.21",
-    "tree-sitter-python>=0.21",
-    "tree-sitter-typescript>=0.21",
-    "tree-sitter-javascript>=0.21",
-]
-chroma = [
-    "chromadb>=0.4",
-]
-server = [
-    "fastapi>=0.124.4",
-    "uvicorn[standard]>=0.38.0",
-]
-mcp = [
-    "mcp>=1.0.0",
-]
-lsp = [
-    "pygls>=1.3.0",
-    "lsprotocol>=2023.0.0",
-]
-llm = [
-    "litellm>=1.0.0",
-]
-dotenv = [
-    "python-dotenv>=1.0.0",
-]
-llm-lib = [
-    "llm>=0.13.0",
-]
-local-llm = [
-    "llama-cpp-python>=0.2.0",
-]
-tui = [
-    "textual>=0.89.0",
-]
-eval = [
-    "swebench>=2.0.0",
-    "datasets>=2.0.0",
-]
-# Meta-group: common optional features for most users
-# Excludes: dev, docs, eval (swebench), llm-lib, local-llm
-all = [
-    "moss[server,mcp,lsp,llm,dotenv,tree-sitter,chroma,tui]",
-]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/moss"]
+# Workspace configuration - no "moss" package, just sub-packages in packages/
 
 [tool.ruff]
 line-length = 100
 target-version = "py313"
-src = ["src", "tests"]
+src = ["packages/*/src", "tests"]
 
 [tool.ruff.lint]
 select = [
@@ -138,16 +17,12 @@ select = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["moss"]
+known-first-party = ["moss_intelligence", "moss_context", "moss_orchestration", "moss_llm", "moss_cli"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-filterwarnings = [
-    # Ignore pytest collection warning for PytestValidator (not a test class)
-    "ignore:cannot collect test class 'PytestValidator':pytest.PytestCollectionWarning",
-]
 
 [tool.uv.workspace]
 members = ["packages/*"]
@@ -161,10 +36,10 @@ moss-mcp = { workspace = true }
 moss-lsp = { workspace = true }
 moss-tui = { workspace = true }
 moss-acp = { workspace = true }
+moss-cli = { workspace = true }
 
 [tool.basedpyright]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
-include = ["src"]
+include = ["packages/*/src"]
 reportMissingTypeStubs = false
-

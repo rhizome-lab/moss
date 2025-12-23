@@ -6,13 +6,19 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 **Package Migration** (see `docs/restructuring-plan.md`, `docs/api-boundaries.md`)
 
-Sub-packages are source of truth. Move implementation FROM `src/moss/` TO `packages/`:
-- [ ] Move skeleton extraction to `moss-intelligence`
-- [ ] Move working memory to `moss-context`
-- [ ] Update internal imports to use sub-packages (not `moss.*`)
-- [ ] Make `src/moss/` a thin meta-package (re-exports only)
+Completed:
+- [x] moss-intelligence is source of truth (28 modules migrated)
+- [x] MossAPI removed
+- [x] src/moss/ deleted entirely
+- [x] moss-cli package scaffolded
 
-Current state: sub-packages delegate to `moss.*` (temporary, invert this)
+Remaining:
+- [ ] Update moss-cli imports (currently has stale moss.* imports)
+- [ ] Move orphaned modules to sub-packages:
+  - context.py, context_memory.py → moss-context
+  - agents.py, drivers.py, session.py → moss-orchestration
+  - servers (mcp, lsp, acp) → respective frontend packages
+  - tui.py → moss-tui
 
 **Deferred:**
 - Driver integration improvements

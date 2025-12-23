@@ -10,6 +10,7 @@ resolution-markers = [
 members = [
     "moss",
     "moss-acp",
+    "moss-cli",
     "moss-context",
     "moss-intelligence",
     "moss-llm",
@@ -2038,6 +2039,21 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
 ]
 provides-extras = ["dev"]
+
+[[package]]
+name = "moss-cli"
+version = "0.1.0"
+source = { editable = "packages/moss-cli" }
+dependencies = [
+    { name = "moss-intelligence" },
+    { name = "moss-orchestration" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "moss-intelligence", editable = "packages/moss-intelligence" },
+    { name = "moss-orchestration", editable = "packages/moss-orchestration" },
+]
 
 [[package]]
 name = "moss-context"
