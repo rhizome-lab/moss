@@ -7,10 +7,14 @@ The fastest way to get the `moss` CLI:
 ```bash
 # Linux / macOS
 curl -fsSL https://raw.githubusercontent.com/pterror/moss/master/install.sh | bash
-
-# Or download manually from GitHub Releases
-# https://github.com/pterror/moss/releases
 ```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/pterror/moss/master/install.ps1 | iex
+```
+
+Or download manually from [GitHub Releases](https://github.com/pterror/moss/releases).
 
 After install, update anytime with:
 ```bash

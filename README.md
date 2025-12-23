@@ -9,7 +9,11 @@ Moss implements a "Compiled Context" approach that prioritizes architectural awa
 ## Install
 
 ```bash
+# Linux / macOS
 curl -fsSL https://raw.githubusercontent.com/pterror/moss/master/install.sh | bash
+
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/pterror/moss/master/install.ps1 | iex
 ```
 
 ## Features
