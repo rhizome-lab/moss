@@ -4,31 +4,27 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 ## Next Up
 
-**1. View: --resolve-imports**
-- Inline imported symbol signatures
-- Fisheye covers most cases, this adds full expansion
-
-**2. View Primitive Polish**
+**1. View Primitive Polish**
 - `--visibility public|all` or `--exported` filter for semantic zoom
 - Barrel file hoisting: detect `export * from` and surface re-exported symbols
 - Useless docstring detection: skip "Sets the user id" on `setUserId()`
 - Fisheye for Rust/TypeScript (currently Python-only import resolution)
 - Selective import resolution (e.g., `--fisheye=moss.config` to expand only that import)
 
-**3. Rust Crate Consolidation**
+**2. Rust Crate Consolidation**
 - Consider: consolidate index.rs, symbols.rs (different designs for CLI vs daemon)
 
-**4. TUI: View/Edit/Analyze Mode Refactor**
+**3. TUI: View/Edit/Analyze Mode Refactor**
 - Mode indicator (bottom right, near palette) OR tabbed content view
 - Better integration of primitives into TUI workflow
 
-**5. Reference Resolution**
+**4. Reference Resolution**
 - Full import graph with alias tracking
 - Variable scoping analysis
 - Type inference for method calls
 - Cross-language tracking (Python ↔ Rust)
 
-**6. Distribution**
+**5. Distribution**
 - Auto-updates
 - Portable single binary
 - Pre-built binaries (GitHub Actions)
@@ -62,6 +58,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 - YOLO mode evaluation
 - Diffusion-like parallel refactors
 - Fine-tuned tiny models (100M RWKV)
+- Analyze ampcode research notes (ampcode.com/research) for deeper patterns
 
 ## Notes
 

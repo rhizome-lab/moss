@@ -12,6 +12,9 @@
   - Resolves Python imports (relative and absolute) to local files
   - Shows imported module skeletons at signature level (depth 1)
   - Combines with `--types-only` for types-only fisheye view
+- `--resolve-imports`: shows only the specific imported symbols (more focused than fisheye)
+  - Lists each imported symbol with its signature, grouped by module
+  - Ideal for understanding what a file uses vs. what modules offer
 - Both flags work together for maximum token efficiency
 
 **Package Restructuring** (Dec 23 2025)

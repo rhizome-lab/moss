@@ -205,6 +205,11 @@ enum Commands {
         /// Resolves local imports and shows their skeletons inline
         #[arg(long)]
         fisheye: bool,
+
+        /// Resolve imports: inline signatures of specific imported symbols
+        /// More focused than --fisheye (shows only what's actually imported)
+        #[arg(long)]
+        resolve_imports: bool,
     },
 
     /// Edit a node in the codebase tree (structural code modification)
@@ -632,6 +637,7 @@ fn main() {
             called_by,
             types_only,
             fisheye,
+            resolve_imports,
         } => cmd_view(
             target.as_deref(),
             root.as_deref(),
@@ -643,6 +649,7 @@ fn main() {
             called_by,
             types_only,
             fisheye,
+            resolve_imports,
             cli.json,
         ),
         Commands::SearchTree { query, root, limit } => {
@@ -891,6 +898,7 @@ fn cmd_view(
     show_called_by: bool,
     types_only: bool,
     fisheye: bool,
+    resolve_imports: bool,
     json: bool,
 ) -> i32 {
     let root = root
@@ -936,7 +944,7 @@ fn cmd_view(
         cmd_view_directory(&root.join(&unified.file_path), &root, depth, json)
     } else if unified.symbol_path.is_empty() {
         // View file
-        cmd_view_file(&unified.file_path, &root, depth, line_numbers, show_deps, types_only, fisheye, json)
+        cmd_view_file(&unified.file_path, &root, depth, line_numbers, show_deps, types_only, fisheye, resolve_imports, json)
     } else {
         // View symbol within file
         cmd_view_symbol(
@@ -1654,6 +1662,7 @@ fn cmd_view_file(
     show_deps: bool,
     types_only: bool,
     fisheye: bool,
+    resolve_imports: bool,
     json: bool,
 ) -> i32 {
     let full_path = root.join(file_path);
@@ -1702,8 +1711,8 @@ fn cmd_view_file(
         skeleton_result
     };
 
-    // Get deps if showing deps or using fisheye mode
-    let deps_result = if show_deps || fisheye {
+    // Get deps if showing deps, fisheye, or resolve_imports mode
+    let deps_result = if show_deps || fisheye || resolve_imports {
         let mut deps_extractor = deps::DepsExtractor::new();
         Some(deps_extractor.extract(&full_path, &content))
     } else {
@@ -1819,8 +1828,62 @@ fn cmd_view_file(
                 }
             }
         }
+
+        // Resolve imports mode: show only the specific imported symbols
+        if resolve_imports {
+            let deps = deps_result.as_ref().unwrap();
+
+            // Collect imports with specific names
+            let mut resolved_symbols: Vec<(String, String, String)> = Vec::new(); // (module, name, signature)
+
+            for imp in &deps.imports {
+                if imp.names.is_empty() {
+                    continue; // Skip bare "import x" statements
+                }
+
+                if let Some(resolved_path) = resolve_python_import(&imp.module, &full_path, root) {
+                    if let Ok(import_content) = std::fs::read_to_string(&resolved_path) {
+                        let mut import_extractor = skeleton::SkeletonExtractor::new();
+                        let import_skeleton = import_extractor.extract(&resolved_path, &import_content);
+
+                        // Find each imported name in the module's skeleton
+                        for name in &imp.names {
+                            if let Some(sig) = find_symbol_signature(&import_skeleton.symbols, name) {
+                                resolved_symbols.push((imp.module.clone(), name.clone(), sig));
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !resolved_symbols.is_empty() {
+                println!("\n## Resolved Imports");
+                let mut current_module = String::new();
+                for (module, name, sig) in resolved_symbols {
+                    if module != current_module {
+                        println!("\n# from {}", module);
+                        current_module = module;
+                    }
+                    println!("{}", sig);
+                }
+            }
+        }
     }
     0
+}
+
+/// Find a symbol's signature in a skeleton
+fn find_symbol_signature(symbols: &[skeleton::SkeletonSymbol], name: &str) -> Option<String> {
+    for sym in symbols {
+        if sym.name == name {
+            return Some(sym.signature.clone());
+        }
+        // Check children (for nested classes, methods, etc.)
+        if let Some(sig) = find_symbol_signature(&sym.children, name) {
+            return Some(sig);
+        }
+    }
+    None
 }
 
 fn cmd_view_symbol(
