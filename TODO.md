@@ -4,7 +4,14 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 ## Next Up
 
-(all tasks complete - check backlog or docs/philosophy.md for ideas)
+**Driver Integration** (follow-up from driver architecture)
+- Wire TUI to use drivers for task execution (replace direct loop calls)
+- Add driver selection in session creation (CLI and TUI)
+- Test LLMDriver with real API calls
+
+**Call Graph Improvements**
+- Wire FunctionComplexity.short_name() into complexity output
+- Add binary file detection for "(no ext)" files
 
 ## Implementation Notes
 
