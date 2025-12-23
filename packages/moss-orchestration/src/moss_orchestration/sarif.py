@@ -9,7 +9,7 @@ which is supported by:
 - Many CI/CD platforms
 
 Usage:
-    from moss.sarif import generate_sarif, write_sarif
+    from moss_orchestration.sarif import generate_sarif, write_sarif
     from moss_orchestration.rules_single import create_engine_with_builtins
 
     # Run analysis

@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
-    from moss.shadow_git import CommitHandle, ShadowBranch, ShadowGit
+    from moss_orchestration.shadow_git import CommitHandle, ShadowBranch, ShadowGit
 
 
 class FixSafety(Enum):
@@ -282,7 +282,7 @@ class FixEngine:
     async def _ensure_shadow_git(self) -> ShadowGit:
         """Ensure ShadowGit is initialized."""
         if self._shadow_git is None:
-            from moss.shadow_git import ShadowGit
+            from moss_orchestration.shadow_git import ShadowGit
 
             self._shadow_git = ShadowGit(self.repo_path)
         return self._shadow_git

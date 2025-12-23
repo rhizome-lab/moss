@@ -4,7 +4,7 @@ Categorizes errors and provides recovery suggestions. Goal is to never crash
 unexpectedly - either handle gracefully or provide clear guidance.
 
 Usage:
-    from moss.errors import MossError, handle_error, ErrorCategory
+    from moss_orchestration.errors import MossError, handle_error, ErrorCategory
 
     try:
         risky_operation()

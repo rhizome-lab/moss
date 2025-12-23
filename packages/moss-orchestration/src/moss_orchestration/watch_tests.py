@@ -4,7 +4,7 @@ This module provides a file watcher that automatically re-runs tests
 when Python files are modified.
 
 Usage:
-    from moss.watch_tests import WatchRunner
+    from moss_orchestration.watch_tests import WatchRunner
 
     watcher = WatchRunner(Path("."))
     await watcher.run()  # Runs until Ctrl+C

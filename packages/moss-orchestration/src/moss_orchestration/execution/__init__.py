@@ -484,7 +484,7 @@ def execute_intent(intent: Intent) -> str:
 
     # Call Rust CLI and capture output
     try:
-        from moss.rust_shim import call_rust
+        from moss_intelligence.rust_shim import call_rust
 
         exit_code, output = call_rust(cli_args)
         if exit_code == 0:
@@ -628,7 +628,7 @@ class SimpleLLM(LLMStrategy):
         self.system_prompt = system_prompt
 
     def decide(self, task: str, context: str) -> Decision:
-        from moss.llm import complete
+        from moss_llm import complete
 
         prompt = f"Task: {task}\n\nContext:\n{context}\n\nWhat's next?"
         response = complete(
@@ -825,7 +825,7 @@ def llm_select_transition(
     Returns:
         Selected state name, or None if LLM couldn't decide
     """
-    from moss.llm import complete
+    from moss_llm import complete
 
     # Build options list
     options = [t.next for t in transitions]

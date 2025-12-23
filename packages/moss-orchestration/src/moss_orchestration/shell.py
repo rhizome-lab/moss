@@ -305,7 +305,7 @@ class MossShell:
 
         from moss_intelligence.views import ViewTarget
 
-        from moss.plugins import get_registry
+        from moss_orchestration.plugins import get_registry
 
         registry = get_registry()
         target = ViewTarget(path=path)
@@ -337,7 +337,7 @@ class MossShell:
 
         from moss_intelligence.views import ViewTarget
 
-        from moss.plugins import get_registry
+        from moss_orchestration.plugins import get_registry
 
         registry = get_registry()
         target = ViewTarget(path=path)
@@ -371,7 +371,7 @@ class MossShell:
 
         from moss_intelligence.views import ViewOptions, ViewTarget
 
-        from moss.plugins import get_registry
+        from moss_orchestration.plugins import get_registry
 
         registry = get_registry()
         target = ViewTarget(path=path)
@@ -456,7 +456,7 @@ class MossShell:
 
         query = " ".join(args)
 
-        from moss.semantic_search import create_search_system
+        from moss_orchestration.semantic_search import create_search_system
 
         indexer, search = create_search_system("memory")
 
@@ -492,7 +492,7 @@ class MossShell:
 
         from moss_intelligence.views import ViewTarget
 
-        from moss.plugins import get_registry
+        from moss_orchestration.plugins import get_registry
 
         registry = get_registry()
         target = ViewTarget(path=path)

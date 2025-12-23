@@ -4,7 +4,7 @@ This module provides a caching mechanism to avoid re-parsing unchanged files,
 improving performance for repeated analysis operations.
 
 Usage:
-    from moss.cache import get_cache, cached_parse
+    from moss_orchestration.cache import get_cache, cached_parse
 
     cache = get_cache()
 

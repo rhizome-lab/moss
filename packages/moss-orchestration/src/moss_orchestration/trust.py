@@ -21,7 +21,7 @@ Configuration via `.moss/trust.yaml`:
           - "write:config/*"
 
 Usage:
-    from moss.trust import TrustManager
+    from moss_orchestration.trust import TrustManager
 
     manager = TrustManager.load(project_root)
     decision = manager.check("bash", "ruff check src/")

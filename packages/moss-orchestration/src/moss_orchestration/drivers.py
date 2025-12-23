@@ -246,14 +246,14 @@ async def execute_action(action: Action, task: Session) -> ActionResult:
     try:
         # Route to appropriate handler based on tool name
         if action.tool == "view":
-            from moss.core_api import ViewAPI
+            from moss_intelligence.core_api import ViewAPI
 
             api = ViewAPI(task.project_root)
             result = api.view(**action.parameters)
             return ActionResult(success=True, output=result)
 
         elif action.tool == "edit":
-            from moss.edit import EditContext, edit
+            from moss_intelligence.edit import EditContext, edit
 
             context = EditContext(
                 project_root=task.project_root,
@@ -264,7 +264,7 @@ async def execute_action(action: Action, task: Session) -> ActionResult:
             return ActionResult(success=result.success, output=result, error=result.error)
 
         elif action.tool == "analyze":
-            from moss.core_api import AnalyzeAPI
+            from moss_intelligence.core_api import AnalyzeAPI
 
             api = AnalyzeAPI(task.project_root)
             result = api.analyze(**action.parameters)
@@ -401,7 +401,7 @@ class LLMDriver:
         task: Session,
         context: Context,
     ) -> Action | None:
-        from moss.llm import complete
+        from moss_llm import complete
 
         # Build prompt from task and context
         user_prompt = self._format_prompt(task, context)

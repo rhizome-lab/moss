@@ -706,7 +706,7 @@ def _register_from_mossapi() -> None:
     as DWIM tools with proper descriptions and keywords extracted from docstrings.
     """
     try:
-        from moss.gen.introspect import introspect_api
+        from moss_orchestration.gen.introspect import introspect_api
     except ImportError:
         logger.debug("Could not import introspect_api, skipping MossAPI registration")
         return

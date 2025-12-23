@@ -4,7 +4,7 @@ This module provides utilities for processing multiple files in parallel,
 improving performance for large codebases.
 
 Usage:
-    from moss.parallel import parallel_analyze, ParallelAnalyzer
+    from moss_orchestration.parallel import parallel_analyze, ParallelAnalyzer
 
     # Simple parallel processing
     results = await parallel_analyze(

@@ -8,7 +8,7 @@ Usage:
     moss cfg --live src/myfile.py
 
     # Or programmatically
-    from moss.live_cfg import LiveCFGServer
+    from moss_orchestration.live_cfg import LiveCFGServer
     server = LiveCFGServer(path)
     server.start()
 """

@@ -4,7 +4,7 @@ This module provides progress tracking and display for long-running operations
 like scanning large codebases, indexing files, or batch analysis.
 
 Usage:
-    from moss.progress import ProgressTracker, with_progress
+    from moss_orchestration.progress import ProgressTracker, with_progress
 
     # Simple usage
     with ProgressTracker("Scanning files", total=100) as progress:

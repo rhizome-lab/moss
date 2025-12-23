@@ -4,7 +4,7 @@ This module provides integration with git pre-commit hooks, allowing
 automatic code analysis before commits.
 
 Usage:
-    from moss.hooks import install_hooks, generate_hook_config
+    from moss_orchestration.hooks import install_hooks, generate_hook_config
 
     # Install hooks directly
     install_hooks(project_dir)
@@ -228,8 +228,8 @@ def run_pre_commit_checks(project_dir: Path) -> tuple[bool, list[str]]:
     """
     import asyncio
 
-    from moss.plugins import get_registry
-    from moss.views import ViewTarget
+    from moss_orchestration.plugins import get_registry
+    from moss_intelligence.views import ViewTarget
 
     staged_files = get_staged_files(project_dir)
     if not staged_files:

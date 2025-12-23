@@ -6,7 +6,7 @@ This module provides a CLI-friendly interface for:
 - `moss rag stats` - Show index statistics
 
 Usage:
-    from moss.rag import RAGIndex
+    from moss_orchestration.rag import RAGIndex
 
     # Create/load index
     rag = RAGIndex(project_root)
@@ -122,7 +122,7 @@ class RAGIndex:
         if self._indexer is not None:
             return
 
-        from moss.semantic_search import CodeIndexer, SemanticSearch, TFIDFIndex
+        from moss_orchestration.semantic_search import CodeIndexer, SemanticSearch, TFIDFIndex
 
         # Ensure index directory exists
         self.index_path.mkdir(parents=True, exist_ok=True)
@@ -137,7 +137,7 @@ class RAGIndex:
         try:
             import chromadb  # noqa: F401 - check if available
 
-            from moss.vector_store import ChromaVectorStore
+            from moss_orchestration.vector_store import ChromaVectorStore
 
             store = ChromaVectorStore(
                 collection_name="moss_rag",
@@ -151,7 +151,7 @@ class RAGIndex:
         # Fall back to SQLite (persistent, no binary deps)
         if store is None:
             try:
-                from moss.vector_store import SQLiteVectorStore
+                from moss_orchestration.vector_store import SQLiteVectorStore
 
                 store = SQLiteVectorStore(
                     db_path=str(self.index_path / "vectors.db"),
@@ -163,7 +163,7 @@ class RAGIndex:
 
         # Last resort: in-memory (non-persistent)
         if store is None:
-            from moss.vector_store import InMemoryVectorStore
+            from moss_orchestration.vector_store import InMemoryVectorStore
 
             store = InMemoryVectorStore()
             self._backend = "memory"

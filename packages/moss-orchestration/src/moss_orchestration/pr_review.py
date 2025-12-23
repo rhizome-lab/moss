@@ -7,7 +7,7 @@ PR-friendly summaries, including:
 - Impact assessment
 
 Usage:
-    from moss.pr_review import analyze_pr, generate_pr_summary
+    from moss_orchestration.pr_review import analyze_pr, generate_pr_summary
 
     # Analyze changes between branches
     review = analyze_pr(Path("."), "main", "feature-branch")

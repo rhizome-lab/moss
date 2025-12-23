@@ -3,7 +3,7 @@
 Provides real-time task display and session persistence.
 
 Usage:
-    from moss.live_todos import TodoTracker, TodoItem, TodoStatus
+    from moss_orchestration.live_todos import TodoTracker, TodoItem, TodoStatus
 
     # Create tracker
     tracker = TodoTracker()

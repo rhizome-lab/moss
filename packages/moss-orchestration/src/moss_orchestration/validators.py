@@ -470,7 +470,7 @@ class ValidatorChain:
 
         # Run heuristics first (fast guardrails)
         if self.include_heuristics:
-            from moss.heuristics import HeuristicEngine
+            from moss_orchestration.heuristics import HeuristicEngine
 
             engine = HeuristicEngine()
             h_result = engine.check(path)
@@ -514,7 +514,7 @@ class LinterValidatorAdapter(Validator):
         Args:
             plugin: A LinterPlugin instance
         """
-        from moss.plugins.linters import LinterPlugin
+        from moss_orchestration.plugins.linters import LinterPlugin
 
         if not isinstance(plugin, LinterPlugin):
             raise TypeError(f"Expected LinterPlugin, got {type(plugin).__name__}")
@@ -526,7 +526,7 @@ class LinterValidatorAdapter(Validator):
 
     async def validate(self, path: Path) -> ValidationResult:
         """Run the linter plugin and convert result to ValidationResult."""
-        from moss.plugins.linters import Severity
+        from moss_orchestration.plugins.linters import Severity
 
         result = await self._plugin.run(path)
 

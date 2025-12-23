@@ -450,7 +450,7 @@ class ShadowGit:
         from dataclasses import replace
 
         try:
-            from moss.tree_sitter import get_symbols_at_line
+            from moss_intelligence.tree_sitter import get_symbols_at_line
         except ImportError:
             # tree-sitter not available, return hunks unchanged
             return hunks

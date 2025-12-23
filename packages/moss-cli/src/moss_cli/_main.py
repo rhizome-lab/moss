@@ -943,7 +943,7 @@ def cmd_gen(args: Namespace) -> int:
 
     try:
         if target == "mcp":
-            from moss.gen.mcp import MCPGenerator
+            from moss_orchestration.gen.mcp import MCPGenerator
 
             generator = MCPGenerator()
             if show_list:
@@ -965,7 +965,7 @@ def cmd_gen(args: Namespace) -> int:
                     print(content)
 
         elif target == "http":
-            from moss.gen.http import HTTPGenerator
+            from moss_orchestration.gen.http import HTTPGenerator
 
             generator = HTTPGenerator()
             if show_list:
@@ -991,7 +991,7 @@ def cmd_gen(args: Namespace) -> int:
                     print(content)
 
         elif target == "cli":
-            from moss.gen.cli import CLIGenerator
+            from moss_orchestration.gen.cli import CLIGenerator
 
             generator = CLIGenerator()
             if show_list:
@@ -1012,7 +1012,7 @@ def cmd_gen(args: Namespace) -> int:
                 parser.print_help()
 
         elif target == "openapi":
-            from moss.gen.http import HTTPGenerator
+            from moss_orchestration.gen.http import HTTPGenerator
 
             generator = HTTPGenerator()
             spec = generator.generate_openapi_spec()
@@ -1024,7 +1024,7 @@ def cmd_gen(args: Namespace) -> int:
                 print(content)
 
         elif target == "grpc":
-            from moss.gen.grpc import GRPCGenerator
+            from moss_orchestration.gen.grpc import GRPCGenerator
 
             generator = GRPCGenerator()
             if show_list:
@@ -1047,7 +1047,7 @@ def cmd_gen(args: Namespace) -> int:
                     print(content)
 
         elif target == "lsp":
-            from moss.gen.lsp import LSPGenerator
+            from moss_orchestration.gen.lsp import LSPGenerator
 
             generator = LSPGenerator()
             if show_list:
@@ -1086,7 +1086,7 @@ def cmd_tui(args: Namespace) -> int:
     """Start the interactive terminal UI (API explorer)."""
     output = setup_output(args)
     try:
-        from moss.gen.tui import run_tui
+        from moss_orchestration.gen.tui import run_tui
 
         directory = Path(getattr(args, "directory", ".")).resolve()
         run_tui(directory)
@@ -1479,18 +1479,18 @@ def cmd_edit(args: Namespace) -> int:
 
 def cmd_synthesize(args: Namespace) -> int:
     """Synthesize code from specification."""
-    from moss.synthesis import (
+    from moss_orchestration.synthesis import (
         Context,
         Specification,
         SynthesisFramework,
     )
-    from moss.synthesis.framework import SynthesisConfig
-    from moss.synthesis.strategies import (
+    from moss_orchestration.synthesis.framework import SynthesisConfig
+    from moss_orchestration.synthesis.strategies import (
         PatternBasedDecomposition,
         TestDrivenDecomposition,
         TypeDrivenDecomposition,
     )
-    from moss.synthesis.strategy import DecompositionStrategy
+    from moss_orchestration.synthesis.strategy import DecompositionStrategy
 
     output = setup_output(args)
 
@@ -1530,13 +1530,13 @@ def cmd_synthesize(args: Namespace) -> int:
         strategies = [PatternBasedDecomposition()]
 
     # Set up generator
-    from moss.synthesis import CodeGenerator
+    from moss_orchestration.synthesis import CodeGenerator
 
     generator: CodeGenerator | None = None
     generator_name = getattr(args, "generator", "auto")
 
     if generator_name != "auto":
-        from moss.synthesis.generators import (
+        from moss_orchestration.synthesis.generators import (
             LLMGenerator,
             MockLLMProvider,
             PlaceholderGenerator,
@@ -2419,7 +2419,7 @@ def _generate_aggregate_html(stats: dict) -> str:
 
 def cmd_extract_preferences(args: Namespace) -> int:
     """Extract user preferences from session logs."""
-    from moss.preferences import LogFormat, extract_preferences, format_preferences
+    from moss_orchestration.preferences import LogFormat, extract_preferences, format_preferences
 
     output = setup_output(args)
     paths = [Path(p) for p in getattr(args, "session_paths", [])]
@@ -2446,7 +2446,7 @@ def cmd_extract_preferences(args: Namespace) -> int:
     log_format = log_format_map.get(log_format_str, LogFormat.AUTO)
 
     # Map confidence
-    from moss.preferences import ConfidenceLevel
+    from moss_orchestration.preferences import ConfidenceLevel
 
     confidence_map = {
         "low": ConfidenceLevel.LOW,
@@ -2467,7 +2467,7 @@ def cmd_extract_preferences(args: Namespace) -> int:
     if synthesize:
         output.info("Synthesizing with LLM...")
         try:
-            from moss.preferences.synthesis import synthesize_preferences
+            from moss_orchestration.preferences.synthesis import synthesize_preferences
 
             provider = getattr(args, "provider", None)
             model = getattr(args, "model", None)
@@ -2492,7 +2492,7 @@ def cmd_diff_preferences(args: Namespace) -> int:
     """Compare two preference extractions."""
     import json
 
-    from moss.preferences import PreferenceSet, diff_preferences
+    from moss_orchestration.preferences import PreferenceSet, diff_preferences
 
     output = setup_output(args)
     old_path = Path(getattr(args, "old_path", ""))
@@ -2514,7 +2514,7 @@ def cmd_diff_preferences(args: Namespace) -> int:
             new_data = json.load(f)
 
         # Reconstruct PreferenceSets
-        from moss.preferences import ConfidenceLevel, Preference, PreferenceCategory
+        from moss_orchestration.preferences import ConfidenceLevel, Preference, PreferenceCategory
 
         def load_prefs(data: dict) -> PreferenceSet:
             ps = PreferenceSet(sources=data.get("sources", []))
@@ -2640,7 +2640,7 @@ def cmd_lint(args: Namespace) -> int:
     """
     import asyncio
 
-    from moss.plugins.linters import get_linter_registry
+    from moss_orchestration.plugins.linters import get_linter_registry
 
     output = setup_output(args)
     paths_arg = getattr(args, "paths", None) or ["."]
@@ -3259,7 +3259,7 @@ def cmd_workflow(args: Namespace) -> int:
         return 0
 
     elif action == "new":
-        from moss.workflows.templates import TEMPLATES
+        from moss_orchestration.workflows.templates import TEMPLATES
 
         name = getattr(args, "workflow_name", None)
         if not name:
@@ -4034,7 +4034,7 @@ def cmd_eval(args: Namespace) -> int:
 
     # Handle swebench
     try:
-        from moss.eval.swebench import (
+        from moss_orchestration.eval.swebench import (
             AgentStrategy,
             Subset,
             SWEBenchHarness,
