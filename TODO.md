@@ -9,7 +9,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 - TUI: ScopesAPI for public/private symbol stats
 - Call Graph: wire FunctionComplexity.short_name() into output
 
-Test Status: 2110 passing, 0 failing, 42 skipped (all optional deps)
+Test Status: 2124 passing, 0 failing, 42 skipped (all optional deps)
 
 **Deferred:**
 - Driver integration improvements
@@ -25,11 +25,11 @@ Test Status: 2110 passing, 0 failing, 42 skipped (all optional deps)
 
 ## Backlog
 
-**File Boundaries Don't Exist:**
+**File Boundaries Don't Exist:** ✓ COMPLETE
 - See `docs/file-boundaries.md` for design
-- Phase 1: DONE - `expand_import_context()` + ViewOptions.expand_imports
-- Phase 2: Available modules summary (show what's importable BEFORE writing)
-- Phase 3: Transitive context with depth limit
+- Phase 1: `expand_import_context()` + ViewOptions.expand_imports
+- Phase 2: `get_available_modules()` + ViewOptions.show_available
+- Phase 3: `expand_import_context(depth=N)` + ViewOptions.import_depth
 
 **Test Coverage Heuristics:**
 - Autodetect missing tests (like coverage but cheaper, no execution needed)

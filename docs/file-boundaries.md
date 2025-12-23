@@ -68,7 +68,12 @@ class User:
 def verify_token(token: str) -> User | None: ...
 ```
 
-### Phase 2: Available Modules Summary
+### Phase 2: Available Modules Summary ✓ IMPLEMENTED
+
+**Implementation:**
+- `get_available_modules(file_path, root)` in `moss_intelligence.dependencies`
+- `ViewOptions(show_available=True, project_root=...)` in skeleton provider
+- Tests in `test_dependencies.py`
 
 **Problem**: Agent doesn't know what exists in the codebase. It might:
 - Reimplement something that already exists
@@ -91,7 +96,13 @@ Agent knows what's available, can choose to import instead of reimplement.
 
 **Implementation**: Use `dependencies.extract_dependencies()` on sibling files to get exports, format as compact list.
 
-### Phase 3: Transitive Context (Limited Depth)
+### Phase 3: Transitive Context (Limited Depth) ✓ IMPLEMENTED
+
+**Implementation:**
+- `expand_import_context(file_path, root, depth=N)` follows N levels
+- `ViewOptions(import_depth=2)` in skeleton provider
+- Cycle detection prevents infinite loops
+- Tests in `test_dependencies.py`
 
 If `User` references `Address`:
 ```python
