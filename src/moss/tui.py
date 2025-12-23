@@ -1173,13 +1173,22 @@ class MossTUI(App):
             diff_view.clear()
             diff_view.write(f"[red]Error loading branches:[/] {e}")
 
-    def navigate_branch(self, branch_name: str) -> None:
+    async def navigate_branch(self, branch_name: str) -> None:
         """Switch to a specific branch and update view."""
         self._log(f"Switching to branch: {branch_name}")
-        cmd = self.query_one("#command-input")
-        cmd.value = f"branch {branch_name}"
-        cmd.display = True
-        cmd.focus()
+        success = await self.api.shadow_git.switch_branch(branch_name)
+        if success:
+            self._log(f"[green]Switched to {branch_name}[/]")
+            # Refresh the diff view
+            diff = await self.api.shadow_git.get_diff(branch_name)
+            diff_view = self.query_one("#diff-view", RichLog)
+            diff_view.clear()
+            if diff.strip():
+                diff_view.write(diff)
+            else:
+                diff_view.write("[dim]No changes on this branch.[/]")
+        else:
+            self._log(f"[red]Failed to switch to {branch_name}[/]")
 
     def _update_tree(self, tree_type: str = "task") -> None:
         """Update the sidebar tree."""
@@ -1353,30 +1362,18 @@ class MossTUI(App):
             path = data["path"]
             self._selected_path = str(path)
             self._selected_type = "file"
-            # In Code mode, double-click triggers view
-            if self.current_mode_name == "Code":
-                self.action_primitive_view()
-            else:
-                self._log(f"Opened file: {path.name}")
-                cmd = self.query_one("#command-input")
-                cmd.value = f"view {path}"
-                cmd.display = True
-                cmd.focus()
+            self.action_primitive_view()
         elif data["type"] == "dir":
             path = data["path"]
             path_str = str(path)
             self._selected_type = "dir"
             # Double-click detection: navigate on second click within 0.5s
-            if self.current_mode_name == "Code":
-                import time
+            import time
 
-                now = time.time()
-                if (
-                    self._selected_path == path_str
-                    and now - getattr(self, "_last_dir_click", 0) < 0.5
-                ):
-                    self.action_cd_to(path_str)
-                self._last_dir_click = now
+            now = time.time()
+            if self._selected_path == path_str and now - getattr(self, "_last_dir_click", 0) < 0.5:
+                self.action_cd_to(path_str)
+            self._last_dir_click = now
             self._selected_path = path_str
         elif data["type"] == "symbol":
             symbol = data["symbol"]
@@ -1386,12 +1383,7 @@ class MossTUI(App):
             self._selected_type = "symbol"
             self._selected_symbol = symbol  # Keep symbol object for markdown headings
             self._selected_file = path
-            if self.current_mode_name == "Code":
-                self.action_primitive_view()
-            else:
-                self._log(f"Symbol: {symbol.name} at {path.name}:{symbol.lineno}")
-                self.query_one("#command-input").value = f"view {symbol_path}"
-                self.query_one("#command-input").focus()
+            self.action_primitive_view()
         elif data["type"] == "task":
             self._selected_type = "task"
             self._selected_task_id = data["task_id"]
@@ -1904,11 +1896,19 @@ class MossTUI(App):
             explore_detail.write(f"[red]Error: {e}[/]")
 
     def navigate(self, target: str) -> None:
-        """Navigate to a specific file or symbol."""
+        """Navigate to a specific file or symbol in the tree."""
         self._log(f"Navigating to: {target}")
-        self.query_one("#command-input").value = f"expand {target}"
-        self.query_one("#command-input").focus()
-        # In a full implementation, this would also highlight the node in the tree
+        tree = self.query_one("#project-tree", ProjectTree)
+        # Convert to relative path if absolute
+        target_path = Path(target)
+        if target_path.is_absolute():
+            try:
+                rel_path = str(target_path.relative_to(self.api.root))
+            except ValueError:
+                rel_path = target
+        else:
+            rel_path = target
+        self._expand_and_select_path(tree, rel_path)
 
     def _goto_fuzzy(self, pattern: str) -> None:
         """Fuzzy navigate to a file or symbol using Rust index."""
