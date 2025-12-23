@@ -16,7 +16,7 @@ from moss.output import Output, Verbosity, configure_output, get_output
 if TYPE_CHECKING:
     from argparse import Namespace
 
-    from moss.session_analysis import SessionAnalysis
+    from moss_orchestration.session_analysis import SessionAnalysis
 
 
 def get_version() -> str:
@@ -136,11 +136,11 @@ config = (
 
 def cmd_run(args: Namespace) -> int:
     """Run a task through moss."""
-    from moss.agents import create_manager
+    from moss_orchestration.agents import create_manager
     from moss.api import TaskRequest, create_api_handler
     from moss.config import load_config_file
     from moss.events import EventBus
-    from moss.shadow_git import ShadowGit
+    from moss_orchestration.shadow_git import ShadowGit
 
     output = setup_output(args)
     project_dir = Path(args.directory).resolve()
@@ -226,11 +226,11 @@ def cmd_run(args: Namespace) -> int:
 
 def cmd_status(args: Namespace) -> int:
     """Show status of moss tasks and workers."""
-    from moss.agents import create_manager
+    from moss_orchestration.agents import create_manager
     from moss.api import create_api_handler
     from moss.config import load_config_file
     from moss.events import EventBus
-    from moss.shadow_git import ShadowGit
+    from moss_orchestration.shadow_git import ShadowGit
 
     output = setup_output(args)
     project_dir = Path(args.directory).resolve()
@@ -515,7 +515,7 @@ def cmd_cfg(args: Namespace) -> int:
         output_result(results, args)
     elif args.html or output_format == "html":
         # HTML output with embedded Mermaid
-        from moss.visualization import visualize_cfgs
+        from moss_intelligence.visualization import visualize_cfgs
 
         content = visualize_cfgs(cfg_objects, format="html")
         if args.output:
@@ -551,7 +551,7 @@ def cmd_cfg(args: Namespace) -> int:
         else:
             output.print(dot_content)
     elif output_format == "svg":
-        from moss.visualization import render_dot_to_svg
+        from moss_intelligence.visualization import render_dot_to_svg
 
         dot_parts = [cfg.to_dot() for cfg in cfg_objects]
         dot_content = "\n\n".join(dot_parts)
@@ -563,7 +563,7 @@ def cmd_cfg(args: Namespace) -> int:
             output.error("No DOT content available for SVG rendering")
             return 1
     elif output_format == "png":
-        from moss.visualization import render_dot_to_png
+        from moss_intelligence.visualization import render_dot_to_png
 
         dot_parts = [cfg.to_dot() for cfg in cfg_objects]
         dot_content = "\n\n".join(dot_parts)
@@ -1148,7 +1148,7 @@ def cmd_watch(args: Namespace) -> int:
     import asyncio
     import shlex
 
-    from moss.watch_tests import WatchRunner, WatchTestConfig
+    from moss_orchestration.watch_tests import WatchRunner, WatchTestConfig
 
     output = setup_output(args)
     directory = Path(getattr(args, "directory", ".")).resolve()
@@ -1180,7 +1180,7 @@ def cmd_watch(args: Namespace) -> int:
 
 def cmd_hooks(args: Namespace) -> int:
     """Manage git pre-commit hooks."""
-    from moss.hooks import (
+    from moss_orchestration.hooks import (
         check_hooks_installed,
         generate_hook_config_yaml,
         install_hooks,
@@ -2008,7 +2008,7 @@ def cmd_roadmap(args: Namespace) -> int:
 
 def cmd_analyze_session(args: Namespace) -> int:
     """Analyze a Claude Code session log."""
-    from moss.session_analysis import analyze_session
+    from moss_orchestration.session_analysis import analyze_session
 
     output = setup_output(args)
     session_path = Path(getattr(args, "session_path", ""))
@@ -2040,7 +2040,7 @@ def cmd_analyze_session(args: Namespace) -> int:
 def cmd_telemetry(args: Namespace) -> int:
     """Show aggregate telemetry across sessions."""
     from moss.moss_api import MossAPI
-    from moss.session_analysis import analyze_session
+    from moss_orchestration.session_analysis import analyze_session
 
     output = setup_output(args)
     log_paths = [Path(p) for p in getattr(args, "logs", []) or []]
@@ -2111,7 +2111,7 @@ def _telemetry_watch_loop(
     import sys
     import time
 
-    from moss.session_analysis import analyze_session
+    from moss_orchestration.session_analysis import analyze_session
 
     last_mtimes: dict[Path, float] = {}
     last_output = ""
@@ -2254,7 +2254,7 @@ def _format_aggregate_stats(stats: dict) -> str:
 
 def _aggregate_analyses(analyses: list) -> SessionAnalysis:
     """Aggregate multiple SessionAnalysis objects."""
-    from moss.session_analysis import SessionAnalysis, TokenStats, ToolStats
+    from moss_orchestration.session_analysis import SessionAnalysis, TokenStats, ToolStats
 
     if not analyses:
         return SessionAnalysis(session_path=Path("."))
@@ -3386,12 +3386,12 @@ def cmd_workflow(args: Namespace) -> int:
             extra_args[key] = value
 
         # Load and run using execution primitives
-        from moss.execution import (
+        from moss_orchestration.execution import (
             NoLLM,
             agent_loop,
             step_loop,
         )
-        from moss.execution import (
+        from moss_orchestration.execution import (
             load_workflow as load_exec_workflow,
         )
 
@@ -3524,7 +3524,7 @@ def cmd_agent(args: Namespace) -> int:
 
     Uses composable execution primitives with task tree context.
     """
-    from moss.execution import (
+    from moss_orchestration.execution import (
         NoLLM,
         agent_loop,
         load_workflow,
