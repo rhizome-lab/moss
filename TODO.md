@@ -4,7 +4,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 ## Next Up
 
-- Push v0.1.0 release: `git push && git push --tags` (tag created, needs push)
 - Test Coverage Heuristics: autodetect missing tests
 - TUI: ScopesAPI for public/private symbol stats
 - Call Graph: wire FunctionComplexity.short_name() into output
