@@ -4,6 +4,15 @@
 
 ### Features
 
+**Driver Plugin Architecture** (Dec 23 2025)
+- Unified execution model: all task automation flows through pluggable drivers
+- Driver protocol: `decide_next_step()` and `on_action_complete()`
+- Built-in drivers: UserDriver, LLMDriver, WorkflowDriver, StateMachineDriver
+- DriverRegistry with entry point discovery for plugin drivers
+- Generic `run_task()` loop works with any driver
+- Legacy adapters: wrap existing agent_loop, step_loop, state_machine_loop
+- See `docs/driver-architecture.md` for design details
+
 **TUI Cleanup** (Dec 23 2025)
 - Removed command input usage from code paths:
   - `navigate_branch` now calls `switch_branch` API directly

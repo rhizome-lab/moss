@@ -4,13 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 ## Next Up
 
-**Driver Plugin Architecture** (see `docs/driver-architecture.md`)
-- Implement Driver protocol (decide_next_step, on_action_complete)
-- Built-in drivers: UserDriver, LLMDriver, WorkflowDriver, StateMachineDriver
-- DriverRegistry with entry point discovery
-- Generic execution loop that works with any driver
-- Migrate existing agent_loop, step_loop, state_machine_loop
-
+(all tasks complete - check backlog or docs/philosophy.md for ideas)
 
 ## Implementation Notes
 
