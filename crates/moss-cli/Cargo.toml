@@ -26,6 +26,9 @@ rayon.workspace = true
 tokio.workspace = true
 notify.workspace = true
 ureq = { version = "2", features = ["json"] }
+flate2 = "1"
+tar = "0.4"
+zip = "2"
 
 [dev-dependencies]
 tempfile = "3"

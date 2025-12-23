@@ -1727,15 +1727,15 @@ impl Foo {
     fn test_format_skeleton() {
         let mut extractor = SkeletonExtractor::new();
         let content = r#"
-def hello(name: str) -> str:
-    """Say hello."""
+def greet(name: str) -> str:
+    """Return a personalized greeting message."""
     return f"Hello, {name}"
 "#;
         let result = extractor.extract(&PathBuf::from("test.py"), content);
         let formatted = result.format(true);
 
-        assert!(formatted.contains("def hello(name: str) -> str:"));
-        assert!(formatted.contains("\"\"\"Say hello.\"\"\""));
+        assert!(formatted.contains("def greet(name: str) -> str:"));
+        assert!(formatted.contains("\"\"\"Return a personalized greeting message.\"\"\""));
     }
 
     #[test]

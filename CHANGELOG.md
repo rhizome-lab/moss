@@ -10,7 +10,10 @@
   - macOS (Intel, Apple Silicon)
   - Windows (x86_64)
   - SHA256 checksums for verification
-- `moss update` command to check for and install updates
+- `moss update` command for self-updating
+  - Downloads and installs new binary from GitHub releases
+  - SHA256 checksum verification against release checksums
+  - Handles tar.gz (Unix) and zip (Windows) archives
   - `--check` flag to check without installing
   - JSON output for programmatic access
 

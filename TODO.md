@@ -7,8 +7,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 **1. Distribution (in progress)**
 - [x] Auto-updates (`moss update` command)
 - [x] GitHub Actions release workflow
+- [x] Self-update binary replacement with SHA256 verification
 - [ ] Test cross-platform builds
-- [ ] Add self-update binary replacement
 
 **2. TUI Integration**
 - Quick access to new primitives:
