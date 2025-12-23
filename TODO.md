@@ -76,7 +76,7 @@ Dogfooding and CLI improvement are the same work stream. The goal is to make `mo
 - Fisheye on Rust files shows normal skeleton (no import resolution - expected, Python-only)
 - Edge case: fuzzy path resolution works (e.g., `view framework.py` finds synthesis/framework.py)
 - Bug FIXED: `workflow list` was looking in cli/workflows not moss/workflows (fixed path)
-- Note: `analyze --complexity` requires a file target (now shows helpful message)
+- Feature: `analyze --complexity` now works codebase-wide (shows top 10 most complex functions)
 
 **Architecture Cleanup:**
 - [x] Consolidate redundant layers discovered Dec 22:

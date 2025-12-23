@@ -14,10 +14,24 @@ pub struct FunctionComplexity {
     pub start_line: usize,
     pub end_line: usize,
     pub parent: Option<String>, // class/struct name for methods
+    pub file_path: Option<String>, // file path for codebase-wide reports
 }
 
 impl FunctionComplexity {
     pub fn qualified_name(&self) -> String {
+        let base = if let Some(parent) = &self.parent {
+            format!("{}.{}", parent, self.name)
+        } else {
+            self.name.clone()
+        };
+        if let Some(fp) = &self.file_path {
+            format!("{}:{}", fp, base)
+        } else {
+            base
+        }
+    }
+
+    pub fn short_name(&self) -> String {
         if let Some(parent) = &self.parent {
             format!("{}.{}", parent, self.name)
         } else {
@@ -142,6 +156,7 @@ impl ComplexityAnalyzer {
                             start_line: node.start_position().row + 1,
                             end_line: node.end_position().row + 1,
                             parent: parent.map(String::from),
+                            file_path: None,
                         });
                     }
                 }
@@ -268,6 +283,7 @@ impl ComplexityAnalyzer {
                             start_line: node.start_position().row + 1,
                             end_line: node.end_position().row + 1,
                             parent: parent.map(String::from),
+                            file_path: None,
                         });
                     }
                 }

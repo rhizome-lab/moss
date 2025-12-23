@@ -392,6 +392,65 @@ pub fn analyze_file_complexity(file_path: &Path) -> Option<ComplexityReport> {
     Some(analyzer.analyze(file_path, &content))
 }
 
+/// Analyze complexity across entire codebase, returning top N functions
+pub fn analyze_codebase_complexity(root: &Path, limit: usize, threshold: Option<usize>) -> ComplexityReport {
+    use crate::path_resolve;
+    use rayon::prelude::*;
+
+    let all_files = path_resolve::all_files(root);
+    let code_files: Vec<_> = all_files
+        .iter()
+        .filter(|f| {
+            f.kind == "file" && {
+                let ext = std::path::Path::new(&f.path)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("");
+                matches!(ext, "py" | "rs")
+            }
+        })
+        .collect();
+
+    // Collect all functions from all files in parallel
+    let all_functions: Vec<_> = code_files
+        .par_iter()
+        .filter_map(|file| {
+            let path = root.join(&file.path);
+            let content = std::fs::read_to_string(&path).ok()?;
+            let mut analyzer = ComplexityAnalyzer::new();
+            let report = analyzer.analyze(&path, &content);
+            Some(
+                report
+                    .functions
+                    .into_iter()
+                    .map(|mut f| {
+                        // Include file path in the function info
+                        f.file_path = Some(file.path.clone());
+                        f
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .flatten()
+        .collect();
+
+    // Filter by threshold if specified
+    let mut filtered: Vec<_> = if let Some(t) = threshold {
+        all_functions.into_iter().filter(|f| f.complexity >= t).collect()
+    } else {
+        all_functions
+    };
+
+    // Sort by complexity descending and take top N
+    filtered.sort_by(|a, b| b.complexity.cmp(&a.complexity));
+    filtered.truncate(limit);
+
+    ComplexityReport {
+        functions: filtered,
+        file_path: root.to_string_lossy().to_string(),
+    }
+}
+
 /// Run unified analysis on a path
 pub fn analyze(
     target: Option<&str>,
@@ -453,9 +512,17 @@ pub fn analyze(
 
     let complexity = if run_complexity {
         if !is_file {
-            // Complexity requires a file target
-            skipped.push("complexity: requires file target (use: moss analyze <file> --complexity)".to_string());
-            None
+            // Codebase-wide complexity: show top 10 most complex functions
+            let analysis_root = if let Some(ref fp) = file_path {
+                root.join(fp)
+            } else {
+                root.to_path_buf()
+            };
+            if analysis_root.is_dir() {
+                Some(analyze_codebase_complexity(&analysis_root, 10, complexity_threshold))
+            } else {
+                None
+            }
         } else if let Some(ref fp) = file_path {
             let full_path = root.join(fp);
             let mut report = analyze_file_complexity(&full_path);
