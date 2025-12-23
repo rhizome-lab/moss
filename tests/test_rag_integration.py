@@ -237,66 +237,6 @@ This is a sample project for testing RAG indexing.
         assert chunks_reindexed > 0
 
 
-@pytest.mark.skip(reason="MossAPI deleted - tests need rewrite for new architecture")
-class TestRAGAPI:
-    """Tests for RAGAPI (MossAPI sub-API)."""
-
-    @pytest.fixture
-    def api(self, tmp_path):
-        return MossAPI.for_project(tmp_path)
-
-    @pytest.fixture
-    def sample_project(self, tmp_path):
-        """Create a sample project structure."""
-        src = tmp_path / "src"
-        src.mkdir()
-
-        (src / "main.py").write_text('''
-def main():
-    """Main entry point."""
-    print("Hello, World!")
-
-if __name__ == "__main__":
-    main()
-''')
-        return tmp_path
-
-    async def test_rag_api_access(self, api):
-        """Test RAGAPI is accessible from MossAPI."""
-        assert hasattr(api, "rag")
-        assert isinstance(api.rag, RAGAPI)
-
-    async def test_index_via_api(self, api, sample_project):
-        """Test indexing via MossAPI."""
-        chunks = await api.rag.index(patterns=["**/*.py"])
-        assert chunks > 0
-
-    async def test_search_via_api(self, api, sample_project):
-        """Test searching via MossAPI."""
-        await api.rag.index(patterns=["**/*.py"])
-        results = await api.rag.search("main entry")
-
-        assert len(results) > 0
-
-    async def test_stats_via_api(self, api, sample_project):
-        """Test getting stats via MossAPI."""
-        await api.rag.index(patterns=["**/*.py"])
-        stats = await api.rag.stats()
-
-        assert stats.total_documents > 0
-        assert stats.backend in ("sqlite", "chroma", "memory")
-
-    async def test_clear_via_api(self, api, sample_project):
-        """Test clearing via MossAPI."""
-        await api.rag.index(patterns=["**/*.py"])
-        result = await api.rag.clear()
-
-        assert result["success"] is True
-
-        stats = await api.rag.stats()
-        assert stats.total_documents == 0
-
-
 class TestSearchResultFormatting:
     """Tests for search result formatting."""
 

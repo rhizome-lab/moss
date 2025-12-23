@@ -66,13 +66,6 @@ class TestServerState:
         assert state.root == tmp_path
         assert state._cache == {}
 
-    @pytest.mark.skip(reason="MossAPI removed")
-    def test_api_property(self, state: ServerState):
-        api = state.api
-        assert api is not None
-        # Should return same instance
-        assert state.api is api
-
     @pytest.mark.asyncio
     async def test_set_and_get_cached(self, state: ServerState):
         await state.set_cached("test.operation", "result", "arg1")

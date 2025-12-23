@@ -4,34 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 ## Next Up
 
-**Package Migration** (see `docs/restructuring-plan.md`, `docs/api-boundaries.md`)
+- First release: tag v0.1.0 and test distribution pipeline
+- Design doc for "File Boundaries Don't Exist" concept
 
-Completed:
-- [x] moss-intelligence is source of truth (28 modules migrated)
-- [x] MossAPI removed, architect_editor.py and gen/introspect.py refactored to use moss-intelligence
-- [x] src/moss/ deleted entirely (72k lines)
-- [x] moss-cli package scaffolded with recovered modules (config, help, metrics, etc.)
-- [x] moss-orchestration recovered modules (events, validators, synthesis, gen, etc.)
-- [x] moss-context recovered modules (context, context_memory, memory)
-- [x] All imports fixed across sub-packages
-- [x] Frontend server files recovered: moss-mcp (server.py, server_full.py), moss-lsp, moss-acp
-- [x] Frontend package imports fixed (MCP, LSP, ACP servers work)
-- [x] TUI refactored to use moss-intelligence directly (ViewAPI, AnalyzeAPI, EditAPIExtended added)
-- [x] CLI broken imports fixed (cmd_explore, cmd_telemetry refactored)
-
-- [x] Recovered missing modules from git history:
-  - plugins/data_files.py, plugins/markdown.py
-  - llm/ subpackage (gbnf, protocol, providers)
-  - rules/ subpackage (backends, engine, config)
-  - refactoring.py, visualization.py, vector_store.py, semantic_search.py
-  - server/ subpackage, web.py
-
-- [x] MCP server refactored to use moss_intelligence directly (MossAPI removed)
-- [x] MCP server tests updated to use new tool names and APIs
-- [x] CLI commands refactored to remove MossAPI (cmd_deps, cmd_context, cmd_query, cmd_cfg)
-- [x] Telemetry: session stats migrated to use SessionManager from moss_orchestration
-
-Test Status: 2120 passing, 0 failing, 50 skipped
+Test Status: 2098 passing, 0 failing, 42 skipped (all optional deps)
 
 **Deferred:**
 - Driver integration improvements

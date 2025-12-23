@@ -24,7 +24,6 @@ from moss_orchestration.gen.introspect import (
     _get_type_string,
     _parse_docstring,
     introspect_method,
-    introspect_subapi,
 )
 
 # =============================================================================
@@ -132,27 +131,7 @@ class TestIntrospectMethod:
 
 
 # =============================================================================
-# SubAPI Introspection Tests
-# =============================================================================
-
-
-@pytest.mark.skip(reason="MossAPI deleted - tests need rewrite for new architecture")
-class TestIntrospectSubapi:
-    def test_introspect_subapi(self):
-        from moss.moss_api import SkeletonAPI
-
-        subapi = introspect_subapi(SkeletonAPI, "skeleton")
-        assert subapi.name == "skeleton"
-        assert subapi.class_name == "SkeletonAPI"
-        assert len(subapi.methods) > 0
-        # Should have extract and format methods
-        method_names = [m.name for m in subapi.methods]
-        assert "extract" in method_names
-        assert "format" in method_names
-
-
-# =============================================================================
-# Full API Introspection Tests
+# API Introspection Tests
 # =============================================================================
 
 
@@ -174,16 +153,6 @@ class TestIntrospectAPI:
         method_names = [m.name for m in skeleton.methods]
         assert "extract_python_skeleton" in method_names
         assert "format_skeleton" in method_names
-
-    @pytest.mark.skip(reason="health module removed in restructuring")
-    def test_health_api_methods(self):
-        sub_apis = introspect_api()
-        health = next((api for api in sub_apis if api.name == "health"), None)
-        assert health is not None
-
-        method_names = [m.name for m in health.methods]
-        assert "check" in method_names
-        assert "summarize" in method_names
 
 
 # =============================================================================

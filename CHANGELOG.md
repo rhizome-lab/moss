@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### Test Suite Cleanup (Dec 24 2025)
+
+- Reduced skipped tests from 82 to 50
+- Removed 70 obsolete DWIM NL matching tests (xfail/xpass → deleted)
+- Final count: 2120 passed, 50 skipped
+
+**Executor Refactoring:**
+- CLIExecutor and MCPToolExecutor now use `_get_tool_dispatcher()` instead of MossAPI
+- Fixed dispatcher bugs: complexity handler pattern=None, security handler invalid arg
+
+**Skipped Test Fixes:**
+- Deleted 14 placeholder test files (test_synthesis*.py stubs, etc.)
+- Fixed dogfooding test paths (src/moss → packages/moss-intelligence)
+- Added `Anchor.parse()` classmethod for MCP tool string parsing
+- Updated TestAllToolsReturnCompact to test only dispatcher-backed tools
+
+**DWIM Simplification:**
+- Removed NL matching tests (embeddings removed, DWIM simplified to 3 primitives)
+- Kept 202 tests for alias resolution, typo tolerance, case/separator equivalence
+- 506 lines removed from test files
+
 ### Features
 
 **Package Restructuring** (Dec 23 2025)
