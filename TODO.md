@@ -4,11 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 ## Next Up
 
-- Test Coverage Heuristics: autodetect missing tests
 - TUI: ScopesAPI for public/private symbol stats
 - Call Graph: wire FunctionComplexity.short_name() into output
 
-Test Status: 2124 passing, 0 failing, 42 skipped (all optional deps)
+Test Status: 2168 passing, 0 failing, 42 skipped (all optional deps)
 
 **Deferred:**
 - Driver integration improvements
@@ -30,12 +29,12 @@ Test Status: 2124 passing, 0 failing, 42 skipped (all optional deps)
 - Phase 2: `get_available_modules()` + ViewOptions.show_available
 - Phase 3: `expand_import_context(depth=N)` + ViewOptions.import_depth
 
-**Test Coverage Heuristics:**
-- Autodetect missing tests (like coverage but cheaper, no execution needed)
-- Heuristically detect test file naming patterns per-repo (test_*.py, *_test.go, etc.)
-- Handle in-file tests (Rust's `#[cfg(test)]` modules)
-- Report: files without corresponding tests based on observed pattern
-- Could be `moss analyze --test-coverage` or separate `moss test-gaps` command
+**Test Coverage Heuristics:** ✓ COMPLETE
+- Module: `moss_intelligence.test_gaps`
+- Functions: `detect_test_patterns()`, `find_untested_files()`, `analyze_test_coverage()`
+- Supports: Python, Go, Rust, JavaScript, TypeScript patterns
+- TODO: Handle in-file tests (Rust's `#[cfg(test)]` modules)
+- TODO: CLI/MCP integration (`moss analyze --test-coverage` or `moss test-gaps`)
 
 **TUI as Library Interface:**
 - Consider ScopesAPI for public/private symbol stats (or add to SkeletonAPI)
