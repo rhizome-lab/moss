@@ -1266,7 +1266,7 @@
   },
   {
     "name": "test_gaps_detect_test_patterns",
-    "description": "Detect test file naming patterns in a codebase. Scans the codebase for test files and identifies which naming patterns are in use. List of detected test patterns, sorted by count (most common first)",
+    "description": "Detect test file naming patterns in a codebase. Scans the codebase for test files and identifies which naming patterns are in use. Also detects inline tests (e.g., Rust's #[cfg(test)]). List of detected test patterns, sorted by count (most common first)",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1293,6 +1293,22 @@
         "patterns": {
           "type": "string",
           "description": "Test patterns to use (auto-detected if None)"
+        }
+      },
+      "required": [
+        "root"
+      ]
+    }
+  },
+  {
+    "name": "test_health_analyze_test_health",
+    "description": "Analyze test health by extracting pytest markers. TestHealthReport with marker statistics and skip reasons",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "root": {
+          "type": "string",
+          "description": "Project root directory"
         }
       },
       "required": [

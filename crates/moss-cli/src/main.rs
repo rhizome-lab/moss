@@ -560,6 +560,10 @@ enum Commands {
         #[arg(long)]
         scopes: bool,
 
+        /// Run test health analysis (pytest markers, skip reasons)
+        #[arg(long)]
+        test_health: bool,
+
         /// Complexity threshold - only show functions above this
         #[arg(short, long)]
         threshold: Option<usize>,
@@ -826,6 +830,7 @@ fn main() {
             security,
             test_coverage,
             scopes,
+            test_health,
             threshold,
             kind,
         } => cmd_analyze(
@@ -836,6 +841,7 @@ fn main() {
             security,
             test_coverage,
             scopes,
+            test_health,
             threshold,
             kind.as_deref(),
             cli.json,
@@ -4538,6 +4544,7 @@ fn cmd_analyze(
     security: bool,
     test_coverage: bool,
     scopes: bool,
+    test_health: bool,
     threshold: Option<usize>,
     kind_filter: Option<&str>,
     json: bool,
@@ -4547,7 +4554,7 @@ fn cmd_analyze(
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     // If no specific flags, run core analyses (health, complexity, security)
-    let any_flag = health || complexity || security || test_coverage || scopes;
+    let any_flag = health || complexity || security || test_coverage || scopes || test_health;
     let (run_health, run_complexity, run_security) = if !any_flag {
         (true, true, true)
     } else {
@@ -4587,6 +4594,16 @@ fn cmd_analyze(
             }
         }
 
+        // Add test health analysis if requested
+        if test_health {
+            let analysis_path = target.map(|t| root.join(t)).unwrap_or_else(|| root.clone());
+            if let Some(test_health_result) = run_python_test_health(&analysis_path, json) {
+                if let serde_json::Value::Object(ref mut map) = output {
+                    map.insert("test_health".to_string(), test_health_result);
+                }
+            }
+        }
+
         println!("{}", output);
     } else {
         println!("{}", report.format());
@@ -4606,6 +4623,16 @@ fn cmd_analyze(
             let analysis_path = target.map(|t| root.join(t)).unwrap_or_else(|| root.clone());
             if let Some(scopes_result) = run_python_scopes(&analysis_path, false) {
                 if let serde_json::Value::String(s) = scopes_result {
+                    println!("\n{}", s);
+                }
+            }
+        }
+
+        // Add test health analysis if requested
+        if test_health {
+            let analysis_path = target.map(|t| root.join(t)).unwrap_or_else(|| root.clone());
+            if let Some(test_health_result) = run_python_test_health(&analysis_path, false) {
+                if let serde_json::Value::String(s) = test_health_result {
                     println!("\n{}", s);
                 }
             }
@@ -4695,6 +4722,50 @@ print(json.dumps(report.to_dict()))
 from pathlib import Path
 from moss_intelligence.scopes import analyze_project_scopes
 report = analyze_project_scopes(Path('{}'))
+print(report.to_compact())
+"#,
+            path.display()
+        )
+    };
+
+    let output = Command::new("uv")
+        .args(["run", "python", "-c", &script])
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if json {
+            serde_json::from_str(stdout.trim()).ok()
+        } else {
+            Some(serde_json::Value::String(stdout.trim().to_string()))
+        }
+    } else {
+        None
+    }
+}
+
+/// Run Python test_health module for pytest marker analysis
+fn run_python_test_health(path: &Path, json: bool) -> Option<serde_json::Value> {
+    use std::process::Command;
+
+    let script = if json {
+        format!(
+            r#"
+import json
+from pathlib import Path
+from moss_intelligence.test_health import analyze_test_health
+report = analyze_test_health(Path('{}'))
+print(json.dumps(report.to_dict()))
+"#,
+            path.display()
+        )
+    } else {
+        format!(
+            r#"
+from pathlib import Path
+from moss_intelligence.test_health import analyze_test_health
+report = analyze_test_health(Path('{}'))
 print(report.to_compact())
 "#,
             path.display()
