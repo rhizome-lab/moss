@@ -4938,6 +4938,23 @@ fn cmd_find_symbols(
     }
 }
 
+/// Check if a file appears to be binary by looking for null bytes in the first 8KB
+fn is_binary_file(path: &Path) -> bool {
+    use std::io::Read;
+
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return false;
+    };
+
+    let mut buffer = [0u8; 8192];
+    let Ok(bytes_read) = file.read(&mut buffer) else {
+        return false;
+    };
+
+    // Check for null bytes (common in binary files)
+    buffer[..bytes_read].contains(&0)
+}
+
 fn cmd_index_stats(root: Option<&Path>, json: bool) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
@@ -4972,17 +4989,25 @@ fn cmd_index_stats(root: Option<&Path>, json: bool) -> i32 {
     let file_count = files.iter().filter(|f| !f.is_dir).count();
     let dir_count = files.iter().filter(|f| f.is_dir).count();
 
-    // Count by extension
+    // Count by extension (detect binary files)
     let mut ext_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     for f in &files {
         if f.is_dir {
             continue;
         }
-        let ext = std::path::Path::new(&f.path)
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("(no ext)")
-            .to_string();
+        let path = std::path::Path::new(&f.path);
+        let ext = match path.extension().and_then(|e| e.to_str()) {
+            Some(e) => e.to_string(),
+            None => {
+                // No extension - check if binary
+                let full_path = root.join(&f.path);
+                if is_binary_file(&full_path) {
+                    "(binary)".to_string()
+                } else {
+                    "(no ext)".to_string()
+                }
+            }
+        };
         *ext_counts.entry(ext).or_insert(0) += 1;
     }
 
