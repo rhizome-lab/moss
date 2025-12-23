@@ -36,7 +36,12 @@ Missing piece: chaining these together automatically.
 
 ## Design
 
-### Phase 1: Implicit Import Context
+### Phase 1: Implicit Import Context ✓ IMPLEMENTED
+
+**Implementation:**
+- `expand_import_context(file_path, root)` in `moss_intelligence.dependencies`
+- `ViewOptions(expand_imports=True, project_root=...)` in skeleton provider
+- Tests in `test_dependencies.py` and `test_skeleton.py`
 
 When `view` or `edit` is called on a file:
 
