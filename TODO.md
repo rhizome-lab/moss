@@ -4,8 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 
 ## Next Up
 
-- First release: tag v0.1.0 and test distribution pipeline
-- Design doc for "File Boundaries Don't Exist" concept
+- Push v0.1.0 release: `git push && git push --tags` (tag created, needs push)
 
 Test Status: 2098 passing, 0 failing, 42 skipped (all optional deps)
 
@@ -24,10 +23,10 @@ Test Status: 2098 passing, 0 failing, 42 skipped (all optional deps)
 ## Backlog
 
 **File Boundaries Don't Exist:**
-- Imports in existing files ARE context - when editing a file, its imports define scope
-- Already support pulling in types; need to extend to suggested imports
-- Design needed: when suggesting new imports, pull in that module's context too
-- Goal: seamless cross-file awareness without explicit "add to context" steps
+- See `docs/file-boundaries.md` for design
+- Phase 1: Implicit import context (expand imports when viewing/editing)
+- Phase 2: Suggested import context (expand before agent adds import)
+- Phase 3: Transitive context with depth limit
 
 **Test Coverage Heuristics:**
 - Autodetect missing tests (like coverage but cheaper, no execution needed)
