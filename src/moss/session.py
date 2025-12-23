@@ -185,11 +185,9 @@ class Checkpoint:
         )
 
 
-class TaskDriver(Enum):
-    """Who is driving the task."""
-
-    USER = auto()  # User interactive session
-    AGENT = auto()  # Autonomous agent workflow
+# Driver is a string, not enum - allows plugin drivers
+# See docs/driver-architecture.md for the plugin design
+# Common values: "user", "llm", "workflow", "state_machine"
 
 
 @dataclass
@@ -226,7 +224,8 @@ class Session:
     parent_id: str | None = None
     children: list[str] = field(default_factory=list)
     shadow_branch: str | None = None  # shadow/task-{id}
-    driver: TaskDriver = TaskDriver.USER
+    driver: str = "user"  # Plugin driver name (user, llm, workflow, etc.)
+    driver_config: dict[str, Any] = field(default_factory=dict)  # Driver-specific config
 
     # Work records
     tool_calls: list[ToolCall] = field(default_factory=list)
@@ -255,7 +254,8 @@ class Session:
         task: str = "",
         session_id: str | None = None,
         parent_id: str | None = None,
-        driver: TaskDriver = TaskDriver.USER,
+        driver: str = "user",
+        driver_config: dict[str, Any] | None = None,
         event_bus: EventBus | None = None,
         on_update: Callable[[Session], None] | None = None,
         **metadata: Any,
@@ -267,7 +267,8 @@ class Session:
             task: Description of the task
             session_id: Optional ID (auto-generated if not provided)
             parent_id: Optional parent task ID for subtasks
-            driver: Who is driving this task (USER or AGENT)
+            driver: Driver name (user, llm, workflow, etc.)
+            driver_config: Driver-specific configuration
             event_bus: Optional event bus for emitting events
             on_update: Optional callback on session updates
             **metadata: Additional metadata
@@ -279,6 +280,7 @@ class Session:
             task=task,
             parent_id=parent_id,
             driver=driver,
+            driver_config=driver_config or {},
             shadow_branch=f"shadow/task-{task_id}",
             metadata=metadata,
             _event_bus=event_bus,
@@ -504,7 +506,8 @@ class Session:
             "parent_id": self.parent_id,
             "children": self.children,
             "shadow_branch": self.shadow_branch,
-            "driver": self.driver.name.lower(),
+            "driver": self.driver,
+            "driver_config": self.driver_config,
             # Work records
             "tool_calls": [tc.to_dict() for tc in self.tool_calls],
             "file_changes": [fc.to_dict() for fc in self.file_changes],
@@ -522,7 +525,6 @@ class Session:
     def from_dict(cls, data: dict[str, Any]) -> Session:
         """Deserialize session from dictionary."""
         status_name = data.get("status", "created").upper()
-        driver_name = data.get("driver", "user").upper()
         return cls(
             id=data["id"],
             workspace=Path(data["workspace"]),
@@ -534,7 +536,8 @@ class Session:
             parent_id=data.get("parent_id"),
             children=data.get("children", []),
             shadow_branch=data.get("shadow_branch"),
-            driver=TaskDriver[driver_name],
+            driver=data.get("driver", "user"),
+            driver_config=data.get("driver_config", {}),
             # Work records
             tool_calls=[ToolCall.from_dict(tc) for tc in data.get("tool_calls", [])],
             file_changes=[FileChange.from_dict(fc) for fc in data.get("file_changes", [])],
@@ -594,7 +597,8 @@ class SessionManager:
         workspace: Path | None = None,
         session_id: str | None = None,
         parent_id: str | None = None,
-        driver: TaskDriver = TaskDriver.USER,
+        driver: str = "user",
+        driver_config: dict[str, Any] | None = None,
         tags: list[str] | None = None,
         **metadata: Any,
     ) -> Session:
@@ -605,7 +609,8 @@ class SessionManager:
             workspace: Working directory
             session_id: Optional ID (auto-generated if not provided)
             parent_id: Optional parent task ID for subtasks
-            driver: Who is driving this task (USER or AGENT)
+            driver: Driver name (user, llm, workflow, etc.)
+            driver_config: Driver-specific configuration
             tags: Optional tags
             **metadata: Additional metadata
         """
@@ -615,6 +620,7 @@ class SessionManager:
             session_id=session_id,
             parent_id=parent_id,
             driver=driver,
+            driver_config=driver_config,
             event_bus=self.event_bus,
             **metadata,
         )
@@ -635,7 +641,8 @@ class SessionManager:
         self,
         parent: Session,
         task: str,
-        driver: TaskDriver = TaskDriver.AGENT,
+        driver: str = "llm",
+        driver_config: dict[str, Any] | None = None,
         **metadata: Any,
     ) -> Session:
         """Create a subtask under a parent task.
@@ -643,7 +650,8 @@ class SessionManager:
         Args:
             parent: Parent task
             task: Description of the subtask
-            driver: Who drives this subtask (default: AGENT)
+            driver: Driver name (default: llm for automated subtasks)
+            driver_config: Driver-specific configuration
             **metadata: Additional metadata
         """
         return self.create(
@@ -651,6 +659,7 @@ class SessionManager:
             workspace=parent.workspace,
             parent_id=parent.id,
             driver=driver,
+            driver_config=driver_config,
             **metadata,
         )
 

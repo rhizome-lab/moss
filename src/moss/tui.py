@@ -1524,8 +1524,8 @@ class MossTUI(App):
                 if len(task.task) > 40:
                     task_desc += "..."
 
-                # Color based on driver (cyan=user, magenta=agent)
-                color = "cyan" if task.driver.name == "USER" else "magenta"
+                # Color based on driver (cyan=user, others=magenta)
+                color = "cyan" if task.driver == "user" else "magenta"
                 click = f"[@click=app.resume_task('{task.id}')]"
                 label = f"{icon} {click}[{color}]{task.id}[/][/]: {task_desc}"
 
