@@ -1313,6 +1313,46 @@ class MossTUI(App):
                 self._log(f"Symbol: {symbol.name} at {path.name}:{symbol.lineno}")
                 self.query_one("#command-input").value = f"view {symbol_path}"
                 self.query_one("#command-input").focus()
+        elif data["type"] == "task":
+            # Show task's diff in the diff view
+            self._show_task_diff(data["task_id"])
+
+    def _show_task_diff(self, task_id: str) -> None:
+        """Show the diff for a task in the diff view."""
+        from textual.widgets import RichLog
+
+        from moss.session import SessionManager
+
+        try:
+            diff_view = self.query_one("#diff-view", expect_type=RichLog)
+            manager = SessionManager(self.api.root / ".moss" / "sessions")
+            task = manager.get(task_id)
+
+            diff_view.clear()
+            if not task:
+                diff_view.write(f"[red]Task not found: {task_id}[/]")
+                return
+
+            # Show task info
+            diff_view.write(f"[bold]Task:[/] {task.id}")
+            diff_view.write(f"[bold]Description:[/] {task.task}")
+            diff_view.write(f"[bold]Status:[/] {task.status.value}")
+            if task.shadow_branch:
+                diff_view.write(f"[bold]Branch:[/] {task.shadow_branch}")
+            diff_view.write("")
+
+            # Get and show diff
+            diff = task.get_diff()
+            if diff:
+                diff_view.write("[bold]Changes:[/]\n")
+                diff_view.write(diff)
+            else:
+                diff_view.write("[dim]No changes yet (or no shadow branch)[/]")
+
+        except Exception as e:
+            diff_view = self.query_one("#diff-view")
+            diff_view.clear()
+            diff_view.write(f"[red]Error loading task: {e}[/]")
 
     def action_toggle_tooltip(self) -> None:
         """Toggle tooltip visibility."""
@@ -1608,19 +1648,21 @@ class MossTUI(App):
 
                 # Color based on driver (cyan=user, others=magenta)
                 color = "cyan" if task.driver == "user" else "magenta"
-                click = f"[@click=app.resume_task('{task.id}')]"
-                label = f"{icon} {click}[{color}]{task.id}[/][/]: {task_desc}"
+                label = f"{icon} [{color}]{task.id}[/]: {task_desc}"
+
+                # Store task data for selection handling
+                node_data = {"type": "task", "task_id": task.id}
 
                 if task.children:
                     # Has children - add as expandable node
-                    node = parent_node.add(label)
+                    node = parent_node.add(label, data=node_data)
                     for child_id in task.children:
                         child = manager.get(child_id)
                         if child:
                             add_task_node(node, child, indent + 1)
                 else:
                     # Leaf task
-                    parent_node.add_leaf(label)
+                    parent_node.add_leaf(label, data=node_data)
 
             for task in root_tasks:
                 add_task_node(root, task)
