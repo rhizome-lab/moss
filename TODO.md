@@ -8,7 +8,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs. See `docs/do
 - [x] Barrel file hoisting: detect `export * from` and surface re-exported symbols
 - [x] Useless docstring detection: skip "Sets the user id" on `setUserId()`
 - [x] Fisheye for TypeScript/JavaScript (Python, Rust, TS/JS all supported)
-- Selective import resolution (e.g., `--fisheye=moss.config` to expand only that import)
+- [x] Selective import resolution (e.g., `--fisheye=models` to expand only matching imports)
 
 **2. Rust Module Cleanup**
 - [x] Consolidated moss-daemon into moss-cli (now `moss daemon run`)
