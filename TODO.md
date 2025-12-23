@@ -19,13 +19,18 @@ Completed:
 - [x] TUI refactored to use moss-intelligence directly (ViewAPI, AnalyzeAPI, EditAPIExtended added)
 - [x] CLI broken imports fixed (cmd_explore, cmd_telemetry refactored)
 
+- [x] Recovered missing modules from git history:
+  - plugins/data_files.py, plugins/markdown.py
+  - llm/ subpackage (gbnf, protocol, providers)
+  - rules/ subpackage (backends, engine, config)
+  - refactoring.py, visualization.py, vector_store.py, semantic_search.py
+  - server/ subpackage, web.py
+
 Remaining:
-- [ ] Recover missing plugin modules: data_files.py, markdown.py (needed for full test suite)
-- [ ] Recover missing modules: llm/, rules/, refactoring.py, visualization.py, etc. (21 tests skipped)
-- [ ] Verify CLI commands work end-to-end
+- [ ] Fix remaining test failures (mostly MCP server tests)
 - [ ] Telemetry: migrate session stats to new architecture (currently stubbed)
 
-Test Status: 1797 passing, 122 failing, 57 skipped (modules not yet migrated)
+Test Status: 2030 passing, 92 failing, 66 skipped
 
 **Deferred:**
 - Driver integration improvements
