@@ -308,11 +308,96 @@ class Session:
         if self._on_update:
             self._on_update(self)
 
-    def start(self) -> None:
-        """Mark session as running."""
+    def start(self, create_shadow_branch: bool = True) -> None:
+        """Mark session as running.
+
+        Args:
+            create_shadow_branch: If True, creates shadow/task-{id} branch
+        """
         self.status = SessionStatus.RUNNING
+
+        # Create shadow branch if not already set
+        if create_shadow_branch and not self.shadow_branch:
+            self._create_shadow_branch()
+
         self._emit(EventType.LOOP_STARTED, {"session_id": self.id, "task": self.task})
         self._notify_update()
+
+    def _create_shadow_branch(self) -> bool:
+        """Create a shadow branch for this task.
+
+        Returns True if branch was created, False on error.
+        """
+        import subprocess
+
+        branch_name = f"shadow/task-{self.id}"
+        try:
+            # Get current branch as base
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=self.workspace,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            base_branch = result.stdout.strip()
+
+            # Create and checkout shadow branch
+            subprocess.run(
+                ["git", "checkout", "-b", branch_name],
+                cwd=self.workspace,
+                capture_output=True,
+                check=True,
+            )
+            self.shadow_branch = branch_name
+            self.metadata["base_branch"] = base_branch
+            return True
+        except subprocess.CalledProcessError:
+            # Git not available or not a repo - continue without shadow branch
+            return False
+
+    def _checkout_shadow_branch(self) -> bool:
+        """Checkout the shadow branch for this task.
+
+        Returns True if checked out, False on error.
+        """
+        import subprocess
+
+        if not self.shadow_branch:
+            return False
+        try:
+            subprocess.run(
+                ["git", "checkout", self.shadow_branch],
+                cwd=self.workspace,
+                capture_output=True,
+                check=True,
+            )
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
+    def get_diff(self) -> str:
+        """Get the diff for this task's shadow branch.
+
+        Returns diff between base branch and shadow branch,
+        or empty string if not available.
+        """
+        import subprocess
+
+        base_branch = self.metadata.get("base_branch")
+        if not self.shadow_branch or not base_branch:
+            return ""
+        try:
+            result = subprocess.run(
+                ["git", "diff", f"{base_branch}...{self.shadow_branch}"],
+                cwd=self.workspace,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return result.stdout
+        except subprocess.CalledProcessError:
+            return ""
 
     def pause(self, reason: str = "") -> None:
         """Pause the session."""
@@ -321,10 +406,19 @@ class Session:
         self._emit(EventType.STEP_COMPLETED, {"session_id": self.id, "action": "paused"})
         self._notify_update()
 
-    def resume(self) -> None:
-        """Resume a paused session."""
+    def resume(self, checkout_shadow_branch: bool = True) -> None:
+        """Resume a paused session.
+
+        Args:
+            checkout_shadow_branch: If True, checks out the task's shadow branch
+        """
         if self.status == SessionStatus.PAUSED:
             self.status = SessionStatus.RUNNING
+
+            # Checkout shadow branch if it exists
+            if checkout_shadow_branch and self.shadow_branch:
+                self._checkout_shadow_branch()
+
             self._emit(EventType.LOOP_STARTED, {"session_id": self.id, "action": "resumed"})
             self._notify_update()
 

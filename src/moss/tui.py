@@ -1477,19 +1477,22 @@ class MossTUI(App):
 
     def action_resume_task(self, task_id: str) -> None:
         """Resume a task by ID."""
-        from moss.session import SessionManager
+        from moss.session import SessionManager, SessionStatus
 
         manager = SessionManager(self.api.root / ".moss" / "sessions")
         task = manager.get(task_id)
         if task:
             self._log(f"Resuming task: {task.task[:50]}")
-            self._log(f"Shadow branch: {task.shadow_branch}")
-            # In a full implementation, this would:
-            # 1. Checkout the shadow branch
-            # 2. Load the task's context
-            # 3. Resume the agent loop
+            if task.shadow_branch:
+                self._log(f"Checking out: {task.shadow_branch}")
+                task.resume(checkout_shadow_branch=True)
+                manager.save(task)
+            elif task.status == SessionStatus.PAUSED:
+                task.resume(checkout_shadow_branch=False)
+                manager.save(task)
+            self._log("[green]Task resumed[/]")
         else:
-            self._log(f"Task not found: {task_id}")
+            self._log(f"[red]Task not found: {task_id}[/]")
 
     def action_toggle_transparency(self) -> None:
         """Toggle transparent background for terminal opacity support."""
