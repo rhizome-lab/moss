@@ -1,7 +1,7 @@
 use ignore::WalkBuilder;
 use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
 use nucleo_matcher::{Config, Matcher};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::index::FileIndex;
 
@@ -10,6 +10,43 @@ pub struct PathMatch {
     pub path: String,
     pub kind: String,
     pub score: u32,
+}
+
+/// Resolved file with content - common return type for commands that need file content.
+#[derive(Debug)]
+pub struct ResolvedFile {
+    /// Absolute path to the file
+    pub abs_path: PathBuf,
+    /// Relative path from root (for display)
+    pub rel_path: String,
+    /// File content
+    pub content: String,
+}
+
+/// Resolve a file query and read its content.
+///
+/// This is the common pattern used by most commands that operate on a single file.
+/// Returns Ok(ResolvedFile) on success, Err(error_message) on failure.
+pub fn resolve_and_read(file: &str, root: Option<&Path>) -> Result<ResolvedFile, String> {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    let matches = resolve(file, &root);
+    let file_match = matches
+        .iter()
+        .find(|m| m.kind == "file")
+        .ok_or_else(|| format!("File not found: {}", file))?;
+
+    let abs_path = root.join(&file_match.path);
+    let content = std::fs::read_to_string(&abs_path)
+        .map_err(|e| format!("Error reading file: {}", e))?;
+
+    Ok(ResolvedFile {
+        abs_path,
+        rel_path: file_match.path.clone(),
+        content,
+    })
 }
 
 /// Result of resolving a unified path like `src/main.py/Foo/bar`

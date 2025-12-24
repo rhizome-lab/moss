@@ -11,31 +11,16 @@ pub fn cmd_scopes(
     find: Option<&str>,
     json: bool,
 ) -> i32 {
-    let root = root
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-
-    // Resolve the file
-    let matches = path_resolve::resolve(file, &root);
-    let file_match = match matches.iter().find(|m| m.kind == "file") {
-        Some(m) => m,
-        None => {
-            eprintln!("File not found: {}", file);
-            return 1;
-        }
-    };
-
-    let file_path = root.join(&file_match.path);
-    let content = match std::fs::read_to_string(&file_path) {
-        Ok(c) => c,
+    let resolved = match path_resolve::resolve_and_read(file, root) {
+        Ok(r) => r,
         Err(e) => {
-            eprintln!("Error reading file: {}", e);
+            eprintln!("{}", e);
             return 1;
         }
     };
 
     let analyzer = scopes::ScopeAnalyzer::new();
-    let result = analyzer.analyze(&file_path, &content);
+    let result = analyzer.analyze(&resolved.abs_path, &resolved.content);
 
     // Find mode: find where a name is defined at a line
     if let (Some(name), Some(ln)) = (find, line) {
@@ -91,7 +76,7 @@ pub fn cmd_scopes(
                 .collect();
             println!("{}", serde_json::to_string_pretty(&output).unwrap());
         } else {
-            println!("# Bindings visible at line {} in {}", ln, file_match.path);
+            println!("# Bindings visible at line {} in {}", ln, resolved.rel_path);
             if bindings.is_empty() {
                 println!("  (none)");
             } else {

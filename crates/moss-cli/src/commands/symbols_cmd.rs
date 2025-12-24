@@ -5,31 +5,16 @@ use std::path::Path;
 
 /// List symbols in a file
 pub fn cmd_symbols(file: &str, root: Option<&Path>, json: bool) -> i32 {
-    let root = root
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-
-    // Resolve the file
-    let matches = path_resolve::resolve(file, &root);
-    let file_match = match matches.iter().find(|m| m.kind == "file") {
-        Some(m) => m,
-        None => {
-            eprintln!("File not found: {}", file);
-            return 1;
-        }
-    };
-
-    let file_path = root.join(&file_match.path);
-    let content = match std::fs::read_to_string(&file_path) {
-        Ok(c) => c,
+    let resolved = match path_resolve::resolve_and_read(file, root) {
+        Ok(r) => r,
         Err(e) => {
-            eprintln!("Error reading file: {}", e);
+            eprintln!("{}", e);
             return 1;
         }
     };
 
     let parser = symbols::SymbolParser::new();
-    let symbols = parser.parse_file(&file_path, &content);
+    let symbols = parser.parse_file(&resolved.abs_path, &resolved.content);
 
     if json {
         let output: Vec<_> = symbols
@@ -54,7 +39,7 @@ pub fn cmd_symbols(file: &str, root: Option<&Path>, json: bool) -> i32 {
                 .unwrap_or_default();
             println!(
                 "{}:{}-{} {} {}{}",
-                file_match.path,
+                resolved.rel_path,
                 s.start_line,
                 s.end_line,
                 s.kind.as_str(),

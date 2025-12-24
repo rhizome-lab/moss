@@ -5,38 +5,23 @@ use std::path::Path;
 
 /// Show file context (skeleton + imports/exports)
 pub fn cmd_context(file: &str, root: Option<&Path>, json: bool) -> i32 {
-    let root = root
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-
-    // Resolve the file
-    let matches = path_resolve::resolve(file, &root);
-    let file_match = match matches.iter().find(|m| m.kind == "file") {
-        Some(m) => m,
-        None => {
-            eprintln!("File not found: {}", file);
-            return 1;
-        }
-    };
-
-    let file_path = root.join(&file_match.path);
-    let content = match std::fs::read_to_string(&file_path) {
-        Ok(c) => c,
+    let resolved = match path_resolve::resolve_and_read(file, root) {
+        Ok(r) => r,
         Err(e) => {
-            eprintln!("Error reading file: {}", e);
+            eprintln!("{}", e);
             return 1;
         }
     };
 
-    let line_count = content.lines().count();
+    let line_count = resolved.content.lines().count();
 
     // Extract skeleton
     let mut skeleton_extractor = skeleton::SkeletonExtractor::new();
-    let skeleton_result = skeleton_extractor.extract(&file_path, &content);
+    let skeleton_result = skeleton_extractor.extract(&resolved.abs_path, &resolved.content);
 
     // Extract deps
     let deps_extractor = deps::DepsExtractor::new();
-    let deps_result = deps_extractor.extract(&file_path, &content);
+    let deps_result = deps_extractor.extract(&resolved.abs_path, &resolved.content);
 
     // Count symbols recursively
     fn count_symbols(symbols: &[skeleton::SkeletonSymbol]) -> (usize, usize, usize) {
@@ -100,7 +85,7 @@ pub fn cmd_context(file: &str, root: Option<&Path>, json: bool) -> i32 {
         println!(
             "{}",
             serde_json::json!({
-                "file": file_match.path,
+                "file": resolved.rel_path,
                 "summary": {
                     "lines": line_count,
                     "classes": classes,
@@ -116,7 +101,7 @@ pub fn cmd_context(file: &str, root: Option<&Path>, json: bool) -> i32 {
         );
     } else {
         // Text output
-        println!("# {}", file_match.path);
+        println!("# {}", resolved.rel_path);
         println!("Lines: {}", line_count);
         println!(
             "Classes: {}, Functions: {}, Methods: {}",

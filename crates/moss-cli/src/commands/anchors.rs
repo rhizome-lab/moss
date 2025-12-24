@@ -5,25 +5,10 @@ use std::path::Path;
 
 /// Show anchors (navigation points) in a file
 pub fn cmd_anchors(file: &str, root: Option<&Path>, query: Option<&str>, json: bool) -> i32 {
-    let root = root
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-
-    // Resolve the file
-    let matches = path_resolve::resolve(file, &root);
-    let file_match = match matches.iter().find(|m| m.kind == "file") {
-        Some(m) => m,
-        None => {
-            eprintln!("File not found: {}", file);
-            return 1;
-        }
-    };
-
-    let file_path = root.join(&file_match.path);
-    let content = match std::fs::read_to_string(&file_path) {
-        Ok(c) => c,
+    let resolved = match path_resolve::resolve_and_read(file, root) {
+        Ok(r) => r,
         Err(e) => {
-            eprintln!("Error reading file: {}", e);
+            eprintln!("{}", e);
             return 1;
         }
     };
@@ -31,9 +16,9 @@ pub fn cmd_anchors(file: &str, root: Option<&Path>, query: Option<&str>, json: b
     let extractor = anchors::AnchorExtractor::new();
 
     let anchors_list = if let Some(q) = query {
-        extractor.find_anchor(&file_path, &content, q)
+        extractor.find_anchor(&resolved.abs_path, &resolved.content, q)
     } else {
-        extractor.extract(&file_path, &content).anchors
+        extractor.extract(&resolved.abs_path, &resolved.content).anchors
     };
 
     if json {
@@ -54,15 +39,15 @@ pub fn cmd_anchors(file: &str, root: Option<&Path>, query: Option<&str>, json: b
         println!(
             "{}",
             serde_json::json!({
-                "file": file_match.path,
+                "file": resolved.rel_path,
                 "anchors": output
             })
         );
     } else {
         if anchors_list.is_empty() {
-            println!("# {} (no anchors)", file_match.path);
+            println!("# {} (no anchors)", resolved.rel_path);
         } else {
-            println!("# {} ({} anchors)", file_match.path, anchors_list.len());
+            println!("# {} ({} anchors)", resolved.rel_path, anchors_list.len());
             for a in &anchors_list {
                 let ctx = if let Some(c) = &a.context {
                     format!(" (in {})", c)

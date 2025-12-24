@@ -5,31 +5,16 @@ use std::path::Path;
 
 /// Analyze cyclomatic complexity of functions in a file
 pub fn cmd_complexity(file: &str, root: Option<&Path>, threshold: Option<usize>, json: bool) -> i32 {
-    let root = root
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-
-    // Resolve the file
-    let matches = path_resolve::resolve(file, &root);
-    let file_match = match matches.iter().find(|m| m.kind == "file") {
-        Some(m) => m,
-        None => {
-            eprintln!("File not found: {}", file);
-            return 1;
-        }
-    };
-
-    let file_path = root.join(&file_match.path);
-    let content = match std::fs::read_to_string(&file_path) {
-        Ok(c) => c,
+    let resolved = match path_resolve::resolve_and_read(file, root) {
+        Ok(r) => r,
         Err(e) => {
-            eprintln!("Error reading file: {}", e);
+            eprintln!("{}", e);
             return 1;
         }
     };
 
     let analyzer = complexity::ComplexityAnalyzer::new();
-    let report = analyzer.analyze(&file_path, &content);
+    let report = analyzer.analyze(&resolved.abs_path, &resolved.content);
 
     // Filter by threshold if specified
     let functions: Vec<_> = if let Some(t) = threshold {
@@ -69,7 +54,7 @@ pub fn cmd_complexity(file: &str, root: Option<&Path>, threshold: Option<usize>,
         println!(
             "{}",
             serde_json::json!({
-                "file": file_match.path,
+                "file": resolved.rel_path,
                 "function_count": functions.len(),
                 "avg_complexity": (avg * 10.0).round() / 10.0,
                 "max_complexity": max,
@@ -78,7 +63,7 @@ pub fn cmd_complexity(file: &str, root: Option<&Path>, threshold: Option<usize>,
             })
         );
     } else {
-        println!("# {} - Complexity Analysis", file_match.path);
+        println!("# {} - Complexity Analysis", resolved.rel_path);
 
         if functions.is_empty() {
             println!(

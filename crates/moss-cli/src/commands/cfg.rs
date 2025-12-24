@@ -5,31 +5,16 @@ use std::path::Path;
 
 /// Build and display control flow graphs for functions
 pub fn cmd_cfg(file: &str, root: Option<&Path>, function: Option<&str>, json: bool) -> i32 {
-    let root = root
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-
-    // Resolve the file
-    let matches = path_resolve::resolve(file, &root);
-    let file_match = match matches.iter().find(|m| m.kind == "file") {
-        Some(m) => m,
-        None => {
-            eprintln!("File not found: {}", file);
-            return 1;
-        }
-    };
-
-    let file_path = root.join(&file_match.path);
-    let content = match std::fs::read_to_string(&file_path) {
-        Ok(c) => c,
+    let resolved = match path_resolve::resolve_and_read(file, root) {
+        Ok(r) => r,
         Err(e) => {
-            eprintln!("Error reading file: {}", e);
+            eprintln!("{}", e);
             return 1;
         }
     };
 
     let mut builder = cfg::CfgBuilder::new();
-    let result = builder.build(&file_path, &content, function);
+    let result = builder.build(&resolved.abs_path, &resolved.content, function);
 
     if result.graphs.is_empty() {
         if let Some(func_name) = function {
@@ -86,12 +71,12 @@ pub fn cmd_cfg(file: &str, root: Option<&Path>, function: Option<&str>, json: bo
         println!(
             "{}",
             serde_json::json!({
-                "file": file_match.path,
+                "file": resolved.rel_path,
                 "graphs": output
             })
         );
     } else {
-        println!("# {} - Control Flow Graphs\n", file_match.path);
+        println!("# {} - Control Flow Graphs\n", resolved.rel_path);
 
         for graph in &result.graphs {
             println!("{}\n", graph.format_text());

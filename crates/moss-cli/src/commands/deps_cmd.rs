@@ -11,31 +11,16 @@ pub fn cmd_deps(
     exports_only: bool,
     json: bool,
 ) -> i32 {
-    let root = root
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-
-    // Resolve the file
-    let matches = path_resolve::resolve(file, &root);
-    let file_match = match matches.iter().find(|m| m.kind == "file") {
-        Some(m) => m,
-        None => {
-            eprintln!("File not found: {}", file);
-            return 1;
-        }
-    };
-
-    let file_path = root.join(&file_match.path);
-    let content = match std::fs::read_to_string(&file_path) {
-        Ok(c) => c,
+    let resolved = match path_resolve::resolve_and_read(file, root) {
+        Ok(r) => r,
         Err(e) => {
-            eprintln!("Error reading file: {}", e);
+            eprintln!("{}", e);
             return 1;
         }
     };
 
     let extractor = deps::DepsExtractor::new();
-    let result = extractor.extract(&file_path, &content);
+    let result = extractor.extract(&resolved.abs_path, &resolved.content);
 
     if json {
         let imports_json: Vec<_> = if !exports_only {
@@ -75,13 +60,13 @@ pub fn cmd_deps(
         println!(
             "{}",
             serde_json::json!({
-                "file": file_match.path,
+                "file": resolved.rel_path,
                 "imports": imports_json,
                 "exports": exports_json
             })
         );
     } else {
-        println!("# {}", file_match.path);
+        println!("# {}", resolved.rel_path);
 
         if !exports_only && !result.imports.is_empty() {
             println!("\n## Imports ({}):", result.imports.len());
