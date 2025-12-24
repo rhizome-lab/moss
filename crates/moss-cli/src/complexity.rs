@@ -4,6 +4,7 @@
 //! Complexity = number of decision points + 1
 
 use moss_core::{tree_sitter, Language, Parsers};
+use moss_languages::{get_support, LanguageSupport};
 use std::path::Path;
 
 /// Complexity data for a function
@@ -101,15 +102,144 @@ impl ComplexityAnalyzer {
 
     pub fn analyze(&self, path: &Path, content: &str) -> ComplexityReport {
         let lang = Language::from_path(path);
+
+        // Try trait-based analysis for supported languages
         let functions = match lang {
-            Some(Language::Python) => self.analyze_python(content),
-            Some(Language::Rust) => self.analyze_rust(content),
-            _ => Vec::new(),
+            Some(lang_val) => {
+                if let Some(support) = get_support(lang_val) {
+                    self.analyze_with_trait(lang_val, content, support)
+                } else {
+                    // Fallback to legacy for unsupported languages
+                    match lang_val {
+                        Language::Python => self.analyze_python(content),
+                        Language::Rust => self.analyze_rust(content),
+                        _ => Vec::new(),
+                    }
+                }
+            }
+            None => Vec::new(),
         };
 
         ComplexityReport {
             functions,
             file_path: path.to_string_lossy().to_string(),
+        }
+    }
+
+    /// Analyze using the LanguageSupport trait
+    fn analyze_with_trait(
+        &self,
+        lang: Language,
+        content: &str,
+        support: &dyn LanguageSupport,
+    ) -> Vec<FunctionComplexity> {
+        let tree = match self.parsers.parse_lang(lang, content) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+
+        let mut functions = Vec::new();
+        let root = tree.root_node();
+        let mut cursor = root.walk();
+
+        self.collect_functions_with_trait(&mut cursor, content, support, &mut functions, None);
+        functions
+    }
+
+    fn collect_functions_with_trait(
+        &self,
+        cursor: &mut tree_sitter::TreeCursor,
+        content: &str,
+        support: &dyn LanguageSupport,
+        functions: &mut Vec<FunctionComplexity>,
+        parent: Option<&str>,
+    ) {
+        loop {
+            let node = cursor.node();
+            let kind = node.kind();
+
+            // Check if this is a function
+            if support.function_kinds().contains(&kind) {
+                if let Some(name) = support.node_name(&node, content) {
+                    let mut complexity = 1; // Base complexity
+                    self.count_complexity_with_trait(&node, support, &mut complexity);
+
+                    functions.push(FunctionComplexity {
+                        name: name.to_string(),
+                        complexity,
+                        start_line: node.start_position().row + 1,
+                        end_line: node.end_position().row + 1,
+                        parent: parent.map(String::from),
+                        file_path: None,
+                    });
+                }
+            }
+            // Check if this is a container (class, impl, module)
+            else if support.container_kinds().contains(&kind) {
+                if let Some(name) = support.node_name(&node, content) {
+                    // Recurse into container with the container name as parent
+                    if cursor.goto_first_child() {
+                        self.collect_functions_with_trait(cursor, content, support, functions, Some(name));
+                        cursor.goto_parent();
+                    }
+                    if cursor.goto_next_sibling() {
+                        continue;
+                    }
+                    break;
+                }
+            }
+
+            // Recurse into other nodes
+            if !support.container_kinds().contains(&kind) && cursor.goto_first_child() {
+                self.collect_functions_with_trait(cursor, content, support, functions, parent);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    fn count_complexity_with_trait(
+        &self,
+        node: &tree_sitter::Node,
+        support: &dyn LanguageSupport,
+        complexity: &mut usize,
+    ) {
+        let complexity_nodes = support.complexity_nodes();
+        let mut cursor = node.walk();
+
+        if !cursor.goto_first_child() {
+            return;
+        }
+
+        loop {
+            let current = cursor.node();
+            let kind = current.kind();
+
+            // Count if this node type contributes to complexity
+            if complexity_nodes.contains(&kind) {
+                *complexity += 1;
+            }
+
+            // Depth-first traversal
+            if cursor.goto_first_child() {
+                continue;
+            }
+
+            if cursor.goto_next_sibling() {
+                continue;
+            }
+
+            loop {
+                if !cursor.goto_parent() {
+                    return;
+                }
+                if cursor.goto_next_sibling() {
+                    break;
+                }
+            }
         }
     }
 
