@@ -1711,15 +1711,49 @@ fn resolve_import(module: &str, current_file: &Path, root: &Path) -> Option<Path
             // Fall back to external packages
             resolve_python_external(module, root)
         }
-        "go" => resolve_go_import_local(module, current_file, root),
-        "rs" => resolve_rust_import(module, current_file, root),
+        "go" => {
+            // Try local resolution first
+            if let Some(path) = resolve_go_import_local(module, current_file, root) {
+                return Some(path);
+            }
+            // Fall back to GOROOT/mod cache
+            resolve_go_external(module)
+        }
+        "rs" => {
+            // Try local resolution first (crate::, self::, super::)
+            if let Some(path) = resolve_rust_import(module, current_file, root) {
+                return Some(path);
+            }
+            // Fall back to cargo registry
+            resolve_rust_external(module)
+        }
         "ts" | "tsx" | "js" | "jsx" | "mts" | "mjs" => {
             // Try local resolution first
             if let Some(path) = resolve_typescript_import(module, current_file, root) {
                 return Some(path);
             }
+            // Try Deno imports (URL and npm:)
+            if let Some(path) = resolve_deno_import(module) {
+                return Some(path);
+            }
             // Fall back to node_modules for bare imports
             resolve_js_external(module, current_file)
+        }
+        "c" | "h" | "cpp" | "hpp" | "cc" | "hh" | "cxx" | "hxx" => {
+            // Try relative resolution first (for #include "header.h")
+            if let Some(path) = resolve_cpp_relative(module, current_file) {
+                return Some(path);
+            }
+            // Fall back to system includes (for #include <header.h>)
+            resolve_cpp_external(module)
+        }
+        "java" => {
+            // Try local resolution first (within project)
+            if let Some(path) = resolve_java_local(module, current_file, root) {
+                return Some(path);
+            }
+            // Fall back to Maven/Gradle cache
+            resolve_java_external(module)
         }
         _ => None,
     }
@@ -2042,6 +2076,139 @@ fn resolve_typescript_import(module: &str, current_file: &Path, _root: &Path) ->
     }
 
     None
+}
+
+/// Resolve a C/C++ include relative to current file.
+/// Handles: #include "header.h"
+fn resolve_cpp_relative(include: &str, current_file: &Path) -> Option<PathBuf> {
+    // Strip quotes if present
+    let header = include
+        .trim_start_matches('"')
+        .trim_end_matches('"')
+        .trim_start_matches('<')
+        .trim_end_matches('>');
+
+    let current_dir = current_file.parent()?;
+
+    // Try relative to current file's directory
+    let relative = current_dir.join(header);
+    if relative.is_file() {
+        return Some(relative);
+    }
+
+    // Try with common extensions if none specified
+    if !header.contains('.') {
+        for ext in &[".h", ".hpp", ".hxx", ".hh"] {
+            let with_ext = current_dir.join(format!("{}{}", header, ext));
+            if with_ext.is_file() {
+                return Some(with_ext);
+            }
+        }
+    }
+
+    None
+}
+
+/// Resolve a C/C++ include to a system header.
+/// Handles: #include <vector>, #include <stdio.h>
+fn resolve_cpp_external(include: &str) -> Option<PathBuf> {
+    // Get system include paths (cached would be better, but this is simple)
+    let include_paths = external_packages::find_cpp_include_paths();
+
+    // Use the external_packages resolution
+    let pkg = external_packages::resolve_cpp_include(include, &include_paths)?;
+    Some(pkg.path)
+}
+
+/// Resolve a Java import within the local project.
+/// Handles: import com.myproject.MyClass;
+fn resolve_java_local(import: &str, current_file: &Path, root: &Path) -> Option<PathBuf> {
+    // Convert import to path: com.foo.Bar -> com/foo/Bar.java
+    let path_part = import.replace('.', "/");
+
+    // Common Java source directories
+    let source_dirs = [
+        "src/main/java",
+        "src/java",
+        "src",
+        "app/src/main/java", // Android
+    ];
+
+    for src_dir in &source_dirs {
+        let source_path = root.join(src_dir).join(format!("{}.java", path_part));
+        if source_path.is_file() {
+            return Some(source_path);
+        }
+    }
+
+    // Also try relative to current file's package structure
+    // Find the source root by walking up from current file
+    let mut current = current_file.parent()?;
+    while current != root {
+        // Check if this might be a source root
+        let potential = current.join(format!("{}.java", path_part));
+        if potential.is_file() {
+            return Some(potential);
+        }
+        current = current.parent()?;
+    }
+
+    None
+}
+
+/// Resolve a Java import to an external package (Maven/Gradle).
+fn resolve_java_external(import: &str) -> Option<PathBuf> {
+    let maven_repo = external_packages::find_maven_repository();
+    let gradle_cache = external_packages::find_gradle_cache();
+
+    let pkg = external_packages::resolve_java_import(
+        import,
+        maven_repo.as_deref(),
+        gradle_cache.as_deref(),
+    )?;
+
+    Some(pkg.path)
+}
+
+/// Resolve a Deno import (URL or npm:).
+fn resolve_deno_import(import: &str) -> Option<PathBuf> {
+    // Only handle Deno-specific imports
+    if !import.starts_with("https://") && !import.starts_with("http://") && !import.starts_with("npm:") {
+        return None;
+    }
+
+    let cache = external_packages::find_deno_cache()?;
+    let pkg = external_packages::resolve_deno_import(import, &cache)?;
+    Some(pkg.path)
+}
+
+/// Resolve a Rust crate import to cargo registry.
+fn resolve_rust_external(crate_name: &str) -> Option<PathBuf> {
+    // Skip local module paths
+    if crate_name.starts_with("crate::") || crate_name.starts_with("self::") || crate_name.starts_with("super::") {
+        return None;
+    }
+
+    // Get the crate name (first segment)
+    let crate_name = crate_name.split("::").next()?;
+
+    // Check the global index first
+    if let Ok(index) = external_packages::PackageIndex::open() {
+        let version = external_packages::get_rust_version()
+            .and_then(|v| external_packages::Version::parse(&v));
+
+        if let Ok(Some(pkg)) = index.find_package("rust", crate_name, version) {
+            let path = PathBuf::from(&pkg.path);
+            if path.exists() {
+                return Some(path);
+            }
+        }
+    }
+
+    // Try cargo registry
+    let registry = external_packages::find_cargo_registry()?;
+    let pkg = external_packages::resolve_rust_crate(crate_name, &registry)?;
+    Some(pkg.path)
 }
 
 /// Resolve a Rust import to a local file path
