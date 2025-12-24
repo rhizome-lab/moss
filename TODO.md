@@ -6,11 +6,19 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 - Session analysis: detect correction patterns ("You're right", "Good point")
 - Complete daemon integration (FileIndex API methods currently unused)
-- Add more language skeleton extractors (Kotlin, Swift, etc.)
 
 Test Status: 71 passing, 0 failing
 
 ## Backlog
+
+**Language Support** (see `docs/language-support.md` for full list):
+- Kotlin, Swift, Dart (mobile)
+- C#, F# (.NET)
+- PHP, Elixir, Erlang (backends)
+- Zig, Lua (systems/gamedev)
+- SQL, GraphQL (data)
+- Dockerfile, HCL (infra)
+- Svelte, SCSS (frontend)
 
 **Integration:**
 - LSP refactor actions (rename symbol across files)
