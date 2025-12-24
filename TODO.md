@@ -69,7 +69,13 @@ Phase 4 - Expand:
 - [x] Removed: complexity (use analyze --complexity)
 - [x] Removed: cfg, scopes, health (inscrutable output, use analyze)
 - [x] Removed: symbols, anchors, expand, context (use view with depth/--full/--deps)
-- CLI reduced from 29 to 19 commands (-3200 lines)
+- [x] Removed: path, search-tree, deps (use view with fuzzy matching/--deps)
+- [x] Removed: summarize, imports (use view --deps)
+- [x] Consolidated: reindex, index-stats, list-files, index-packages → `moss index` subcommand
+- [x] Consolidated: overview → `analyze --overview`
+- [x] Fixed: view --deps now shows exports, doesn't show symbols
+- [x] Fixed: view lists all matches when query is ambiguous
+- CLI reduced from 29 to 9 commands (-5000+ lines)
 
 **Bugs:**
 - [x] `view --calls`/`--called-by` semantics were swapped - FIXED
