@@ -15,6 +15,8 @@ Removed Python subprocess calls and hardcoded language counters from moss-cli:
 - Removed ~145 lines of dead code from edit.rs (legacy `find_symbol_in_node`, `check_node_is_container` methods)
 - Fixed unnecessary `&mut self` in Editor methods
 - Added `find_package_entry()` to Language trait for Python's `__init__.py` handling
+- Added `file_path_to_module_name()` to Language trait for module name resolution
+- Added `has_language_support()` helper, replaced hardcoded `.py`/`.rs` extension filters
 
 ### Package Indexing Trait Methods
 
