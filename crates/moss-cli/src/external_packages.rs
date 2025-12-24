@@ -839,6 +839,788 @@ pub fn resolve_rust_crate(crate_name: &str, registry: &Path) -> Option<ResolvedP
 }
 
 // =============================================================================
+// C/C++
+// =============================================================================
+
+/// Get GCC version.
+pub fn get_gcc_version() -> Option<String> {
+    let output = Command::new("gcc").args(["--version"]).output().ok()?;
+
+    if output.status.success() {
+        let version_str = String::from_utf8_lossy(&output.stdout);
+        // "gcc (GCC) 13.2.0" or "gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0"
+        for line in version_str.lines() {
+            // Look for version number pattern
+            for part in line.split_whitespace() {
+                if part.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                    let ver_parts: Vec<&str> = part.split('.').collect();
+                    if ver_parts.len() >= 2 {
+                        return Some(format!("{}.{}", ver_parts[0], ver_parts[1]));
+                    }
+                }
+            }
+        }
+    }
+
+    // Try clang as fallback
+    let output = Command::new("clang").args(["--version"]).output().ok()?;
+    if output.status.success() {
+        let version_str = String::from_utf8_lossy(&output.stdout);
+        for line in version_str.lines() {
+            if line.contains("clang version") {
+                for part in line.split_whitespace() {
+                    if part.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                        let ver_parts: Vec<&str> = part.split('.').collect();
+                        if ver_parts.len() >= 2 {
+                            return Some(format!("{}.{}", ver_parts[0], ver_parts[1]));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Find C/C++ system include directories.
+pub fn find_cpp_include_paths() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+
+    // Standard system include paths
+    let system_paths = [
+        "/usr/include",
+        "/usr/local/include",
+        "/usr/include/c++",
+        "/usr/include/x86_64-linux-gnu",
+        "/usr/include/aarch64-linux-gnu",
+    ];
+
+    for path in system_paths {
+        let p = PathBuf::from(path);
+        if p.is_dir() {
+            paths.push(p);
+        }
+    }
+
+    // Try to get GCC include paths
+    if let Ok(output) = Command::new("gcc").args(["-E", "-Wp,-v", "-xc", "/dev/null"]).output() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let mut in_search_list = false;
+
+        for line in stderr.lines() {
+            if line.contains("#include <...> search starts here:") {
+                in_search_list = true;
+                continue;
+            }
+            if line.contains("End of search list.") {
+                break;
+            }
+            if in_search_list {
+                let path = PathBuf::from(line.trim());
+                if path.is_dir() && !paths.contains(&path) {
+                    paths.push(path);
+                }
+            }
+        }
+    }
+
+    // Try clang as well
+    if let Ok(output) = Command::new("clang").args(["-E", "-Wp,-v", "-xc", "/dev/null"]).output() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let mut in_search_list = false;
+
+        for line in stderr.lines() {
+            if line.contains("#include <...> search starts here:") {
+                in_search_list = true;
+                continue;
+            }
+            if line.contains("End of search list.") {
+                break;
+            }
+            if in_search_list {
+                let path = PathBuf::from(line.trim());
+                if path.is_dir() && !paths.contains(&path) {
+                    paths.push(path);
+                }
+            }
+        }
+    }
+
+    // macOS specific paths
+    #[cfg(target_os = "macos")]
+    {
+        // Xcode command line tools
+        let xcode_paths = [
+            "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include",
+            "/Library/Developer/CommandLineTools/usr/include",
+            "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include",
+        ];
+        for path in xcode_paths {
+            let p = PathBuf::from(path);
+            if p.is_dir() && !paths.contains(&p) {
+                paths.push(p);
+            }
+        }
+
+        // Homebrew
+        let homebrew_paths = [
+            "/opt/homebrew/include",
+            "/usr/local/include",
+        ];
+        for path in homebrew_paths {
+            let p = PathBuf::from(path);
+            if p.is_dir() && !paths.contains(&p) {
+                paths.push(p);
+            }
+        }
+    }
+
+    paths
+}
+
+/// Resolve a C/C++ include to a header file.
+/// Handles: <stdio.h>, <vector>, "myheader.h"
+pub fn resolve_cpp_include(include: &str, include_paths: &[PathBuf]) -> Option<ResolvedPackage> {
+    // Strip angle brackets or quotes
+    let header = include
+        .trim_start_matches('<')
+        .trim_end_matches('>')
+        .trim_start_matches('"')
+        .trim_end_matches('"');
+
+    // Search through include paths
+    for base_path in include_paths {
+        let full_path = base_path.join(header);
+        if full_path.is_file() {
+            return Some(ResolvedPackage {
+                path: full_path,
+                name: header.to_string(),
+                is_namespace: false,
+            });
+        }
+
+        // For C++ standard library, might be without extension
+        if !header.contains('.') {
+            // Try with common extensions
+            for ext in &["", ".h", ".hpp", ".hxx"] {
+                let with_ext = if ext.is_empty() {
+                    base_path.join(header)
+                } else {
+                    base_path.join(format!("{}{}", header, ext))
+                };
+                if with_ext.is_file() {
+                    return Some(ResolvedPackage {
+                        path: with_ext,
+                        name: header.to_string(),
+                        is_namespace: false,
+                    });
+                }
+            }
+        }
+    }
+
+    None
+}
+
+// =============================================================================
+// Java
+// =============================================================================
+
+/// Get Java version.
+pub fn get_java_version() -> Option<String> {
+    let output = Command::new("java").args(["--version"]).output().ok()?;
+
+    if output.status.success() {
+        let version_str = String::from_utf8_lossy(&output.stdout);
+        // "openjdk 17.0.1 2021-10-19" or "java 21.0.1 2023-10-17 LTS"
+        for line in version_str.lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                let version = parts[1];
+                let ver_parts: Vec<&str> = version.split('.').collect();
+                if ver_parts.len() >= 2 {
+                    return Some(format!("{}.{}", ver_parts[0], ver_parts[1]));
+                } else if ver_parts.len() == 1 {
+                    return Some(format!("{}.0", ver_parts[0]));
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Find Maven local repository.
+/// Default: ~/.m2/repository/
+pub fn find_maven_repository() -> Option<PathBuf> {
+    // Check M2_HOME or MAVEN_HOME env var
+    if let Ok(m2_home) = std::env::var("M2_HOME").or_else(|_| std::env::var("MAVEN_HOME")) {
+        let repo = PathBuf::from(m2_home).join("repository");
+        if repo.is_dir() {
+            return Some(repo);
+        }
+    }
+
+    // Default ~/.m2/repository
+    if let Ok(home) = std::env::var("HOME") {
+        let repo = PathBuf::from(home).join(".m2").join("repository");
+        if repo.is_dir() {
+            return Some(repo);
+        }
+    }
+
+    // Windows fallback
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        let repo = PathBuf::from(home).join(".m2").join("repository");
+        if repo.is_dir() {
+            return Some(repo);
+        }
+    }
+
+    None
+}
+
+/// Find Gradle cache directory.
+/// Default: ~/.gradle/caches/modules-2/files-2.1/
+pub fn find_gradle_cache() -> Option<PathBuf> {
+    // Check GRADLE_USER_HOME env var
+    if let Ok(gradle_home) = std::env::var("GRADLE_USER_HOME") {
+        let cache = PathBuf::from(gradle_home).join("caches").join("modules-2").join("files-2.1");
+        if cache.is_dir() {
+            return Some(cache);
+        }
+    }
+
+    // Default ~/.gradle/caches/modules-2/files-2.1
+    if let Ok(home) = std::env::var("HOME") {
+        let cache = PathBuf::from(home).join(".gradle").join("caches").join("modules-2").join("files-2.1");
+        if cache.is_dir() {
+            return Some(cache);
+        }
+    }
+
+    // Windows fallback
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        let cache = PathBuf::from(home).join(".gradle").join("caches").join("modules-2").join("files-2.1");
+        if cache.is_dir() {
+            return Some(cache);
+        }
+    }
+
+    None
+}
+
+/// Resolve a Java import to a source file in Maven/Gradle cache.
+/// Note: This resolves to sources JAR if available, otherwise returns the JAR path.
+pub fn resolve_java_import(import: &str, maven_repo: Option<&Path>, gradle_cache: Option<&Path>) -> Option<ResolvedPackage> {
+    // Java imports are like: com.google.gson.Gson
+    // Package structure: com/google/gson/
+    // Artifact: com.google.gson:gson:2.10.1
+
+    // For now, try to find a matching package directory
+    // Full resolution would require parsing POMs and looking up dependencies
+
+    let package_path = import.replace('.', "/");
+
+    // Try Maven first
+    if let Some(maven) = maven_repo {
+        if let Some(result) = find_java_package_in_maven(maven, &package_path, import) {
+            return Some(result);
+        }
+    }
+
+    // Try Gradle
+    if let Some(gradle) = gradle_cache {
+        if let Some(result) = find_java_package_in_gradle(gradle, &package_path, import) {
+            return Some(result);
+        }
+    }
+
+    None
+}
+
+/// Find a Java package in Maven repository.
+fn find_java_package_in_maven(maven_repo: &Path, package_path: &str, import: &str) -> Option<ResolvedPackage> {
+    // Maven structure: group/artifact/version/artifact-version.jar
+    // e.g., com/google/gson/gson/2.10.1/gson-2.10.1.jar
+    //       com/google/gson/gson/2.10.1/gson-2.10.1-sources.jar
+
+    // Try to find a matching directory structure
+    let target_dir = maven_repo.join(package_path);
+    if target_dir.is_dir() {
+        // This might be the artifact directory, look for version subdirs
+        return find_maven_artifact(&target_dir, import);
+    }
+
+    // Try parent paths (package path might include class name)
+    let parts: Vec<&str> = package_path.split('/').collect();
+    for i in (2..parts.len()).rev() {
+        let dir_path = parts[..i].join("/");
+        let artifact = parts[i - 1];
+        let search_dir = maven_repo.join(&dir_path);
+
+        if search_dir.is_dir() {
+            if let Some(result) = find_maven_artifact(&search_dir, import) {
+                return Some(result);
+            }
+
+            // Also try the artifact name directly under group
+            let artifact_dir = search_dir.join(artifact);
+            if artifact_dir.is_dir() {
+                if let Some(result) = find_maven_artifact(&artifact_dir, import) {
+                    return Some(result);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Find an artifact in a Maven artifact directory.
+fn find_maven_artifact(artifact_dir: &Path, import: &str) -> Option<ResolvedPackage> {
+    // Look for version subdirectories
+    let versions: Vec<_> = std::fs::read_dir(artifact_dir).ok()?
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .collect();
+
+    if versions.is_empty() {
+        return None;
+    }
+
+    // Sort by version and take the latest
+    let mut versions: Vec<_> = versions.into_iter().collect();
+    versions.sort_by(|a, b| {
+        let a_name = a.file_name().to_string_lossy().to_string();
+        let b_name = b.file_name().to_string_lossy().to_string();
+        version_cmp(&a_name, &b_name)
+    });
+
+    let version_dir = versions.last()?.path();
+    let artifact_name = artifact_dir.file_name()?.to_string_lossy().to_string();
+    let version = version_dir.file_name()?.to_string_lossy().to_string();
+
+    // Prefer sources JAR
+    let sources_jar = version_dir.join(format!("{}-{}-sources.jar", artifact_name, version));
+    if sources_jar.is_file() {
+        return Some(ResolvedPackage {
+            path: sources_jar,
+            name: import.to_string(),
+            is_namespace: false,
+        });
+    }
+
+    // Fall back to regular JAR
+    let jar = version_dir.join(format!("{}-{}.jar", artifact_name, version));
+    if jar.is_file() {
+        return Some(ResolvedPackage {
+            path: jar,
+            name: import.to_string(),
+            is_namespace: false,
+        });
+    }
+
+    None
+}
+
+/// Find a Java package in Gradle cache.
+fn find_java_package_in_gradle(gradle_cache: &Path, package_path: &str, import: &str) -> Option<ResolvedPackage> {
+    // Gradle structure: group/artifact/version/hash/artifact-version.jar
+    // e.g., com.google.gson/gson/2.10.1/abc123/gson-2.10.1.jar
+
+    // Convert package path to group (dots for gradle)
+    let parts: Vec<&str> = package_path.split('/').collect();
+
+    for i in (2..parts.len()).rev() {
+        // Try group.artifact format
+        let group = parts[..i - 1].join(".");
+        let artifact = parts[i - 1];
+        let group_dir = gradle_cache.join(&group);
+
+        if group_dir.is_dir() {
+            let artifact_dir = group_dir.join(artifact);
+            if artifact_dir.is_dir() {
+                if let Some(result) = find_gradle_artifact(&artifact_dir, import) {
+                    return Some(result);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Find an artifact in a Gradle artifact directory.
+fn find_gradle_artifact(artifact_dir: &Path, import: &str) -> Option<ResolvedPackage> {
+    // Look for version subdirectories
+    let versions: Vec<_> = std::fs::read_dir(artifact_dir).ok()?
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .collect();
+
+    if versions.is_empty() {
+        return None;
+    }
+
+    // Sort by version and take the latest
+    let mut versions: Vec<_> = versions.into_iter().collect();
+    versions.sort_by(|a, b| {
+        let a_name = a.file_name().to_string_lossy().to_string();
+        let b_name = b.file_name().to_string_lossy().to_string();
+        version_cmp(&a_name, &b_name)
+    });
+
+    let version_dir = versions.last()?.path();
+
+    // Gradle has hash subdirectories
+    let hash_dirs: Vec<_> = std::fs::read_dir(&version_dir).ok()?
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .collect();
+
+    for hash_dir in hash_dirs {
+        let hash_path = hash_dir.path();
+
+        // Look for sources JAR first
+        if let Ok(entries) = std::fs::read_dir(&hash_path) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.ends_with("-sources.jar") {
+                    return Some(ResolvedPackage {
+                        path: entry.path(),
+                        name: import.to_string(),
+                        is_namespace: false,
+                    });
+                }
+            }
+        }
+
+        // Fall back to regular JAR
+        if let Ok(entries) = std::fs::read_dir(&hash_path) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.ends_with(".jar") && !name.ends_with("-sources.jar") && !name.ends_with("-javadoc.jar") {
+                    return Some(ResolvedPackage {
+                        path: entry.path(),
+                        name: import.to_string(),
+                        is_namespace: false,
+                    });
+                }
+            }
+        }
+    }
+
+    None
+}
+
+// =============================================================================
+// Deno
+// =============================================================================
+
+/// Get Deno version.
+pub fn get_deno_version() -> Option<String> {
+    let output = Command::new("deno").args(["--version"]).output().ok()?;
+
+    if output.status.success() {
+        let version_str = String::from_utf8_lossy(&output.stdout);
+        // "deno 1.40.0 (release, ...)" -> "1.40"
+        for line in version_str.lines() {
+            if line.starts_with("deno ") {
+                let version_part = line.strip_prefix("deno ")?;
+                let parts: Vec<&str> = version_part.split('.').collect();
+                if parts.len() >= 2 {
+                    // First part might have extra chars, get just the number
+                    let major = parts[0].trim();
+                    let minor = parts[1].chars().take_while(|c| c.is_ascii_digit()).collect::<String>();
+                    return Some(format!("{}.{}", major, minor));
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Find Deno cache directory.
+/// Structure: $DENO_DIR or ~/.cache/deno (Linux) / ~/Library/Caches/deno (macOS)
+pub fn find_deno_cache() -> Option<PathBuf> {
+    // Check DENO_DIR env var first
+    if let Ok(deno_dir) = std::env::var("DENO_DIR") {
+        let cache = PathBuf::from(deno_dir);
+        if cache.is_dir() {
+            return Some(cache);
+        }
+    }
+
+    // Platform-specific defaults
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            let cache = PathBuf::from(home).join("Library/Caches/deno");
+            if cache.is_dir() {
+                return Some(cache);
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // XDG_CACHE_HOME or ~/.cache
+        if let Ok(xdg_cache) = std::env::var("XDG_CACHE_HOME") {
+            let cache = PathBuf::from(xdg_cache).join("deno");
+            if cache.is_dir() {
+                return Some(cache);
+            }
+        }
+        if let Ok(home) = std::env::var("HOME") {
+            let cache = PathBuf::from(home).join(".cache/deno");
+            if cache.is_dir() {
+                return Some(cache);
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+            let cache = PathBuf::from(local_app_data).join("deno");
+            if cache.is_dir() {
+                return Some(cache);
+            }
+        }
+    }
+
+    // Fallback: try common paths
+    if let Ok(home) = std::env::var("HOME") {
+        for path in &[".cache/deno", "Library/Caches/deno"] {
+            let cache = PathBuf::from(&home).join(path);
+            if cache.is_dir() {
+                return Some(cache);
+            }
+        }
+    }
+
+    None
+}
+
+/// Resolve a Deno URL import to its cached location.
+/// Handles: https://deno.land/std@version/path, https://esm.sh/package, npm:package
+pub fn resolve_deno_import(import_url: &str, cache: &Path) -> Option<ResolvedPackage> {
+    // Handle npm: imports
+    if let Some(npm_spec) = import_url.strip_prefix("npm:") {
+        return resolve_deno_npm_import(npm_spec, cache);
+    }
+
+    // Handle https:// imports
+    if import_url.starts_with("https://") || import_url.starts_with("http://") {
+        return resolve_deno_url_import(import_url, cache);
+    }
+
+    None
+}
+
+/// Resolve a Deno npm: import.
+fn resolve_deno_npm_import(npm_spec: &str, cache: &Path) -> Option<ResolvedPackage> {
+    // npm:express@4 or npm:@types/node@20
+    // Deno stores npm packages in cache/npm/registry.npmjs.org/package/version/
+
+    let npm_cache = cache.join("npm").join("registry.npmjs.org");
+    if !npm_cache.is_dir() {
+        return None;
+    }
+
+    // Parse package name and version
+    let (pkg_name, version_spec) = if npm_spec.starts_with('@') {
+        // Scoped package: @scope/name@version
+        let parts: Vec<&str> = npm_spec.splitn(3, '/').collect();
+        if parts.len() < 2 {
+            return None;
+        }
+        let scope = parts[0];
+        let name_ver = parts[1];
+        let (name, ver) = if let Some(idx) = name_ver.rfind('@') {
+            (&name_ver[..idx], Some(&name_ver[idx + 1..]))
+        } else {
+            (name_ver, None)
+        };
+        (format!("{}/{}", scope, name), ver)
+    } else {
+        // Regular package: name@version
+        if let Some(idx) = npm_spec.rfind('@') {
+            (npm_spec[..idx].to_string(), Some(&npm_spec[idx + 1..]))
+        } else {
+            (npm_spec.to_string(), None)
+        }
+    };
+
+    // Find the package in cache
+    let pkg_path = if pkg_name.starts_with('@') {
+        // Scoped: npm/registry.npmjs.org/@scope/name/version
+        let parts: Vec<&str> = pkg_name.splitn(2, '/').collect();
+        npm_cache.join(parts[0]).join(parts[1])
+    } else {
+        npm_cache.join(&pkg_name)
+    };
+
+    if !pkg_path.is_dir() {
+        return None;
+    }
+
+    // Find matching version directory
+    let version_dir = find_best_version_dir(&pkg_path, version_spec)?;
+
+    // Look for entry point
+    let entry = find_node_entry_in_dir(&version_dir)?;
+
+    Some(ResolvedPackage {
+        path: entry,
+        name: pkg_name,
+        is_namespace: false,
+    })
+}
+
+/// Resolve a Deno https:// URL import.
+fn resolve_deno_url_import(url: &str, cache: &Path) -> Option<ResolvedPackage> {
+    // https://deno.land/std@0.200.0/path/mod.ts
+    // -> cache/deps/https/deno.land/<hash>
+    // Deno uses content hashing, so we need to find by metadata
+
+    let deps_dir = cache.join("deps");
+
+    // Parse URL
+    let url_parsed = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))?;
+    let scheme = if url.starts_with("https://") { "https" } else { "http" };
+
+    let scheme_dir = deps_dir.join(scheme);
+    if !scheme_dir.is_dir() {
+        return None;
+    }
+
+    // Get host and path
+    let (host, path) = url_parsed.split_once('/')?;
+    let host_dir = scheme_dir.join(host);
+    if !host_dir.is_dir() {
+        return None;
+    }
+
+    // Deno uses hashed filenames, but stores metadata files
+    // Look for a file whose .metadata.json contains our URL
+    if let Ok(entries) = std::fs::read_dir(&host_dir) {
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+
+            // Skip metadata files, look for actual cached files
+            if name.ends_with(".metadata.json") {
+                continue;
+            }
+
+            // Check if there's a corresponding metadata file
+            let meta_path = host_dir.join(format!("{}.metadata.json", name));
+            if meta_path.is_file() {
+                if let Ok(meta_content) = std::fs::read_to_string(&meta_path) {
+                    // Metadata contains {"url": "...", ...}
+                    if meta_content.contains(url) {
+                        return Some(ResolvedPackage {
+                            path: entry_path,
+                            name: format!("{}/{}", host, path),
+                            is_namespace: false,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Find the best matching version directory.
+fn find_best_version_dir(pkg_path: &Path, version_spec: Option<&str>) -> Option<PathBuf> {
+    let entries: Vec<_> = std::fs::read_dir(pkg_path).ok()?.flatten().collect();
+
+    if let Some(spec) = version_spec {
+        // Try exact match first
+        let exact = pkg_path.join(spec);
+        if exact.is_dir() {
+            return Some(exact);
+        }
+
+        // Try prefix match (e.g., "4" matches "4.18.2")
+        for entry in &entries {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(spec) && entry.path().is_dir() {
+                return Some(entry.path());
+            }
+        }
+    }
+
+    // Return latest (last in sorted order)
+    let mut versions: Vec<_> = entries
+        .into_iter()
+        .filter(|e| e.path().is_dir())
+        .collect();
+    versions.sort_by(|a, b| {
+        let a_name = a.file_name().to_string_lossy().to_string();
+        let b_name = b.file_name().to_string_lossy().to_string();
+        version_cmp(&a_name, &b_name)
+    });
+    versions.last().map(|e| e.path())
+}
+
+/// Compare version strings (simple semver-like comparison).
+pub fn version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    let a_parts: Vec<u32> = a.split('.').filter_map(|p| p.parse().ok()).collect();
+    let b_parts: Vec<u32> = b.split('.').filter_map(|p| p.parse().ok()).collect();
+
+    for (ap, bp) in a_parts.iter().zip(b_parts.iter()) {
+        match ap.cmp(bp) {
+            std::cmp::Ordering::Equal => continue,
+            other => return other,
+        }
+    }
+    a_parts.len().cmp(&b_parts.len())
+}
+
+/// Find entry point in a node-style package directory.
+fn find_node_entry_in_dir(dir: &Path) -> Option<PathBuf> {
+    // Try package.json
+    let pkg_json = dir.join("package.json");
+    if pkg_json.is_file() {
+        if let Ok(content) = std::fs::read_to_string(&pkg_json) {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                // Try module, main
+                for field in &["module", "main"] {
+                    if let Some(entry) = json.get(field).and_then(|v| v.as_str()) {
+                        let path = dir.join(entry.trim_start_matches("./"));
+                        if path.is_file() {
+                            return Some(path);
+                        }
+                        // Try with .js extension
+                        let with_ext = path.with_extension("js");
+                        if with_ext.is_file() {
+                            return Some(with_ext);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback to index files
+    for ext in &["js", "mjs", "cjs", "ts"] {
+        let index = dir.join(format!("index.{}", ext));
+        if index.is_file() {
+            return Some(index);
+        }
+    }
+
+    None
+}
+
+// =============================================================================
 // Global Package Index Database
 // =============================================================================
 
