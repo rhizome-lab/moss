@@ -36,9 +36,12 @@ First release. See `docs/` for design docs and `README.md` for usage.
 - Global package index database: `~/.cache/moss/packages.db` with version ranges (major, minor)
 - PackageIndex API: insert/find packages and symbols with version filtering
 - Lazy indexing: packages indexed on first resolution, cached for future lookups
-- `moss index-packages` command: pre-index packages with `--only=python,go,js,rust`
+- `moss index-packages` command: pre-index packages with `--only=python,go,js,deno,java,cpp,rust`
 - JavaScript/TypeScript: node_modules resolution with package.json parsing (exports/module/main)
 - Rust: cargo registry resolution in `~/.cargo/registry/src/`
+- Deno: URL import cache resolution (`~/.cache/deno/deps/`) and npm: imports
+- Java: Maven repository (`~/.m2/repository/`) and Gradle cache resolution
+- C/C++: System include path detection and header indexing
 
 **Additional Analysis Modules** (Dec 24 2025)
 - Binary detection in call graph: detects binary files by null byte check (8KB sample)
