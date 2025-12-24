@@ -32,7 +32,8 @@ Phase 3 - Integrate (in progress):
   - Python, JavaScript, TypeScript, Rust, Go, Java, Ruby, C, C++
   - Scala, Markdown, JSON, YAML, TOML
   - Vue remains on legacy (needs script element parsing)
-- [ ] Refactor `deps.rs` to use trait
+- [x] Add extract_imports/extract_exports to LanguageSupport trait
+- [x] Refactor `deps.rs` to use trait (Python, Rust, JS, Go migrated)
 - [ ] Refactor `complexity.rs`, `scopes.rs`, `symbols.rs`
 - [ ] Refactor `anchors.rs`, `edit.rs`, `cfg.rs`
 - [ ] Delete old language-specific code from moss-cli
