@@ -68,7 +68,9 @@ pub fn cmd_view(
                 return 1;
             }
         };
-        return cmd_view_calls(&root, target, show_calls, show_called_by, json);
+        // show_called_by → find callers (what calls this)
+        // show_calls → find callees (what this calls)
+        return cmd_view_calls(&root, target, show_called_by, show_calls, json);
     }
 
     // --focus requires a file target
@@ -241,8 +243,8 @@ fn cmd_view_calls(
             format!("Callees of {}", symbol)
         };
         println!("{}:", header);
-        for (file, sym, line, direction) in &results {
-            println!("  {}:{}:{} ({})", file, line, sym, direction);
+        for (file, sym, line, _direction) in &results {
+            println!("  {}:{}:{}", file, line, sym);
         }
     }
 
