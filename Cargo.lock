@@ -1288,6 +1288,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "moss-languages"
+version = "0.1.0"
+dependencies = [
+ "arborium",
+ "moss-core",
+]
+
+[[package]]
 name = "notify"
 version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,0 +1,63 @@
+[package]
+name = "moss-languages"
+version = "0.1.0"
+edition = "2021"
+description = "Language support traits and implementations for moss"
+
+[dependencies]
+moss-core = { path = "../moss-core" }
+arborium = { workspace = true }
+
+[features]
+default = ["all-languages"]
+
+# Meta-features
+all-languages = [
+    "lang-python", "lang-rust", "lang-javascript", "lang-typescript",
+    "lang-go", "lang-java", "lang-c", "lang-cpp", "lang-ruby",
+    "lang-scala", "lang-vue", "lang-markdown", "lang-json", "lang-yaml",
+    "lang-toml", "lang-html", "lang-css", "lang-bash",
+]
+
+# Tier 1: Most common languages
+tier1 = [
+    "lang-python", "lang-rust", "lang-javascript", "lang-typescript",
+    "lang-go", "lang-java", "lang-cpp",
+]
+
+# Individual language features
+lang-python = ["arborium/lang-python"]
+lang-rust = ["arborium/lang-rust"]
+lang-javascript = ["arborium/lang-javascript"]
+lang-typescript = ["arborium/lang-typescript"]
+lang-go = ["arborium/lang-go"]
+lang-java = ["arborium/lang-java"]
+lang-c = ["arborium/lang-c"]
+lang-cpp = ["arborium/lang-cpp"]
+lang-ruby = ["arborium/lang-ruby"]
+lang-scala = ["arborium/lang-scala"]
+lang-vue = ["arborium/lang-vue"]
+lang-markdown = ["arborium/lang-markdown"]
+lang-json = ["arborium/lang-json"]
+lang-yaml = ["arborium/lang-yaml"]
+lang-toml = ["arborium/lang-toml"]
+lang-html = ["arborium/lang-html"]
+lang-css = ["arborium/lang-css"]
+lang-bash = ["arborium/lang-bash"]
+
+# Future high-priority languages (commented until implemented)
+# lang-kotlin = ["arborium/lang-kotlin"]
+# lang-swift = ["arborium/lang-swift"]
+# lang-dart = ["arborium/lang-dart"]
+# lang-csharp = ["arborium/lang-c-sharp"]
+# lang-fsharp = ["arborium/lang-fsharp"]
+# lang-php = ["arborium/lang-php"]
+# lang-elixir = ["arborium/lang-elixir"]
+# lang-zig = ["arborium/lang-zig"]
+# lang-lua = ["arborium/lang-lua"]
+# lang-sql = ["arborium/lang-sql"]
+# lang-graphql = ["arborium/lang-graphql"]
+# lang-dockerfile = ["arborium/lang-dockerfile"]
+# lang-hcl = ["arborium/lang-hcl"]
+# lang-svelte = ["arborium/lang-svelte"]
+# lang-scss = ["arborium/lang-scss"]
