@@ -3,6 +3,7 @@
 //! Builds a simplified control flow graph for functions.
 
 use moss_core::{tree_sitter, Language, Parsers};
+use moss_languages::{get_support, LanguageSupport};
 use std::path::Path;
 
 /// Type of control flow edge
@@ -171,6 +172,24 @@ impl CfgBuilder {
             graphs,
             file_path: path.to_string_lossy().to_string(),
         }
+    }
+
+    /// Check if a node kind is a control flow node using the trait
+    #[allow(dead_code)]
+    fn is_control_flow(&self, lang: Language, kind: &str) -> bool {
+        if let Some(support) = get_support(lang) {
+            return support.control_flow_kinds().contains(&kind);
+        }
+        false
+    }
+
+    /// Check if a node kind is a function using the trait
+    #[allow(dead_code)]
+    fn is_function(&self, lang: Language, kind: &str) -> bool {
+        if let Some(support) = get_support(lang) {
+            return support.function_kinds().contains(&kind);
+        }
+        false
     }
 
     fn new_node(

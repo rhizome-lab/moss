@@ -71,6 +71,19 @@ impl LanguageSupport for RustSupport {
         ]
     }
 
+    fn control_flow_kinds(&self) -> &'static [&'static str] {
+        &[
+            "if_expression",
+            "match_expression",
+            "for_expression",
+            "while_expression",
+            "loop_expression",
+            "return_expression",
+            "break_expression",
+            "continue_expression",
+        ]
+    }
+
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
 

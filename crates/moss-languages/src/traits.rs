@@ -166,6 +166,14 @@ pub trait LanguageSupport: Send + Sync {
         &[]
     }
 
+    // === Control Flow ===
+
+    /// Nodes that affect control flow (for CFG analysis)
+    /// Includes: if, for, while, return, break, continue, try, match
+    fn control_flow_kinds(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     // === Complexity ===
 
     /// Nodes that increase cyclomatic complexity

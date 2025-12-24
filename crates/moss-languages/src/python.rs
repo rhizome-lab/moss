@@ -81,6 +81,22 @@ impl LanguageSupport for PythonSupport {
         ]
     }
 
+    fn control_flow_kinds(&self) -> &'static [&'static str] {
+        &[
+            "if_statement",
+            "for_statement",
+            "while_statement",
+            "try_statement",
+            "with_statement",
+            "match_statement",
+            "return_statement",
+            "break_statement",
+            "continue_statement",
+            "raise_statement",
+            "assert_statement",
+        ]
+    }
+
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
 
