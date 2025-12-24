@@ -4,7 +4,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Add moss-languages feature flags to moss-cli Cargo.toml
 - Session analysis: detect correction patterns
 - Complete daemon integration
 

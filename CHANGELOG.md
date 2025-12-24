@@ -4,6 +4,12 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Language Feature Flags
+
+Added feature flags to moss-cli for selective language support:
+- `all-languages` (default), `tier1`, individual `lang-*` flags
+- Enables smaller builds: `--no-default-features --features lang-python,lang-rust`
+
 ### Command Module Extraction
 
 Completed extraction of all commands from main.rs to individual modules:
