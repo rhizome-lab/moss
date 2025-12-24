@@ -4,8 +4,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Delete legacy symbol parsing code from `symbols.rs` (marked with `#[allow(dead_code)]`)
-- Clean up legacy extraction code in `skeleton.rs`, `deps.rs`, `complexity.rs`
+- Refactor `anchors.rs` to use trait (similar to symbols.rs, should be straightforward)
+- Refactor `scopes.rs` to use trait (add scope_kinds, extract_binding to trait)
+- Refactor `edit.rs` to use trait (add byte positions to Symbol)
+- Refactor `cfg.rs` to use trait (add control_flow_kinds to trait)
+- Delete legacy code from `symbols.rs`, `skeleton.rs`, `deps.rs`, `complexity.rs`
 - Session analysis: detect correction patterns ("You're right", "Good point")
 - Complete daemon integration (FileIndex API methods currently unused)
 
@@ -27,7 +30,7 @@ Phase 2 - Port existing languages: ✅
 - [x] Port Go, Java, C, C++, Ruby, Scala, Vue
 - [x] Port config formats: JSON, YAML, TOML, Markdown
 
-Phase 3 - Integrate: ✅
+Phase 3 - Integrate (in progress):
 - [x] Add trait infrastructure to `skeleton.rs` (extract_with_trait, convert_symbol)
 - [x] Improve trait impls to match legacy behavior (Rust impl blocks, Go types, Java visibility)
 - [x] Migrate languages to trait-based extraction:
@@ -38,8 +41,10 @@ Phase 3 - Integrate: ✅
 - [x] Refactor `deps.rs` to use trait (Python, Rust, JS, Go migrated)
 - [x] Refactor `complexity.rs` to use trait (complexity_nodes method)
 - [x] Refactor `symbols.rs` to use trait
-- [x] Deferred: `scopes.rs` (needs scope extraction trait methods, Python/Rust only)
-- [x] Deferred: `anchors.rs`, `edit.rs`, `cfg.rs` (specialized, Python/Rust only)
+- [ ] Refactor `anchors.rs` to use trait (similar to symbols.rs)
+- [ ] Refactor `scopes.rs` to use trait (add scope_kinds, extract_binding)
+- [ ] Refactor `edit.rs` to use trait (add byte positions to Symbol)
+- [ ] Refactor `cfg.rs` to use trait (add control_flow_kinds)
 - [ ] Delete old language-specific code from moss-cli
 
 Phase 4 - Expand:
@@ -62,13 +67,6 @@ Phase 4 - Expand:
 
 ## Deferred
 
-**Trait migration for specialized modules** (Python/Rust only, need new trait methods):
-- `scopes.rs` - needs scope/binding extraction trait methods
-- `anchors.rs` - needs constant/import anchor extraction
-- `edit.rs` - needs byte position and indentation info in Symbol
-- `cfg.rs` - needs control flow node types in trait
-
-**Other:**
 - Driver integration improvements
 - Python edit separate targeting (LLM-based)
 - Remaining docs: prior-art.md, hybrid-loops.md
