@@ -4,13 +4,13 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Continue splitting main.rs (~3960 lines remaining) into command modules:
+- Continue splitting main.rs (~3890 lines remaining) into command modules:
   - [x] commands/update.rs: cmd_update + self-update helpers
   - [x] commands/index.rs: cmd_index_packages, cmd_index_stats, cmd_list_files, cmd_reindex
   - [x] commands/daemon.rs: cmd_daemon + DaemonAction enum
+  - [x] commands/search.rs: cmd_grep, cmd_search_tree (partial - cmd_find_symbols, cmd_path need Profiler)
   - [ ] commands/view.rs: cmd_view*, cmd_skeleton, cmd_tree, cmd_context, cmd_expand
   - [ ] commands/analyze.rs: cmd_health, cmd_overview, cmd_complexity, cmd_cfg, cmd_anchors, cmd_scopes
-  - [ ] commands/search.rs: cmd_grep, cmd_find_symbols, cmd_search_tree, cmd_path
   - [ ] commands/deps.rs: cmd_symbols, cmd_callees, cmd_callers, cmd_deps, cmd_imports
   - [ ] commands/edit.rs: cmd_edit
 - Add moss-languages feature flags to moss-cli Cargo.toml
