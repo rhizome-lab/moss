@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use moss_core::get_moss_dir;
 use moss_languages::external_packages;
+use moss_languages::Language;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -5157,8 +5158,10 @@ fn index_python_packages(
 
     let mut extractor = skeleton::SkeletonExtractor::new();
 
+    let python = moss_languages::python::Python;
+
     // Index stdlib
-    if let Some(stdlib) = moss_languages::python::find_python_stdlib(root) {
+    if let Some(stdlib) = python.find_stdlib(root) {
         if !json {
             println!("  Stdlib: {}", stdlib.display());
         }
@@ -5167,26 +5170,20 @@ fn index_python_packages(
                 let path = entry.path();
                 let name = entry.file_name().to_string_lossy().to_string();
 
-                // Skip private modules and __pycache__
-                if name.starts_with('_') || name == "__pycache__" {
+                if python.should_skip_package_entry(&name, path.is_dir()) {
                     continue;
                 }
 
-                // Skip non-Python content
-                if path.is_file() && !name.ends_with(".py") {
-                    continue;
-                }
-
-                let module_name = name.trim_end_matches(".py");
+                let module_name = python.package_module_name(&name);
 
                 // Skip if already indexed
-                if let Ok(true) = index.is_indexed("python", module_name) {
+                if let Ok(true) = index.is_indexed("python", &module_name) {
                     continue;
                 }
 
                 let pkg_id = match index.insert_package(
                     "python",
-                    module_name,
+                    &module_name,
                     &path.to_string_lossy(),
                     min_version,
                     version, // stdlib is version-specific
@@ -5212,30 +5209,20 @@ fn index_python_packages(
                 let path = entry.path();
                 let name = entry.file_name().to_string_lossy().to_string();
 
-                // Skip private, dist-info, egg-info, __pycache__
-                if name.starts_with('_')
-                    || name.ends_with(".dist-info")
-                    || name.ends_with(".egg-info")
-                    || name == "__pycache__"
-                {
+                if python.should_skip_package_entry(&name, path.is_dir()) {
                     continue;
                 }
 
-                // Skip non-Python content
-                if path.is_file() && !name.ends_with(".py") {
-                    continue;
-                }
-
-                let module_name = name.trim_end_matches(".py");
+                let module_name = python.package_module_name(&name);
 
                 // Skip if already indexed
-                if let Ok(true) = index.is_indexed("python", module_name) {
+                if let Ok(true) = index.is_indexed("python", &module_name) {
                     continue;
                 }
 
                 let pkg_id = match index.insert_package(
                     "python",
-                    module_name,
+                    &module_name,
                     &path.to_string_lossy(),
                     min_version,
                     None, // packages may work with newer versions
@@ -5286,6 +5273,7 @@ fn index_go_packages(
     stats: &mut IndexPackagesStats,
     json: bool,
 ) {
+    let go = moss_languages::go::Go;
     let version = moss_languages::go::get_go_version()
         .and_then(|v| external_packages::Version::parse(&v));
 
@@ -5298,11 +5286,11 @@ fn index_go_packages(
     let mut extractor = skeleton::SkeletonExtractor::new();
 
     // Index stdlib
-    if let Some(stdlib) = moss_languages::go::find_go_stdlib() {
+    if let Some(stdlib) = go.find_stdlib(Path::new(".")) {
         if !json {
             println!("  Stdlib: {}", stdlib.display());
         }
-        index_go_stdlib_recursive(&mut extractor, index, &stdlib, "", min_version, version, stats);
+        index_go_stdlib_recursive(&go, &mut extractor, index, &stdlib, "", min_version, version, stats);
     }
 
     // Index mod cache (just top-level for now - full recursive would be slow)
@@ -5317,6 +5305,7 @@ fn index_go_packages(
 
 /// Recursively index Go stdlib packages.
 fn index_go_stdlib_recursive(
+    go: &moss_languages::go::Go,
     extractor: &mut skeleton::SkeletonExtractor,
     index: &external_packages::PackageIndex,
     base: &Path,
@@ -5332,21 +5321,21 @@ fn index_go_stdlib_recursive(
     for entry in entries.flatten() {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
+        let is_dir = path.is_dir();
 
-        // Skip hidden, vendor, internal, testdata
-        if name.starts_with('.') || name == "vendor" || name == "testdata" {
+        if go.should_skip_package_entry(&name, is_dir) {
             continue;
         }
 
-        if path.is_dir() {
+        if is_dir {
             // Recurse into subdirectories
             let sub_prefix = if prefix.is_empty() {
                 name.clone()
             } else {
                 format!("{}/{}", prefix, name)
             };
-            index_go_stdlib_recursive(extractor, index, &path, &sub_prefix, min_version, max_version, stats);
-        } else if name.ends_with(".go") && !name.ends_with("_test.go") {
+            index_go_stdlib_recursive(go, extractor, index, &path, &sub_prefix, min_version, max_version, stats);
+        } else {
             has_go_files = true;
         }
     }
@@ -5375,13 +5364,11 @@ fn index_go_stdlib_recursive(
         if let Ok(entries) = std::fs::read_dir(base) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().map_or(false, |e| e == "go") {
-                    let name = path.file_name().unwrap_or_default().to_string_lossy();
-                    if !name.ends_with("_test.go") {
-                        if let Ok(content) = std::fs::read_to_string(&path) {
-                            let result = extractor.extract(&path, &content);
-                            stats.go_symbols += count_and_insert_symbols(index, pkg_id, &result.symbols);
-                        }
+                let name = entry.file_name().to_string_lossy().to_string();
+                if !go.should_skip_package_entry(&name, false) {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        let result = extractor.extract(&path, &content);
+                        stats.go_symbols += count_and_insert_symbols(index, pkg_id, &result.symbols);
                     }
                 }
             }
@@ -5396,6 +5383,7 @@ fn index_js_packages(
     stats: &mut IndexPackagesStats,
     json: bool,
 ) {
+    let js = moss_languages::javascript::JavaScript;
     let version = moss_languages::ecmascript::get_node_version()
         .and_then(|v| external_packages::Version::parse(&v));
 
@@ -5403,7 +5391,7 @@ fn index_js_packages(
         println!("Indexing JavaScript packages (version {:?})...", version);
     }
 
-    let node_modules = match moss_languages::ecmascript::find_node_modules(root) {
+    let node_modules = match js.find_package_cache(root) {
         Some(nm) => nm,
         None => {
             if !json {
@@ -5425,8 +5413,8 @@ fn index_js_packages(
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
 
-            // Skip hidden and .bin
-            if name.starts_with('.') || name == ".bin" {
+            // Skip hidden dirs (but not scoped packages starting with @)
+            if js.should_skip_package_entry(&name, path.is_dir()) && !name.starts_with('@') {
                 continue;
             }
 
@@ -6049,6 +6037,7 @@ fn index_cpp_packages(
     stats: &mut IndexPackagesStats,
     json: bool,
 ) {
+    let cpp = moss_languages::cpp::Cpp;
     let version = moss_languages::c_cpp::get_gcc_version()
         .and_then(|v| external_packages::Version::parse(&v));
 
@@ -6076,12 +6065,13 @@ fn index_cpp_packages(
 
     // Index headers from each include path
     for include_path in &include_paths {
-        index_cpp_directory(index, include_path, include_path, min_version, &mut extractor, stats);
+        index_cpp_directory(&cpp, index, include_path, include_path, min_version, &mut extractor, stats);
     }
 }
 
 /// Recursively index a C/C++ include directory.
 fn index_cpp_directory(
+    cpp: &moss_languages::cpp::Cpp,
     index: &external_packages::PackageIndex,
     base_path: &Path,
     current: &Path,
@@ -6097,15 +6087,15 @@ fn index_cpp_directory(
     for entry in entries.flatten() {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
+        let is_dir = path.is_dir();
 
-        // Skip hidden directories and certain system dirs
-        if name.starts_with('.') || name == "bits" {
+        if cpp.should_skip_package_entry(&name, is_dir) {
             continue;
         }
 
-        if path.is_dir() {
-            index_cpp_directory(index, base_path, &path, min_version, extractor, stats);
-        } else if is_cpp_header(&name) {
+        if is_dir {
+            index_cpp_directory(cpp, index, base_path, &path, min_version, extractor, stats);
+        } else {
             // Get relative path from base
             let rel_path = path.strip_prefix(base_path)
                 .map(|p| p.to_string_lossy().to_string())
@@ -6138,24 +6128,13 @@ fn index_cpp_directory(
     }
 }
 
-/// Check if a file is a C/C++ header.
-fn is_cpp_header(name: &str) -> bool {
-    // Standard C/C++ headers (no extension like <vector>, <iostream>)
-    // or explicit extensions
-    name.ends_with(".h")
-        || name.ends_with(".hpp")
-        || name.ends_with(".hxx")
-        || name.ends_with(".hh")
-        // C++ standard library headers (no extension)
-        || (!name.contains('.') && !name.contains('-') && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
-}
-
 /// Index Rust crates from cargo registry.
 fn index_rust_packages(
     index: &external_packages::PackageIndex,
     stats: &mut IndexPackagesStats,
     json: bool,
 ) {
+    let rust = moss_languages::rust::Rust;
     let version = moss_languages::rust::get_rust_version()
         .and_then(|v| external_packages::Version::parse(&v));
 
@@ -6163,7 +6142,7 @@ fn index_rust_packages(
         println!("Indexing Rust crates (version {:?})...", version);
     }
 
-    let registry = match moss_languages::rust::find_cargo_registry() {
+    let registry = match rust.find_package_cache(Path::new(".")) {
         Some(r) => r,
         None => {
             if !json {

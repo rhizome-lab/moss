@@ -173,9 +173,20 @@ impl Language for Cpp {
     }
 
     fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
-        use crate::traits::{skip_dotfiles, has_extension};
+        use crate::traits::skip_dotfiles;
         if skip_dotfiles(name) { return true; }
-        !is_dir && !has_extension(name, &["cpp", "hpp", "cc", "hh", "cxx", "hxx", "h"])
+        // Skip the "bits" directory (C++ internal headers)
+        if is_dir && name == "bits" { return true; }
+        if is_dir { return false; }
+        // Check if it's a valid header: explicit extensions or extensionless stdlib headers
+        let is_header = name.ends_with(".h")
+            || name.ends_with(".hpp")
+            || name.ends_with(".hxx")
+            || name.ends_with(".hh")
+            // C++ standard library headers (no extension, like vector, iostream)
+            || (!name.contains('.') && !name.contains('-')
+                && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'));
+        !is_header
     }
 }
 
