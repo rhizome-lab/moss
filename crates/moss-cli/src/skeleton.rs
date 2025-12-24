@@ -253,7 +253,63 @@ impl SkeletonExtractor {
                     self.extract_legacy(lang, content)
                 }
             }
-            // Other languages use legacy extractors (handle complex cases)
+            Some(Language::Ruby) => {
+                if let Some(support) = get_support(Language::Ruby) {
+                    self.extract_with_trait(Language::Ruby, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
+            Some(Language::C) => {
+                if let Some(support) = get_support(Language::C) {
+                    self.extract_with_trait(Language::C, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
+            Some(Language::Cpp) => {
+                if let Some(support) = get_support(Language::Cpp) {
+                    self.extract_with_trait(Language::Cpp, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
+            Some(Language::Scala) => {
+                if let Some(support) = get_support(Language::Scala) {
+                    self.extract_with_trait(Language::Scala, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
+            Some(Language::Markdown) => {
+                if let Some(support) = get_support(Language::Markdown) {
+                    self.extract_with_trait(Language::Markdown, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
+            Some(Language::Json) => {
+                if let Some(support) = get_support(Language::Json) {
+                    self.extract_with_trait(Language::Json, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
+            Some(Language::Yaml) => {
+                if let Some(support) = get_support(Language::Yaml) {
+                    self.extract_with_trait(Language::Yaml, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
+            Some(Language::Toml) => {
+                if let Some(support) = get_support(Language::Toml) {
+                    self.extract_with_trait(Language::Toml, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
+            // Rust, Go, Java use legacy extractors (need complex handling: impl blocks, type decls)
             _ => self.extract_legacy(lang, content),
         };
 
