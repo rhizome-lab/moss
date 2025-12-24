@@ -2,7 +2,7 @@
 //!
 //! Extracts function/class signatures with optional docstrings.
 
-use moss_core::{Language, Parsers};
+use moss_core::{tree_sitter, Language, Parsers};
 use std::path::Path;
 
 /// A code symbol with its signature
@@ -224,7 +224,7 @@ impl SkeletonExtractor {
     }
 
     fn extract_python(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.get(Language::Python).parse(content, None) {
+        let tree = match self.parsers.parse_lang(Language::Python, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -406,7 +406,7 @@ impl SkeletonExtractor {
     }
 
     fn extract_rust(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.get(Language::Rust).parse(content, None) {
+        let tree = match self.parsers.parse_lang(Language::Rust, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -693,7 +693,7 @@ impl SkeletonExtractor {
     }
 
     fn extract_markdown(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.get(Language::Markdown).parse(content, None) {
+        let tree = match self.parsers.parse_lang(Language::Markdown, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -834,7 +834,7 @@ impl SkeletonExtractor {
 
     // JavaScript/JSX extraction (also used for TSX)
     fn extract_javascript(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.get(Language::JavaScript).parse(content, None) {
+        let tree = match self.parsers.parse_lang(Language::JavaScript, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -843,7 +843,7 @@ impl SkeletonExtractor {
 
     // TypeScript extraction
     fn extract_typescript(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.get(Language::TypeScript).parse(content, None) {
+        let tree = match self.parsers.parse_lang(Language::TypeScript, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -998,7 +998,7 @@ impl SkeletonExtractor {
 
     // Go extraction
     fn extract_go(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.get(Language::Go).parse(content, None) {
+        let tree = match self.parsers.parse_lang(Language::Go, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -1106,7 +1106,7 @@ impl SkeletonExtractor {
 
     // Java extraction
     fn extract_java(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.get(Language::Java).parse(content, None) {
+        let tree = match self.parsers.parse_lang(Language::Java, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -1208,7 +1208,7 @@ impl SkeletonExtractor {
 
     // C extraction
     fn extract_c(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.get(Language::C).parse(content, None) {
+        let tree = match self.parsers.parse_lang(Language::C, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -1217,7 +1217,7 @@ impl SkeletonExtractor {
 
     // C++ extraction
     fn extract_cpp(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.get(Language::Cpp).parse(content, None) {
+        let tree = match self.parsers.parse_lang(Language::Cpp, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -1328,7 +1328,7 @@ impl SkeletonExtractor {
 
     // Ruby extraction
     fn extract_ruby(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.get(Language::Ruby).parse(content, None) {
+        let tree = match self.parsers.parse_lang(Language::Ruby, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -1420,7 +1420,7 @@ impl SkeletonExtractor {
     }
 
     fn extract_json(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.get(Language::Json).parse(content, None) {
+        let tree = match self.parsers.parse_lang(Language::Json, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -1497,7 +1497,7 @@ impl SkeletonExtractor {
     }
 
     fn extract_yaml(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.get(Language::Yaml).parse(content, None) {
+        let tree = match self.parsers.parse_lang(Language::Yaml, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -1573,7 +1573,7 @@ impl SkeletonExtractor {
     }
 
     fn extract_toml(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.get(Language::Toml).parse(content, None) {
+        let tree = match self.parsers.parse_lang(Language::Toml, content) {
             Some(t) => t,
             None => return Vec::new(),
         };

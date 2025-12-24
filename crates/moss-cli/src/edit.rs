@@ -1,5 +1,5 @@
+use moss_core::{tree_sitter, Language, Parsers};
 use std::path::Path;
-use tree_sitter::Parser;
 
 /// Result of finding a symbol in a file
 #[derive(Debug)]
@@ -29,39 +29,26 @@ pub struct ContainerBody {
 
 /// Editor for structural code modifications
 pub struct Editor {
-    python_parser: Parser,
-    rust_parser: Parser,
+    parsers: Parsers,
 }
 
 impl Editor {
     pub fn new() -> Self {
-        let mut python_parser = Parser::new();
-        python_parser
-            .set_language(&moss_core::tree_sitter_python::LANGUAGE.into())
-            .expect("Failed to load Python grammar");
-
-        let mut rust_parser = Parser::new();
-        rust_parser
-            .set_language(&moss_core::tree_sitter_rust::LANGUAGE.into())
-            .expect("Failed to load Rust grammar");
-
         Self {
-            python_parser,
-            rust_parser,
+            parsers: Parsers::new(),
         }
     }
 
     /// Find a symbol by name in a file
-    pub fn find_symbol(&mut self, path: &Path, content: &str, name: &str) -> Option<SymbolLocation> {
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        let tree = match ext {
-            "py" => self.python_parser.parse(content, None)?,
-            "rs" => self.rust_parser.parse(content, None)?,
+    pub fn find_symbol(&self, path: &Path, content: &str, name: &str) -> Option<SymbolLocation> {
+        let lang = Language::from_path(path)?;
+        let tree = match lang {
+            Language::Python | Language::Rust => self.parsers.parse_lang(lang, content)?,
             _ => return None,
         };
 
         let root = tree.root_node();
-        self.find_symbol_in_node(root, content, name, ext)
+        self.find_symbol_in_node(root, content, name, lang)
     }
 
     fn find_symbol_in_node(
@@ -69,17 +56,17 @@ impl Editor {
         node: tree_sitter::Node,
         content: &str,
         name: &str,
-        ext: &str,
+        lang: Language,
     ) -> Option<SymbolLocation> {
         // Check if this node is the symbol we're looking for
-        if let Some(loc) = self.check_node_is_symbol(&node, content, name, ext) {
+        if let Some(loc) = self.check_node_is_symbol(&node, content, name, lang) {
             return Some(loc);
         }
 
         // Recurse into children
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            if let Some(loc) = self.find_symbol_in_node(child, content, name, ext) {
+            if let Some(loc) = self.find_symbol_in_node(child, content, name, lang) {
                 return Some(loc);
             }
         }
@@ -92,16 +79,16 @@ impl Editor {
         node: &tree_sitter::Node,
         content: &str,
         name: &str,
-        ext: &str,
+        lang: Language,
     ) -> Option<SymbolLocation> {
         let kind = node.kind();
-        let symbol_kind = match ext {
-            "py" => match kind {
+        let symbol_kind = match lang {
+            Language::Python => match kind {
                 "function_definition" | "async_function_definition" => Some("function"),
                 "class_definition" => Some("class"),
                 _ => None,
             },
-            "rs" => match kind {
+            Language::Rust => match kind {
                 "function_item" => Some("function"),
                 "struct_item" | "enum_item" | "trait_item" => Some("class"),
                 "impl_item" => Some("impl"),
@@ -310,20 +297,19 @@ impl Editor {
 
     /// Find the body of a container symbol (class, impl block) for prepend/append
     pub fn find_container_body(
-        &mut self,
+        &self,
         path: &Path,
         content: &str,
         name: &str,
     ) -> Option<ContainerBody> {
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        let tree = match ext {
-            "py" => self.python_parser.parse(content, None)?,
-            "rs" => self.rust_parser.parse(content, None)?,
+        let lang = Language::from_path(path)?;
+        let tree = match lang {
+            Language::Python | Language::Rust => self.parsers.parse_lang(lang, content)?,
             _ => return None,
         };
 
         let root = tree.root_node();
-        self.find_container_body_in_node(root, content, name, ext)
+        self.find_container_body_in_node(root, content, name, lang)
     }
 
     fn find_container_body_in_node(
@@ -331,17 +317,17 @@ impl Editor {
         node: tree_sitter::Node,
         content: &str,
         name: &str,
-        ext: &str,
+        lang: Language,
     ) -> Option<ContainerBody> {
         // Check if this is our target container
-        if let Some(body) = self.check_node_is_container(&node, content, name, ext) {
+        if let Some(body) = self.check_node_is_container(&node, content, name, lang) {
             return Some(body);
         }
 
         // Recurse into children
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            if let Some(body) = self.find_container_body_in_node(child, content, name, ext) {
+            if let Some(body) = self.find_container_body_in_node(child, content, name, lang) {
                 return Some(body);
             }
         }
@@ -354,14 +340,14 @@ impl Editor {
         node: &tree_sitter::Node,
         content: &str,
         name: &str,
-        ext: &str,
+        lang: Language,
     ) -> Option<ContainerBody> {
         let kind = node.kind();
 
         // Only handle container types (can contain methods/functions)
-        let is_container = match ext {
-            "py" => kind == "class_definition",
-            "rs" => kind == "impl_item", // Only impl blocks for prepend/append
+        let is_container = match lang {
+            Language::Python => kind == "class_definition",
+            Language::Rust => kind == "impl_item", // Only impl blocks for prepend/append
             _ => false,
         };
 
@@ -393,16 +379,12 @@ impl Editor {
             .take_while(|c| c.is_whitespace())
             .collect();
 
-        // Determine inner indent based on language
-        let inner_indent = match ext {
-            "py" => format!("{}    ", container_indent), // Python: 4 spaces
-            "rs" => format!("{}    ", container_indent), // Rust: 4 spaces
-            _ => format!("{}    ", container_indent),
-        };
+        // Determine inner indent based on language (same for all currently supported)
+        let inner_indent = format!("{}    ", container_indent);
 
-        match ext {
-            "py" => self.analyze_python_class_body(&body_node, content, &inner_indent),
-            "rs" => self.analyze_rust_impl_body(&body_node, content, &inner_indent),
+        match lang {
+            Language::Python => self.analyze_python_class_body(&body_node, content, &inner_indent),
+            Language::Rust => self.analyze_rust_impl_body(&body_node, content, &inner_indent),
             _ => None,
         }
     }

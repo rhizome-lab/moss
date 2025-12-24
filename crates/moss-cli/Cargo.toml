@@ -17,7 +17,6 @@ walkdir.workspace = true
 ignore.workspace = true
 nucleo-matcher.workspace = true
 rusqlite.workspace = true
-tree-sitter.workspace = true
 moss-core.workspace = true
 grep-matcher.workspace = true
 grep-regex.workspace = true

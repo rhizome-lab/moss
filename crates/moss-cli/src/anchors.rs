@@ -3,8 +3,8 @@
 //! Anchors are stable references to code locations (functions, classes, variables)
 //! that can be used for structural edits instead of line numbers.
 
+use moss_core::{tree_sitter, Language, Parsers};
 use std::path::Path;
-use tree_sitter::Parser;
 
 /// Type of code anchor
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,33 +64,21 @@ pub struct AnchorsResult {
 }
 
 pub struct AnchorExtractor {
-    python_parser: Parser,
-    rust_parser: Parser,
+    parsers: Parsers,
 }
 
 impl AnchorExtractor {
     pub fn new() -> Self {
-        let mut python_parser = Parser::new();
-        python_parser
-            .set_language(&moss_core::tree_sitter_python::LANGUAGE.into())
-            .expect("Failed to load Python grammar");
-
-        let mut rust_parser = Parser::new();
-        rust_parser
-            .set_language(&moss_core::tree_sitter_rust::LANGUAGE.into())
-            .expect("Failed to load Rust grammar");
-
         Self {
-            python_parser,
-            rust_parser,
+            parsers: Parsers::new(),
         }
     }
 
-    pub fn extract(&mut self, path: &Path, content: &str) -> AnchorsResult {
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        let anchors = match ext {
-            "py" => self.extract_python(content),
-            "rs" => self.extract_rust(content),
+    pub fn extract(&self, path: &Path, content: &str) -> AnchorsResult {
+        let lang = Language::from_path(path);
+        let anchors = match lang {
+            Some(Language::Python) => self.extract_python(content),
+            Some(Language::Rust) => self.extract_rust(content),
             _ => Vec::new(),
         };
 
@@ -100,8 +88,8 @@ impl AnchorExtractor {
         }
     }
 
-    fn extract_python(&mut self, content: &str) -> Vec<Anchor> {
-        let tree = match self.python_parser.parse(content, None) {
+    fn extract_python(&self, content: &str) -> Vec<Anchor> {
+        let tree = match self.parsers.parse_lang(Language::Python, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -246,8 +234,8 @@ impl AnchorExtractor {
         }
     }
 
-    fn extract_rust(&mut self, content: &str) -> Vec<Anchor> {
-        let tree = match self.rust_parser.parse(content, None) {
+    fn extract_rust(&self, content: &str) -> Vec<Anchor> {
+        let tree = match self.parsers.parse_lang(Language::Rust, content) {
             Some(t) => t,
             None => return Vec::new(),
         };
@@ -410,7 +398,7 @@ impl AnchorExtractor {
     }
 
     /// Find a specific anchor by name (fuzzy match)
-    pub fn find_anchor(&mut self, path: &Path, content: &str, query: &str) -> Vec<Anchor> {
+    pub fn find_anchor(&self, path: &Path, content: &str, query: &str) -> Vec<Anchor> {
         let result = self.extract(path, content);
         let query_lower = query.to_lowercase();
 

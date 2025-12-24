@@ -8,24 +8,9 @@ pub use language::Language;
 pub use parsers::Parsers;
 pub use paths::get_moss_dir;
 
-// Re-export grammar crates for use in other modules
-pub use tree_sitter;
-pub use tree_sitter_bash;
-pub use tree_sitter_c;
-pub use tree_sitter_cpp;
-pub use tree_sitter_css;
-pub use tree_sitter_go;
-pub use tree_sitter_html;
-pub use tree_sitter_java;
-pub use tree_sitter_javascript;
-pub use tree_sitter_json;
-pub use tree_sitter_md;
-pub use tree_sitter_python;
-pub use tree_sitter_ruby;
-pub use tree_sitter_rust;
-pub use tree_sitter_toml_updated as tree_sitter_toml;
-pub use tree_sitter_typescript;
-pub use tree_sitter_yaml;
+// Re-export arborium and its tree-sitter for use in other modules
+pub use arborium;
+pub use arborium::tree_sitter;
 
 /// Symbol kind in source code
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

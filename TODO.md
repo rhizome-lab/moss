@@ -4,12 +4,12 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Add Scala support (tree-sitter-scala 0.24.0 exists)
-- Add Vue support (tree-sitter-vue 0.0.3 exists)
+- Add Scala/Vue skeleton extractors (language support added via arborium)
+- Fix Python docstring extraction (arborium grammar difference - 3 failing tests)
 - Session analysis: detect correction patterns ("You're right", "Good point")
 - Complete daemon integration (FileIndex API methods currently unused)
 
-Test Status: 2184 passing, 0 failing, 42 skipped (all optional deps)
+Test Status: 65 passing, 3 failing (docstring extraction in skeleton tests)
 
 ## Backlog
 

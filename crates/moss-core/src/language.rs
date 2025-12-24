@@ -22,6 +22,8 @@ pub enum Language {
     Ruby,
     Bash,
     Toml,
+    Scala,
+    Vue,
 }
 
 impl Language {
@@ -46,6 +48,8 @@ impl Language {
             "rb" | "ruby" => Some(Language::Ruby),
             "sh" | "bash" | "zsh" => Some(Language::Bash),
             "toml" => Some(Language::Toml),
+            "scala" | "sc" => Some(Language::Scala),
+            "vue" => Some(Language::Vue),
             _ => None,
         }
     }
@@ -77,6 +81,8 @@ impl Language {
             Language::Ruby => &["rb"],
             Language::Bash => &["sh", "bash", "zsh"],
             Language::Toml => &["toml"],
+            Language::Scala => &["scala", "sc"],
+            Language::Vue => &["vue"],
         }
     }
 
@@ -100,6 +106,8 @@ impl Language {
             Language::Ruby => "Ruby",
             Language::Bash => "Bash",
             Language::Toml => "TOML",
+            Language::Scala => "Scala",
+            Language::Vue => "Vue",
         }
     }
 

@@ -2,8 +2,8 @@
 //!
 //! Extracts imports and exports from source files.
 
+use moss_core::{tree_sitter, Language, Parsers};
 use std::path::Path;
-use tree_sitter::Parser;
 
 /// An import statement
 #[derive(Debug, Clone)]
@@ -100,71 +100,31 @@ impl DepsResult {
 }
 
 pub struct DepsExtractor {
-    python_parser: Parser,
-    rust_parser: Parser,
-    typescript_parser: Parser,
-    tsx_parser: Parser,
-    javascript_parser: Parser,
-    go_parser: Parser,
+    parsers: Parsers,
 }
 
 impl DepsExtractor {
     pub fn new() -> Self {
-        let mut python_parser = Parser::new();
-        python_parser
-            .set_language(&moss_core::tree_sitter_python::LANGUAGE.into())
-            .expect("Failed to load Python grammar");
-
-        let mut rust_parser = Parser::new();
-        rust_parser
-            .set_language(&moss_core::tree_sitter_rust::LANGUAGE.into())
-            .expect("Failed to load Rust grammar");
-
-        let mut typescript_parser = Parser::new();
-        typescript_parser
-            .set_language(&moss_core::tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
-            .expect("Failed to load TypeScript grammar");
-
-        let mut tsx_parser = Parser::new();
-        tsx_parser
-            .set_language(&moss_core::tree_sitter_typescript::LANGUAGE_TSX.into())
-            .expect("Failed to load TSX grammar");
-
-        let mut javascript_parser = Parser::new();
-        javascript_parser
-            .set_language(&moss_core::tree_sitter_javascript::LANGUAGE.into())
-            .expect("Failed to load JavaScript grammar");
-
-        let mut go_parser = Parser::new();
-        go_parser
-            .set_language(&moss_core::tree_sitter_go::LANGUAGE.into())
-            .expect("Failed to load Go grammar");
-
         Self {
-            python_parser,
-            rust_parser,
-            typescript_parser,
-            tsx_parser,
-            javascript_parser,
-            go_parser,
+            parsers: Parsers::new(),
         }
     }
 
-    pub fn extract(&mut self, path: &Path, content: &str) -> DepsResult {
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        let (imports, exports, reexports) = match ext {
-            "py" => {
+    pub fn extract(&self, path: &Path, content: &str) -> DepsResult {
+        let lang = Language::from_path(path);
+        let (imports, exports, reexports) = match lang {
+            Some(Language::Python) => {
                 let (i, e) = self.extract_python(content);
                 (i, e, Vec::new())
             }
-            "rs" => {
+            Some(Language::Rust) => {
                 let (i, e) = self.extract_rust(content);
                 (i, e, Vec::new())
             }
-            "ts" | "mts" => self.extract_typescript(content),
-            "tsx" => self.extract_tsx(content),
-            "js" | "mjs" | "jsx" => self.extract_javascript(content),
-            "go" => {
+            Some(Language::TypeScript) => self.extract_typescript(content),
+            Some(Language::Tsx) => self.extract_tsx(content),
+            Some(Language::JavaScript) => self.extract_javascript(content),
+            Some(Language::Go) => {
                 let (i, e) = self.extract_go(content);
                 (i, e, Vec::new())
             }
@@ -179,8 +139,8 @@ impl DepsExtractor {
         }
     }
 
-    fn extract_python(&mut self, content: &str) -> (Vec<Import>, Vec<Export>) {
-        let tree = match self.python_parser.parse(content, None) {
+    fn extract_python(&self, content: &str) -> (Vec<Import>, Vec<Export>) {
+        let tree = match self.parsers.parse_lang(Language::Python, content) {
             Some(t) => t,
             None => return (Vec::new(), Vec::new()),
         };
@@ -324,8 +284,8 @@ impl DepsExtractor {
         }
     }
 
-    fn extract_rust(&mut self, content: &str) -> (Vec<Import>, Vec<Export>) {
-        let tree = match self.rust_parser.parse(content, None) {
+    fn extract_rust(&self, content: &str) -> (Vec<Import>, Vec<Export>) {
+        let tree = match self.parsers.parse_lang(Language::Rust, content) {
             Some(t) => t,
             None => return (Vec::new(), Vec::new()),
         };
@@ -453,32 +413,32 @@ impl DepsExtractor {
         }
     }
 
-    fn extract_typescript(&mut self, content: &str) -> (Vec<Import>, Vec<Export>, Vec<ReExport>) {
-        let tree = match self.typescript_parser.parse(content, None) {
+    fn extract_typescript(&self, content: &str) -> (Vec<Import>, Vec<Export>, Vec<ReExport>) {
+        let tree = match self.parsers.parse_lang(Language::TypeScript, content) {
             Some(t) => t,
             None => return (Vec::new(), Vec::new(), Vec::new()),
         };
         self.extract_js_ts_deps(&tree, content)
     }
 
-    fn extract_tsx(&mut self, content: &str) -> (Vec<Import>, Vec<Export>, Vec<ReExport>) {
-        let tree = match self.tsx_parser.parse(content, None) {
+    fn extract_tsx(&self, content: &str) -> (Vec<Import>, Vec<Export>, Vec<ReExport>) {
+        let tree = match self.parsers.parse_lang(Language::Tsx, content) {
             Some(t) => t,
             None => return (Vec::new(), Vec::new(), Vec::new()),
         };
         self.extract_js_ts_deps(&tree, content)
     }
 
-    fn extract_javascript(&mut self, content: &str) -> (Vec<Import>, Vec<Export>, Vec<ReExport>) {
-        let tree = match self.javascript_parser.parse(content, None) {
+    fn extract_javascript(&self, content: &str) -> (Vec<Import>, Vec<Export>, Vec<ReExport>) {
+        let tree = match self.parsers.parse_lang(Language::JavaScript, content) {
             Some(t) => t,
             None => return (Vec::new(), Vec::new(), Vec::new()),
         };
         self.extract_js_ts_deps(&tree, content)
     }
 
-    fn extract_go(&mut self, content: &str) -> (Vec<Import>, Vec<Export>) {
-        let tree = match self.go_parser.parse(content, None) {
+    fn extract_go(&self, content: &str) -> (Vec<Import>, Vec<Export>) {
+        let tree = match self.parsers.parse_lang(Language::Go, content) {
             Some(t) => t,
             None => return (Vec::new(), Vec::new()),
         };

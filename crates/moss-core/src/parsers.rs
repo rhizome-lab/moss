@@ -1,98 +1,75 @@
 //! Tree-sitter parser initialization and management.
 
 use crate::Language;
-use tree_sitter::Parser;
+use arborium::tree_sitter::Parser;
+use arborium::GrammarStore;
+use std::sync::Arc;
 
-/// Collection of tree-sitter parsers for all supported languages.
+/// Collection of tree-sitter parsers using arborium's grammar store.
 pub struct Parsers {
-    python: Parser,
-    rust: Parser,
-    javascript: Parser,
-    typescript: Parser,
-    tsx: Parser,
-    markdown: Parser,
-    json: Parser,
-    yaml: Parser,
-    html: Parser,
-    css: Parser,
-    go: Parser,
-    c: Parser,
-    cpp: Parser,
-    java: Parser,
-    ruby: Parser,
-    bash: Parser,
-    toml: Parser,
+    store: Arc<GrammarStore>,
 }
 
 impl Parsers {
-    /// Create new parser collection with all languages initialized.
+    /// Create new parser collection with arborium's grammar store.
     pub fn new() -> Self {
         Self {
-            python: Self::create_parser(&tree_sitter_python::LANGUAGE.into()),
-            rust: Self::create_parser(&tree_sitter_rust::LANGUAGE.into()),
-            javascript: Self::create_parser(&tree_sitter_javascript::LANGUAGE.into()),
-            typescript: Self::create_parser(&tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()),
-            tsx: Self::create_parser(&tree_sitter_typescript::LANGUAGE_TSX.into()),
-            markdown: Self::create_parser(&tree_sitter_md::LANGUAGE.into()),
-            json: Self::create_parser(&tree_sitter_json::LANGUAGE.into()),
-            yaml: Self::create_parser(&tree_sitter_yaml::LANGUAGE.into()),
-            html: Self::create_parser(&tree_sitter_html::LANGUAGE.into()),
-            css: Self::create_parser(&tree_sitter_css::LANGUAGE.into()),
-            go: Self::create_parser(&tree_sitter_go::LANGUAGE.into()),
-            c: Self::create_parser(&tree_sitter_c::LANGUAGE.into()),
-            cpp: Self::create_parser(&tree_sitter_cpp::LANGUAGE.into()),
-            java: Self::create_parser(&tree_sitter_java::LANGUAGE.into()),
-            ruby: Self::create_parser(&tree_sitter_ruby::LANGUAGE.into()),
-            bash: Self::create_parser(&tree_sitter_bash::LANGUAGE.into()),
-            // tree-sitter-toml-updated uses old API with language() function
-            toml: Self::create_parser_old(tree_sitter_toml_updated::language()),
+            store: Arc::new(GrammarStore::new()),
         }
     }
 
-    fn create_parser(lang: &tree_sitter::Language) -> Parser {
-        let mut parser = Parser::new();
-        parser.set_language(lang).expect("Failed to load grammar");
-        parser
-    }
-
-    // For older grammars that return tree_sitter::Language directly
-    fn create_parser_old(lang: tree_sitter::Language) -> Parser {
-        let mut parser = Parser::new();
-        parser.set_language(&lang).expect("Failed to load grammar");
-        parser
-    }
-
-    /// Get parser for a specific language.
-    pub fn get(&mut self, lang: Language) -> &mut Parser {
+    /// Get the arborium language name for our Language enum.
+    fn arborium_name(lang: Language) -> &'static str {
         match lang {
-            Language::Python => &mut self.python,
-            Language::Rust => &mut self.rust,
-            Language::JavaScript => &mut self.javascript,
-            Language::TypeScript => &mut self.typescript,
-            Language::Tsx => &mut self.tsx,
-            Language::Markdown => &mut self.markdown,
-            Language::Json => &mut self.json,
-            Language::Yaml => &mut self.yaml,
-            Language::Html => &mut self.html,
-            Language::Css => &mut self.css,
-            Language::Go => &mut self.go,
-            Language::C => &mut self.c,
-            Language::Cpp => &mut self.cpp,
-            Language::Java => &mut self.java,
-            Language::Ruby => &mut self.ruby,
-            Language::Bash => &mut self.bash,
-            Language::Toml => &mut self.toml,
+            Language::Python => "python",
+            Language::Rust => "rust",
+            Language::JavaScript => "javascript",
+            Language::TypeScript => "typescript",
+            Language::Tsx => "tsx",
+            Language::Markdown => "markdown",
+            Language::Json => "json",
+            Language::Yaml => "yaml",
+            Language::Html => "html",
+            Language::Css => "css",
+            Language::Go => "go",
+            Language::C => "c",
+            Language::Cpp => "cpp",
+            Language::Java => "java",
+            Language::Ruby => "ruby",
+            Language::Bash => "bash",
+            Language::Toml => "toml",
+            Language::Scala => "scala",
+            Language::Vue => "vue",
         }
+    }
+
+    /// Create a parser for a specific language.
+    pub fn parser_for(&self, lang: Language) -> Option<Parser> {
+        let name = Self::arborium_name(lang);
+        let grammar = self.store.get(name)?;
+        let mut parser = Parser::new();
+        parser.set_language(grammar.language()).ok()?;
+        Some(parser)
+    }
+
+    /// Parse source code for a specific language.
+    pub fn parse_lang(
+        &self,
+        lang: Language,
+        source: &str,
+    ) -> Option<arborium::tree_sitter::Tree> {
+        let mut parser = self.parser_for(lang)?;
+        parser.parse(source, None)
     }
 
     /// Parse source code, auto-detecting language from path.
     pub fn parse(
-        &mut self,
+        &self,
         path: &std::path::Path,
         source: &str,
-    ) -> Option<(Language, tree_sitter::Tree)> {
+    ) -> Option<(Language, arborium::tree_sitter::Tree)> {
         let lang = Language::from_path(path)?;
-        let parser = self.get(lang);
+        let mut parser = self.parser_for(lang)?;
         let tree = parser.parse(source, None)?;
         Some((lang, tree))
     }
