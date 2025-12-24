@@ -4,11 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- view.rs internal cleanup (consolidated but messy, problem shifted not solved)
-- Self-documenting CLI names audit (commands, subcommands, flags)
-- Tree view: apply boilerplate_dirs to depth calculation
+- Phase 5: Add new language support (start with Kotlin or C#)
+- Investigate slow `moss analyze --health` (+500ms over baseline)
 
-Test Status: 72 passing, 0 failing
+Test Status: 74 passing, 0 failing
 
 ## Backlog
 

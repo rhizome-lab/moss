@@ -51,6 +51,19 @@ Derived CLAUDE.md design principles from correction pattern analysis:
 - "Simplicity over cleverness" - stdlib > dependencies
 - "When stuck, reconsider the problem" - not just try more solutions
 
+### Tree View Improvements
+
+- **Boilerplate-aware depth**: Directories like `src/`, `lib/`, `crates/` don't count against `max_depth` limit
+  - Shows more useful content at shallow depths
+  - Example: `moss view . --depth=2` now shows files inside `src/commands/`
+- Added 2 tests for boilerplate-aware depth limiting
+
+### CLI Cleanup
+
+- Fixed `--calls`/`--called-by` help text (was swapped, code was correct)
+- Cleaned up view.rs: removed unused parameters, unified symbol search functions
+- Fixed clippy warnings: if-let patterns, range contains, unnecessary casts
+
 ### Language Trait Defaults Removed (Phase 4)
 
 Removed all default implementations from the `Language` trait following CLAUDE.md principle: "defaults let you 'implement' a trait without implementing it. That's a silent bug."
