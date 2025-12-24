@@ -68,6 +68,19 @@ impl LanguageSupport for PythonSupport {
         ]
     }
 
+    fn scope_creating_kinds(&self) -> &'static [&'static str] {
+        // Additional scope-creating nodes beyond functions and containers
+        &[
+            "for_statement",
+            "with_statement",
+            "list_comprehension",
+            "set_comprehension",
+            "dictionary_comprehension",
+            "generator_expression",
+            "lambda",
+        ]
+    }
+
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
 

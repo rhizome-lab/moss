@@ -60,6 +60,17 @@ impl LanguageSupport for RustSupport {
         ]
     }
 
+    fn scope_creating_kinds(&self) -> &'static [&'static str] {
+        // Additional scope-creating nodes beyond functions and containers
+        &[
+            "block",
+            "for_expression",
+            "while_expression",
+            "loop_expression",
+            "closure_expression",
+        ]
+    }
+
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
 

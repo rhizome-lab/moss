@@ -5,6 +5,7 @@
 //! and detecting variable shadowing.
 
 use moss_core::{tree_sitter::Node, Language, Parsers};
+use moss_languages::get_support;
 use std::path::Path;
 
 /// A scope in the code
@@ -215,6 +216,25 @@ impl ScopeAnalyzer {
             root,
             file_path: path.to_string_lossy().to_string(),
         }
+    }
+
+    /// Check if a node kind creates a new scope using trait-based detection
+    #[allow(dead_code)]
+    fn is_scope_creating(&self, lang: Language, kind: &str) -> bool {
+        if let Some(support) = get_support(lang) {
+            // Check trait-defined scope-creating kinds
+            if support.scope_creating_kinds().contains(&kind) {
+                return true;
+            }
+            // Functions and containers also create scopes
+            if support.function_kinds().contains(&kind) {
+                return true;
+            }
+            if support.container_kinds().contains(&kind) {
+                return true;
+            }
+        }
+        false
     }
 
     fn analyze_python(&self, content: &str) -> Scope {

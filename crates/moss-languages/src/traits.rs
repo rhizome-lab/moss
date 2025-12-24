@@ -157,6 +157,15 @@ pub trait LanguageSupport: Send + Sync {
         Vec::new()
     }
 
+    // === Scope Analysis ===
+
+    /// Nodes that create new variable scopes (for scope analysis)
+    /// Includes: loops, blocks, comprehensions, lambdas, with statements
+    /// Note: Functions and containers (from function_kinds/container_kinds) also create scopes
+    fn scope_creating_kinds(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     // === Complexity ===
 
     /// Nodes that increase cyclomatic complexity
