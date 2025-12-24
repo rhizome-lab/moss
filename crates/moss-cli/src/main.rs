@@ -5425,7 +5425,7 @@ fn index_js_packages(
                         let scoped_path = scoped_entry.path();
                         let scoped_name = format!("{}/{}", name, scoped_entry.file_name().to_string_lossy());
 
-                        if let Some(entry_point) = get_js_entry_point(&scoped_path) {
+                        if let Some(entry_point) = moss_languages::ecmascript::find_package_entry(&scoped_path) {
                             index_single_js_package(
                                 index, &mut extractor, &scoped_name, &entry_point, min_version, stats
                             );
@@ -5437,7 +5437,7 @@ fn index_js_packages(
 
             // Regular package
             if path.is_dir() {
-                if let Some(entry_point) = get_js_entry_point(&path) {
+                if let Some(entry_point) = moss_languages::ecmascript::find_package_entry(&path) {
                     index_single_js_package(
                         index, &mut extractor, &name, &entry_point, min_version, stats
                     );
@@ -5445,44 +5445,6 @@ fn index_js_packages(
             }
         }
     }
-}
-
-/// Get the entry point for a JavaScript package.
-fn get_js_entry_point(pkg_dir: &Path) -> Option<PathBuf> {
-    let pkg_json = pkg_dir.join("package.json");
-    if pkg_json.is_file() {
-        let content = std::fs::read_to_string(&pkg_json).ok()?;
-        let json: serde_json::Value = serde_json::from_str(&content).ok()?;
-
-        // Try module, main, or index.js
-        if let Some(module) = json.get("module").and_then(|v| v.as_str()) {
-            let path = pkg_dir.join(module.trim_start_matches("./"));
-            if path.is_file() {
-                return Some(path);
-            }
-        }
-        if let Some(main) = json.get("main").and_then(|v| v.as_str()) {
-            let path = pkg_dir.join(main.trim_start_matches("./"));
-            if path.is_file() {
-                return Some(path);
-            }
-            // Try with .js extension
-            let path = pkg_dir.join(main.trim_start_matches("./")).with_extension("js");
-            if path.is_file() {
-                return Some(path);
-            }
-        }
-    }
-
-    // Fallback to index.js
-    for ext in &["js", "mjs", "cjs"] {
-        let index = pkg_dir.join(format!("index.{}", ext));
-        if index.is_file() {
-            return Some(index);
-        }
-    }
-
-    None
 }
 
 /// Index a single JavaScript package.
@@ -5635,7 +5597,7 @@ fn index_deno_npm_package(
     let version_dir = versions.last().unwrap().path();
 
     // Find entry point
-    let entry_point = match find_deno_package_entry(&version_dir) {
+    let entry_point = match moss_languages::ecmascript::find_package_entry(&version_dir) {
         Some(e) => e,
         None => return,
     };
@@ -5657,40 +5619,6 @@ fn index_deno_npm_package(
         let result = extractor.extract(&entry_point, &content);
         stats.deno_symbols += count_and_insert_symbols(index, pkg_id, &result.symbols);
     }
-}
-
-/// Find entry point for a Deno package.
-fn find_deno_package_entry(dir: &Path) -> Option<PathBuf> {
-    // Try package.json
-    let pkg_json = dir.join("package.json");
-    if pkg_json.is_file() {
-        if let Ok(content) = std::fs::read_to_string(&pkg_json) {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                for field in &["module", "main"] {
-                    if let Some(entry) = json.get(field).and_then(|v| v.as_str()) {
-                        let path = dir.join(entry.trim_start_matches("./"));
-                        if path.is_file() {
-                            return Some(path);
-                        }
-                        let with_ext = path.with_extension("js");
-                        if with_ext.is_file() {
-                            return Some(with_ext);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Fallback to index files
-    for ext in &["js", "mjs", "cjs", "ts"] {
-        let index = dir.join(format!("index.{}", ext));
-        if index.is_file() {
-            return Some(index);
-        }
-    }
-
-    None
 }
 
 /// Index Deno URL-based packages.

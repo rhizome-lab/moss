@@ -661,7 +661,7 @@ fn resolve_deno_npm_import(npm_spec: &str, cache: &Path) -> Option<ResolvedPacka
     }
 
     let version_dir = find_best_version_dir(&pkg_path, version_spec)?;
-    let entry = find_deno_node_entry(&version_dir)?;
+    let entry = find_package_entry(&version_dir)?;
 
     Some(ResolvedPackage {
         path: entry,
@@ -755,7 +755,9 @@ fn deno_version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
     a_parts.len().cmp(&b_parts.len())
 }
 
-fn find_deno_node_entry(dir: &Path) -> Option<PathBuf> {
+/// Find entry point for a JavaScript/TypeScript package.
+/// Checks package.json for module/main fields, falls back to index.{js,mjs,cjs,ts}.
+pub fn find_package_entry(dir: &Path) -> Option<PathBuf> {
     let pkg_json = dir.join("package.json");
     if pkg_json.is_file() {
         if let Ok(content) = std::fs::read_to_string(&pkg_json) {
