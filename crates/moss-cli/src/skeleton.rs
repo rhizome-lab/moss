@@ -316,7 +316,14 @@ impl SkeletonExtractor {
                     self.extract_legacy(lang, content)
                 }
             }
-            // Go, Java use legacy extractors (need complex handling: type decls, interface/enum)
+            Some(Language::Go) => {
+                if let Some(support) = get_support(Language::Go) {
+                    self.extract_with_trait(Language::Go, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
+            // Java uses legacy extractor (needs complex handling: interface/enum)
             _ => self.extract_legacy(lang, content),
         };
 

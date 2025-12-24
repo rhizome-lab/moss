@@ -10,7 +10,7 @@ impl LanguageSupport for GoSupport {
     fn grammar_name(&self) -> &'static str { "go" }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["type_declaration"] // for struct/interface with methods
+        &[] // Go types don't have children in the tree-sitter sense
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
@@ -18,7 +18,7 @@ impl LanguageSupport for GoSupport {
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["type_declaration"]
+        &["type_spec"] // The actual type is in type_spec, not type_declaration
     }
 
     fn import_kinds(&self) -> &'static [&'static str] {
@@ -47,12 +47,27 @@ impl LanguageSupport for GoSupport {
         })
     }
 
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        // Go type declarations
-        let name = self.node_name(node, content)?;
+    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
+        None // Go types are extracted via extract_type
+    }
+
+    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
+        // Go type_spec: name field + type field (struct_type, interface_type, etc.)
+        let name_node = node.child_by_field_name("name")?;
+        let name = content[name_node.byte_range()].to_string();
+
+        let type_node = node.child_by_field_name("type");
+        let type_kind = type_node.map(|t| t.kind()).unwrap_or("");
+
+        let kind = match type_kind {
+            "struct_type" => SymbolKind::Struct,
+            "interface_type" => SymbolKind::Interface,
+            _ => SymbolKind::Type,
+        };
+
         Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Type,
+            name: name.clone(),
+            kind,
             signature: format!("type {}", name),
             docstring: None,
             start_line: node.start_position().row + 1,
