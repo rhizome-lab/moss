@@ -1,12 +1,9 @@
 //! CLI command implementations - one command per file.
 
 pub mod analyze_cmd;
-pub mod anchors;
-pub mod context;
 pub mod daemon;
 pub mod deps_cmd;
 pub mod edit;
-pub mod expand;
 pub mod find_symbols;
 pub mod grep_cmd;
 pub mod imports;
@@ -19,6 +16,5 @@ pub mod reindex;
 pub mod search_tree;
 pub mod sessions;
 pub mod summarize_cmd;
-pub mod symbols_cmd;
 pub mod update;
 pub mod view_cmd;

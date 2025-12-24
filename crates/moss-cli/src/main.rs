@@ -2,8 +2,6 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 mod analyze;
-mod anchors;
-mod cfg;
 mod commands;
 mod complexity;
 mod daemon;
@@ -19,76 +17,6 @@ mod skeleton;
 mod summarize;
 mod symbols;
 mod tree;
-
-
-/// Detect if a string looks like a file path
-fn looks_like_file(s: &str) -> bool {
-    // Contains path separator
-    if s.contains('/') {
-        return true;
-    }
-    // Has file extension (dot followed by 1-10 alphanumeric chars at end)
-    if let Some(idx) = s.rfind('.') {
-        let ext = &s[idx + 1..];
-        if !ext.is_empty() && ext.len() <= 10 && ext.chars().all(|c| c.is_alphanumeric()) {
-            return true;
-        }
-    }
-    false
-}
-
-/// Try to parse file and symbol from a single string
-/// Supports separators: :, ::, #
-fn parse_file_symbol_string(s: &str) -> Option<(String, String)> {
-    // Try various separators: #, ::, :
-    for sep in ["#", "::", ":"] {
-        if let Some(idx) = s.find(sep) {
-            let (file, rest) = s.split_at(idx);
-            let symbol = &rest[sep.len()..];
-            if !file.is_empty() && !symbol.is_empty() && looks_like_file(file) {
-                return Some((symbol.to_string(), file.to_string()));
-            }
-        }
-    }
-    None
-}
-
-/// Normalize flexible symbol arguments to (symbol, optional_file)
-/// Supports:
-/// - ["symbol"] -> ("symbol", None)
-/// - ["file:symbol"], ["file::symbol"], ["file#symbol"] -> ("symbol", Some("file"))
-/// - ["file", "symbol"] -> ("symbol", Some("file"))
-/// - ["symbol", "file"] -> ("symbol", Some("file"))
-fn normalize_symbol_args(args: &[String]) -> (String, Option<String>) {
-    match args.len() {
-        0 => (String::new(), None),
-        1 => {
-            let arg = &args[0];
-            // Try to parse file:symbol, file::symbol, or file#symbol
-            if let Some((symbol, file)) = parse_file_symbol_string(arg) {
-                return (symbol, Some(file));
-            }
-            (arg.clone(), None)
-        }
-        _ => {
-            let (a, b) = (&args[0], &args[1]);
-            let a_is_file = looks_like_file(a);
-            let b_is_file = looks_like_file(b);
-
-            if a_is_file && !b_is_file {
-                (b.clone(), Some(a.clone()))
-            } else if b_is_file && !a_is_file {
-                (a.clone(), Some(b.clone()))
-            } else if a_is_file && b_is_file {
-                // Both look like files, use first as file, second as symbol
-                (b.clone(), Some(a.clone()))
-            } else {
-                // Neither looks like file, first is symbol, second is scope hint
-                (a.clone(), Some(b.clone()))
-            }
-        }
-    }
-}
 
 #[derive(Parser)]
 #[command(name = "moss")]
@@ -274,51 +202,6 @@ enum Commands {
         /// Also rebuild the call graph (slower, parses all files)
         #[arg(short, long)]
         call_graph: bool,
-    },
-
-    /// Show full source of a symbol
-    Expand {
-        /// Symbol and optional file (supports: "symbol", "file:symbol", "file symbol", "symbol file")
-        #[arg(required = true)]
-        args: Vec<String>,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-    },
-
-    /// List symbols in a file
-    Symbols {
-        /// File to analyze
-        file: String,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-    },
-
-    /// Generate compiled context (skeleton + deps + summary)
-    Context {
-        /// File to analyze
-        file: String,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-    },
-
-    /// List code anchors (named code locations)
-    Anchors {
-        /// File to extract anchors from
-        file: String,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-
-        /// Filter anchors by name (fuzzy match)
-        #[arg(short, long)]
-        query: Option<String>,
     },
 
     /// Show module dependencies (imports and exports)
@@ -619,19 +502,6 @@ fn main() {
             cli.json,
         ),
         Commands::Reindex { root, call_graph } => commands::reindex::cmd_reindex(root.as_deref(), call_graph),
-        Commands::Expand { args, root } => {
-            let (symbol, file) = normalize_symbol_args(&args);
-            commands::expand::cmd_expand(&symbol, file.as_deref(), root.as_deref(), cli.json)
-        }
-        Commands::Symbols { file, root } => {
-            commands::symbols_cmd::cmd_symbols(&file, root.as_deref(), cli.json)
-        }
-        Commands::Context { file, root } => {
-            commands::context::cmd_context(&file, root.as_deref(), cli.json)
-        }
-        Commands::Anchors { file, root, query } => {
-            commands::anchors::cmd_anchors(&file, root.as_deref(), query.as_deref(), cli.json)
-        }
         Commands::Deps {
             file,
             root,
