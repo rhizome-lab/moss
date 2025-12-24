@@ -13,6 +13,12 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Simplified Parsers API: `parse_lang()` replaces `get().parse()`
 - Net code reduction: -108 lines
 
+**Scala/Vue Skeleton Extractors:**
+- Scala: class, object, trait, function definitions
+- Vue: functions from script sections (function declarations, const arrow functions)
+- Fixed Python docstring extraction for arborium grammar (string nodes vs expression_statement)
+- All 71 tests pass
+
 ### Test Suite Cleanup
 
 - Removed obsolete tests for deleted MossAPI/health module (8 tests)

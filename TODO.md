@@ -4,12 +4,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Add Scala/Vue skeleton extractors (language support added via arborium)
-- Fix Python docstring extraction (arborium grammar difference - 3 failing tests)
 - Session analysis: detect correction patterns ("You're right", "Good point")
 - Complete daemon integration (FileIndex API methods currently unused)
+- Add more language skeleton extractors (Kotlin, Swift, etc.)
 
-Test Status: 65 passing, 3 failing (docstring extraction in skeleton tests)
+Test Status: 71 passing, 0 failing
 
 ## Backlog
 
