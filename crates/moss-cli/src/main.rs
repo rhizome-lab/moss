@@ -207,7 +207,7 @@ enum Commands {
         /// Focus view: show target at high detail, imports at signature level
         /// Resolves local imports and shows their skeletons inline
         /// Optionally filter to a specific module: --focus=models
-        #[arg(long, value_name = "MODULE", num_args = 0..=1, default_missing_value = "*")]
+        #[arg(long, value_name = "MODULE", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
         focus: Option<String>,
 
         /// Resolve imports: inline signatures of specific imported symbols
@@ -1020,6 +1020,12 @@ fn cmd_view(
             }
         };
         return cmd_view_calls(&root, target, show_calls, show_called_by, json);
+    }
+
+    // --focus requires a file target
+    if focus.is_some() && target.is_none() {
+        eprintln!("--focus requires a file target");
+        return 1;
     }
 
     let target = target.unwrap_or(".");
