@@ -99,6 +99,8 @@ Quick reference:
 Fall back to generic tools (Read/Grep) only for:
 - Exact line content needed for editing
 
+**Verify codebases with moss, not agents/greps.** One `moss view` call beats spawning an agent or running 50 greps. If moss output isn't useful enough for verification, that's a bug in moss - improve the tool (see tree view improvements in TODO.md).
+
 ## Conventions
 
 ### Updating CLAUDE.md
