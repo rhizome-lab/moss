@@ -74,10 +74,9 @@ Phase 4 - Expand:
 - Key distinction: view = tree operations, analyze = summaries
 
 **Bugs:**
-- `view --calls` semantics confused: shows callers but label says "caller", should show callees
-- `view --called-by` error says "No callees found" (wrong term, should say callers)
-- Call graph returns definition as caller: `suggest_tool` at line 1239 (docstring) listed as caller of itself
-- Output has unnecessary trailing "(caller)" on every line
+- [x] `view --calls`/`--called-by` semantics were swapped - FIXED
+- [x] Output had unnecessary trailing "(caller)" on every line - FIXED
+- Call graph shows same-named method on different object as self-call (e.g., `suggest_tool` calls `router.suggest_tool`)
 
 **Performance:**
 - Investigate slow `moss analyze --health` (+500ms over baseline, not uv startup)
