@@ -230,135 +230,23 @@ impl SkeletonExtractor {
     pub fn extract(&mut self, path: &Path, content: &str) -> SkeletonResult {
         let lang = Language::from_path(path);
 
-        // Use trait-based extraction for languages that are fully supported
         let symbols = match lang {
-            Some(Language::Python) => {
-                if let Some(support) = get_support(Language::Python) {
-                    self.extract_with_trait(Language::Python, content, support)
+            // Vue needs special handling for script element parsing
+            Some(Language::Vue) => self.extract_vue(content),
+            // All other languages use trait-based extraction
+            Some(l) => {
+                if let Some(support) = get_support(l) {
+                    self.extract_with_trait(l, content, support)
                 } else {
-                    self.extract_legacy(lang, content)
+                    Vec::new()
                 }
             }
-            Some(Language::JavaScript) | Some(Language::Tsx) => {
-                if let Some(support) = get_support(Language::JavaScript) {
-                    self.extract_with_trait(Language::JavaScript, content, support)
-                } else {
-                    self.extract_legacy(lang, content)
-                }
-            }
-            Some(Language::TypeScript) => {
-                if let Some(support) = get_support(Language::TypeScript) {
-                    self.extract_with_trait(Language::TypeScript, content, support)
-                } else {
-                    self.extract_legacy(lang, content)
-                }
-            }
-            Some(Language::Ruby) => {
-                if let Some(support) = get_support(Language::Ruby) {
-                    self.extract_with_trait(Language::Ruby, content, support)
-                } else {
-                    self.extract_legacy(lang, content)
-                }
-            }
-            Some(Language::C) => {
-                if let Some(support) = get_support(Language::C) {
-                    self.extract_with_trait(Language::C, content, support)
-                } else {
-                    self.extract_legacy(lang, content)
-                }
-            }
-            Some(Language::Cpp) => {
-                if let Some(support) = get_support(Language::Cpp) {
-                    self.extract_with_trait(Language::Cpp, content, support)
-                } else {
-                    self.extract_legacy(lang, content)
-                }
-            }
-            Some(Language::Scala) => {
-                if let Some(support) = get_support(Language::Scala) {
-                    self.extract_with_trait(Language::Scala, content, support)
-                } else {
-                    self.extract_legacy(lang, content)
-                }
-            }
-            Some(Language::Markdown) => {
-                if let Some(support) = get_support(Language::Markdown) {
-                    self.extract_with_trait(Language::Markdown, content, support)
-                } else {
-                    self.extract_legacy(lang, content)
-                }
-            }
-            Some(Language::Json) => {
-                if let Some(support) = get_support(Language::Json) {
-                    self.extract_with_trait(Language::Json, content, support)
-                } else {
-                    self.extract_legacy(lang, content)
-                }
-            }
-            Some(Language::Yaml) => {
-                if let Some(support) = get_support(Language::Yaml) {
-                    self.extract_with_trait(Language::Yaml, content, support)
-                } else {
-                    self.extract_legacy(lang, content)
-                }
-            }
-            Some(Language::Toml) => {
-                if let Some(support) = get_support(Language::Toml) {
-                    self.extract_with_trait(Language::Toml, content, support)
-                } else {
-                    self.extract_legacy(lang, content)
-                }
-            }
-            Some(Language::Rust) => {
-                if let Some(support) = get_support(Language::Rust) {
-                    self.extract_with_trait(Language::Rust, content, support)
-                } else {
-                    self.extract_legacy(lang, content)
-                }
-            }
-            Some(Language::Go) => {
-                if let Some(support) = get_support(Language::Go) {
-                    self.extract_with_trait(Language::Go, content, support)
-                } else {
-                    self.extract_legacy(lang, content)
-                }
-            }
-            Some(Language::Java) => {
-                if let Some(support) = get_support(Language::Java) {
-                    self.extract_with_trait(Language::Java, content, support)
-                } else {
-                    self.extract_legacy(lang, content)
-                }
-            }
-            // Vue uses legacy extractor (needs script element parsing)
-            _ => self.extract_legacy(lang, content),
+            None => Vec::new(),
         };
 
         SkeletonResult {
             symbols,
             file_path: path.to_string_lossy().to_string(),
-        }
-    }
-
-    /// Legacy extraction - will be replaced by trait-based extraction incrementally
-    fn extract_legacy(&mut self, lang: Option<Language>, content: &str) -> Vec<SkeletonSymbol> {
-        match lang {
-            Some(Language::Python) => self.extract_python(content),
-            Some(Language::Rust) => self.extract_rust(content),
-            Some(Language::Markdown) => self.extract_markdown(content),
-            Some(Language::JavaScript) | Some(Language::Tsx) => self.extract_javascript(content),
-            Some(Language::TypeScript) => self.extract_typescript(content),
-            Some(Language::Go) => self.extract_go(content),
-            Some(Language::Java) => self.extract_java(content),
-            Some(Language::C) => self.extract_c(content),
-            Some(Language::Cpp) => self.extract_cpp(content),
-            Some(Language::Ruby) => self.extract_ruby(content),
-            Some(Language::Json) => self.extract_json(content),
-            Some(Language::Yaml) => self.extract_yaml(content),
-            Some(Language::Toml) => self.extract_toml(content),
-            Some(Language::Scala) => self.extract_scala(content),
-            Some(Language::Vue) => self.extract_vue(content),
-            _ => Vec::new(),
         }
     }
 

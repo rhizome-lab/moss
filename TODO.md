@@ -8,6 +8,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - Complete daemon integration (FileIndex API methods currently unused)
 - Manual cleanup: delete legacy parsing methods from `symbols.rs`, `skeleton.rs`, `deps.rs`, `complexity.rs`
   (trait-based extraction complete, legacy code marked dead; requires manual editing)
+- API cleanup: remove `Option` wrappers from `get_support()` and similar APIs where `None` is never returned
 
 Test Status: 79 passing, 0 failing
 
