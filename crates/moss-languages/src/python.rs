@@ -878,6 +878,33 @@ impl Language for Python {
         }
         None
     }
+
+    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
+        // Only Python files
+        if path.extension()?.to_str()? != "py" {
+            return None;
+        }
+
+        // Remove extension
+        let stem = path.with_extension("");
+        let stem_str = stem.to_str()?;
+
+        // Strip common source directory prefixes
+        let module_path = stem_str
+            .strip_prefix("src/")
+            .or_else(|| stem_str.strip_prefix("lib/"))
+            .unwrap_or(stem_str);
+
+        // Handle __init__.py - use parent directory as module
+        let module_path = if module_path.ends_with("/__init__") {
+            module_path.strip_suffix("/__init__")?
+        } else {
+            module_path
+        };
+
+        // Convert path separators to dots
+        Some(module_path.replace('/', "."))
+    }
 }
 
 #[cfg(test)]

@@ -255,6 +255,13 @@ pub trait Language: Send + Sync {
         Some(&content[name_node.byte_range()])
     }
 
+    /// Convert a file path to a module name for this language.
+    /// Used to find "importers" - files that import a given file.
+    /// Returns None for languages without module systems or where not applicable.
+    fn file_path_to_module_name(&self, _path: &Path) -> Option<String> {
+        None
+    }
+
     // === Import Resolution ===
 
     /// Language key for package index cache (e.g., "python", "go", "js").

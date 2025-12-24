@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use moss_core::get_moss_dir;
-use moss_languages::external_packages;
+use moss_languages::{external_packages, support_for_extension};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -1565,7 +1565,7 @@ fn cmd_view_filtered(root: &Path, scope: &str, kind: &str, json: bool) -> i32 {
         // Search all files in root
         path_resolve::all_files(root)
             .into_iter()
-            .filter(|m| m.kind == "file" && (m.path.ends_with(".py") || m.path.ends_with(".rs")))
+            .filter(|m| m.kind == "file" && has_language_support(&m.path))
             .map(|m| root.join(&m.path))
             .collect()
     } else {
@@ -1573,7 +1573,7 @@ fn cmd_view_filtered(root: &Path, scope: &str, kind: &str, json: bool) -> i32 {
         let matches = path_resolve::resolve(scope, root);
         matches
             .into_iter()
-            .filter(|m| m.kind == "file" && (m.path.ends_with(".py") || m.path.ends_with(".rs")))
+            .filter(|m| m.kind == "file" && has_language_support(&m.path))
             .map(|m| root.join(&m.path))
             .collect()
     };
@@ -2225,10 +2225,10 @@ fn cmd_expand(symbol: &str, file: Option<&str>, root: Option<&Path>, json: bool)
             .map(|m| root.join(&m.path))
             .collect()
     } else {
-        // Search all Python/Rust files
+        // Search all files with language support
         path_resolve::all_files(&root)
             .into_iter()
-            .filter(|m| m.kind == "file" && (m.path.ends_with(".py") || m.path.ends_with(".rs")))
+            .filter(|m| m.kind == "file" && has_language_support(&m.path))
             .map(|m| root.join(&m.path))
             .collect()
     };
@@ -3443,36 +3443,22 @@ fn cmd_imports(
     }
 }
 
-/// Convert a file path to a Python module name
-/// e.g., "src/moss/gen/serialize.py" -> "moss.gen.serialize"
+/// Check if a file has language support (symbols can be extracted)
+fn has_language_support(path: &str) -> bool {
+    let p = std::path::Path::new(path);
+    p.extension()
+        .and_then(|e| e.to_str())
+        .and_then(support_for_extension)
+        .map(|lang| lang.has_symbols())
+        .unwrap_or(false)
+}
+
+/// Convert a file path to a module name using language-specific rules
 fn file_path_to_module(file_path: &str) -> Option<String> {
     let path = std::path::Path::new(file_path);
     let ext = path.extension()?.to_str()?;
-
-    // Only Python files for now
-    if ext != "py" {
-        return None;
-    }
-
-    // Remove extension and common prefixes
-    let stem = path.with_extension("");
-    let stem_str = stem.to_str()?;
-
-    // Strip common source directory prefixes
-    let module_path = stem_str
-        .strip_prefix("src/")
-        .or_else(|| stem_str.strip_prefix("lib/"))
-        .unwrap_or(stem_str);
-
-    // Handle __init__.py - use parent directory as module
-    let module_path = if module_path.ends_with("/__init__") {
-        module_path.strip_suffix("/__init__")?
-    } else {
-        module_path
-    };
-
-    // Convert path separators to dots
-    Some(module_path.replace('/', "."))
+    let lang = support_for_extension(ext)?;
+    lang.file_path_to_module_name(path)
 }
 
 fn output_imports(imports: &[symbols::Import], file_path: &str, json: bool) -> i32 {
