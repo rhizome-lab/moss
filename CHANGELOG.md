@@ -27,6 +27,14 @@ First release. See `docs/` for design docs and `README.md` for usage.
 
 ### Features
 
+**External Package Resolution** (Dec 24 2025)
+- Python stdlib resolution: finds modules in `sys.prefix/lib/pythonX.Y/`
+- Python site-packages resolution: finds installed packages in venv
+- Go stdlib resolution: finds packages in `$GOROOT/src/`
+- Go mod cache resolution: finds dependencies in `$GOMODCACHE` or `~/go/pkg/mod/`
+- `view --focus` now falls back to external packages when local resolution fails
+- Global cache structure at `~/.cache/moss/` (prepared for future index caching)
+
 **Additional Analysis Modules** (Dec 24 2025)
 - Binary detection in call graph: detects binary files by null byte check (8KB sample)
 - Rust in-file tests: `#[cfg(test)]` module detection in test_gaps analysis

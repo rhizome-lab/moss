@@ -1680,17 +1680,85 @@ fn cmd_view_directory(dir: &Path, root: &Path, depth: i32, json: bool) -> i32 {
     0
 }
 
-/// Resolve an import to a local file path based on the source file's language
+/// Resolve an import to a local file path based on the source file's language.
+/// Falls back to external package resolution (stdlib, site-packages, mod cache) if local fails.
 fn resolve_import(module: &str, current_file: &Path, root: &Path) -> Option<PathBuf> {
     let ext = current_file.extension().and_then(|e| e.to_str()).unwrap_or("");
     match ext {
-        "py" => resolve_python_import(module, current_file, root),
+        "py" => {
+            // Try local resolution first
+            if let Some(path) = resolve_python_import(module, current_file, root) {
+                return Some(path);
+            }
+            // Fall back to external packages
+            resolve_python_external(module, root)
+        }
+        "go" => resolve_go_import_local(module, current_file, root),
         "rs" => resolve_rust_import(module, current_file, root),
         "ts" | "tsx" | "js" | "jsx" | "mts" | "mjs" => {
             resolve_typescript_import(module, current_file, root)
         }
         _ => None,
     }
+}
+
+/// Resolve a Python import to an external package (stdlib or site-packages).
+fn resolve_python_external(module: &str, root: &Path) -> Option<PathBuf> {
+    // Try stdlib first
+    if let Some(stdlib) = external_packages::find_python_stdlib(root) {
+        if let Some(pkg) = external_packages::resolve_python_stdlib_import(module, &stdlib) {
+            return Some(pkg.path);
+        }
+    }
+
+    // Try site-packages
+    if let Some(site_packages) = external_packages::find_python_site_packages(root) {
+        if let Some(pkg) = external_packages::resolve_python_import(module, &site_packages) {
+            return Some(pkg.path);
+        }
+    }
+
+    None
+}
+
+/// Resolve a Go import to a local file path within the module.
+fn resolve_go_import_local(import_path: &str, current_file: &Path, _root: &Path) -> Option<PathBuf> {
+    // Find go.mod to understand module boundaries
+    if let Some(go_mod_path) = go_mod::find_go_mod(current_file) {
+        if let Some(module) = go_mod::parse_go_mod(&go_mod_path) {
+            // Try local resolution within the module
+            let project_root = go_mod_path.parent()?;
+            if let Some(local_path) = go_mod::resolve_go_import(import_path, &module, project_root) {
+                if local_path.exists() && local_path.is_dir() {
+                    return Some(local_path);
+                }
+            }
+        }
+    }
+
+    // Fall back to external packages
+    resolve_go_external(import_path)
+}
+
+/// Resolve a Go import to an external package (stdlib or mod cache).
+fn resolve_go_external(import_path: &str) -> Option<PathBuf> {
+    // Try stdlib first
+    if external_packages::is_go_stdlib_import(import_path) {
+        if let Some(stdlib) = external_packages::find_go_stdlib() {
+            if let Some(pkg) = external_packages::resolve_go_stdlib_import(import_path, &stdlib) {
+                return Some(pkg.path);
+            }
+        }
+    }
+
+    // Try mod cache
+    if let Some(mod_cache) = external_packages::find_go_mod_cache() {
+        if let Some(pkg) = external_packages::resolve_go_import(import_path, &mod_cache) {
+            return Some(pkg.path);
+        }
+    }
+
+    None
 }
 
 /// Resolve a TypeScript/JavaScript import to a local file path
