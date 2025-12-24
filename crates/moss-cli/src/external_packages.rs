@@ -5,6 +5,154 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
+
+// =============================================================================
+// Python Path Cache (filesystem-based detection, no subprocess calls)
+// =============================================================================
+
+static PYTHON_CACHE: Mutex<Option<PythonPathCache>> = Mutex::new(None);
+
+/// Cached Python paths detected from filesystem structure.
+#[derive(Clone)]
+struct PythonPathCache {
+    /// Canonical project root used as cache key
+    root: PathBuf,
+    /// Python version (e.g., "3.13")
+    version: Option<String>,
+    /// Stdlib path (e.g., /usr/.../lib/python3.13/)
+    stdlib: Option<PathBuf>,
+    /// Site-packages path
+    site_packages: Option<PathBuf>,
+}
+
+impl PythonPathCache {
+    fn new(root: &Path) -> Self {
+        let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+
+        // Try to find Python from venv or PATH
+        let python_bin = if root.join(".venv/bin/python").exists() {
+            Some(root.join(".venv/bin/python"))
+        } else if root.join("venv/bin/python").exists() {
+            Some(root.join("venv/bin/python"))
+        } else {
+            // Look in PATH
+            std::env::var("PATH").ok().and_then(|path| {
+                for dir in path.split(':') {
+                    let python = PathBuf::from(dir).join("python3");
+                    if python.exists() {
+                        return Some(python);
+                    }
+                    let python = PathBuf::from(dir).join("python");
+                    if python.exists() {
+                        return Some(python);
+                    }
+                }
+                None
+            })
+        };
+
+        let Some(python_bin) = python_bin else {
+            return Self {
+                root,
+                version: None,
+                stdlib: None,
+                site_packages: None,
+            };
+        };
+
+        // Resolve symlinks to find the actual Python installation
+        let python_real = std::fs::canonicalize(&python_bin).unwrap_or(python_bin.clone());
+
+        // Python binary is typically at /prefix/bin/python3
+        // Stdlib is at /prefix/lib/pythonX.Y/
+        // Site-packages is at /prefix/lib/pythonX.Y/site-packages/ (system)
+        // Or for venv: venv/lib/pythonX.Y/site-packages/
+
+        let prefix = python_real.parent().and_then(|bin| bin.parent());
+
+        // Look for lib/pythonX.Y directories to detect version
+        let (version, stdlib, site_packages) = if let Some(prefix) = prefix {
+            let lib = prefix.join("lib");
+            if lib.exists() {
+                // Find pythonX.Y directories
+                let mut best_version: Option<(String, PathBuf)> = None;
+                if let Ok(entries) = std::fs::read_dir(&lib) {
+                    for entry in entries.flatten() {
+                        let name = entry.file_name();
+                        let name = name.to_string_lossy();
+                        if name.starts_with("python") && entry.path().is_dir() {
+                            let ver = name.trim_start_matches("python");
+                            // Check it looks like a version (X.Y)
+                            if ver.contains('.') && ver.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                                // Prefer higher versions
+                                if best_version.as_ref().map_or(true, |(v, _)| ver > v.as_str()) {
+                                    best_version = Some((ver.to_string(), entry.path()));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if let Some((ver, stdlib_path)) = best_version {
+                    // For venv, site-packages is in the venv
+                    let site = if root.join(".venv").exists() || root.join("venv").exists() {
+                        let venv = if root.join(".venv").exists() {
+                            root.join(".venv")
+                        } else {
+                            root.join("venv")
+                        };
+                        let venv_site = venv.join("lib").join(format!("python{}", ver)).join("site-packages");
+                        if venv_site.exists() {
+                            Some(venv_site)
+                        } else {
+                            // Fall back to system site-packages
+                            let sys_site = stdlib_path.join("site-packages");
+                            if sys_site.exists() { Some(sys_site) } else { None }
+                        }
+                    } else {
+                        let sys_site = stdlib_path.join("site-packages");
+                        if sys_site.exists() { Some(sys_site) } else { None }
+                    };
+
+                    (Some(ver), Some(stdlib_path), site)
+                } else {
+                    (None, None, None)
+                }
+            } else {
+                (None, None, None)
+            }
+        } else {
+            (None, None, None)
+        };
+
+        Self {
+            root,
+            version,
+            stdlib,
+            site_packages,
+        }
+    }
+}
+
+/// Get cached Python paths for a project.
+fn get_python_cache(project_root: &Path) -> PythonPathCache {
+    let canonical = project_root
+        .canonicalize()
+        .unwrap_or_else(|_| project_root.to_path_buf());
+
+    let mut cache_guard = PYTHON_CACHE.lock().unwrap();
+
+    if let Some(ref cache) = *cache_guard {
+        if cache.root == canonical {
+            return cache.clone();
+        }
+    }
+
+    let new_cache = PythonPathCache::new(project_root);
+    *cache_guard = Some(new_cache.clone());
+    new_cache
+}
 
 // =============================================================================
 // Global Cache
@@ -48,26 +196,9 @@ pub fn get_global_packages_db() -> Option<PathBuf> {
     Some(cache.join("packages.db"))
 }
 
-/// Get Python version from the project's interpreter.
+/// Get Python version from filesystem structure (no subprocess).
 pub fn get_python_version(project_root: &Path) -> Option<String> {
-    let python = if project_root.join(".venv/bin/python").exists() {
-        project_root.join(".venv/bin/python")
-    } else if project_root.join("venv/bin/python").exists() {
-        project_root.join("venv/bin/python")
-    } else {
-        PathBuf::from("python3")
-    };
-
-    let output = Command::new(&python)
-        .args(["-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"])
-        .output()
-        .ok()?;
-
-    if output.status.success() {
-        Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    } else {
-        None
-    }
+    get_python_cache(project_root).version
 }
 
 /// Get Go version.
@@ -107,48 +238,9 @@ pub struct ResolvedPackage {
 // Python
 // =============================================================================
 
-/// Find Python stdlib directory.
-///
-/// Uses `python -c "import sys; print(sys.prefix)"` to find the prefix,
-/// then looks for lib/pythonX.Y/ underneath.
+/// Find Python stdlib directory from filesystem structure (no subprocess).
 pub fn find_python_stdlib(project_root: &Path) -> Option<PathBuf> {
-    // Try to use the project's Python first (from venv)
-    let python = if project_root.join(".venv/bin/python").exists() {
-        project_root.join(".venv/bin/python")
-    } else if project_root.join("venv/bin/python").exists() {
-        project_root.join("venv/bin/python")
-    } else {
-        PathBuf::from("python3")
-    };
-
-    // Get sys.prefix and sys.version_info
-    let output = Command::new(&python)
-        .args(["-c", "import sys; print(sys.prefix); print(f'{sys.version_info.major}.{sys.version_info.minor}')"])
-        .output()
-        .ok()?;
-
-    if !output.status.success() {
-        return None;
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut lines = stdout.lines();
-    let prefix = lines.next()?.trim();
-    let version = lines.next()?.trim();
-
-    // Unix: lib/pythonX.Y
-    let stdlib = PathBuf::from(prefix).join("lib").join(format!("python{}", version));
-    if stdlib.is_dir() {
-        return Some(stdlib);
-    }
-
-    // Windows: Lib
-    let stdlib = PathBuf::from(prefix).join("Lib");
-    if stdlib.is_dir() {
-        return Some(stdlib);
-    }
-
-    None
+    get_python_cache(project_root).stdlib
 }
 
 /// Check if a module name is a Python stdlib module.
@@ -241,23 +333,12 @@ pub fn resolve_python_stdlib_import(import_name: &str, stdlib_path: &Path) -> Op
 /// 1. .venv/lib/pythonX.Y/site-packages/ (uv, poetry, standard venv)
 /// 2. Walk up looking for venv directories
 pub fn find_python_site_packages(project_root: &Path) -> Option<PathBuf> {
-    // Check .venv in project root first (most common with uv/poetry)
-    let venv_dir = project_root.join(".venv");
-    if venv_dir.is_dir() {
-        if let Some(site_packages) = find_site_packages_in_venv(&venv_dir) {
-            return Some(site_packages);
-        }
+    // Use cached result from filesystem detection
+    if let Some(site) = get_python_cache(project_root).site_packages {
+        return Some(site);
     }
 
-    // Check venv (alternative name)
-    let venv_dir = project_root.join("venv");
-    if venv_dir.is_dir() {
-        if let Some(site_packages) = find_site_packages_in_venv(&venv_dir) {
-            return Some(site_packages);
-        }
-    }
-
-    // Check .venv in parent directories
+    // Fall back to scanning parent directories for venvs
     let mut current = project_root.to_path_buf();
     while let Some(parent) = current.parent() {
         let venv_dir = parent.join(".venv");
