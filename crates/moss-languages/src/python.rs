@@ -1,6 +1,6 @@
 //! Python language support.
 
-use crate::{Import, LanguageSupport, Symbol, SymbolKind, Visibility};
+use crate::{Export, Import, LanguageSupport, Symbol, SymbolKind, Visibility};
 use moss_core::{tree_sitter::Node, Language};
 
 pub struct PythonSupport;
@@ -28,6 +28,10 @@ impl LanguageSupport for PythonSupport {
 
     fn import_kinds(&self) -> &'static [&'static str] {
         &["import_statement", "import_from_statement"]
+    }
+
+    fn export_kinds(&self) -> &'static [&'static str] {
+        &["function_definition", "async_function_definition", "class_definition"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
@@ -172,33 +176,43 @@ impl LanguageSupport for PythonSupport {
         }
     }
 
-    fn extract_import(&self, node: &Node, content: &str) -> Option<Import> {
+    fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         let line = node.start_position().row + 1;
 
         match node.kind() {
             "import_statement" => {
-                // import foo, bar, baz
-                let mut names = Vec::new();
+                // import foo, import foo as bar
+                let mut imports = Vec::new();
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
                     if child.kind() == "dotted_name" {
-                        names.push(content[child.byte_range()].to_string());
+                        let module = content[child.byte_range()].to_string();
+                        imports.push(Import {
+                            module,
+                            names: Vec::new(),
+                            alias: None,
+                            is_wildcard: false,
+                            is_relative: false,
+                            line,
+                        });
                     } else if child.kind() == "aliased_import" {
                         if let Some(name) = child.child_by_field_name("name") {
-                            names.push(content[name.byte_range()].to_string());
+                            let module = content[name.byte_range()].to_string();
+                            let alias = child
+                                .child_by_field_name("alias")
+                                .map(|a| content[a.byte_range()].to_string());
+                            imports.push(Import {
+                                module,
+                                names: Vec::new(),
+                                alias,
+                                is_wildcard: false,
+                                is_relative: false,
+                                line,
+                            });
                         }
                     }
                 }
-                if names.is_empty() {
-                    return None;
-                }
-                Some(Import {
-                    module: names[0].clone(),
-                    names,
-                    alias: None,
-                    is_wildcard: false,
-                    line,
-                })
+                imports
             }
             "import_from_statement" => {
                 // from foo import bar, baz
@@ -207,15 +221,23 @@ impl LanguageSupport for PythonSupport {
                     .map(|m| content[m.byte_range()].to_string())
                     .unwrap_or_default();
 
+                // Check for relative import (from . or from .. or from .foo)
+                let text = &content[node.byte_range()];
+                let is_relative = text.starts_with("from .");
+
                 let mut names = Vec::new();
                 let mut is_wildcard = false;
+                let module_end = node
+                    .child_by_field_name("module_name")
+                    .map(|m| m.end_byte())
+                    .unwrap_or(0);
 
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
                     match child.kind() {
                         "dotted_name" | "identifier" => {
                             // Skip the module name itself
-                            if child.start_byte() > node.child_by_field_name("module_name").map(|m| m.end_byte()).unwrap_or(0) {
+                            if child.start_byte() > module_end {
                                 names.push(content[child.byte_range()].to_string());
                             }
                         }
@@ -231,15 +253,48 @@ impl LanguageSupport for PythonSupport {
                     }
                 }
 
-                Some(Import {
+                vec![Import {
                     module,
                     names,
                     alias: None,
                     is_wildcard,
+                    is_relative,
                     line,
-                })
+                }]
             }
-            _ => None,
+            _ => Vec::new(),
+        }
+    }
+
+    fn extract_exports(&self, node: &Node, content: &str) -> Vec<Export> {
+        let line = node.start_position().row + 1;
+
+        match node.kind() {
+            "function_definition" | "async_function_definition" => {
+                if let Some(name) = self.node_name(node, content) {
+                    if !name.starts_with('_') {
+                        return vec![Export {
+                            name: name.to_string(),
+                            kind: SymbolKind::Function,
+                            line,
+                        }];
+                    }
+                }
+                Vec::new()
+            }
+            "class_definition" => {
+                if let Some(name) = self.node_name(node, content) {
+                    if !name.starts_with('_') {
+                        return vec![Export {
+                            name: name.to_string(),
+                            kind: SymbolKind::Class,
+                            line,
+                        }];
+                    }
+                }
+                Vec::new()
+            }
+            _ => Vec::new(),
         }
     }
 

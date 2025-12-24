@@ -68,6 +68,7 @@ pub struct Import {
     pub names: Vec<String>,
     pub alias: Option<String>,
     pub is_wildcard: bool,
+    pub is_relative: bool,
     pub line: usize,
 }
 
@@ -144,16 +145,16 @@ pub trait LanguageSupport: Send + Sync {
 
     // === Import/Export ===
 
-    /// Extract import from an import node
-    fn extract_import(&self, node: &Node, content: &str) -> Option<Import> {
+    /// Extract imports from an import node (may return multiple)
+    fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         let _ = (node, content);
-        None
+        Vec::new()
     }
 
-    /// Extract export from an export node
-    fn extract_export(&self, node: &Node, content: &str) -> Option<Export> {
+    /// Extract exports from an export/definition node (may return multiple)
+    fn extract_exports(&self, node: &Node, content: &str) -> Vec<Export> {
         let _ = (node, content);
-        None
+        Vec::new()
     }
 
     // === Complexity ===

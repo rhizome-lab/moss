@@ -1,6 +1,6 @@
 //! JavaScript language support.
 
-use crate::{LanguageSupport, Symbol, SymbolKind, Visibility};
+use crate::{Export, Import, LanguageSupport, Symbol, SymbolKind, Visibility};
 use moss_core::{tree_sitter::Node, Language};
 
 pub struct JavaScriptSupport;
@@ -80,5 +80,125 @@ impl LanguageSupport for JavaScriptSupport {
             visibility: Visibility::Public,
             children: Vec::new(),
         })
+    }
+
+    fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
+        if node.kind() != "import_statement" {
+            return Vec::new();
+        }
+
+        let line = node.start_position().row + 1;
+        let mut module = String::new();
+        let mut names = Vec::new();
+
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                "string" | "string_fragment" => {
+                    let text = &content[child.byte_range()];
+                    module = text.trim_matches(|c| c == '"' || c == '\'').to_string();
+                }
+                "import_clause" => {
+                    Self::collect_import_names(&child, content, &mut names);
+                }
+                _ => {}
+            }
+        }
+
+        if module.is_empty() {
+            return Vec::new();
+        }
+
+        vec![Import {
+            module: module.clone(),
+            names,
+            alias: None,
+            is_wildcard: false,
+            is_relative: module.starts_with('.'),
+            line,
+        }]
+    }
+
+    fn extract_exports(&self, node: &Node, content: &str) -> Vec<Export> {
+        if node.kind() != "export_statement" {
+            return Vec::new();
+        }
+
+        let line = node.start_position().row + 1;
+        let mut exports = Vec::new();
+
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            match child.kind() {
+                "function_declaration" | "generator_function_declaration" => {
+                    if let Some(name_node) = child.child_by_field_name("name") {
+                        exports.push(Export {
+                            name: content[name_node.byte_range()].to_string(),
+                            kind: SymbolKind::Function,
+                            line,
+                        });
+                    }
+                }
+                "class_declaration" => {
+                    if let Some(name_node) = child.child_by_field_name("name") {
+                        exports.push(Export {
+                            name: content[name_node.byte_range()].to_string(),
+                            kind: SymbolKind::Class,
+                            line,
+                        });
+                    }
+                }
+                "lexical_declaration" => {
+                    // export const foo = ...
+                    let mut decl_cursor = child.walk();
+                    for decl_child in child.children(&mut decl_cursor) {
+                        if decl_child.kind() == "variable_declarator" {
+                            if let Some(name_node) = decl_child.child_by_field_name("name") {
+                                exports.push(Export {
+                                    name: content[name_node.byte_range()].to_string(),
+                                    kind: SymbolKind::Variable,
+                                    line,
+                                });
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        exports
+    }
+}
+
+impl JavaScriptSupport {
+    fn collect_import_names(import_clause: &Node, content: &str, names: &mut Vec<String>) {
+        let mut cursor = import_clause.walk();
+        for child in import_clause.children(&mut cursor) {
+            match child.kind() {
+                "identifier" => {
+                    // Default import: import foo from './module'
+                    names.push(content[child.byte_range()].to_string());
+                }
+                "named_imports" => {
+                    // { foo, bar }
+                    let mut inner_cursor = child.walk();
+                    for inner in child.children(&mut inner_cursor) {
+                        if inner.kind() == "import_specifier" {
+                            if let Some(name_node) = inner.child_by_field_name("name") {
+                                names.push(content[name_node.byte_range()].to_string());
+                            }
+                        }
+                    }
+                }
+                "namespace_import" => {
+                    // import * as foo
+                    if let Some(name_node) = child.child_by_field_name("name") {
+                        names.push(format!("* as {}", &content[name_node.byte_range()]));
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 }

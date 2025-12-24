@@ -1,6 +1,6 @@
 //! Rust language support.
 
-use crate::{LanguageSupport, Symbol, SymbolKind, Visibility};
+use crate::{Export, Import, LanguageSupport, Symbol, SymbolKind, Visibility};
 use moss_core::{tree_sitter::Node, Language};
 
 pub struct RustSupport;
@@ -28,6 +28,10 @@ impl LanguageSupport for RustSupport {
 
     fn import_kinds(&self) -> &'static [&'static str] {
         &["use_declaration"]
+    }
+
+    fn export_kinds(&self) -> &'static [&'static str] {
+        &["function_item", "struct_item", "enum_item", "trait_item"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
@@ -188,6 +192,83 @@ impl LanguageSupport for RustSupport {
         } else {
             Some(doc_lines.join("\n"))
         }
+    }
+
+    fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
+        if node.kind() != "use_declaration" {
+            return Vec::new();
+        }
+
+        let line = node.start_position().row + 1;
+        let text = &content[node.byte_range()];
+        let module = text.trim_start_matches("use ").trim_end_matches(';').trim();
+
+        // Check for braced imports: use foo::{bar, baz}
+        let mut names = Vec::new();
+        let is_relative = module.starts_with("crate")
+            || module.starts_with("self")
+            || module.starts_with("super");
+
+        if let Some(brace_start) = module.find('{') {
+            let prefix = module[..brace_start].trim_end_matches("::");
+            if let Some(brace_end) = module.find('}') {
+                let items = &module[brace_start + 1..brace_end];
+                for item in items.split(',') {
+                    let trimmed = item.trim();
+                    if !trimmed.is_empty() {
+                        names.push(trimmed.to_string());
+                    }
+                }
+            }
+            vec![Import {
+                module: prefix.to_string(),
+                names,
+                alias: None,
+                is_wildcard: false,
+                is_relative,
+                line,
+            }]
+        } else {
+            // Simple import: use foo::bar or use foo::bar as baz
+            let (module_part, alias) = if let Some(as_pos) = module.find(" as ") {
+                (&module[..as_pos], Some(module[as_pos + 4..].to_string()))
+            } else {
+                (module, None)
+            };
+
+            vec![Import {
+                module: module_part.to_string(),
+                names: Vec::new(),
+                alias,
+                is_wildcard: module_part.ends_with("::*"),
+                is_relative,
+                line,
+            }]
+        }
+    }
+
+    fn extract_exports(&self, node: &Node, content: &str) -> Vec<Export> {
+        let line = node.start_position().row + 1;
+
+        // Only export pub items
+        if !self.is_public(node, content) {
+            return Vec::new();
+        }
+
+        let name = match self.node_name(node, content) {
+            Some(n) => n.to_string(),
+            None => return Vec::new(),
+        };
+
+        let kind = match node.kind() {
+            "function_item" => SymbolKind::Function,
+            "struct_item" => SymbolKind::Struct,
+            "enum_item" => SymbolKind::Enum,
+            "trait_item" => SymbolKind::Trait,
+            _ => return Vec::new(),
+        };
+
+        vec![Export { name, kind, line }]
     }
 
     fn is_public(&self, node: &Node, content: &str) -> bool {
