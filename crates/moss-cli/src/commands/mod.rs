@@ -3,7 +3,6 @@
 pub mod analyze_cmd;
 pub mod daemon;
 pub mod edit;
-pub mod find_symbols;
 pub mod grep_cmd;
 pub mod index;
 pub mod index_packages;

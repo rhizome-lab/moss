@@ -297,12 +297,12 @@ impl DaemonServer {
         match req {
             Request::Status => {
                 let idx = self.index.lock().unwrap();
-                let (files, symbols, _) = idx.call_graph_stats().unwrap_or((0, 0, 0));
+                let stats = idx.call_graph_stats().unwrap_or_default();
                 ServerResponse::ok(serde_json::json!({
                     "root": self.root.to_string_lossy(),
                     "files": idx.count().unwrap_or(0),
-                    "symbols": symbols,
-                    "call_graph_files": files,
+                    "symbols": stats.symbols,
+                    "calls": stats.calls,
                 }))
             }
             Request::Path { query } => {
@@ -388,8 +388,8 @@ pub async fn run_daemon(root: &Path) -> Result<i32, Box<dyn std::error::Error>> 
     {
         let mut idx = server.index.lock().unwrap();
         let file_count = idx.refresh()?;
-        let (_, symbols, calls) = idx.incremental_call_graph_refresh()?;
-        eprintln!("Indexed {} files, {} symbols, {} calls", file_count, symbols, calls);
+        let stats = idx.incremental_call_graph_refresh()?;
+        eprintln!("Indexed {} files, {} symbols, {} calls", file_count, stats.symbols, stats.calls);
     }
 
     // Start file watcher - triggers incremental refresh on changes

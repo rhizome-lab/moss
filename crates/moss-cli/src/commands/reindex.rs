@@ -18,10 +18,10 @@ pub fn cmd_reindex(root: Option<&Path>, call_graph: bool) -> i32 {
                     // Optionally rebuild call graph
                     if call_graph {
                         match idx.refresh_call_graph() {
-                            Ok((symbols, calls, imports)) => {
+                            Ok(stats) => {
                                 println!(
                                     "Indexed {} symbols, {} calls, {} imports",
-                                    symbols, calls, imports
+                                    stats.symbols, stats.calls, stats.imports
                                 );
                             }
                             Err(e) => {

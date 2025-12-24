@@ -49,6 +49,33 @@ pub struct IndexedFile {
     pub mtime: i64,
 }
 
+/// Result from symbol search
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SymbolMatch {
+    pub name: String,
+    pub kind: String,
+    pub file: String,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub parent: Option<String>,
+}
+
+/// Files that changed since last index
+#[derive(Debug, Default)]
+pub struct ChangedFiles {
+    pub added: Vec<String>,
+    pub modified: Vec<String>,
+    pub deleted: Vec<String>,
+}
+
+/// Call graph statistics
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CallGraphStats {
+    pub symbols: usize,
+    pub calls: usize,
+    pub imports: usize,
+}
+
 pub struct FileIndex {
     conn: Connection,
     root: PathBuf,
@@ -240,11 +267,8 @@ impl FileIndex {
     }
 
     /// Get files that have changed since last index
-    /// Returns (new_files, modified_files, deleted_files)
-    pub fn get_changed_files(&self) -> rusqlite::Result<(Vec<String>, Vec<String>, Vec<String>)> {
-        let mut new_files = Vec::new();
-        let mut modified_files = Vec::new();
-        let mut deleted_files = Vec::new();
+    pub fn get_changed_files(&self) -> rusqlite::Result<ChangedFiles> {
+        let mut result = ChangedFiles::default();
 
         // Get all indexed files with their mtimes
         let mut indexed: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
@@ -291,10 +315,10 @@ impl FileIndex {
 
                 if let Some(&indexed_mtime) = indexed.get(&rel_str) {
                     if current_mtime > indexed_mtime {
-                        modified_files.push(rel_str);
+                        result.modified.push(rel_str);
                     }
                 } else {
-                    new_files.push(rel_str);
+                    result.added.push(rel_str);
                 }
             }
         }
@@ -302,18 +326,18 @@ impl FileIndex {
         // Find deleted files
         for path in indexed.keys() {
             if !seen.contains(path) {
-                deleted_files.push(path.clone());
+                result.deleted.push(path.clone());
             }
         }
 
-        Ok((new_files, modified_files, deleted_files))
+        Ok(result)
     }
 
     /// Refresh only files that have changed (faster than full refresh)
     /// Returns number of files updated
     pub fn incremental_refresh(&mut self) -> rusqlite::Result<usize> {
-        let (new_files, modified_files, deleted_files) = self.get_changed_files()?;
-        let total_changes = new_files.len() + modified_files.len() + deleted_files.len();
+        let changed = self.get_changed_files()?;
+        let total_changes = changed.added.len() + changed.modified.len() + changed.deleted.len();
 
         if total_changes == 0 {
             return Ok(0);
@@ -322,12 +346,12 @@ impl FileIndex {
         let tx = self.conn.transaction()?;
 
         // Delete removed files
-        for path in &deleted_files {
+        for path in &changed.deleted {
             tx.execute("DELETE FROM files WHERE path = ?1", params![path])?;
         }
 
         // Update/insert changed files
-        for path in new_files.iter().chain(modified_files.iter()) {
+        for path in changed.added.iter().chain(changed.modified.iter()) {
             let full_path = self.root.join(path);
             let is_dir = full_path.is_dir();
             let mtime = full_path
@@ -647,14 +671,13 @@ impl FileIndex {
     }
 
     /// Find symbols by name with fuzzy matching, optional kind filter, and limit
-    /// Returns: (name, kind, file, start_line, end_line, parent)
     pub fn find_symbols(
         &self,
         query: &str,
         kind: Option<&str>,
         fuzzy: bool,
         limit: usize,
-    ) -> rusqlite::Result<Vec<(String, String, String, usize, usize, Option<String>)>> {
+    ) -> rusqlite::Result<Vec<SymbolMatch>> {
         let query_lower = query.to_lowercase();
 
         // Build SQL based on fuzzy/exact mode
@@ -741,14 +764,14 @@ impl FileIndex {
 
         let symbols = stmt
             .query_map(params_refs.as_slice(), |row| {
-                Ok((
-                    row.get(0)?,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                    row.get(4)?,
-                    row.get(5)?,
-                ))
+                Ok(SymbolMatch {
+                    name: row.get(0)?,
+                    kind: row.get(1)?,
+                    file: row.get(2)?,
+                    start_line: row.get(3)?,
+                    end_line: row.get(4)?,
+                    parent: row.get(5)?,
+                })
             })?
             .filter_map(|r| r.ok())
             .collect();
@@ -757,18 +780,19 @@ impl FileIndex {
     }
 
     /// Get call graph stats
-    pub fn call_graph_stats(&self) -> rusqlite::Result<(usize, usize, usize)> {
-        let symbol_count: usize =
-            self.conn
-                .query_row("SELECT COUNT(*) FROM symbols", [], |row| row.get(0))?;
-        let call_count: usize = self
-            .conn
-            .query_row("SELECT COUNT(*) FROM calls", [], |row| row.get(0))?;
-        let import_count: usize = self
-            .conn
-            .query_row("SELECT COUNT(*) FROM imports", [], |row| row.get(0))
-            .unwrap_or(0);
-        Ok((symbol_count, call_count, import_count))
+    pub fn call_graph_stats(&self) -> rusqlite::Result<CallGraphStats> {
+        Ok(CallGraphStats {
+            symbols: self
+                .conn
+                .query_row("SELECT COUNT(*) FROM symbols", [], |row| row.get(0))?,
+            calls: self
+                .conn
+                .query_row("SELECT COUNT(*) FROM calls", [], |row| row.get(0))?,
+            imports: self
+                .conn
+                .query_row("SELECT COUNT(*) FROM imports", [], |row| row.get(0))
+                .unwrap_or(0),
+        })
     }
 
     /// Get imports for a file
@@ -896,7 +920,7 @@ impl FileIndex {
     /// Refresh the call graph by parsing all supported source files
     /// This is more expensive than file refresh since it parses every file
     /// Uses parallel processing for parsing, sequential insertion for SQLite
-    pub fn refresh_call_graph(&mut self) -> rusqlite::Result<(usize, usize, usize)> {
+    pub fn refresh_call_graph(&mut self) -> rusqlite::Result<CallGraphStats> {
         // Get all indexed source files BEFORE starting transaction
         let files: Vec<String> = {
             let sql = format!(
@@ -1001,28 +1025,34 @@ impl FileIndex {
         }
 
         tx.commit()?;
-        Ok((symbol_count, call_count, import_count))
+        Ok(CallGraphStats {
+            symbols: symbol_count,
+            calls: call_count,
+            imports: import_count,
+        })
     }
 
     /// Incrementally update call graph for changed files only
     /// Much faster than full refresh when few files changed
-    pub fn incremental_call_graph_refresh(&mut self) -> rusqlite::Result<(usize, usize, usize)> {
-        let (new_files, modified_files, deleted_files) = self.get_changed_files()?;
+    pub fn incremental_call_graph_refresh(&mut self) -> rusqlite::Result<CallGraphStats> {
+        let changed = self.get_changed_files()?;
 
         // Only process supported source and data files
-        let changed_files: Vec<String> = new_files
+        let changed_files: Vec<String> = changed
+            .added
             .into_iter()
-            .chain(modified_files.into_iter())
+            .chain(changed.modified.into_iter())
             .filter(|f| is_source_file(f))
             .collect();
 
-        let deleted_source_files: Vec<String> = deleted_files
+        let deleted_source_files: Vec<String> = changed
+            .deleted
             .into_iter()
             .filter(|f| is_source_file(f))
             .collect();
 
         if changed_files.is_empty() && deleted_source_files.is_empty() {
-            return Ok((0, 0, 0));
+            return Ok(CallGraphStats::default());
         }
 
         let tx = self.conn.transaction()?;
@@ -1081,14 +1111,17 @@ impl FileIndex {
         }
 
         tx.commit()?;
-        Ok((symbol_count, call_count, import_count))
+        Ok(CallGraphStats {
+            symbols: symbol_count,
+            calls: call_count,
+            imports: import_count,
+        })
     }
 
     /// Check if call graph needs refresh
     #[allow(dead_code)] // FileIndex API - used by daemon
     pub fn needs_call_graph_refresh(&self) -> bool {
-        let (symbols, _, _) = self.call_graph_stats().unwrap_or((0, 0, 0));
-        symbols == 0
+        self.call_graph_stats().unwrap_or_default().symbols == 0
     }
 
     /// Find files matching a query using LIKE (fast pre-filter)

@@ -11,6 +11,39 @@ fn has_language_support(path: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// Search for symbols in the index by name
+fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
+    let idx = match index::FileIndex::open(root) {
+        Ok(i) => i,
+        Err(_) => return vec![],
+    };
+
+    // Check if call graph is populated
+    let stats = idx.call_graph_stats().unwrap_or_default();
+    if stats.symbols == 0 {
+        return vec![];
+    }
+
+    // Query symbols with fuzzy matching, limit to 10
+    match idx.find_symbols(query, None, true, 10) {
+        Ok(symbols) => symbols,
+        Err(_) => vec![],
+    }
+}
+
+/// View a symbol directly by file, name, and line
+fn cmd_view_symbol_direct(
+    file_path: &str,
+    symbol_name: &str,
+    _line: usize,
+    root: &Path,
+    depth: i32,
+    full: bool,
+    json: bool,
+) -> i32 {
+    cmd_view_symbol(file_path, &[symbol_name.to_string()], root, depth, false, full, json)
+}
+
 /// Try various separators to parse file:symbol format
 fn parse_file_symbol_string(s: &str) -> Option<(String, String)> {
     // Try various separators: #, ::, :
@@ -89,16 +122,24 @@ pub fn cmd_view(
     // Use unified path resolution - get ALL matches
     let matches = path_resolve::resolve_unified_all(target, &root);
 
-    let unified = match matches.len() {
-        0 => {
+    // Also search for symbols in the index
+    let symbol_matches = search_symbols(target, &root);
+
+    let unified = match (matches.len(), symbol_matches.len()) {
+        (0, 0) => {
             eprintln!("No matches for: {}", target);
             return 1;
         }
-        1 => matches.into_iter().next().unwrap(),
+        (1, 0) => matches.into_iter().next().unwrap(),
+        (0, 1) => {
+            // Single symbol match - construct path to it
+            let sym = &symbol_matches[0];
+            return cmd_view_symbol_direct(&sym.file, &sym.name, sym.start_line, &root, depth, full, json);
+        }
         _ => {
-            // Multiple matches - list them instead of picking one
+            // Multiple matches - list files and symbols
             if json {
-                let items: Vec<_> = matches
+                let file_items: Vec<_> = matches
                     .iter()
                     .map(|m| {
                         serde_json::json!({
@@ -107,12 +148,34 @@ pub fn cmd_view(
                         })
                     })
                     .collect();
-                println!("{}", serde_json::json!({ "matches": items }));
+                let symbol_items: Vec<_> = symbol_matches
+                    .iter()
+                    .map(|sym| {
+                        serde_json::json!({
+                            "path": format!("{}:{}", sym.file, sym.start_line),
+                            "type": "symbol",
+                            "name": sym.name,
+                            "kind": sym.kind,
+                            "parent": sym.parent
+                        })
+                    })
+                    .collect();
+                println!("{}", serde_json::json!({
+                    "file_matches": file_items,
+                    "symbol_matches": symbol_items
+                }));
             } else {
                 eprintln!("Multiple matches for '{}' - be more specific:", target);
                 for m in &matches {
                     let kind = if m.is_directory { "directory" } else { "file" };
                     println!("  {} ({})", m.file_path, kind);
+                }
+                for sym in &symbol_matches {
+                    let symbol_path = match &sym.parent {
+                        Some(p) => format!("{}/{}", p, sym.name),
+                        None => sym.name.clone(),
+                    };
+                    println!("  {}/{} ({}, line {})", sym.file, symbol_path, sym.kind, sym.start_line);
                 }
             }
             return 1;
@@ -175,8 +238,8 @@ fn cmd_view_calls(
         }
     };
 
-    let (_, call_count, _) = idx.call_graph_stats().unwrap_or((0, 0, 0));
-    if call_count == 0 {
+    let stats = idx.call_graph_stats().unwrap_or_default();
+    if stats.calls == 0 {
         eprintln!("Call graph not indexed. Run: moss reindex --call-graph");
         return 1;
     }

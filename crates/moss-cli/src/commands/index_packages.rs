@@ -4,6 +4,12 @@ use crate::skeleton;
 use moss_languages::external_packages;
 use std::path::{Path, PathBuf};
 
+/// Result of indexing packages for a language
+struct IndexedCounts {
+    packages: usize,
+    symbols: usize,
+}
+
 /// Index external packages into the global cache.
 pub fn cmd_index_packages(only: &[String], clear: bool, root: Option<&Path>, json: bool) -> i32 {
     let root = root.map(|p| p.to_path_buf()).unwrap_or_else(|| {
@@ -30,7 +36,7 @@ pub fn cmd_index_packages(only: &[String], clear: bool, root: Option<&Path>, jso
     }
 
     // Collect results per language
-    let mut results: std::collections::HashMap<&str, (usize, usize)> = std::collections::HashMap::new();
+    let mut results: std::collections::HashMap<&str, IndexedCounts> = std::collections::HashMap::new();
 
     // Get all available lang_keys from registered languages
     let available: Vec<&str> = moss_languages::supported_languages()
@@ -66,22 +72,22 @@ pub fn cmd_index_packages(only: &[String], clear: bool, root: Option<&Path>, jso
         if results.contains_key(lang_key) {
             continue;
         }
-        let (pkgs, syms) = index_language_packages(lang, &index, &root, json);
-        results.insert(lang_key, (pkgs, syms));
+        let counts = index_language_packages(lang, &index, &root, json);
+        results.insert(lang_key, counts);
     }
 
     // Output results
     if json {
         let mut json_obj = serde_json::Map::new();
-        for (key, (pkgs, syms)) in &results {
-            json_obj.insert(format!("{}_packages", key), serde_json::json!(pkgs));
-            json_obj.insert(format!("{}_symbols", key), serde_json::json!(syms));
+        for (key, counts) in &results {
+            json_obj.insert(format!("{}_packages", key), serde_json::json!(counts.packages));
+            json_obj.insert(format!("{}_symbols", key), serde_json::json!(counts.symbols));
         }
         println!("{}", serde_json::Value::Object(json_obj));
     } else {
         println!("\nIndexing complete:");
-        for (key, (pkgs, syms)) in &results {
-            println!("  {}: {} packages, {} symbols", key, pkgs, syms);
+        for (key, counts) in &results {
+            println!("  {}: {} packages, {} symbols", key, counts.packages, counts.symbols);
         }
     }
 
@@ -115,13 +121,13 @@ fn index_language_packages(
     index: &external_packages::PackageIndex,
     project_root: &Path,
     json: bool,
-) -> (usize, usize) {
+) -> IndexedCounts {
     let version = lang.get_version(project_root)
         .and_then(|v| external_packages::Version::parse(&v));
 
     let lang_key = lang.lang_key();
     if lang_key.is_empty() {
-        return (0, 0);
+        return IndexedCounts { packages: 0, symbols: 0 };
     }
 
     if !json {
@@ -133,7 +139,7 @@ fn index_language_packages(
         if !json {
             println!("  No package sources found");
         }
-        return (0, 0);
+        return IndexedCounts { packages: 0, symbols: 0 };
     }
 
     let min_version = version.unwrap_or(external_packages::Version { major: 0, minor: 0 });
@@ -172,7 +178,10 @@ fn index_language_packages(
         }
     }
 
-    (total_packages, total_symbols)
+    IndexedCounts {
+        packages: total_packages,
+        symbols: total_symbols,
+    }
 }
 
 /// Index symbols from a package path (file or directory).

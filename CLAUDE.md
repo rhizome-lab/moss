@@ -38,6 +38,7 @@ Do not:
 - **Add to the monolith** - implementation goes in sub-packages (`moss-intelligence`, `moss-orchestration`, etc.), never in `src/moss/`. The `moss` package is a meta-package for external convenience only. Internal code imports from sub-packages, not `moss`.
 - **Do half measures** - when adding a trait/abstraction, migrate ALL callers immediately. No "we can consolidate later" or asking whether to do partial vs full migration. Just do the full migration.
 - **Ask permission on design when philosophy is clear** - if "Generalize Don't Multiply" or other tenets point to an obvious answer, don't present options. Just do the right thing.
+- **Return tuples from functions** - use structs with named fields. Tuples obscure meaning and cause ordering bugs. Only use tuples when names would be pure ceremony (e.g., `(x, y)` coordinates).
 
 Our system prompt for sub-agents (`src/moss/agent_loop.py:LLMConfig.system_prompt`):
 "Be terse. No preamble, no summary, no markdown formatting. Plain text only. For analysis: short bullet points, max 5 items, no code."

@@ -339,15 +339,15 @@ pub fn get_node_version() -> Option<String> {
 /// - `lodash/fp` -> `node_modules/lodash/fp`
 fn resolve_node_import(import_path: &str, node_modules: &Path) -> Option<ResolvedPackage> {
     // Parse package name (handle scoped packages)
-    let (pkg_name, subpath) = parse_node_package_name(import_path);
+    let parsed = parse_node_package_name(import_path);
 
-    let pkg_dir = node_modules.join(&pkg_name);
+    let pkg_dir = node_modules.join(&parsed.name);
     if !pkg_dir.is_dir() {
         return None;
     }
 
     // If there's a subpath, resolve it directly
-    if let Some(subpath) = subpath {
+    if let Some(subpath) = parsed.subpath {
         let target = pkg_dir.join(subpath);
         if let Some(resolved) = resolve_node_file_or_dir(&target) {
             return Some(ResolvedPackage {
@@ -383,25 +383,31 @@ fn resolve_node_import(import_path: &str, node_modules: &Path) -> Option<Resolve
     None
 }
 
-/// Parse a package name, returning (package_name, optional_subpath).
-fn parse_node_package_name(import_path: &str) -> (String, Option<&str>) {
+/// Parsed node package reference
+struct ParsedPackage<'a> {
+    name: String,
+    subpath: Option<&'a str>,
+}
+
+/// Parse a package name into name and optional subpath
+fn parse_node_package_name(import_path: &str) -> ParsedPackage<'_> {
     if import_path.starts_with('@') {
         // Scoped package: @scope/name or @scope/name/subpath
         let parts: Vec<&str> = import_path.splitn(3, '/').collect();
         if parts.len() >= 2 {
-            let pkg_name = format!("{}/{}", parts[0], parts[1]);
+            let name = format!("{}/{}", parts[0], parts[1]);
             let subpath = if parts.len() > 2 { Some(parts[2]) } else { None };
-            return (pkg_name, subpath);
+            return ParsedPackage { name, subpath };
         }
-        (import_path.to_string(), None)
+        ParsedPackage { name: import_path.to_string(), subpath: None }
     } else {
         // Regular package: name or name/subpath
         if let Some(idx) = import_path.find('/') {
-            let pkg_name = &import_path[..idx];
-            let subpath = &import_path[idx + 1..];
-            (pkg_name.to_string(), Some(subpath))
+            let name = import_path[..idx].to_string();
+            let subpath = Some(&import_path[idx + 1..]);
+            ParsedPackage { name, subpath }
         } else {
-            (import_path.to_string(), None)
+            ParsedPackage { name: import_path.to_string(), subpath: None }
         }
     }
 }

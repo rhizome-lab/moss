@@ -75,7 +75,14 @@ Phase 4 - Expand:
 - [x] Consolidated: overview → `analyze --overview`
 - [x] Fixed: view --deps now shows exports, doesn't show symbols
 - [x] Fixed: view lists all matches when query is ambiguous
-- CLI reduced from 29 to 9 commands (-5000+ lines)
+- [x] Consolidated: find-symbols → view now searches symbols too
+- CLI reduced from 29 to 8 commands (-5000+ lines)
+
+**Code Quality:**
+- Audit Rust codebase for tuple returns - replace with structs unconditionally (unless names would be pure ceremony)
+  - Already fixed: `find_symbols` → `SymbolMatch`, `call_graph_stats` → `CallGraphStats`, `get_changed_files` → `ChangedFiles`
+- Clean up `crates/moss-cli/src/commands/` to mirror actual command list (remove dead modules)
+- Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 
 **Bugs:**
 - [x] `view --calls`/`--called-by` semantics were swapped - FIXED

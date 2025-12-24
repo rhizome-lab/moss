@@ -255,28 +255,6 @@ enum Commands {
         ignore_case: bool,
     },
 
-    /// Find symbols by name across the codebase
-    FindSymbols {
-        /// Symbol name to search for (supports partial matching with --fuzzy)
-        name: String,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-
-        /// Filter by kind: function, class, method
-        #[arg(short, long)]
-        kind: Option<String>,
-
-        /// Enable fuzzy matching (default: true)
-        #[arg(short, long, default_value = "true")]
-        fuzzy: bool,
-
-        /// Maximum number of results
-        #[arg(short, long, default_value = "50")]
-        limit: usize,
-    },
-
     /// Analyze Claude Code and other agent session logs
     Sessions {
         /// Session ID or path (optional - lists sessions if omitted)
@@ -417,20 +395,6 @@ fn main() {
             glob.as_deref(),
             limit,
             ignore_case,
-            cli.json,
-        ),
-        Commands::FindSymbols {
-            name,
-            root,
-            kind,
-            fuzzy,
-            limit,
-        } => commands::find_symbols::cmd_find_symbols(
-            &name,
-            root.as_deref(),
-            kind.as_deref(),
-            fuzzy,
-            limit,
             cli.json,
         ),
         Commands::Sessions {

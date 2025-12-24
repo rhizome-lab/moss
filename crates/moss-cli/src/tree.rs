@@ -133,8 +133,14 @@ pub fn generate_tree(root: &Path, options: &TreeOptions) -> TreeResult {
     }
 }
 
+/// Result of collapsing a chain of single-child directories
+struct CollapsedChain<'a> {
+    path: String,
+    end_node: &'a TreeNode,
+}
+
 /// Collect a chain of single-child directories into a collapsed path
-fn collect_single_chain<'a>(node: &'a TreeNode, name: &str) -> (String, &'a TreeNode) {
+fn collect_single_chain<'a>(node: &'a TreeNode, name: &str) -> CollapsedChain<'a> {
     let mut current = node;
     let mut path = name.to_string();
 
@@ -153,7 +159,7 @@ fn collect_single_chain<'a>(node: &'a TreeNode, name: &str) -> (String, &'a Tree
         current = child_node;
     }
 
-    (path, current)
+    CollapsedChain { path, end_node: current }
 }
 
 fn render_tree(node: &TreeNode, prefix: &str, lines: &mut Vec<String>, options: &TreeOptions) {
@@ -174,7 +180,8 @@ fn render_tree(node: &TreeNode, prefix: &str, lines: &mut Vec<String>, options: 
 
         // Collapse single-child directory chains if enabled
         let (display_name, effective_child) = if options.collapse_single && child.is_dir {
-            collect_single_chain(child, name)
+            let chain = collect_single_chain(child, name);
+            (chain.path, chain.end_node)
         } else {
             (name.clone(), child)
         };

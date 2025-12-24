@@ -35,6 +35,13 @@ pub struct ReExport {
     pub line: usize,
 }
 
+/// Extracted dependencies (without file context)
+struct ExtractedDeps {
+    imports: Vec<Import>,
+    exports: Vec<Export>,
+    reexports: Vec<ReExport>,
+}
+
 /// Dependency information for a file
 #[allow(dead_code)] // file_path provides context; format() is API method
 pub struct DepsResult {
@@ -150,7 +157,7 @@ impl DepsExtractor {
     pub fn extract(&self, path: &Path, content: &str) -> DepsResult {
         let support = support_for_path(path);
 
-        let (imports, exports, reexports) = match support.map(|s| s.grammar_name()) {
+        let extracted = match support.map(|s| s.grammar_name()) {
             // JS/TS need special handling for re-exports
             Some("javascript") => self.extract_javascript(content),
             Some("typescript") => self.extract_typescript(content),
@@ -158,16 +165,19 @@ impl DepsExtractor {
             // All other languages use trait-based extraction
             Some(_) => {
                 let support = support.unwrap();
-                let (i, e) = self.extract_with_trait(content, support);
-                (i, e, Vec::new())
+                self.extract_with_trait(content, support)
             }
-            None => (Vec::new(), Vec::new(), Vec::new()),
+            None => ExtractedDeps {
+                imports: Vec::new(),
+                exports: Vec::new(),
+                reexports: Vec::new(),
+            },
         };
 
         DepsResult {
-            imports,
-            exports,
-            reexports,
+            imports: extracted.imports,
+            exports: extracted.exports,
+            reexports: extracted.reexports,
             file_path: path.to_string_lossy().to_string(),
         }
     }
@@ -177,10 +187,14 @@ impl DepsExtractor {
         &self,
         content: &str,
         support: &dyn Language,
-    ) -> (Vec<Import>, Vec<Export>) {
+    ) -> ExtractedDeps {
         let tree = match self.parsers.parse_with_grammar(support.grammar_name(), content) {
             Some(t) => t,
-            None => return (Vec::new(), Vec::new()),
+            None => return ExtractedDeps {
+                imports: Vec::new(),
+                exports: Vec::new(),
+                reexports: Vec::new(),
+            },
         };
 
         let mut imports = Vec::new();
@@ -189,7 +203,11 @@ impl DepsExtractor {
         let mut cursor = root.walk();
 
         self.collect_with_trait(&mut cursor, content, support, &mut imports, &mut exports);
-        (imports, exports)
+        ExtractedDeps {
+            imports,
+            exports,
+            reexports: Vec::new(),
+        }
     }
 
     fn collect_with_trait(
@@ -228,26 +246,38 @@ impl DepsExtractor {
         }
     }
 
-    fn extract_typescript(&self, content: &str) -> (Vec<Import>, Vec<Export>, Vec<ReExport>) {
+    fn extract_typescript(&self, content: &str) -> ExtractedDeps {
         let tree = match self.parsers.parse_with_grammar("typescript", content) {
             Some(t) => t,
-            None => return (Vec::new(), Vec::new(), Vec::new()),
+            None => return ExtractedDeps {
+                imports: Vec::new(),
+                exports: Vec::new(),
+                reexports: Vec::new(),
+            },
         };
         self.extract_js_ts_deps(&tree, content)
     }
 
-    fn extract_tsx(&self, content: &str) -> (Vec<Import>, Vec<Export>, Vec<ReExport>) {
+    fn extract_tsx(&self, content: &str) -> ExtractedDeps {
         let tree = match self.parsers.parse_with_grammar("tsx", content) {
             Some(t) => t,
-            None => return (Vec::new(), Vec::new(), Vec::new()),
+            None => return ExtractedDeps {
+                imports: Vec::new(),
+                exports: Vec::new(),
+                reexports: Vec::new(),
+            },
         };
         self.extract_js_ts_deps(&tree, content)
     }
 
-    fn extract_javascript(&self, content: &str) -> (Vec<Import>, Vec<Export>, Vec<ReExport>) {
+    fn extract_javascript(&self, content: &str) -> ExtractedDeps {
         let tree = match self.parsers.parse_with_grammar("javascript", content) {
             Some(t) => t,
-            None => return (Vec::new(), Vec::new(), Vec::new()),
+            None => return ExtractedDeps {
+                imports: Vec::new(),
+                exports: Vec::new(),
+                reexports: Vec::new(),
+            },
         };
         self.extract_js_ts_deps(&tree, content)
     }
@@ -257,7 +287,7 @@ impl DepsExtractor {
         &self,
         tree: &tree_sitter::Tree,
         content: &str,
-    ) -> (Vec<Import>, Vec<Export>, Vec<ReExport>) {
+    ) -> ExtractedDeps {
         let mut imports = Vec::new();
         let mut exports = Vec::new();
         let mut reexports = Vec::new();
@@ -265,7 +295,11 @@ impl DepsExtractor {
         let mut cursor = root.walk();
 
         self.collect_js_ts_deps(&mut cursor, content, &mut imports, &mut exports, &mut reexports);
-        (imports, exports, reexports)
+        ExtractedDeps {
+            imports,
+            exports,
+            reexports,
+        }
     }
 
     fn collect_js_ts_deps(

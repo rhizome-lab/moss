@@ -83,7 +83,7 @@ pub fn cmd_index_stats(root: Option<&Path>, json: bool) -> i32 {
     ext_list.sort_by(|a, b| b.1.cmp(&a.1));
 
     // Get call graph stats
-    let (symbol_count, call_count, import_count) = idx.call_graph_stats().unwrap_or((0, 0, 0));
+    let stats = idx.call_graph_stats().unwrap_or_default();
 
     // Calculate codebase size (sum of file sizes)
     let mut codebase_size: u64 = 0;
@@ -103,9 +103,9 @@ pub fn cmd_index_stats(root: Option<&Path>, json: bool) -> i32 {
             "ratio": if codebase_size > 0 { db_size as f64 / codebase_size as f64 } else { 0.0 },
             "file_count": file_count,
             "dir_count": dir_count,
-            "symbol_count": symbol_count,
-            "call_count": call_count,
-            "import_count": import_count,
+            "symbol_count": stats.symbols,
+            "call_count": stats.calls,
+            "import_count": stats.imports,
             "extensions": ext_list.iter().take(20).map(|(e, c)| serde_json::json!({"ext": e, "count": c})).collect::<Vec<_>>()
         });
         println!("{}", serde_json::to_string_pretty(&output).unwrap());
@@ -118,9 +118,9 @@ pub fn cmd_index_stats(root: Option<&Path>, json: bool) -> i32 {
         println!("Ratio:        {:.2}%", if codebase_size > 0 { db_size as f64 / codebase_size as f64 * 100.0 } else { 0.0 });
         println!();
         println!("Files:        {} ({} dirs)", file_count, dir_count);
-        println!("Symbols:      {}", symbol_count);
-        println!("Calls:        {}", call_count);
-        println!("Imports:      {}", import_count);
+        println!("Symbols:      {}", stats.symbols);
+        println!("Calls:        {}", stats.calls);
+        println!("Imports:      {}", stats.imports);
         println!();
         println!("Top extensions:");
         for (ext, count) in ext_list.iter().take(15) {
