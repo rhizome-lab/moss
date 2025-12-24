@@ -323,7 +323,14 @@ impl SkeletonExtractor {
                     self.extract_legacy(lang, content)
                 }
             }
-            // Java uses legacy extractor (needs complex handling: interface/enum)
+            Some(Language::Java) => {
+                if let Some(support) = get_support(Language::Java) {
+                    self.extract_with_trait(Language::Java, content, support)
+                } else {
+                    self.extract_legacy(lang, content)
+                }
+            }
+            // Vue uses legacy extractor (needs script element parsing)
             _ => self.extract_legacy(lang, content),
         };
 

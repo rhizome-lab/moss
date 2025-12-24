@@ -64,11 +64,13 @@ impl LanguageSupport for JavaSupport {
         for child in node.children(&mut cursor) {
             if child.kind() == "modifiers" {
                 let mods = &content[child.byte_range()];
-                if mods.contains("public") { return Visibility::Public; }
                 if mods.contains("private") { return Visibility::Private; }
                 if mods.contains("protected") { return Visibility::Protected; }
+                // public or no modifier = visible in skeleton
+                return Visibility::Public;
             }
         }
-        Visibility::Internal // package-private
+        // No modifier = package-private, but still visible for skeleton purposes
+        Visibility::Public
     }
 }
