@@ -1,4 +1,5 @@
 use moss_core::{tree_sitter, Language, Parsers};
+use moss_languages::{get_support, LanguageSupport};
 use std::path::Path;
 
 /// Result of finding a symbol in a file
@@ -42,6 +43,15 @@ impl Editor {
     /// Find a symbol by name in a file
     pub fn find_symbol(&self, path: &Path, content: &str, name: &str) -> Option<SymbolLocation> {
         let lang = Language::from_path(path)?;
+
+        // Use trait-based detection for supported languages
+        if let Some(support) = get_support(lang) {
+            let tree = self.parsers.parse_lang(lang, content)?;
+            let root = tree.root_node();
+            return self.find_symbol_with_trait(root, content, name, lang, support);
+        }
+
+        // Legacy fallback
         let tree = match lang {
             Language::Python | Language::Rust => self.parsers.parse_lang(lang, content)?,
             _ => return None,
@@ -49,6 +59,64 @@ impl Editor {
 
         let root = tree.root_node();
         self.find_symbol_in_node(root, content, name, lang)
+    }
+
+    fn find_symbol_with_trait(
+        &self,
+        node: tree_sitter::Node,
+        content: &str,
+        name: &str,
+        lang: Language,
+        support: &dyn LanguageSupport,
+    ) -> Option<SymbolLocation> {
+        let kind = node.kind();
+
+        // Check if this is a function or container with matching name
+        let symbol_kind = if support.function_kinds().contains(&kind) {
+            Some("function")
+        } else if support.container_kinds().contains(&kind) {
+            Some("class")
+        } else if support.type_kinds().contains(&kind) && !support.container_kinds().contains(&kind) {
+            Some("type")
+        } else {
+            None
+        };
+
+        if let Some(sym_kind) = symbol_kind {
+            if let Some(name_node) = node.child_by_field_name("name")
+                .or_else(|| node.child_by_field_name("type")) // For impl blocks
+            {
+                let symbol_name = &content[name_node.byte_range()];
+                if symbol_name == name {
+                    let start_byte = node.start_byte();
+                    let line_start = content[..start_byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                    let indent = content[line_start..start_byte]
+                        .chars()
+                        .take_while(|c| c.is_whitespace())
+                        .collect();
+
+                    return Some(SymbolLocation {
+                        name: symbol_name.to_string(),
+                        kind: sym_kind.to_string(),
+                        start_byte: node.start_byte(),
+                        end_byte: node.end_byte(),
+                        start_line: node.start_position().row + 1,
+                        end_line: node.end_position().row + 1,
+                        indent,
+                    });
+                }
+            }
+        }
+
+        // Recurse into children
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if let Some(loc) = self.find_symbol_with_trait(child, content, name, lang, support) {
+                return Some(loc);
+            }
+        }
+
+        None
     }
 
     fn find_symbol_in_node(
@@ -303,6 +371,15 @@ impl Editor {
         name: &str,
     ) -> Option<ContainerBody> {
         let lang = Language::from_path(path)?;
+
+        // Use trait-based detection for supported languages
+        if let Some(support) = get_support(lang) {
+            let tree = self.parsers.parse_lang(lang, content)?;
+            let root = tree.root_node();
+            return self.find_container_body_with_trait(root, content, name, lang, support);
+        }
+
+        // Legacy fallback
         let tree = match lang {
             Language::Python | Language::Rust => self.parsers.parse_lang(lang, content)?,
             _ => return None,
@@ -310,6 +387,56 @@ impl Editor {
 
         let root = tree.root_node();
         self.find_container_body_in_node(root, content, name, lang)
+    }
+
+    fn find_container_body_with_trait(
+        &self,
+        node: tree_sitter::Node,
+        content: &str,
+        name: &str,
+        lang: Language,
+        support: &dyn LanguageSupport,
+    ) -> Option<ContainerBody> {
+        let kind = node.kind();
+
+        // Only check container types
+        if support.container_kinds().contains(&kind) {
+            // Get the name of this container
+            let name_node = node.child_by_field_name("name")
+                .or_else(|| node.child_by_field_name("type"))?; // impl blocks use "type"
+            let container_name = &content[name_node.byte_range()];
+
+            if container_name == name {
+                // Get the body node using trait method
+                let body_node = support.container_body(&node)?;
+
+                // Calculate inner indentation
+                let start_byte = node.start_byte();
+                let line_start = content[..start_byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                let container_indent: String = content[line_start..start_byte]
+                    .chars()
+                    .take_while(|c| c.is_whitespace())
+                    .collect();
+                let inner_indent = format!("{}    ", container_indent);
+
+                // Use language-specific body analysis
+                return match lang {
+                    Language::Python => self.analyze_python_class_body(&body_node, content, &inner_indent),
+                    Language::Rust => self.analyze_rust_impl_body(&body_node, content, &inner_indent),
+                    _ => None,
+                };
+            }
+        }
+
+        // Recurse into children
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if let Some(body) = self.find_container_body_with_trait(child, content, name, lang, support) {
+                return Some(body);
+            }
+        }
+
+        None
     }
 
     fn find_container_body_in_node(
