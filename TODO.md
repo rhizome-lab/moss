@@ -4,6 +4,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
+- Delete legacy symbol parsing code from `symbols.rs` (marked with `#[allow(dead_code)]`)
+- Clean up legacy extraction code in `skeleton.rs`, `deps.rs`, `complexity.rs`
 - Session analysis: detect correction patterns ("You're right", "Good point")
 - Complete daemon integration (FileIndex API methods currently unused)
 
