@@ -154,6 +154,10 @@ enum Commands {
         #[arg(long)]
         types_only: bool,
 
+        /// Disable smart display (no collapsing single-child dirs)
+        #[arg(long)]
+        raw: bool,
+
         /// Focus view: show target at high detail, imports at signature level
         /// Resolves local imports and shows their skeletons inline
         /// Optionally filter to a specific module: --focus=models
@@ -314,39 +318,6 @@ enum Commands {
         /// Root directory (defaults to current directory)
         #[arg(short, long)]
         root: Option<PathBuf>,
-    },
-
-    /// Show directory tree structure
-    Tree {
-        /// Directory to show (defaults to root)
-        #[arg(default_value = ".")]
-        path: String,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-
-        /// Maximum depth to display
-        #[arg(short, long)]
-        depth: Option<usize>,
-
-        /// Show only directories
-        #[arg(short = 'D', long)]
-        dirs_only: bool,
-    },
-
-    /// Show code skeleton (function/class signatures)
-    Skeleton {
-        /// File to extract skeleton from
-        file: String,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-
-        /// Include docstrings
-        #[arg(short = 'd', long, default_value = "true")]
-        docstrings: bool,
     },
 
     /// Generate compiled context (skeleton + deps + summary)
@@ -658,6 +629,7 @@ fn main() {
             calls,
             called_by,
             types_only,
+            raw,
             focus,
             resolve_imports,
             all,
@@ -672,6 +644,7 @@ fn main() {
             calls,
             called_by,
             types_only,
+            raw,
             focus.as_deref(),
             resolve_imports,
             all,
@@ -737,17 +710,6 @@ fn main() {
             let (symbol, _file) = normalize_symbol_args(&args);
             commands::callers::cmd_callers(&symbol, root.as_deref(), cli.json)
         }
-        Commands::Tree {
-            path,
-            root,
-            depth,
-            dirs_only,
-        } => commands::tree_cmd::cmd_tree(&path, root.as_deref(), depth, dirs_only, cli.json),
-        Commands::Skeleton {
-            file,
-            root,
-            docstrings,
-        } => commands::skeleton::cmd_skeleton(&file, root.as_deref(), docstrings, cli.json),
         Commands::Context { file, root } => {
             commands::context::cmd_context(&file, root.as_deref(), cli.json)
         }

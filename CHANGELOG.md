@@ -4,6 +4,14 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Tree View Improvements
+
+- **Collapse single-child folders**: `src/moss_intelligence/` shown as one line instead of two
+- **Smart display by default**: `--raw` flag to disable collapsing
+- **Removed `tree` command**: consolidated into `view` (use `moss view <dir>`)
+- **Removed `skeleton` command**: consolidated into `view` (docstrings now shown by default)
+- **Added `--dirs-only` and `--raw` flags** to `view` command for directory trees
+
 ### Session Analysis Command
 
 New `moss sessions` command for analyzing Claude Code and Gemini CLI logs:

@@ -818,13 +818,14 @@ TOOL_REGISTRY = _TOOLS
 
 # Semantic aliases: alternative names that map to canonical tools
 TOOL_ALIASES: dict[str, str] = {
-    # skeleton (most common terms for code structure)
-    "symbols": "skeleton",
-    "outline": "skeleton",
-    "tree": "skeleton",
-    "hierarchy": "skeleton",
-    "structure": "skeleton",  # Code structure = skeleton
-    "overview": "skeleton",  # Code overview = skeleton
+    # view (most common terms for code structure)
+    "symbols": "view",
+    "outline": "view",
+    "tree": "view",
+    "hierarchy": "view",
+    "structure": "view",  # Code structure = view
+    "overview": "view",  # Code overview = view
+    "skeleton": "view",  # skeleton is now part of view
     # cli_expand (show full source of a symbol)
     "expand": "cli_expand",
     "fullsource": "cli_expand",

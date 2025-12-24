@@ -42,6 +42,7 @@ pub fn cmd_view(
     show_calls: bool,
     show_called_by: bool,
     types_only: bool,
+    raw: bool,
     focus: Option<&str>,
     resolve_imports: bool,
     show_all: bool,
@@ -80,7 +81,7 @@ pub fn cmd_view(
 
     // Handle "." as current directory
     if target == "." {
-        return cmd_view_directory(&root, &root, depth, json);
+        return cmd_view_directory(&root, &root, depth, raw, json);
     }
 
     // Use unified path resolution
@@ -94,7 +95,7 @@ pub fn cmd_view(
 
     if unified.is_directory {
         // View directory
-        cmd_view_directory(&root.join(&unified.file_path), &root, depth, json)
+        cmd_view_directory(&root.join(&unified.file_path), &root, depth, raw, json)
     } else if unified.symbol_path.is_empty() {
         // View file (--full overrides depth to show raw content)
         let effective_depth = if full { -1 } else { depth };
@@ -358,9 +359,16 @@ fn cmd_view_filtered(root: &Path, scope: &str, kind: &str, json: bool) -> i32 {
     0
 }
 
-fn cmd_view_directory(dir: &Path, root: &Path, depth: i32, json: bool) -> i32 {
+fn cmd_view_directory(dir: &Path, root: &Path, depth: i32, raw: bool, json: bool) -> i32 {
     let effective_depth = if depth < 0 { None } else { Some(depth as usize) };
-    let result = tree::generate_tree(dir, effective_depth, false);
+    let result = tree::generate_tree(
+        dir,
+        &tree::TreeOptions {
+            max_depth: effective_depth,
+            collapse_single: !raw,
+            ..Default::default()
+        },
+    );
 
     let rel_path = dir
         .strip_prefix(root)
@@ -565,7 +573,8 @@ fn cmd_view_file(
         }
 
         if depth >= 1 {
-            let formatted = skeleton_result.format(depth >= 2);
+            // Always include docstrings (was: depth >= 2)
+            let formatted = skeleton_result.format(true);
             if !formatted.is_empty() {
                 println!("\n## Symbols");
                 println!("{}", formatted);

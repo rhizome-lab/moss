@@ -6,13 +6,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 - Complete daemon integration
 - Streaming --jq support for sessions command (currently loads all files into memory)
-- Tree view improvements:
-  - Collapse single-child folders (src/moss_orchestration/ → one level)
-  - Package-aware resolution (moss view moss-orchestration → finds code dir)
-  - Smart depth (skip boilerplate when counting depth)
-  - Config: on by default, `--raw` to disable all, per-option flags, per-directory config
+- Tree view remaining:
+  - Smart depth: boilerplate_dirs defined but not yet applied to depth calculation
+  - Per-directory config (.moss/tree.toml or similar)
 
-Test Status: 64 passing, 0 failing
+Test Status: 65 passing, 0 failing
 
 ## Backlog
 
@@ -71,6 +69,7 @@ Phase 4 - Expand:
 - Filter out tests from views (--no-tests or --exclude=tests)
 - Filter by category: tests, config files, build files, etc.
 - Inverse: show only specific categories (--only=tests)
+- Filter view children by type/name (needs design: glob patterns? symbol kinds?)
 
 **Agent Research:**
 - Conversational loop pattern (vs hierarchical)
