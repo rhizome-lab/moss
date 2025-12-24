@@ -16,8 +16,6 @@ from moss_orchestration.output import Output, Verbosity, configure_output, get_o
 if TYPE_CHECKING:
     from argparse import Namespace
 
-    from moss_orchestration.session_analysis import SessionAnalysis
-
 
 def get_version() -> str:
     """Get the moss version."""
@@ -2004,8 +2002,8 @@ def cmd_roadmap(args: Namespace) -> int:
 
 
 def cmd_analyze_session(args: Namespace) -> int:
-    """Analyze a Claude Code session log."""
-    from moss_orchestration.session_analysis import analyze_session
+    """Analyze a Claude Code session log (delegates to Rust CLI)."""
+    import subprocess
 
     output = setup_output(args)
     session_path = Path(getattr(args, "session_path", ""))
@@ -2014,30 +2012,28 @@ def cmd_analyze_session(args: Namespace) -> int:
         output.error(f"Session file not found: {session_path}")
         return 1
 
-    output.info(f"Analyzing {session_path.name}...")
+    # Delegate to Rust CLI
+    cmd = ["moss", "sessions", str(session_path), "--analyze"]
+    if wants_json(args):
+        cmd.append("--json")
 
     try:
-        analysis = analyze_session(session_path)
-    except Exception as e:
-        output.error(f"Failed to analyze session: {e}")
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.stdout:
+            output.print(result.stdout.rstrip())
+        if result.stderr:
+            output.error(result.stderr.rstrip())
+        return result.returncode
+    except FileNotFoundError:
+        output.error("Rust CLI (moss) not found. Run: cargo install --path crates/moss-cli")
         return 1
-
-    # Output format
-    compact = getattr(args, "compact", False)
-    if compact and not wants_json(args):
-        output.print(analysis.to_compact())
-    elif wants_json(args):
-        output.data(analysis.to_dict())
-    else:
-        output.print(analysis.to_markdown())
-
-    return 0
 
 
 def cmd_telemetry(args: Namespace) -> int:
     """Show aggregate telemetry across sessions."""
+    import subprocess
+
     from moss_orchestration.session import SessionManager
-    from moss_orchestration.session_analysis import analyze_session
 
     output = setup_output(args)
     log_paths = [Path(p) for p in getattr(args, "logs", []) or []]
@@ -2063,7 +2059,7 @@ def cmd_telemetry(args: Namespace) -> int:
             output.print(_format_session_stats(stats))
         return 0
 
-    # Mode 2: Analyze external Claude Code session logs
+    # Mode 2: Analyze external Claude Code session logs (delegates to Rust CLI)
     if log_paths:
         for path in log_paths:
             if not path.exists():
@@ -2071,25 +2067,24 @@ def cmd_telemetry(args: Namespace) -> int:
                 return 1
 
         if watch_mode:
-            return _telemetry_watch_loop(log_paths, output, html_output, args)
+            output.error("Watch mode not supported for external logs. Use: moss sessions <id> --jq")
+            return 1
 
-        analyses = [analyze_session(p) for p in log_paths]
+        # Delegate to Rust CLI
+        cmd = ["moss", "sessions"] + [str(p) for p in log_paths] + ["--analyze"]
+        if wants_json(args):
+            cmd.append("--json")
 
-        if len(analyses) == 1:
-            analysis = analyses[0]
-        else:
-            analysis = _aggregate_analyses(analyses)
-
-        if html_output:
-            html = _generate_telemetry_html(analysis)
-            output.print(html)
-        elif wants_json(args):
-            output.data(analysis.to_dict())
-        elif getattr(args, "compact", False):
-            output.print(analysis.to_compact())
-        else:
-            output.print(analysis.to_markdown())
-        return 0
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if result.stdout:
+                output.print(result.stdout.rstrip())
+            if result.stderr:
+                output.error(result.stderr.rstrip())
+            return result.returncode
+        except FileNotFoundError:
+            output.error("Rust CLI (moss) not found. Run: cargo install --path crates/moss-cli")
+            return 1
 
     # Mode 3: Default - aggregate stats across all moss sessions
     manager = SessionManager()
@@ -2109,113 +2104,6 @@ def cmd_telemetry(args: Namespace) -> int:
     else:
         output.print(_format_aggregate_stats(aggregate))
     return 0
-
-
-def _telemetry_watch_loop(
-    log_paths: list[Path], output: Any, html_output: bool, args: Namespace
-) -> int:
-    """Run continuous telemetry watch loop."""
-    import sys
-    import time
-
-    from moss_orchestration.session_analysis import analyze_session
-
-    last_mtimes: dict[Path, float] = {}
-    last_output = ""
-    refresh_interval = 2.0  # seconds
-
-    output.print(f"Watching {len(log_paths)} log file(s)... (Ctrl+C to stop)")
-
-    try:
-        while True:
-            # Check if any files changed
-            changed = False
-            for path in log_paths:
-                try:
-                    mtime = path.stat().st_mtime
-                    if path not in last_mtimes or mtime > last_mtimes[path]:
-                        last_mtimes[path] = mtime
-                        changed = True
-                except OSError:
-                    pass
-
-            if changed or not last_output:
-                # Re-analyze
-                analyses = [analyze_session(p) for p in log_paths]
-                if len(analyses) == 1:
-                    analysis = analyses[0]
-                else:
-                    analysis = _aggregate_analyses(analyses)
-
-                # Format output
-                if html_output:
-                    new_output = _generate_telemetry_html(analysis)
-                elif getattr(args, "compact", False):
-                    new_output = analysis.to_compact()
-                else:
-                    new_output = _format_watch_output(analysis)
-
-                # Only redraw if output changed
-                if new_output != last_output:
-                    last_output = new_output
-                    # Clear screen and move cursor to top
-                    sys.stdout.write("\033[2J\033[H")
-                    sys.stdout.write(new_output)
-                    sys.stdout.write(
-                        f"\n\n[Last updated: {time.strftime('%H:%M:%S')}] "
-                        f"Watching... (Ctrl+C to stop)\n"
-                    )
-                    sys.stdout.flush()
-
-            time.sleep(refresh_interval)
-    except KeyboardInterrupt:
-        output.print("\nWatch stopped.")
-        return 0
-
-
-def _format_watch_output(analysis: Any) -> str:
-    """Format telemetry for watch mode (compact live view)."""
-    lines = []
-    lines.append("TELEMETRY WATCH")
-    lines.append("=" * 50)
-    lines.append("")
-
-    # Summary stats
-    lines.append(f"Tool calls: {analysis.total_tool_calls}")
-    lines.append(f"Success rate: {analysis.overall_success_rate:.1%}")
-    lines.append(f"Turns: {analysis.total_turns}")
-    lines.append("")
-
-    # Token stats
-    if analysis.token_stats.api_calls:
-        ts = analysis.token_stats
-        lines.append("TOKENS")
-        lines.append(f"  API calls: {ts.api_calls}")
-        lines.append(f"  Avg context: {ts.avg_context:,}")
-        lines.append(f"  Output: {ts.total_output:,}")
-        if ts.cache_read:
-            lines.append(f"  Cache read: {ts.cache_read:,}")
-        lines.append("")
-
-    # Top tools (compact)
-    if analysis.tool_stats:
-        lines.append("TOP TOOLS")
-        sorted_tools = sorted(analysis.tool_stats.values(), key=lambda t: t.calls, reverse=True)[:5]
-        for tool in sorted_tools:
-            lines.append(f"  {tool.name}: {tool.calls}")
-        lines.append("")
-
-    # File hotspots
-    if analysis.file_tokens:
-        lines.append("FILE HOTSPOTS (by tokens)")
-        sorted_files = sorted(analysis.file_tokens.items(), key=lambda x: -x[1])[:5]
-        for path, tokens in sorted_files:
-            # Truncate long paths
-            display_path = path if len(path) <= 40 else "..." + path[-37:]
-            lines.append(f"  {display_path}: {tokens:,}")
-        lines.append("")
-
-    return "\n".join(lines)
 
 
 def _extract_session_stats(session: Any) -> dict:
@@ -2320,63 +2208,6 @@ def _format_aggregate_stats(stats: dict) -> str:
             lines.append(f"  {path}: {count} accesses")
 
     return "\n".join(lines)
-
-
-def _aggregate_analyses(analyses: list) -> SessionAnalysis:
-    """Aggregate multiple SessionAnalysis objects."""
-    from moss_orchestration.session_analysis import SessionAnalysis, TokenStats, ToolStats
-
-    if not analyses:
-        return SessionAnalysis(session_path=Path("."))
-
-    # Combine tool stats
-    combined_tools: dict[str, ToolStats] = {}
-    for analysis in analyses:
-        for name, stats in analysis.tool_stats.items():
-            if name not in combined_tools:
-                combined_tools[name] = ToolStats(name=name)
-            combined_tools[name].calls += stats.calls
-            combined_tools[name].errors += stats.errors
-
-    # Combine token stats
-    combined_tokens = TokenStats()
-    for analysis in analyses:
-        ts = analysis.token_stats
-        combined_tokens.total_input += ts.total_input
-        combined_tokens.total_output += ts.total_output
-        combined_tokens.cache_read += ts.cache_read
-        combined_tokens.cache_create += ts.cache_create
-        combined_tokens.api_calls += ts.api_calls
-        if ts.max_context > combined_tokens.max_context:
-            combined_tokens.max_context = ts.max_context
-        if combined_tokens.min_context == 0 or (
-            ts.min_context > 0 and ts.min_context < combined_tokens.min_context
-        ):
-            combined_tokens.min_context = ts.min_context
-
-    # Combine message counts
-    combined_messages: dict[str, int] = {}
-    for analysis in analyses:
-        for msg_type, count in analysis.message_counts.items():
-            combined_messages[msg_type] = combined_messages.get(msg_type, 0) + count
-
-    # Combine file tokens
-    combined_file_tokens: dict[str, int] = {}
-    for analysis in analyses:
-        for path, tokens in analysis.file_tokens.items():
-            combined_file_tokens[path] = combined_file_tokens.get(path, 0) + tokens
-
-    result = SessionAnalysis(
-        session_path=Path(f"<{len(analyses)} sessions>"),
-        tool_stats=combined_tools,
-        token_stats=combined_tokens,
-        message_counts=combined_messages,
-        file_tokens=combined_file_tokens,
-        total_turns=sum(a.total_turns for a in analyses),
-        parallel_opportunities=sum(a.parallel_opportunities for a in analyses),
-    )
-
-    return result
 
 
 def _telemetry_css() -> str:
@@ -2496,54 +2327,6 @@ def _generate_aggregate_html(stats: dict) -> str:
                 {hotspot_rows}
             </table>
         </div>
-    </div>
-</body>
-</html>"""
-
-
-def _generate_telemetry_html(analysis: SessionAnalysis) -> str:
-    """Generate HTML dashboard for session analysis."""
-    tool_rows = ""
-    for tool in sorted(analysis.tool_stats.values(), key=lambda t: -t.calls):
-        success_pct = f"{tool.success_rate:.0%}"
-        row = f"<tr><td>{tool.name}</td><td>{tool.calls}</td>"
-        row += f"<td>{tool.errors}</td><td>{success_pct}</td></tr>\n"
-        tool_rows += row
-
-    ts = analysis.token_stats
-    css = _telemetry_css()
-    return f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Session Telemetry</title>
-    <style>{css}</style>
-</head>
-<body>
-    <h1>Session Telemetry</h1>
-    <div class="grid">
-        <div class="card">
-            <div class="metric">{analysis.total_tool_calls}</div>
-            <div class="label">Tool Calls</div>
-        </div>
-        <div class="card">
-            <div class="metric">{analysis.overall_success_rate:.0%}</div>
-            <div class="label">Success Rate</div>
-        </div>
-        <div class="card">
-            <div class="metric">{ts.api_calls}</div>
-            <div class="label">API Calls</div>
-        </div>
-        <div class="card">
-            <div class="metric">{ts.avg_context // 1000}K</div>
-            <div class="label">Avg Context</div>
-        </div>
-    </div>
-    <div class="card">
-        <h2>Tool Usage</h2>
-        <table>
-            <tr><th>Tool</th><th>Calls</th><th>Errors</th><th>Success Rate</th></tr>
-            {tool_rows}
-        </table>
     </div>
 </body>
 </html>"""
