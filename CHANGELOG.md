@@ -51,6 +51,17 @@ Derived CLAUDE.md design principles from correction pattern analysis:
 - "Simplicity over cleverness" - stdlib > dependencies
 - "When stuck, reconsider the problem" - not just try more solutions
 
+### Language Trait Defaults Removed (Phase 4)
+
+Removed all default implementations from the `Language` trait following CLAUDE.md principle: "defaults let you 'implement' a trait without implementing it. That's a silent bug."
+
+- 24 methods now require explicit implementation: `has_symbols`, `extract_type`, `extract_docstring`, `extract_imports`, `extract_public_symbols`, `is_public`, `get_visibility`, `container_body`, `body_has_docstring`, `node_name`, `file_path_to_module_name`, `module_name_to_paths`, `lang_key`, `resolve_local_import`, `resolve_external_import`, `is_stdlib_import`, `get_version`, `find_package_cache`, `indexable_extensions`, `find_stdlib`, `package_module_name`, `package_sources`, `discover_packages`, `find_package_entry`
+- 3 methods kept as provided defaults (utility methods): `discover_flat_packages`, `discover_recursive_packages`, `discover_npm_scoped_packages`
+- All 18 language files updated with explicit implementations
+- Languages with `has_symbols() -> false`: JSON, YAML, TOML, Markdown, HTML, CSS (data formats)
+- Languages with `has_symbols() -> true`: Python, Rust, Go, JavaScript, TypeScript, TSX, Java, C, C++, Ruby, Scala, Vue, Bash
+- All 72 tests pass
+
 ### Language Feature Flags
 
 Added feature flags to moss-cli for selective language support:

@@ -4,58 +4,17 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-**Phase 4: Remove all Language trait defaults** (17 languages × 27 methods):
-
-Trait methods to make required (remove defaults):
-- [ ] Symbol extraction: `has_symbols`, `extract_type`, `extract_docstring`
-- [ ] Imports/exports: `extract_imports`, `extract_public_symbols`
-- [ ] Visibility: `is_public`, `get_visibility`
-- [ ] Edit support: `container_body`, `body_has_docstring`, `node_name`
-- [ ] Module mapping: `file_path_to_module_name`, `module_name_to_paths`
-- [ ] Resolution: `lang_key`, `resolve_local_import`, `resolve_external_import`, `is_stdlib_import`
-- [ ] Package discovery: `get_version`, `find_package_cache`, `indexable_extensions`, `find_stdlib`, `package_module_name`, `package_sources`, `discover_packages`, `find_package_entry`
-- [ ] Keep as provided defaults (utility methods): `discover_flat_packages`, `discover_recursive_packages`, `discover_npm_scoped_packages`
-
-Languages to update (explicit implementations for all methods):
-- [ ] Python (python.rs) - full import resolution
-- [ ] Rust (rust.rs) - full import resolution
-- [ ] JavaScript (javascript.rs, ecmascript.rs) - full import resolution
-- [ ] TypeScript (typescript.rs) - delegates to ecmascript
-- [ ] Go (go.rs) - full import resolution
-- [ ] Java (java.rs) - partial resolution
-- [ ] C (c.rs, c_cpp.rs) - header-based
-- [ ] C++ (cpp.rs) - header-based
-- [ ] Ruby (ruby.rs) - minimal
-- [ ] Scala (scala.rs) - minimal
-- [ ] Vue (vue.rs) - minimal
-- [ ] Bash (bash.rs) - minimal
-- [ ] JSON (json.rs) - data format, most return None/empty
-- [ ] YAML (yaml.rs) - data format
-- [ ] TOML (toml.rs) - data format
-- [ ] Markdown (markdown.rs) - data format
-- [ ] HTML (html.rs) - minimal
-- [ ] CSS (css.rs) - minimal
-
-Audit callers after trait changes:
-- [ ] skeleton.rs - handles None from extract_type/extract_docstring
-- [ ] deps.rs - handles empty from extract_imports
-- [ ] symbols.rs - handles None from node_name
-- [ ] index.rs - handles empty from extract_public_symbols
-
-**After Phase 4:**
 - view.rs internal cleanup (consolidated but messy, problem shifted not solved)
 - Self-documenting CLI names audit (commands, subcommands, flags)
 - Tree view: apply boilerplate_dirs to depth calculation
 
-Test Status: 65 passing, 0 failing
+Test Status: 72 passing, 0 failing
 
 ## Backlog
 
 **Language Support Refactor** (see `docs/language-support.md` for full design):
 
-Phase 1-3: ✅ Complete (scaffold, port, integrate)
-
-Phase 4 - Remove trait defaults: **In Progress** (see Next Up)
+Phase 1-4: ✅ Complete (scaffold, port, integrate, remove trait defaults)
 
 Phase 5 - Expand (new languages):
 - [ ] Kotlin, Swift, Dart (mobile)
