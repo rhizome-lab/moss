@@ -23,6 +23,7 @@ pub mod path_cmd;
 pub mod reindex;
 pub mod scopes;
 pub mod search_tree;
+pub mod sessions;
 pub mod skeleton;
 pub mod summarize_cmd;
 pub mod symbols_cmd;

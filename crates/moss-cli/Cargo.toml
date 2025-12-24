@@ -56,6 +56,10 @@ ureq = { version = "2", features = ["json"] }
 flate2 = "1"
 tar = "0.4"
 zip = "2"
+regex = "1"
+jaq-core = "2"
+jaq-std = "2"
+jaq-json = { version = "1", features = ["serde_json"] }
 
 [dev-dependencies]
 tempfile = "3"

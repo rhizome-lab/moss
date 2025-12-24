@@ -15,6 +15,7 @@ mod index;
 mod overview;
 mod path_resolve;
 mod scopes;
+mod sessions;
 mod skeleton;
 mod summarize;
 mod symbols;
@@ -612,6 +613,32 @@ enum Commands {
         #[arg(short, long)]
         root: Option<PathBuf>,
     },
+
+    /// Analyze Claude Code and other agent session logs
+    Sessions {
+        /// Session ID or path (optional - lists sessions if omitted)
+        session: Option<String>,
+
+        /// Project path to find sessions for (defaults to current directory)
+        #[arg(short, long)]
+        project: Option<PathBuf>,
+
+        /// Apply jq filter to each JSONL line
+        #[arg(long)]
+        jq: Option<String>,
+
+        /// Force specific format: claude, gemini, moss
+        #[arg(long)]
+        format: Option<String>,
+
+        /// Run full analysis instead of dumping raw log
+        #[arg(short, long)]
+        analyze: bool,
+
+        /// Limit number of sessions to list
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
 }
 
 fn main() {
@@ -815,6 +842,27 @@ fn main() {
         }
         Commands::IndexPackages { only, clear, root } => {
             commands::index_packages::cmd_index_packages(&only, clear, root.as_deref(), cli.json)
+        }
+        Commands::Sessions {
+            session,
+            project,
+            jq,
+            format,
+            analyze,
+            limit,
+        } => {
+            if let Some(session_id) = session {
+                commands::sessions::cmd_sessions_show(
+                    &session_id,
+                    project.as_deref(),
+                    jq.as_deref(),
+                    format.as_deref(),
+                    analyze,
+                    cli.json,
+                )
+            } else {
+                commands::sessions::cmd_sessions_list(project.as_deref(), limit, cli.json)
+            }
         }
     };
 
