@@ -25,7 +25,7 @@ Phase 2 - Port existing languages: ✅
 - [x] Port Go, Java, C, C++, Ruby, Scala, Vue
 - [x] Port config formats: JSON, YAML, TOML, Markdown
 
-Phase 3 - Integrate (in progress):
+Phase 3 - Integrate: ✅
 - [x] Add trait infrastructure to `skeleton.rs` (extract_with_trait, convert_symbol)
 - [x] Improve trait impls to match legacy behavior (Rust impl blocks, Go types, Java visibility)
 - [x] Migrate languages to trait-based extraction:
@@ -34,8 +34,10 @@ Phase 3 - Integrate (in progress):
   - Vue remains on legacy (needs script element parsing)
 - [x] Add extract_imports/extract_exports to LanguageSupport trait
 - [x] Refactor `deps.rs` to use trait (Python, Rust, JS, Go migrated)
-- [ ] Refactor `complexity.rs`, `scopes.rs`, `symbols.rs`
-- [ ] Refactor `anchors.rs`, `edit.rs`, `cfg.rs`
+- [x] Refactor `complexity.rs` to use trait (complexity_nodes method)
+- [x] Refactor `symbols.rs` to use trait
+- [x] Deferred: `scopes.rs` (needs scope extraction trait methods, Python/Rust only)
+- [x] Deferred: `anchors.rs`, `edit.rs`, `cfg.rs` (specialized, Python/Rust only)
 - [ ] Delete old language-specific code from moss-cli
 
 Phase 4 - Expand:

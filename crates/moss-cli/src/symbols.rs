@@ -1,4 +1,5 @@
 use moss_core::{tree_sitter, Language, Parsers};
+use moss_languages::{get_support, LanguageSupport, Symbol as LangSymbol, SymbolKind as LangSymbolKind};
 use std::path::Path;
 
 #[derive(Debug, Clone)]
@@ -45,6 +46,36 @@ impl SymbolKind {
     }
 }
 
+fn convert_symbol_kind(kind: LangSymbolKind) -> SymbolKind {
+    match kind {
+        LangSymbolKind::Function => SymbolKind::Function,
+        LangSymbolKind::Class | LangSymbolKind::Struct | LangSymbolKind::Enum
+        | LangSymbolKind::Interface | LangSymbolKind::Trait | LangSymbolKind::Type => SymbolKind::Class,
+        LangSymbolKind::Method => SymbolKind::Method,
+        LangSymbolKind::Variable | LangSymbolKind::Constant | LangSymbolKind::Module
+        | LangSymbolKind::Heading => SymbolKind::Variable,
+    }
+}
+
+fn flatten_symbols(symbols: Vec<LangSymbol>, parent: Option<&str>) -> Vec<Symbol> {
+    let mut result = Vec::new();
+    for sym in symbols {
+        let parent_name = parent.map(String::from);
+        result.push(Symbol {
+            name: sym.name.clone(),
+            kind: convert_symbol_kind(sym.kind),
+            start_line: sym.start_line,
+            end_line: sym.end_line,
+            parent: parent_name,
+        });
+        // Recursively flatten children
+        if !sym.children.is_empty() {
+            result.extend(flatten_symbols(sym.children, Some(&sym.name)));
+        }
+    }
+    result
+}
+
 pub struct SymbolParser {
     parsers: Parsers,
 }
@@ -57,20 +88,119 @@ impl SymbolParser {
     }
 
     pub fn parse_file(&self, path: &Path, content: &str) -> Vec<Symbol> {
-        let lang = Language::from_path(path);
+        let lang = match Language::from_path(path) {
+            Some(l) => l,
+            None => return Vec::new(),
+        };
 
+        // Use trait-based extraction
+        if let Some(support) = get_support(lang) {
+            return self.parse_with_trait(lang, content, support);
+        }
+
+        // Fall back to legacy methods for languages without trait support
+        self.parse_legacy(lang, content)
+    }
+
+    fn parse_legacy(&self, lang: Language, content: &str) -> Vec<Symbol> {
         match lang {
-            Some(Language::Python) => self.parse_python(content),
-            Some(Language::Rust) => self.parse_rust(content),
-            Some(Language::Java) => self.parse_java(content),
-            Some(Language::TypeScript) => self.parse_typescript(content),
-            Some(Language::Tsx) => self.parse_tsx(content),
-            Some(Language::JavaScript) => self.parse_javascript(content),
-            Some(Language::Go) => self.parse_go(content),
-            Some(Language::Json) => self.parse_json(content),
-            Some(Language::Yaml) => self.parse_yaml(content),
-            Some(Language::Toml) => self.parse_toml(content),
+            Language::Python => self.parse_python(content),
+            Language::Rust => self.parse_rust(content),
+            Language::Java => self.parse_java(content),
+            Language::TypeScript => self.parse_typescript(content),
+            Language::Tsx => self.parse_tsx(content),
+            Language::JavaScript => self.parse_javascript(content),
+            Language::Go => self.parse_go(content),
+            Language::Json => self.parse_json(content),
+            Language::Yaml => self.parse_yaml(content),
+            Language::Toml => self.parse_toml(content),
             _ => Vec::new(),
+        }
+    }
+
+    fn parse_with_trait(&self, lang: Language, content: &str, support: &dyn LanguageSupport) -> Vec<Symbol> {
+        let tree = match self.parsers.parse_lang(lang, content) {
+            Some(t) => t,
+            None => return Vec::new(),
+        };
+
+        let root = tree.root_node();
+        let mut symbols = Vec::new();
+        self.collect_with_trait(&mut root.walk(), content, support, &mut symbols, None);
+        symbols
+    }
+
+    fn collect_with_trait(
+        &self,
+        cursor: &mut tree_sitter::TreeCursor,
+        content: &str,
+        support: &dyn LanguageSupport,
+        symbols: &mut Vec<Symbol>,
+        parent: Option<&str>,
+    ) {
+        loop {
+            let node = cursor.node();
+            let kind = node.kind();
+
+            // Check for container (class, struct, etc.)
+            if support.container_kinds().contains(&kind) {
+                if let Some(sym) = support.extract_container(&node, content) {
+                    let sym_name = sym.name.clone();
+                    symbols.push(Symbol {
+                        name: sym.name,
+                        kind: convert_symbol_kind(sym.kind),
+                        start_line: sym.start_line,
+                        end_line: sym.end_line,
+                        parent: parent.map(String::from),
+                    });
+
+                    // Recurse into container to find methods
+                    if cursor.goto_first_child() {
+                        self.collect_with_trait(cursor, content, support, symbols, Some(&sym_name));
+                        cursor.goto_parent();
+                    }
+                    if cursor.goto_next_sibling() {
+                        continue;
+                    }
+                    break;
+                }
+            }
+
+            // Check for function
+            if support.function_kinds().contains(&kind) {
+                if let Some(sym) = support.extract_function(&node, content, parent.is_some()) {
+                    symbols.push(Symbol {
+                        name: sym.name,
+                        kind: convert_symbol_kind(sym.kind),
+                        start_line: sym.start_line,
+                        end_line: sym.end_line,
+                        parent: parent.map(String::from),
+                    });
+                }
+            }
+
+            // Check for type (struct, enum, interface - when not a container)
+            if support.type_kinds().contains(&kind) && !support.container_kinds().contains(&kind) {
+                if let Some(sym) = support.extract_type(&node, content) {
+                    symbols.push(Symbol {
+                        name: sym.name,
+                        kind: convert_symbol_kind(sym.kind),
+                        start_line: sym.start_line,
+                        end_line: sym.end_line,
+                        parent: parent.map(String::from),
+                    });
+                }
+            }
+
+            // Recurse into children (but not for containers, handled above)
+            if !support.container_kinds().contains(&kind) && cursor.goto_first_child() {
+                self.collect_with_trait(cursor, content, support, symbols, parent);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
         }
     }
 
