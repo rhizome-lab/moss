@@ -1,6 +1,6 @@
-//! Search-related commands for moss CLI.
+//! Search tree command - search codebase for files matching a query.
 
-use crate::{grep, path_resolve};
+use crate::path_resolve;
 use std::path::Path;
 
 /// Search the codebase tree for files matching a query
@@ -38,43 +38,4 @@ pub fn cmd_search_tree(query: &str, root: Option<&Path>, limit: usize, json: boo
     }
 
     0
-}
-
-/// Search file contents for a pattern
-pub fn cmd_grep(
-    pattern: &str,
-    root: Option<&Path>,
-    glob_pattern: Option<&str>,
-    limit: usize,
-    ignore_case: bool,
-    json: bool,
-) -> i32 {
-    let root = root
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-
-    match grep::grep(pattern, &root, glob_pattern, limit, ignore_case) {
-        Ok(result) => {
-            if json {
-                println!("{}", serde_json::to_string(&result).unwrap());
-            } else {
-                if result.matches.is_empty() {
-                    eprintln!("No matches found for: {}", pattern);
-                    return 1;
-                }
-                for m in &result.matches {
-                    println!("{}:{}:{}", m.file, m.line, m.content);
-                }
-                eprintln!(
-                    "\n{} matches in {} files",
-                    result.total_matches, result.files_searched
-                );
-            }
-            0
-        }
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            1
-        }
-    }
 }

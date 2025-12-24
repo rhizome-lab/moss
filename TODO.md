@@ -4,16 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Continue splitting main.rs (~2500 lines remaining) into command modules:
-  - [x] commands/update.rs: cmd_update + self-update helpers
-  - [x] commands/index.rs: cmd_index_packages, cmd_index_stats, cmd_list_files, cmd_reindex
-  - [x] commands/daemon.rs: cmd_daemon + DaemonAction enum
-  - [x] commands/search.rs: cmd_grep, cmd_search_tree (partial - cmd_find_symbols, cmd_path need Profiler)
-  - [x] commands/analyze.rs: cmd_anchors, cmd_scopes, cmd_complexity, cmd_cfg (partial - cmd_health, cmd_overview need Profiler)
-  - [x] commands/deps.rs: cmd_deps, cmd_imports, cmd_callees (cmd_symbols, cmd_callers need Profiler)
-  - [x] commands/edit.rs: cmd_edit
-  - [ ] commands/view.rs: cmd_view*, cmd_skeleton, cmd_tree, cmd_context, cmd_expand
-  - Note: Some commands need Profiler refactoring before extraction (cmd_health, cmd_overview, cmd_symbols, cmd_callers, cmd_find_symbols, cmd_path)
+- Continue splitting main.rs (~2100 lines remaining) into command modules:
+  - [x] Removed Profiler (was adding complexity for marginal value)
+  - [x] Restructured commands/ to one-command-per-file (21 files)
+  - [ ] Extract remaining commands from main.rs: cmd_symbols, cmd_callers, cmd_path, cmd_find_symbols, cmd_tree, cmd_expand, cmd_view, cmd_summarize, cmd_analyze
 - Add moss-languages feature flags to moss-cli Cargo.toml
 - Session analysis: detect correction patterns
 - Complete daemon integration
