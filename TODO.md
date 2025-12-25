@@ -32,7 +32,7 @@ Core (port to Rust):
 
 Servers (port to Rust):
 - [x] `moss serve {mcp,http,lsp}` - command structure added
-- [ ] `moss serve mcp` - rmcp 0.12 API needs investigation (scaffold exists, `--features mcp`)
+- [x] `moss serve mcp` - working with rmcp 0.12 (`--features mcp`)
 - [ ] `moss serve http` - REST API (consider exposing commands as library first)
 - [ ] `moss serve lsp` - LSP server
 
@@ -41,10 +41,10 @@ TUI (evaluate):
 
 Delete (redundant with Rust CLI or external tools):
 - [ ] `cmd_toml` - jaq handles TOML natively (expose `moss jq` or document jaq usage)
-- [x] `cmd_complexity` - `moss analyze --complexity`
-- [x] `cmd_deps` - `moss view --deps`
+- [x] `cmd_complexity` - `moss analyze --complexity` (deleted from Python CLI)
+- [x] `cmd_deps` - `moss view --deps` (deleted from Python CLI)
 - [ ] `cmd_cfg` - control flow graph (who uses this?)
-- [x] `cmd_query` - `moss view` with filters
+- [x] `cmd_query` - `moss view` with filters (deleted from Python CLI)
 - [ ] `cmd_rag` - duplicates `cmd_search`?
 - [ ] `cmd_metrics` / `cmd_report` / `cmd_overview` - consolidate to `moss analyze --overview`
 
@@ -55,7 +55,7 @@ Delete (questionable value):
 
 Consolidate to subcommands:
 - [ ] `cmd_analyze_session` / `cmd_telemetry` / `cmd_extract_preferences` → `moss session {analyze,telemetry,prefs}`
-- [x] `cmd_mcp_server` / `cmd_acp_server` / `cmd_lsp` → `moss serve {mcp,http,lsp}`
+- [x] `cmd_mcp_server` / `cmd_acp_server` / `cmd_lsp` → `moss serve {mcp,http,lsp}` (deleted from Python CLI)
 
 **Phase 3: Delete Python**
 - [ ] Remove `packages/` directory

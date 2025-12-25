@@ -375,66 +375,6 @@ def cmd_distros(args: Namespace) -> int:
 # =============================================================================
 
 
-def cmd_query(args: Namespace) -> int:
-    """Query code with pattern matching and filters."""
-    from moss_intelligence.skeleton import query_symbols
-
-    output = setup_output(args)
-    path = Path(args.path).resolve()
-
-    if not path.exists():
-        output.error(f"Path {path} does not exist")
-        return 1
-
-    results = query_symbols(
-        path=path,
-        pattern=args.pattern or "**/*.py",
-        kind=args.type if args.type != "all" else None,
-        name=args.name,
-        signature=args.signature,
-        inherits=args.inherits,
-        min_lines=args.min_lines,
-        max_lines=args.max_lines,
-    )
-
-    if getattr(args, "json", False):
-        json_results = [r.to_dict() for r in results]
-        if getattr(args, "group_by", None) == "file":
-            # Group results by file for JSON output
-            grouped: dict[str, list] = {}
-            for r in json_results:
-                grouped.setdefault(r["file"], []).append(r)
-            output_result(grouped, args)
-        else:
-            output_result(json_results, args)
-    else:
-        if getattr(args, "group_by", None) == "file":
-            # Group results by file for text output
-            grouped_text: dict[str, list] = {}
-            for r in results:
-                grouped_text.setdefault(r.file, []).append(r)
-            for file_path_str, file_results in grouped_text.items():
-                output.header(file_path_str)
-                for r in file_results:
-                    ctx = f" (in {r.context})" if r.context else ""
-                    output.print(f"  :{r.line} {r.kind} {r.name}{ctx}")
-                    if r.signature:
-                        output.print(f"    {r.signature}")
-        else:
-            for r in results:
-                ctx = f" (in {r.context})" if r.context else ""
-                output.print(f"{r.file}:{r.line} {r.kind} {r.name}{ctx}")
-                if r.signature:
-                    output.print(f"  {r.signature}")
-                if r.docstring:
-                    output.verbose(f"  {r.docstring[:50]}...")
-
-    if not results:
-        output.warning("No matches found")
-
-    return 0
-
-
 def cmd_cfg(args: Namespace) -> int:
     """Build and display control flow graph."""
     from moss_intelligence.cfg import build_cfg
@@ -569,113 +509,6 @@ def cmd_cfg(args: Namespace) -> int:
         # Default: text output
         for cfg in cfg_objects:
             output.print(cfg.to_text())
-
-    return 0
-
-
-def cmd_deps(args: Namespace) -> int:
-    """Extract dependencies (imports/exports) from code."""
-    from moss_intelligence.dependencies import (
-        build_dependency_graph,
-        dependency_graph_to_dot,
-        extract_dependencies,
-        find_reverse_dependencies,
-        format_dependencies,
-    )
-
-    output = setup_output(args)
-    path = Path(args.path).resolve()
-
-    if not path.exists():
-        output.error(f"Path {path} does not exist")
-        return 1
-
-    # Handle --dot mode: generate dependency graph visualization
-    if getattr(args, "dot", False):
-        if not path.is_dir():
-            output.error("--dot requires a directory path")
-            return 1
-
-        pattern = args.pattern or "**/*.py"
-        graph = build_dependency_graph(str(path), pattern)
-
-        if not graph:
-            output.warning("No internal dependencies found")
-            return 1
-
-        dot_output = dependency_graph_to_dot(graph, title=path.name)
-        output.print(dot_output)
-        return 0
-
-    # Handle --reverse mode: find what imports the target module
-    if args.reverse:
-        search_dir = args.search_dir or "."
-        pattern = args.pattern or "**/*.py"
-        reverse_deps = find_reverse_dependencies(args.reverse, search_dir, pattern)
-
-        if getattr(args, "json", False):
-            results = [
-                {
-                    "file": rd.file,
-                    "line": rd.import_line,
-                    "type": rd.import_type,
-                    "names": rd.names,
-                }
-                for rd in reverse_deps
-            ]
-            output_result({"target": args.reverse, "importers": results}, args)
-        else:
-            if reverse_deps:
-                output.info(f"Files that import '{args.reverse}':")
-                for rd in reverse_deps:
-                    names = f" ({', '.join(rd.names)})" if rd.names else ""
-                    output.print(f"  {rd.file}:{rd.import_line} {rd.import_type}{names}")
-            else:
-                output.warning(f"No files found that import '{args.reverse}'")
-
-        return 0
-
-    # Normal mode: show dependencies of file(s)
-    results = []
-
-    if path.is_file():
-        files = [path]
-    else:
-        pattern = args.pattern or "**/*.py"
-        files = list(path.glob(pattern))
-
-    for file_path in files:
-        try:
-            source = file_path.read_text()
-            info = extract_dependencies(source)
-            content = format_dependencies(info)
-
-            if getattr(args, "json", False):
-                results.append(
-                    {
-                        "file": str(file_path),
-                        "imports": [
-                            {"module": imp.module, "names": imp.names, "line": imp.lineno}
-                            for imp in info.imports
-                        ],
-                        "exports": [
-                            {"name": exp.name, "type": exp.export_type, "line": exp.lineno}
-                            for exp in info.exports
-                        ],
-                    }
-                )
-            else:
-                if len(files) > 1:
-                    output.header(str(file_path))
-                if content:
-                    output.print(content)
-        except Exception as e:
-            output.verbose(f"Error in {file_path}: {e}")
-            if getattr(args, "json", False):
-                results.append({"file": str(file_path), "error": str(e)})
-
-    if getattr(args, "json", False):
-        output_result(results if len(results) > 1 else results[0] if results else {}, args)
 
     return 0
 
@@ -898,36 +731,6 @@ def cmd_search(args: Namespace) -> int:
     return 0
 
 
-def cmd_mcp_server(args: Namespace) -> int:
-    """Start the MCP server for LLM tool access."""
-    output = setup_output(args)
-    try:
-        if getattr(args, "full", False):
-            from moss_mcp.server_full import main as mcp_main
-        else:
-            from moss_mcp.server import main as mcp_main
-
-        mcp_main()
-        return 0
-    except ImportError as e:
-        output.error("MCP SDK not installed. Install with: pip install 'moss[mcp]'")
-        output.debug(f"Details: {e}")
-        return 1
-    except KeyboardInterrupt:
-        return 0
-
-
-def cmd_acp_server(args: Namespace) -> int:
-    """Start the ACP server for IDE integration (Zed, JetBrains)."""
-    try:
-        from moss_acp.server import run_acp_server
-
-        run_acp_server()
-        return 0
-    except KeyboardInterrupt:
-        return 0
-
-
 def cmd_gen(args: Namespace) -> int:
     """Generate interface code from MossAPI introspection."""
     import json as json_mod
@@ -1107,23 +910,6 @@ def cmd_explore(args: Namespace) -> int:
         return 0
     except ImportError as e:
         output.error("TUI dependencies not installed. Install with: pip install 'moss[tui]'")
-        output.debug(f"Details: {e}")
-        return 1
-    except KeyboardInterrupt:
-        return 0
-
-
-def cmd_lsp(args: Namespace) -> int:
-    """Start the LSP server for IDE integration."""
-    output = setup_output(args)
-    try:
-        from moss_lsp.server import start_server
-
-        transport = getattr(args, "transport", "stdio")
-        start_server(transport)
-        return 0
-    except ImportError as e:
-        output.error("LSP dependencies not installed. Install with: pip install 'moss-lsp'")
         output.debug(f"Details: {e}")
         return 1
     except KeyboardInterrupt:
@@ -2852,43 +2638,6 @@ def cmd_checkpoint(args: Namespace) -> int:
     return asyncio.run(run_action())
 
 
-def cmd_complexity(args: Namespace) -> int:
-    """Analyze cyclomatic complexity of functions."""
-    from moss import MossAPI
-
-    output = setup_output(args)
-    root = Path(getattr(args, "directory", ".")).resolve()
-    pattern = getattr(args, "pattern", "**/*.py")
-
-    if not root.exists():
-        output.error(f"Directory not found: {root}")
-        return 1
-
-    output.info(f"Analyzing complexity for {root.name}...")
-
-    try:
-        api = MossAPI.for_project(root)
-        report = api.complexity.analyze(pattern=pattern)
-    except Exception as e:
-        output.error(f"Failed to analyze complexity: {e}")
-        return 1
-
-    if report.error:
-        output.error(report.error)
-        return 1
-
-    # Output format
-    compact = getattr(args, "compact", False)
-    if compact and not wants_json(args):
-        output.print(report.to_compact())
-    elif wants_json(args):
-        output.data(report.to_dict())
-    else:
-        output.print(report.to_markdown())
-
-    return 0
-
-
 def cmd_clones(args: Namespace) -> int:
     """Detect structural clones via AST hashing."""
     from moss import MossAPI
@@ -4237,34 +3986,6 @@ def create_parser() -> argparse.ArgumentParser:
     # for their usage.
     # ==========================================================================
 
-    # query command
-    query_parser = subparsers.add_parser(
-        "query", help="Query code with pattern matching and filters"
-    )
-    query_parser.add_argument("path", help="File or directory to search")
-    query_parser.add_argument("--name", "-n", help="Name pattern (regex)")
-    query_parser.add_argument("--signature", "-s", help="Signature pattern (regex)")
-    query_parser.add_argument(
-        "--type",
-        "-t",
-        choices=["function", "class", "method", "all"],
-        help="Filter by type",
-    )
-    query_parser.add_argument("--inherits", "-i", help="Filter classes by base class")
-    query_parser.add_argument(
-        "--min-lines", type=int, dest="min_lines", help="Minimum lines (complexity)"
-    )
-    query_parser.add_argument(
-        "--max-lines", type=int, dest="max_lines", help="Maximum lines (complexity)"
-    )
-    query_parser.add_argument(
-        "--pattern", "-p", help="Glob pattern for directory (default: **/*.py)"
-    )
-    query_parser.add_argument(
-        "--group-by", choices=["file"], dest="group_by", help="Group results by file"
-    )
-    query_parser.set_defaults(func=cmd_query)
-
     # cfg command
     cfg_parser = subparsers.add_parser("cfg", help="Build control flow graph")
     cfg_parser.add_argument("path", help="Python file to analyze")
@@ -4289,23 +4010,6 @@ def create_parser() -> argparse.ArgumentParser:
         "--port", type=int, default=8765, help="Port for live server (default: 8765)"
     )
     cfg_parser.set_defaults(func=cmd_cfg)
-
-    # deps command
-    deps_parser = subparsers.add_parser("deps", help="Extract dependencies (imports/exports)")
-    deps_parser.add_argument("path", help="File or directory to analyze")
-    deps_parser.add_argument(
-        "--pattern", "-p", help="Glob pattern for directory (default: **/*.py)"
-    )
-    deps_parser.add_argument(
-        "--reverse", "-r", help="Find files that import this module (reverse dependency)"
-    )
-    deps_parser.add_argument(
-        "--search-dir", "-d", dest="search_dir", help="Directory to search for reverse deps"
-    )
-    deps_parser.add_argument(
-        "--dot", action="store_true", help="Output dependency graph in DOT format"
-    )
-    deps_parser.set_defaults(func=cmd_deps)
 
     # context command
     context_parser = subparsers.add_parser(
@@ -4338,22 +4042,6 @@ def create_parser() -> argparse.ArgumentParser:
         help="Search mode (default: hybrid)",
     )
     search_parser.set_defaults(func=cmd_search)
-
-    # mcp-server command
-    mcp_parser = subparsers.add_parser("mcp-server", help="Start MCP server for LLM tool access")
-    mcp_parser.add_argument(
-        "--full",
-        action="store_true",
-        help="Use full multi-tool server (more tokens, better for IDEs)",
-    )
-    mcp_parser.set_defaults(func=cmd_mcp_server)
-
-    # acp-server command
-    acp_parser = subparsers.add_parser(
-        "acp-server",
-        help="Start ACP server for IDE integration (Zed, JetBrains)",
-    )
-    acp_parser.set_defaults(func=cmd_acp_server)
 
     # gen command
     gen_parser = subparsers.add_parser(
@@ -4389,16 +4077,6 @@ def create_parser() -> argparse.ArgumentParser:
         help="Project root directory (default: current)",
     )
     tui_parser.set_defaults(func=cmd_tui)
-
-    # lsp command
-    lsp_parser = subparsers.add_parser("lsp", help="Start LSP server for IDE integration")
-    lsp_parser.add_argument(
-        "--transport",
-        "-t",
-        default="stdio",
-        help="Transport: 'stdio' (default) or 'tcp:host:port'",
-    )
-    lsp_parser.set_defaults(func=cmd_lsp)
 
     # shell command
     shell_parser = subparsers.add_parser("shell", help="Interactive shell for code exploration")
@@ -5148,24 +4826,6 @@ def create_parser() -> argparse.ArgumentParser:
         help="Message for create/merge operations",
     )
     checkpoint_parser.set_defaults(func=cmd_checkpoint)
-
-    # complexity command
-    complexity_parser = subparsers.add_parser(
-        "complexity", help="Analyze cyclomatic complexity of functions"
-    )
-    complexity_parser.add_argument(
-        "directory",
-        nargs="?",
-        default=".",
-        help="Directory to analyze (default: current)",
-    )
-    complexity_parser.add_argument(
-        "--pattern",
-        "-p",
-        default="src/**/*.py",
-        help="Glob pattern for files (default: src/**/*.py)",
-    )
-    complexity_parser.set_defaults(func=cmd_complexity)
 
     # clones command
     clones_parser = subparsers.add_parser("clones", help="Detect structural clones via AST hashing")
