@@ -697,4 +697,89 @@ require (
         let result = resolve_go_import("github.com/other/lib", &module, Path::new("/fake/root"));
         assert!(result.is_none());
     }
+
+    /// Documents node kinds that exist in the Go grammar but aren't used in trait methods.
+    /// Run `cross_check_node_kinds` in registry.rs to see all potentially useful kinds.
+    #[test]
+    fn unused_node_kinds_audit() {
+        use crate::validate_unused_kinds_audit;
+
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // STRUCTURAL
+            "blank_identifier",        // _
+            "field_declaration",       // struct field
+            "field_declaration_list",  // struct body
+            "field_identifier",        // field name
+            "identifier",              // too common
+            "package_clause",          // package foo
+            "package_identifier",      // package name
+            "parameter_declaration",   // func param
+            "statement_list",          // block contents
+            "variadic_parameter_declaration", // ...T
+
+            // CLAUSE
+            "default_case",            // default:
+            "for_clause",              // for init; cond; post
+            "import_spec",             // import spec
+            "import_spec_list",        // import block
+            "method_elem",             // interface method
+            "range_clause",            // for range
+
+            // EXPRESSION
+            "call_expression",         // foo()
+            "index_expression",        // arr[i]
+            "parenthesized_expression",// (expr)
+            "selector_expression",     // foo.bar
+            "slice_expression",        // arr[1:3]
+            "type_assertion_expression", // x.(T)
+            "type_conversion_expression", // T(x)
+            "type_instantiation_expression", // generic instantiation
+            "unary_expression",        // -x, !x
+
+            // TYPE
+            "array_type",              // [N]T
+            "channel_type",            // chan T
+            "implicit_length_array_type", // [...]T
+            "function_type",           // func(T) U
+            "generic_type",            // T[U]
+            "interface_type",          // interface{}
+            "map_type",                // map[K]V
+            "negated_type",            // ~T
+            "parenthesized_type",      // (T)
+            "pointer_type",            // *T
+            "qualified_type",          // pkg.Type
+            "slice_type",              // []T
+            "struct_type",             // struct{}
+            "type_arguments",          // [T, U]
+            "type_constraint",         // T constraint
+            "type_elem",               // type element
+            "type_identifier",         // type name
+            "type_parameter_declaration", // [T any]
+            "type_parameter_list",     // type params
+
+            // DECLARATION
+            "assignment_statement",    // x = y
+            "const_declaration",       // const x = 1
+            "dec_statement",           // x--
+            "expression_list",         // a, b, c
+            "expression_statement",    // expr
+            "inc_statement",           // x++
+            "short_var_declaration",   // x := y
+            "type_alias",              // type X = Y
+            "type_declaration",        // type X struct{}
+            "var_declaration",         // var x int
+
+            // CONTROL FLOW DETAILS
+            "empty_statement",         // ;
+            "fallthrough_statement",   // fallthrough
+            "go_statement",            // go foo()
+            "labeled_statement",       // label:
+            "receive_statement",       // <-ch
+            "send_statement",          // ch <- x
+        ];
+
+        validate_unused_kinds_audit(&Go, documented_unused)
+            .expect("Go unused node kinds audit failed");
+    }
 }

@@ -278,3 +278,24 @@ impl Language for Lua {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "assignment_statement", "binary_expression", "block",
+            "bracket_index_expression", "dot_index_expression", "else_statement",
+            "empty_statement", "expression_list", "for_generic_clause",
+            "for_numeric_clause", "identifier", "label_statement",
+            "method_index_expression", "parenthesized_expression", "table_constructor",
+            "unary_expression", "vararg_expression", "variable_declaration",
+        ];
+        validate_unused_kinds_audit(&Lua, documented_unused)
+            .expect("Lua unused node kinds audit failed");
+    }
+}

@@ -145,3 +145,20 @@ fn get_type_attribute<'a>(node: &Node, content: &'a str) -> Option<&'a str> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "doctype",
+        ];
+
+        validate_unused_kinds_audit(&Html, documented_unused)
+            .expect("HTML unused node kinds audit failed");
+    }
+}

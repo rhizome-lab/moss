@@ -427,3 +427,23 @@ fn get_lang_attribute<'a>(node: &Node, content: &'a str) -> Option<&'a str> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        // Run cross_check_node_kinds to populate
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "await_end", "await_start", "block_end_tag", "block_start_tag",
+            "block_tag", "catch_block", "catch_start", "doctype", "else_block",
+            "else_if_start", "else_start", "expression", "expression_tag",
+            "if_end", "if_start", "key_statement", "snippet_statement", "then_block",
+        ];
+        validate_unused_kinds_audit(&Svelte, documented_unused)
+            .expect("Svelte unused node kinds audit failed");
+    }
+}

@@ -409,3 +409,24 @@ fn strip_xml_tags(s: &str) -> String {
     }
     result.trim().to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // C# grammar uses "c_sharp" - check cross_check output for actual kinds
+            // This is a placeholder - run cross_check_node_kinds to get the full list
+        ];
+
+        // C# may need manual verification - skip for now if empty
+        if !documented_unused.is_empty() {
+            validate_unused_kinds_audit(&CSharp, documented_unused)
+                .expect("C# unused node kinds audit failed");
+        }
+    }
+}

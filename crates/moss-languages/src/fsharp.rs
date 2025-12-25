@@ -327,3 +327,43 @@ impl Language for FSharp {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "access_modifier", "anon_record_expression", "anon_record_type",
+            "anon_type_defn", "array_expression", "atomic_type", "begin_end_expression",
+            "block_comment", "block_comment_content", "brace_expression",
+            "ce_expression", "class_as_reference", "class_inherits_decl",
+            "compound_type", "constrained_type", "declaration_expression",
+            "delegate_type_defn", "do_expression", "dot_expression", "elif_expression",
+            "enum_type_case", "enum_type_cases", "enum_type_defn",
+            "exception_definition", "flexible_type", "format_string",
+            "format_string_eval", "format_triple_quoted_string", "fun_expression",
+            "function_declaration_left", "function_expression", "function_type",
+            "generic_type", "identifier", "identifier_pattern", "index_expression", "interface_implementation",
+            "interface_type_defn", "list_expression", "list_type", "literal_expression",
+            "long_identifier", "long_identifier_or_op", "method_or_prop_defn",
+            "module_abbrev", "mutate_expression", "named_module", "object_expression",
+            "op_identifier", "paren_expression", "paren_type", "postfix_type",
+            "prefixed_expression", "preproc_else", "preproc_if", "range_expression",
+            "sequential_expression", "short_comp_expression", "simple_type",
+            "static_type", "trait_member_constraint", "tuple_expression",
+            "type_abbrev_defn", "type_argument", "type_argument_constraints",
+            "type_argument_defn", "type_arguments", "type_attribute", "type_attributes",
+            "type_check_pattern", "type_extension", "type_extension_elements",
+            "type_name", "typed_expression", "typed_pattern", "typecast_expression",
+            "types", "union_type_case", "union_type_cases", "union_type_field",
+            "union_type_fields", "value_declaration", "value_declaration_left",
+            "with_field_expression",
+        ];
+        validate_unused_kinds_audit(&FSharp, documented_unused)
+            .expect("F# unused node kinds audit failed");
+    }
+}

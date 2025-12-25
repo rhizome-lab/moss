@@ -249,3 +249,79 @@ fn find_deno_version_dir(pkg_path: &Path, pkg_name: &str) -> Option<(String, Pat
     let version_dir = versions.last()?.path();
     Some((pkg_name.to_string(), version_dir))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    /// Documents node kinds that exist in the JavaScript grammar but aren't used in trait methods.
+    /// Run `cross_check_node_kinds` in registry.rs to see all potentially useful kinds.
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // STRUCTURAL
+            "class_body",              // class body block
+            "class_heritage",          // extends clause
+            "class_static_block",      // static { }
+            "formal_parameters",       // function params
+            "field_definition",        // class field
+            "identifier",              // too common
+            "private_property_identifier", // #field
+            "property_identifier",     // obj.prop
+            "shorthand_property_identifier", // { x } shorthand
+            "shorthand_property_identifier_pattern", // destructuring shorthand
+            "statement_block",         // { }
+            "statement_identifier",    // label name
+            "switch_body",             // switch cases
+
+            // CLAUSE
+            "else_clause",             // else branch
+            "finally_clause",          // finally block
+
+            // EXPRESSION
+            "assignment_expression",   // x = y
+            "augmented_assignment_expression", // x += y
+            "await_expression",        // await foo
+            "call_expression",         // foo()
+            "function_expression",     // function() {}
+            "member_expression",       // foo.bar
+            "new_expression",          // new Foo()
+            "parenthesized_expression",// (expr)
+            "sequence_expression",     // a, b
+            "subscript_expression",    // arr[i]
+            "unary_expression",        // -x, !x
+            "update_expression",       // x++
+            "yield_expression",        // yield x
+
+            // IMPORT/EXPORT DETAILS
+            "export_clause",           // export { a, b }
+            "export_specifier",        // export { a as b }
+            "import",                  // import keyword
+            "import_attribute",        // import attributes
+            "import_clause",           // import clause
+            "import_specifier",        // import { a }
+            "named_imports",           // { a, b }
+            "namespace_export",        // export * as ns
+            "namespace_import",        // import * as ns
+
+            // DECLARATION
+            "debugger_statement",      // debugger;
+            "empty_statement",         // ;
+            "expression_statement",    // expr;
+            "generator_function",      // function* foo
+            "labeled_statement",       // label: stmt
+            "lexical_declaration",     // let/const
+            "using_declaration",       // using x = ...
+            "variable_declaration",    // var x
+            "with_statement",          // with (obj) - deprecated
+
+            // JSX
+            "jsx_expression",          // {expr} in JSX
+        ];
+
+        validate_unused_kinds_audit(&JavaScript, documented_unused)
+            .expect("JavaScript unused node kinds audit failed");
+    }
+}

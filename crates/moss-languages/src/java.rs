@@ -743,3 +743,109 @@ fn discover_gradle_packages(gradle_cache: &Path, current: &Path) -> Vec<(String,
 
     packages
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    /// Documents node kinds that exist in the Java grammar but aren't used in trait methods.
+    /// Run `cross_check_node_kinds` in registry.rs to see all potentially useful kinds.
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // STRUCTURAL
+            "block_comment",           // comments
+            "class_body",              // class body
+            "class_literal",           // Foo.class
+            "constructor_body",        // constructor body
+            "enum_body",               // enum body
+            "enum_body_declarations",  // enum body decls
+            "enum_constant",           // enum value
+            "field_declaration",       // field decl
+            "formal_parameter",        // method param
+            "formal_parameters",       // param list
+            "identifier",              // too common
+            "interface_body",          // interface body
+            "modifiers",               // access modifiers
+            "scoped_identifier",       // pkg.Class
+            "scoped_type_identifier",  // pkg.Type
+            "superclass",              // extends
+            "super_interfaces",        // implements
+            "type_identifier",         // type name
+
+            // CLAUSE
+            "catch_formal_parameter",  // catch param
+            "catch_type",              // catch type
+            "extends_interfaces",      // extends for interfaces
+            "finally_clause",          // finally block
+            "switch_block",            // switch body
+            "switch_block_statement_group", // case group
+            "throws",                  // throws clause
+
+            // EXPRESSION
+            "array_creation_expression", // new T[]
+            "assignment_expression",   // x = y
+            "cast_expression",         // (T)x
+            "instanceof_expression",   // x instanceof T
+            "lambda_expression",       // x -> y
+            "method_invocation",       // obj.method()
+            "method_reference",        // Class::method
+            "object_creation_expression", // new Foo()
+            "parenthesized_expression",// (expr)
+            "template_expression",     // string template
+            "unary_expression",        // -x, !x
+            "update_expression",       // x++
+            "yield_statement",         // yield x
+
+            // TYPE
+            "annotated_type",          // @Ann Type
+            "array_type",              // T[]
+            "boolean_type",            // boolean
+            "floating_point_type",     // float, double
+            "generic_type",            // T<U>
+            "integral_type",           // int, long
+            "type_arguments",          // <T, U>
+            "type_bound",              // T extends X
+            "type_list",               // T, U, V
+            "type_parameter",          // T
+            "type_parameters",         // <T, U>
+            "type_pattern",            // type pattern
+            "void_type",               // void
+
+            // DECLARATION
+            "annotation_type_body",    // @interface body
+            "annotation_type_declaration", // @interface
+            "annotation_type_element_declaration", // @interface element
+            "assert_statement",        // assert
+            "compact_constructor_declaration", // record constructor
+            "constant_declaration",    // const decl
+            "explicit_constructor_invocation", // this(), super()
+            "expression_statement",    // expr;
+            "labeled_statement",       // label: stmt
+            "local_variable_declaration", // local var
+            "record_declaration",      // record
+            "record_pattern_body",     // record pattern
+
+            // MODULE
+            "exports_module_directive",// exports
+            "module_body",             // module body
+            "module_declaration",      // module
+            "opens_module_directive",  // opens
+            "package_declaration",     // package
+            "provides_module_directive", // provides
+            "requires_modifier",       // requires modifier
+            "requires_module_directive", // requires
+            "uses_module_directive",   // uses
+
+            // OTHER
+            "resource_specification", // try-with-resources
+            "synchronized_statement",  // synchronized
+            "try_with_resources_statement", // try-with
+        ];
+
+        validate_unused_kinds_audit(&Java, documented_unused)
+            .expect("Java unused node kinds audit failed");
+    }
+}

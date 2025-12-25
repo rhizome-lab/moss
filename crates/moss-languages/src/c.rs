@@ -320,3 +320,102 @@ impl C {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    /// Documents node kinds that exist in the C grammar but aren't used in trait methods.
+    /// Run `cross_check_node_kinds` in registry.rs to see all potentially useful kinds.
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // STRUCTURAL
+            "bitfield_clause",         // : width
+            "declaration",             // declaration
+            "declaration_list",        // decl list
+            "enumerator",              // enum value
+            "enumerator_list",         // enum body
+            "field_declaration",       // struct field
+            "field_declaration_list",  // struct body
+            "field_expression",        // foo.bar
+            "field_identifier",        // field name
+            "identifier",              // too common
+            "linkage_specification",   // extern "C"
+            "parameter_declaration",   // param decl
+            "primitive_type",          // int, char
+            "sized_type_specifier",    // unsigned int
+            "statement_identifier",    // label name
+            "storage_class_specifier", // static, extern
+            "type_descriptor",         // type desc
+            "type_identifier",         // type name
+            "type_qualifier",          // const, volatile
+            "union_specifier",         // union
+
+            // CLAUSE
+            "else_clause",             // else
+
+            // EXPRESSION
+            "alignof_expression",      // alignof(T)
+            "assignment_expression",   // x = y
+            "binary_expression",       // a + b
+            "call_expression",         // foo()
+            "cast_expression",         // (T)x
+            "comma_expression",        // a, b
+            "compound_literal_expression", // (T){...}
+            "extension_expression",    // __extension__
+            "generic_expression",      // _Generic
+            "gnu_asm_expression",      // asm()
+            "offsetof_expression",     // offsetof
+            "parenthesized_expression",// (expr)
+            "pointer_expression",      // *p, &x
+            "sizeof_expression",       // sizeof(T)
+            "subscript_expression",    // arr[i]
+            "unary_expression",        // -x, !x
+            "update_expression",       // x++
+
+            // FUNCTION
+            "abstract_function_declarator", // abstract func
+            "function_declarator",     // func decl
+
+            // PREPROCESSOR
+            "preproc_elif",            // #elif
+            "preproc_elifdef",         // #elifdef
+            "preproc_else",            // #else
+            "preproc_function_def",    // function macro
+            "preproc_if",              // #if
+            "preproc_ifdef",           // #ifdef
+
+            // OTHER
+            "alignas_qualifier",       // alignas
+            "attribute_declaration",   // [[attr]]
+            "attribute_specifier",     // __attribute__
+            "attributed_statement",    // stmt with attr
+            "expression_statement",    // expr;
+            "gnu_asm_qualifier",       // asm qualifiers
+            "labeled_statement",       // label:
+            "macro_type_specifier",    // macro type
+
+            // MS EXTENSIONS
+            "ms_based_modifier",       // __based
+            "ms_call_modifier",        // __cdecl
+            "ms_declspec_modifier",    // __declspec
+            "ms_pointer_modifier",     // __ptr32
+            "ms_restrict_modifier",    // __restrict
+            "ms_signed_ptr_modifier",  // __sptr
+            "ms_unaligned_ptr_modifier", // __unaligned
+            "ms_unsigned_ptr_modifier", // __uptr
+
+            // SEH
+            "seh_except_clause",       // __except
+            "seh_finally_clause",      // __finally
+            "seh_leave_statement",     // __leave
+            "seh_try_statement",       // __try
+        ];
+
+        validate_unused_kinds_audit(&C, documented_unused)
+            .expect("C unused node kinds audit failed");
+    }
+}

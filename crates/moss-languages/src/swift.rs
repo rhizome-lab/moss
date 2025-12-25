@@ -373,3 +373,50 @@ impl Language for Swift {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // STRUCTURAL
+            "as_operator", "associatedtype_declaration", "catch_keyword", "class_body",
+            "computed_modify", "constructor_expression", "constructor_suffix", "custom_operator",
+            "deinit_declaration", "deprecated_operator_declaration_body", "didset_clause",
+            "else", "enum_class_body", "enum_entry", "enum_type_parameters",
+            "existential_type", "external_macro_definition", "function_body", "function_modifier",
+            "getter_specifier", "identifier", "inheritance_modifier", "inheritance_specifier",
+            "interpolated_expression", "key_path_expression", "key_path_string_expression",
+            "lambda_function_type", "lambda_function_type_parameters", "lambda_parameter",
+            "macro_declaration", "macro_definition", "member_modifier", "metatype", "modifiers",
+            "modify_specifier", "mutation_modifier", "opaque_type", "operator_declaration",
+            "optional_type", "ownership_modifier", "parameter_modifier", "parameter_modifiers",
+            "precedence_group_declaration", "property_behavior_modifier", "property_declaration",
+            "property_modifier", "protocol_body", "protocol_composition_type",
+            "protocol_function_declaration", "protocol_property_declaration", "self_expression",
+            "setter_specifier", "simple_identifier", "statement_label", "statements",
+            "super_expression", "switch_entry", "throw_keyword", "throws", "try_operator",
+            "tuple_expression", "tuple_type", "tuple_type_item", "type_annotation",
+            "type_arguments", "type_constraint", "type_constraints", "type_identifier",
+            "type_modifiers", "type_pack_expansion", "type_parameter", "type_parameter_modifiers",
+            "type_parameter_pack", "type_parameters", "user_type", "visibility_modifier",
+            "where_clause", "willset_clause", "willset_didset_block",
+            // EXPRESSION
+            "additive_expression", "as_expression", "await_expression", "call_expression",
+            "check_expression", "comparison_expression", "conjunction_expression",
+            "directly_assignable_expression", "disjunction_expression", "equality_expression",
+            "infix_expression", "multiplicative_expression", "navigation_expression",
+            "open_end_range_expression", "open_start_range_expression", "postfix_expression",
+            "prefix_expression", "range_expression", "selector_expression", "try_expression",
+            // TYPE
+            "array_type", "dictionary_type", "function_type",
+        ];
+
+        validate_unused_kinds_audit(&Swift, documented_unused)
+            .expect("Swift unused node kinds audit failed");
+    }
+}

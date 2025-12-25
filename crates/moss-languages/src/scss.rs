@@ -287,3 +287,27 @@ impl Language for Scss {
         if path.is_file() { Some(path.to_path_buf()) } else { None }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        // Run cross_check_node_kinds to populate
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "at_root_statement", "binary_expression", "call_expression",
+            "charset_statement", "class_name", "class_selector", "debug_statement",
+            "declaration", "else_clause", "else_if_clause", "error_statement",
+            "extend_statement", "function_name", "identifier", "important",
+            "important_value", "include_statement", "keyframe_block",
+            "keyframe_block_list", "keyframes_statement", "media_statement",
+            "namespace_statement", "postcss_statement", "pseudo_class_selector",
+            "return_statement", "scope_statement", "supports_statement", "warn_statement",
+        ];
+        validate_unused_kinds_audit(&Scss, documented_unused)
+            .expect("SCSS unused node kinds audit failed");
+    }
+}

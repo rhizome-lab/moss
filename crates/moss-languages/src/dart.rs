@@ -358,3 +358,57 @@ impl Language for Dart {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "additive_expression", "additive_operator", "annotation", "as_operator",
+            "assert_statement", "assignable_expression", "assignment_expression",
+            "assignment_expression_without_cascade", "await_expression", "binary_operator",
+            "bitwise_and_expression", "bitwise_operator", "bitwise_or_expression",
+            "bitwise_xor_expression", "cascade_section", "case_builtin",
+            "catch_parameters", "class_body", "const_object_expression",
+            "constant_constructor_signature", "constructor_invocation",
+            "constructor_param", "constructor_signature", "constructor_tearoff",
+            "declaration", "dotted_identifier_list", "enum_body", "enum_constant",
+            "equality_expression", "equality_operator", "expression_statement",
+            "extension_body", "extension_type_declaration", "factory_constructor_signature",
+            "finally_clause", "for_element", "for_loop_parts", "formal_parameter",
+            "formal_parameter_list", "function_expression_body", "function_type",
+            "identifier", "identifier_dollar_escaped", "identifier_list",
+            "if_element", "if_null_expression", "import_or_export", "increment_operator",
+            "inferred_type", "initialized_identifier", "initialized_identifier_list",
+            "initialized_variable_definition", "initializer_list_entry", "interface",
+            "interfaces", "is_operator", "label", "lambda_expression",
+            "library_import", "library_name", "local_function_declaration",
+            "local_variable_declaration", "logical_and_operator", "logical_or_operator",
+            "minus_operator", "mixin_application_class", "multiplicative_expression",
+            "multiplicative_operator", "named_parameter_types", "negation_operator",
+            "new_expression", "normal_parameter_type", "nullable_type",
+            "operator_signature", "optional_formal_parameters", "optional_parameter_types",
+            "optional_positional_parameter_types", "parameter_type_list",
+            "parenthesized_expression", "pattern_variable_declaration",
+            "postfix_expression", "postfix_operator", "prefix_operator", "qualified",
+            "record_type", "record_type_field", "record_type_named_field",
+            "redirecting_factory_constructor_signature", "relational_expression",
+            "relational_operator", "representation_declaration", "rethrow_builtin",
+            "scoped_identifier", "shift_expression", "shift_operator", "spread_element",
+            "static_final_declaration", "static_final_declaration_list", "superclass",
+            "super_formal_parameter", "switch_block", "switch_expression",
+            "switch_expression_case", "switch_statement_default", "symbol_literal",
+            "throw_expression_without_cascade", "tilde_operator", "type_arguments",
+            "type_bound", "type_cast", "type_cast_expression", "type_identifier",
+            "type_parameter", "type_parameters", "type_test", "type_test_expression",
+            "typed_identifier", "unary_expression", "void_type", "yield_each_statement",
+            "yield_statement",
+        ];
+        validate_unused_kinds_audit(&Dart, documented_unused)
+            .expect("Dart unused node kinds audit failed");
+    }
+}

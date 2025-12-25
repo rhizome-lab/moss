@@ -197,3 +197,31 @@ impl Language for GraphQL {
         if path.is_file() { Some(path.to_path_buf()) } else { None }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        // Run cross_check_node_kinds to populate - many kinds already used
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "argument", "directive", "enum_value", "enum_value_definition",
+            "enum_values_definition", "executable_definition", "field",
+            "fields_definition", "fragment_definition", "fragment_spread",
+            "implements_interfaces", "inline_fragment", "input_fields_definition",
+            "input_value_definition", "named_type", "type", "type_condition",
+            "type_definition", "type_extension", "type_system_definition",
+            "type_system_extension", "union_member_types", "variable_definition",
+            "arguments_definition", "definition", "directive_definition", "list_type",
+            "non_null_type", "object_type_extension", "operation_type",
+            "root_operation_type_definition", "scalar_type_extension", "schema_definition",
+            "enum_type_extension", "input_object_type_extension", "interface_type_extension",
+            "type_system_directive_location", "union_type_extension", "variable_definitions",
+        ];
+        validate_unused_kinds_audit(&GraphQL, documented_unused)
+            .expect("GraphQL unused node kinds audit failed");
+    }
+}

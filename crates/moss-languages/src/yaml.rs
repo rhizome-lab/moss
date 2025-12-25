@@ -86,3 +86,20 @@ impl Language for Yaml {
         !is_dir && !has_extension(name, &["yaml", "yml"])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "block_mapping_pair", "block_node", "block_scalar",
+            "block_sequence", "block_sequence_item",
+        ];
+        validate_unused_kinds_audit(&Yaml, documented_unused)
+            .expect("YAML unused node kinds audit failed");
+    }
+}

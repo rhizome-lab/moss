@@ -316,3 +316,26 @@ impl Hcl {
         Some((block_type, name))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        // Run cross_check_node_kinds to populate this list
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "binary_operation", "body", "collection_value", "expression",
+            "for_cond", "for_intro", "for_object_expr", "for_tuple_expr",
+            "function_arguments", "function_call", "get_attr", "heredoc_identifier",
+            "identifier", "index", "literal_value", "object_elem", "quoted_template",
+            "template_else_intro", "template_for", "template_for_end", "template_for_start",
+            "template_if", "template_if_end", "template_if_intro", "tuple",
+            "block_end", "block_start",
+        ];
+        validate_unused_kinds_audit(&Hcl, documented_unused)
+            .expect("HCL unused node kinds audit failed");
+    }
+}

@@ -87,3 +87,17 @@ impl Language for Toml {
         !is_dir && !has_extension(name, &["toml"])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        // TOML has no "interesting" unused kinds matching our patterns
+        let documented_unused: &[&str] = &[];
+        validate_unused_kinds_audit(&Toml, documented_unused)
+            .expect("TOML unused node kinds audit failed");
+    }
+}

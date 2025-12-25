@@ -354,3 +354,49 @@ impl Language for Php {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // STRUCTURAL
+            "abstract_modifier", "anonymous_class", "anonymous_function",
+            "anonymous_function_use_clause", "base_clause", "cast_expression", "cast_type",
+            "class_constant_access_expression", "class_interface_clause", "colon_block",
+            "compound_statement", "const_declaration", "declaration_list", "enum_case",
+            "enum_declaration_list", "final_modifier", "formal_parameters", "heredoc_body",
+            "named_type", "namespace_use_clause", "nowdoc_body",
+            "optional_type", "primitive_type", "property_declaration", "qualified_name",
+            "readonly_modifier", "reference_modifier", "static_modifier", "static_variable_declaration",
+            "use_as_clause", "use_declaration", "use_instead_of_clause", "var_modifier",
+            "visibility_modifier",
+            // CLAUSE
+            "declare_statement", "default_statement", "else_clause", "else_if_clause",
+            "finally_clause", "match_block", "match_condition_list", "match_conditional_expression",
+            "match_default_expression", "switch_block",
+            // EXPRESSION
+            "array_creation_expression", "assignment_expression", "augmented_assignment_expression",
+            "binary_expression", "bottom_type", "clone_expression", "disjunctive_normal_form_type",
+            "error_suppression_expression", "function_call_expression", "function_static_declaration",
+            "include_expression", "include_once_expression", "intersection_type",
+            "match_expression", "member_access_expression", "member_call_expression",
+            "nullsafe_member_access_expression", "nullsafe_member_call_expression",
+            "object_creation_expression", "parenthesized_expression", "reference_assignment_expression",
+            "require_expression", "require_once_expression", "scoped_call_expression",
+            "scoped_property_access_expression", "sequence_expression", "shell_command_expression",
+            "subscript_expression", "type_list", "unary_op_expression", "union_type",
+            "update_expression", "yield_expression",
+            // STATEMENT
+            "echo_statement", "empty_statement", "exit_statement", "expression_statement",
+            "global_declaration", "goto_statement", "named_label_statement", "unset_statement",
+        ];
+
+        validate_unused_kinds_audit(&Php, documented_unused)
+            .expect("PHP unused node kinds audit failed");
+    }
+}

@@ -193,3 +193,47 @@ impl Language for Scala {
         !is_dir && !has_extension(name, &["scala", "sc"])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // STRUCTURAL
+            "access_modifier", "access_qualifier", "arrow_renamed_identifier",
+            "as_renamed_identifier", "block_comment", "case_block", "case_class_pattern",
+            "class_parameter", "class_parameters", "derives_clause", "enum_body",
+            "enum_case_definitions", "enum_definition", "enumerator", "enumerators",
+            "export_declaration", "extends_clause", "extension_definition", "field_expression",
+            "full_enum_case", "identifier", "identifiers", "indented_block", "indented_cases",
+            "infix_modifier", "inline_modifier", "instance_expression", "into_modifier",
+            "macro_body", "modifiers", "name_and_type", "opaque_modifier", "open_modifier",
+            "operator_identifier", "package_clause", "package_identifier", "self_type",
+            "simple_enum_case", "template_body", "tracked_modifier", "transparent_modifier",
+            "val_declaration", "val_definition", "var_declaration", "var_definition",
+            "with_template_body",
+            // CLAUSE
+            "finally_clause", "type_case_clause",
+            // EXPRESSION
+            "ascription_expression", "assignment_expression", "call_expression",
+            "generic_function", "interpolated_string_expression", "parenthesized_expression",
+            "postfix_expression", "prefix_expression", "quote_expression", "splice_expression",
+            "tuple_expression",
+            // TYPE
+            "annotated_type", "applied_constructor_type", "compound_type",
+            "contravariant_type_parameter", "covariant_type_parameter", "function_declaration",
+            "function_type", "generic_type", "given_definition", "infix_type", "lazy_parameter_type",
+            "literal_type", "match_type", "named_tuple_type", "parameter_types",
+            "projected_type", "repeated_parameter_type", "singleton_type", "stable_identifier",
+            "stable_type_identifier", "structural_type", "tuple_type", "type_arguments",
+            "type_definition", "type_identifier", "type_lambda", "type_parameters", "typed_pattern",
+        ];
+
+        validate_unused_kinds_audit(&Scala, documented_unused)
+            .expect("Scala unused node kinds audit failed");
+    }
+}

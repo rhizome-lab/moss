@@ -352,3 +352,28 @@ impl Language for Erlang {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "ann_type", "b_generator", "binary_comprehension", "bit_type_list",
+            "bit_type_unit", "block_expr", "catch_expr", "clause_body",
+            "cond_match_expr", "deprecated_module", "export_attribute",
+            "export_type_attribute", "field_type", "fun_type", "fun_type_sig",
+            "generator", "guard_clause", "import_attribute", "list_comprehension",
+            "map_comprehension", "map_generator", "match_expr", "module",
+            "pp_elif", "pp_else", "pp_endif", "pp_if", "pp_ifdef", "pp_ifndef",
+            "range_type", "remote_module", "replacement_cr_clauses",
+            "replacement_function_clauses", "ssr_definition", "try_after",
+            "try_class", "try_stack", "type_guards", "type_name", "type_sig",
+        ];
+        validate_unused_kinds_audit(&Erlang, documented_unused)
+            .expect("Erlang unused node kinds audit failed");
+    }
+}

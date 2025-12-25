@@ -691,3 +691,131 @@ impl Rust {
         String::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    /// Documents node kinds that exist in the Rust grammar but aren't used in trait methods.
+    /// Run `cross_check_node_kinds` in registry.rs to see all potentially useful kinds.
+    #[test]
+    fn unused_node_kinds_audit() {
+        // Categories:
+        // - STRUCTURAL: Internal/wrapper nodes
+        // - CLAUSE: Sub-parts of larger constructs
+        // - EXPRESSION: Expressions (we track statements/definitions)
+        // - TYPE: Type-related nodes
+        // - MODIFIER: Visibility/async/unsafe modifiers
+        // - PATTERN: Pattern matching internals
+        // - MACRO: Macro-related nodes
+        // - TODO: Potentially useful
+
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // STRUCTURAL
+            "block_comment",           // comments
+            "declaration_list",        // extern block contents
+            "field_declaration",       // struct field
+            "field_declaration_list",  // struct body
+            "field_expression",        // foo.bar
+            "field_identifier",        // field name
+            "identifier",              // too common
+            "lifetime",                // 'a
+            "lifetime_parameter",      // <'a>
+            "ordered_field_declaration_list", // tuple struct fields
+            "scoped_identifier",       // path::to::thing
+            "scoped_type_identifier",  // path::to::Type
+            "shorthand_field_identifier", // struct init shorthand
+            "type_identifier",         // type names
+            "visibility_modifier",     // pub, pub(crate)
+
+            // CLAUSE
+            "else_clause",             // part of if
+            "enum_variant",            // enum variant
+            "enum_variant_list",       // enum body
+            "match_block",             // match body
+            "match_pattern",           // match arm pattern
+            "trait_bounds",            // T: Foo + Bar
+            "where_clause",            // where T: Foo
+
+            // EXPRESSION
+            "array_expression",        // [1, 2, 3]
+            "assignment_expression",   // x = y
+            "async_block",             // async { }
+            "await_expression",        // foo.await
+            "call_expression",         // foo()
+            "generic_function",        // foo::<T>()
+            "index_expression",        // arr[i]
+            "parenthesized_expression",// (expr)
+            "range_expression",        // 0..10
+            "reference_expression",    // &x
+            "struct_expression",       // Foo { x: 1 }
+            "try_expression",          // foo?
+            "tuple_expression",        // (a, b)
+            "type_cast_expression",    // x as T
+            "unary_expression",        // -x, !x
+            "unit_expression",         // ()
+            "yield_expression",        // yield x
+
+            // TYPE
+            "abstract_type",           // impl Trait
+            "array_type",              // [T; N]
+            "bounded_type",            // T: Foo
+            "bracketed_type",          // <T>
+            "dynamic_type",            // dyn Trait
+            "function_type",           // fn(T) -> U
+            "generic_type",            // Vec<T>
+            "generic_type_with_turbofish", // Vec::<T>
+            "higher_ranked_trait_bound", // for<'a>
+            "never_type",              // !
+            "pointer_type",            // *const T
+            "primitive_type",          // i32, bool
+            "qualified_type",          // <T as Trait>::Item
+            "reference_type",          // &T
+            "removed_trait_bound",     // ?Sized
+            "tuple_type",              // (A, B)
+            "type_arguments",          // <T, U>
+            "type_binding",            // Item = T
+            "type_parameter",          // T
+            "type_parameters",         // <T, U>
+            "unit_type",               // ()
+            "unsafe_bound_type",       // unsafe trait bound
+
+            // MODIFIER
+            "block_outer_doc_comment", // //!
+            "extern_modifier",         // extern "C"
+            "function_modifiers",      // async, const, unsafe
+            "mutable_specifier",       // mut
+
+            // PATTERN
+            "struct_pattern",          // Foo { x, y }
+            "tuple_struct_pattern",    // Foo(x, y)
+
+            // MACRO
+            "fragment_specifier",      // $x:expr
+            "macro_arguments_declaration", // macro args
+            "macro_body_v2",           // macro body
+            "macro_definition",        // macro_rules!
+            "macro_definition_v2",     // macro 2.0
+
+            // OTHER
+            "block_expression_with_attribute", // #[attr] { }
+            "const_block",             // const { }
+            "expression_statement",    // expr;
+            "expression_with_attribute", // #[attr] expr
+            "extern_crate_declaration",// extern crate
+            "foreign_mod_item",        // extern block item
+            "function_signature_item", // fn signature in trait
+            "gen_block",               // gen { }
+            "let_declaration",         // let x = y
+            "try_block",               // try { }
+            "unsafe_block",            // unsafe { }
+            "use_as_clause",           // use foo as bar
+            "empty_statement",         // ;
+        ];
+
+        validate_unused_kinds_audit(&Rust, documented_unused)
+            .expect("Rust unused node kinds audit failed");
+    }
+}

@@ -181,3 +181,32 @@ impl Language for Ruby {
         !is_dir && !has_extension(name, &["rb"])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // STRUCTURAL
+            "begin_block", "block_argument", "block_body", "block_parameter", "block_parameters",
+            "body_statement", "class_variable", "destructured_left_assignment",
+            "destructured_parameter", "else", "elsif", "empty_statement", "end_block",
+            "exception_variable", "exceptions", "expression_reference_pattern", "forward_argument",
+            "forward_parameter", "heredoc_body", "identifier", "lambda_parameters",
+            "method_parameters", "operator", "operator_assignment", "parenthesized_statements",
+            "singleton_class", "superclass",
+            // CLAUSE
+            "case_match", "if_guard", "if_modifier", "in_clause", "match_pattern",
+            "rescue_modifier", "unless_modifier", "until_modifier", "while_modifier",
+            // EXPRESSION
+            "yield",
+        ];
+
+        validate_unused_kinds_audit(&Ruby, documented_unused)
+            .expect("Ruby unused node kinds audit failed");
+    }
+}

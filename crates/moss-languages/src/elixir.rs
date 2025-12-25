@@ -421,3 +421,22 @@ impl Elixir {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "after_block", "block", "body", "catch_block", "charlist",
+            "else_block", "identifier", "interpolation", "operator_identifier",
+            "rescue_block", "sigil_modifiers", "stab_clause", "struct",
+            "unary_operator",
+        ];
+        validate_unused_kinds_audit(&Elixir, documented_unused)
+            .expect("Elixir unused node kinds audit failed");
+    }
+}

@@ -347,3 +347,27 @@ impl Language for Zig {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // Zig grammar uses PascalCase node kinds
+            "ArrayTypeStart", "BUILTINIDENTIFIER", "BitShiftOp", "BlockExpr",
+            "BlockExprStatement", "BlockLabel", "BuildinTypeExpr", "ContainerDeclType",
+            "ForArgumentsList", "ForExpr", "ForItem", "ForPrefix", "ForTypeExpr",
+            "FormatSequence", "IDENTIFIER", "IfExpr", "IfPrefix", "IfTypeExpr",
+            "LabeledStatement", "LabeledTypeExpr", "LoopExpr", "LoopStatement",
+            "LoopTypeExpr", "ParamType", "PrefixTypeOp", "PtrTypeStart",
+            "SliceTypeStart", "Statement", "SwitchCase", "WhileContinueExpr",
+            "WhileExpr", "WhilePrefix", "WhileTypeExpr",
+        ];
+        validate_unused_kinds_audit(&Zig, documented_unused)
+            .expect("Zig unused node kinds audit failed");
+    }
+}

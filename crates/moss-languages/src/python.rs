@@ -1051,4 +1051,91 @@ def __dunder__(): pass
         assert_eq!(support.get_visibility(&funcs[2], content), Visibility::Private);
         assert_eq!(support.get_visibility(&funcs[3], content), Visibility::Public); // dunder
     }
+
+    /// Documents node kinds that exist in the Python grammar but aren't used in trait methods.
+    /// Each exclusion has a reason. Review periodically as features expand.
+    ///
+    /// Run `cross_check_node_kinds` in registry.rs to see all potentially useful kinds.
+    #[test]
+    fn unused_node_kinds_audit() {
+        use crate::validate_unused_kinds_audit;
+
+        // Categories:
+        // - STRUCTURAL: Internal/wrapper nodes, not semantically meaningful on their own
+        // - CLAUSE: Sub-parts of statements, handled via parent (e.g., else_clause in if_statement)
+        // - EXPRESSION: Expressions don't create control flow/scope, we track statements
+        // - TYPE: Type annotation nodes, not relevant for current analysis
+        // - LEGACY: Python 2 compatibility, not worth supporting
+        // - OPERATOR: Operators within expressions, too granular
+        // - TODO: Potentially useful, to be added when needed
+
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // STRUCTURAL
+            "aliased_import",          // used internally by extract_imports
+            "block",                   // generic block wrapper (duplicate in grammar)
+            "expression_list",         // comma-separated expressions
+            "identifier",              // too common, used everywhere
+            "import_prefix",           // dots in relative imports
+            "lambda_parameters",       // internal to lambda
+            "module",                  // root node of file
+            "parenthesized_expression",// grouping only
+            "relative_import",         // handled in extract_imports
+            "tuple_expression",        // comma-separated values
+            "wildcard_import",         // handled in extract_imports
+
+            // CLAUSE (sub-parts of statements)
+            "case_pattern",            // internal to case_clause
+            "class_pattern",           // pattern in match/case
+            "elif_clause",             // part of if_statement
+            "else_clause",             // part of if/for/while/try
+            "finally_clause",          // part of try_statement
+            "for_in_clause",           // internal to comprehensions
+            "if_clause",               // internal to comprehensions
+            "with_clause",             // internal to with_statement
+            "with_item",               // internal to with_statement
+
+            // EXPRESSION (don't affect control flow structure)
+            "await",                   // await keyword, not a statement
+            "format_expression",       // f-string interpolation
+            "format_specifier",        // f-string format spec
+            "named_expression",        // walrus operator :=
+            "yield",                   // yield keyword form
+
+            // TYPE (type annotations)
+            "constrained_type",        // type constraints
+            "generic_type",            // parameterized types
+            "member_type",             // attribute access in types
+            "splat_type",              // *args/**kwargs types
+            "type",                    // generic type node
+            "type_alias_statement",    // could track as symbol
+            "type_conversion",         // !r/!s/!a in f-strings
+            "type_parameter",          // generic type params
+            "typed_default_parameter", // param with type and default
+            "typed_parameter",         // param with type annotation
+            "union_type",              // X | Y union syntax
+
+            // OPERATOR
+            "binary_operator",         // +, -, *, /, etc.
+            "boolean_operator",        // and/or - handled in complexity_nodes as keywords
+            "comparison_operator",     // ==, <, >, etc.
+            "not_operator",            // not keyword
+            "unary_operator",          // -, +, ~
+
+            // LEGACY (Python 2)
+            "exec_statement",          // Python 2 exec
+            "print_statement",         // Python 2 print
+
+            // TODO: Potentially useful
+            "decorated_definition",    // wrapper for @decorator
+            "delete_statement",        // del statement
+            "future_import_statement", // from __future__
+            "global_statement",        // scope modifier
+            "nonlocal_statement",      // scope modifier
+            "pass_statement",          // no-op, detect empty bodies
+        ];
+
+        validate_unused_kinds_audit(&Python, documented_unused)
+            .expect("Python unused node kinds audit failed");
+    }
 }

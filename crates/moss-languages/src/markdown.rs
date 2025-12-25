@@ -97,3 +97,22 @@ impl Language for Markdown {
         !is_dir && !has_extension(name, &["md", "markdown"])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "block_continuation", "block_quote", "block_quote_marker",
+            "fenced_code_block", "fenced_code_block_delimiter",
+            "html_block", "indented_code_block", "link_reference_definition",
+        ];
+
+        validate_unused_kinds_audit(&Markdown, documented_unused)
+            .expect("Markdown unused node kinds audit failed");
+    }
+}

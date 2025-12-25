@@ -135,7 +135,7 @@ pub mod scss;
 pub mod svelte;
 
 // Re-exports from registry
-pub use registry::{register, support_for_extension, support_for_grammar, support_for_path, supported_languages};
+pub use registry::{register, support_for_extension, support_for_grammar, support_for_path, supported_languages, validate_unused_kinds_audit};
 
 // Re-exports from traits
 pub use traits::{

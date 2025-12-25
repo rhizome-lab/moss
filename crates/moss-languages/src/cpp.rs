@@ -341,3 +341,179 @@ fn find_identifier<'a>(node: &Node, content: &'a str) -> Option<&'a str> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    /// Documents node kinds that exist in the C++ grammar but aren't used in trait methods.
+    /// Run `cross_check_node_kinds` in registry.rs to see all potentially useful kinds.
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // STRUCTURAL (C++ adds many to C)
+            "access_specifier",        // public:, private:
+            "base_class_clause",       // : public Base
+            "bitfield_clause",         // : width
+            "condition_clause",        // if condition
+            "declaration",             // declaration
+            "declaration_list",        // decl list
+            "default_method_clause",   // = default
+            "delete_method_clause",    // = delete
+            "dependent_type",          // typename T::X
+            "destructor_name",         // ~Foo
+            "enumerator",              // enum value
+            "enumerator_list",         // enum body
+            "field_declaration",       // struct field
+            "field_declaration_list",  // struct body
+            "field_expression",        // foo.bar
+            "field_identifier",        // field name
+            "identifier",              // too common
+            "init_statement",          // for init
+            "linkage_specification",   // extern "C"
+            "module_name",             // module name
+            "module_partition",        // module partition
+            "namespace_identifier",    // namespace name
+            "nested_namespace_specifier", // ns1::ns2
+            "operator_name",           // operator+
+            "parameter_declaration",   // param decl
+            "primitive_type",          // int, char
+            "pure_virtual_clause",     // = 0
+            "ref_qualifier",           // &, &&
+            "sized_type_specifier",    // unsigned int
+            "statement_identifier",    // label name
+            "static_assert_declaration", // static_assert
+            "storage_class_specifier", // static, extern
+            "structured_binding_declarator", // auto [a, b]
+            "type_descriptor",         // type desc
+            "type_identifier",         // type name
+            "type_parameter_declaration", // template param
+            "type_qualifier",          // const, volatile
+            "union_specifier",         // union
+            "using_declaration",       // using ns::name
+            "variadic_parameter_declaration", // T...
+            "variadic_type_parameter_declaration", // typename...
+            "virtual_specifier",       // override, final
+
+            // CLAUSE
+            "else_clause",             // else
+            "noexcept",                // noexcept
+
+            // EXPRESSION (C++ adds many to C)
+            "alignof_expression",      // alignof(T)
+            "assignment_expression",   // x = y
+            "binary_expression",       // a + b
+            "call_expression",         // foo()
+            "cast_expression",         // (T)x
+            "co_await_expression",     // co_await x
+            "co_return_statement",     // co_return
+            "co_yield_statement",      // co_yield x
+            "comma_expression",        // a, b
+            "compound_literal_expression", // (T){...}
+            "delete_expression",       // delete x
+            "extension_expression",    // __extension__
+            "fold_expression",         // (... + args)
+            "generic_expression",      // _Generic
+            "gnu_asm_expression",      // asm()
+            "new_expression",          // new T
+            "offsetof_expression",     // offsetof
+            "parenthesized_expression",// (expr)
+            "pointer_expression",      // *p, &x
+            "reflect_expression",      // reflexpr
+            "sizeof_expression",       // sizeof(T)
+            "splice_expression",       // [:expr:]
+            "subscript_expression",    // arr[i]
+            "unary_expression",        // -x, !x
+            "update_expression",       // x++
+
+            // TEMPLATE
+            "template_declaration",    // template<>
+            "template_function",       // template func
+            "template_method",         // template method
+            "template_template_parameter_declaration", // template template
+            "template_type",           // T<U>
+
+            // LAMBDA
+            "lambda_capture_initializer", // [x = y]
+            "lambda_capture_specifier",   // [=], [&]
+            "lambda_declarator",       // lambda params
+            "lambda_default_capture",  // =, &
+            "lambda_specifier",        // mutable
+
+            // FUNCTION
+            "abstract_function_declarator", // abstract func
+            "explicit_function_specifier", // explicit
+            "explicit_object_parameter_declaration", // this param
+            "function_declarator",     // func decl
+            "operator_cast",           // operator T()
+            "optional_parameter_declaration", // param = default
+            "optional_type_parameter_declaration", // T = U
+            "placeholder_type_specifier", // auto, decltype(auto)
+            "pointer_type_declarator", // ptr declarator
+            "trailing_return_type",    // -> T
+
+            // CONCEPTS/REQUIRES
+            "concept_definition",      // concept
+            "requires_clause",         // requires
+            "requires_expression",     // requires {}
+            "type_requirement",        // typename T
+
+            // MODULE
+            "export_declaration",      // export
+            "global_module_fragment_declaration", // module;
+            "import_declaration",      // import
+            "module_declaration",      // module
+            "private_module_fragment_declaration", // module :private
+
+            // PREPROCESSOR
+            "preproc_elif",            // #elif
+            "preproc_elifdef",         // #elifdef
+            "preproc_else",            // #else
+            "preproc_function_def",    // function macro
+            "preproc_if",              // #if
+            "preproc_ifdef",           // #ifdef
+
+            // SPLICE
+            "splice_specifier",        // [: :] specifier
+            "splice_type_specifier",   // [: :] type
+
+            // OTHER
+            "alias_declaration",       // using X = Y
+            "alignas_qualifier",       // alignas
+            "attribute_declaration",   // [[attr]]
+            "attribute_specifier",     // __attribute__
+            "attributed_statement",    // stmt with attr
+            "consteval_block_declaration", // consteval
+            "decltype",                // decltype
+            "expansion_statement",     // pack expansion stmt
+            "expression_statement",    // expr;
+            "friend_declaration",      // friend
+            "gnu_asm_qualifier",       // asm qualifiers
+            "labeled_statement",       // label:
+            "namespace_alias_definition", // namespace X = Y
+            "qualified_identifier",    // ns::name
+            "throw_specifier",         // throw()
+
+            // MS EXTENSIONS
+            "ms_based_modifier",       // __based
+            "ms_call_modifier",        // __cdecl
+            "ms_declspec_modifier",    // __declspec
+            "ms_pointer_modifier",     // __ptr32
+            "ms_restrict_modifier",    // __restrict
+            "ms_signed_ptr_modifier",  // __sptr
+            "ms_unaligned_ptr_modifier", // __unaligned
+            "ms_unsigned_ptr_modifier", // __uptr
+
+            // SEH
+            "seh_except_clause",       // __except
+            "seh_finally_clause",      // __finally
+            "seh_leave_statement",     // __leave
+            "seh_try_statement",       // __try
+        ];
+
+        validate_unused_kinds_audit(&Cpp, documented_unused)
+            .expect("C++ unused node kinds audit failed");
+    }
+}

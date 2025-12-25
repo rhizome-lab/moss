@@ -128,3 +128,23 @@ impl Language for Bash {
         !is_dir && !has_extension(name, &["sh", "bash", "zsh"])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "binary_expression", "brace_expression", "c_style_for_statement",
+            "compound_statement", "declaration_command", "else_clause",
+            "heredoc_body", "parenthesized_expression", "postfix_expression",
+            "redirected_statement", "ternary_expression", "test_operator",
+            "unary_expression",
+        ];
+        validate_unused_kinds_audit(&Bash, documented_unused)
+            .expect("Bash unused node kinds audit failed");
+    }
+}

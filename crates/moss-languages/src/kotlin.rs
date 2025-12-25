@@ -396,3 +396,103 @@ impl Language for Kotlin {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    /// Documents node kinds that exist in the Kotlin grammar but aren't used in trait methods.
+    /// Run `cross_check_node_kinds` in registry.rs to see all potentially useful kinds.
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            // STRUCTURAL
+            "annotated_lambda",        // @Ann { }
+            "class_body",              // class body
+            "class_modifier",          // class modifiers
+            "class_parameter",         // class param
+            "constructor_delegation_call", // this(), super()
+            "constructor_invocation",  // constructor call
+            "control_structure_body",  // control body
+            "delegation_specifier",    // delegation
+            "enum_entry",              // enum value
+            "function_body",           // function body
+            "function_modifier",       // fun modifiers
+            "function_type_parameters",// (T) -> U params
+            "function_value_parameters", // fun params
+            "identifier",              // too common
+            "import_alias",            // import as
+            "import_list",             // imports
+            "inheritance_modifier",    // open, final
+            "interpolated_expression", // ${expr}
+            "interpolated_identifier", // $id
+            "lambda_parameters",       // lambda params
+            "member_modifier",         // member modifiers
+            "modifiers",               // modifiers
+            "multi_variable_declaration", // val (a, b)
+            "parameter_modifier",      // param modifiers
+            "parameter_modifiers",     // param modifiers list
+            "parameter_with_optional_type", // optional type param
+            "platform_modifier",       // expect, actual
+            "primary_constructor",     // primary constructor
+            "property_declaration",    // property
+            "property_modifier",       // property modifiers
+            "reification_modifier",    // reified
+            "secondary_constructor",   // secondary constructor
+            "simple_identifier",       // simple id
+            "statements",              // statement list
+            "visibility_modifier",     // public, private
+
+            // EXPRESSION
+            "additive_expression",     // a + b
+            "as_expression",           // x as T
+            "call_expression",         // foo()
+            "check_expression",        // is, !is
+            "comparison_expression",   // a < b
+            "directly_assignable_expression", // assignable
+            "equality_expression",     // a == b
+            "indexing_expression",     // arr[i]
+            "infix_expression",        // a infix b
+            "multiplicative_expression", // a * b
+            "navigation_expression",   // a.b
+            "parenthesized_expression",// (expr)
+            "postfix_expression",      // x++
+            "prefix_expression",       // ++x
+            "range_expression",        // 0..10
+            "spread_expression",       // *arr
+            "super_expression",        // super
+            "this_expression",         // this
+            "wildcard_import",         // import.*
+
+            // TYPE
+            "function_type",           // (T) -> U
+            "not_nullable_type",       // T & Any
+            "nullable_type",           // T?
+            "parenthesized_type",      // (T)
+            "parenthesized_user_type", // (UserType)
+            "receiver_type",           // T.
+            "type_arguments",          // <T, U>
+            "type_constraint",         // T : Bound
+            "type_constraints",        // where clause
+            "type_identifier",         // type name
+            "type_modifiers",          // type modifiers
+            "type_parameter",          // T
+            "type_parameter_modifiers",// type param mods
+            "type_parameters",         // <T, U>
+            "type_projection",         // out T, in T
+            "type_projection_modifiers", // projection mods
+            "type_test",               // is T
+            "user_type",               // user-defined type
+            "variance_modifier",       // in, out
+
+            // OTHER
+            "finally_block",           // finally
+            "variable_declaration",    // var/val decl
+        ];
+
+        validate_unused_kinds_audit(&Kotlin, documented_unused)
+            .expect("Kotlin unused node kinds audit failed");
+    }
+}
