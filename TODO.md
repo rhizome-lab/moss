@@ -7,23 +7,69 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - view.rs: depth 2+ on directories should show symbols inside files (currently only shows file tree)
 - view.rs: symbol JSON output uses old format, not ViewNode (inconsistent with directory/file output)
 - index: lazy reindex on query (check file mtimes, update changed files before querying)
-- Python CLI consolidation: 55 commands → ~15 (see _main.py audit). Remove redundant (cmd_toml - jaq handles it), merge related into subcommands
-- Single installation: maturin wheel with embedded Rust binary
 
 Test Status: 107 passing, 0 failing (moss-languages)
+
+## Python → Rust Migration
+
+Goal: Delete `packages/` entirely. Single Rust binary, no Python dependency.
+
+**Phase 1: Workflow Engine**
+- [ ] Port TOML workflow state machine to Rust (no LLM dependency)
+- [ ] Add `rig` crate for LLM support (optional workflow plugin)
+- [ ] Port LLM calling logic (streaming, tool use) as workflow component
+
+**Phase 2: Audit Python Commands**
+Each command: port, redesign, or delete?
+
+Core (port to Rust):
+- [ ] `cmd_workflow` - TOML state machine engine, orchestrates primitives
+- LLM lives in workflow engine, not primitives. Primitives stay deterministic:
+  - `view` - no LLM
+  - `edit` - structural/AST only, no LLM
+  - `analyze` - no LLM
+- `cmd_agent` = `moss workflow run dwim`, not a separate command
+
+Servers (port to Rust):
+- [ ] `cmd_mcp_server` - MCP protocol (mcp-rust-sdk exists)
+- [ ] `cmd_acp_server` - ACP protocol
+- [ ] `cmd_lsp` - LSP server
+
+TUI (evaluate):
+- [ ] `cmd_tui` / `cmd_explore` - Textual → ratatui? Or delete?
+
+Delete (redundant with Rust CLI or external tools):
+- [ ] `cmd_toml` - jaq handles TOML natively
+- [ ] `cmd_complexity` - `moss analyze --complexity`
+- [ ] `cmd_deps` - `moss view --deps`
+- [ ] `cmd_cfg` - control flow graph (who uses this?)
+- [ ] `cmd_query` - `moss view` with filters
+- [ ] `cmd_rag` - duplicates `cmd_search`?
+- [ ] `cmd_metrics` / `cmd_report` / `cmd_overview` - consolidate to one
+
+Delete (questionable value):
+- [ ] `cmd_mutate` - mutation testing (is it even implemented?)
+- [ ] `cmd_patterns` / `cmd_weaknesses` / `cmd_clones` - used?
+- [ ] `cmd_synthesize` - distinct from `cmd_edit`?
+
+Consolidate to subcommands:
+- [ ] `cmd_analyze_session` / `cmd_telemetry` / `cmd_extract_preferences` → `moss session {analyze,telemetry,prefs}`
+- [ ] `cmd_mcp_server` / `cmd_acp_server` / `cmd_lsp` → `moss serve {mcp,acp,lsp}`
+
+**Phase 3: Delete Python**
+- [ ] Remove `packages/` directory
+- [ ] Remove Python-related CI/tooling
+- [ ] Update installation docs
 
 ## Backlog
 
 **Language Support:** 98 languages implemented - all arborium grammars covered.
 See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to verify.
 
-**CLI Redundancy:** See `docs/llm-code-consistency.md`
-- [ ] Rust: OutputFormatter trait for JSON/text output
-- [ ] Python: output helpers for JSON/markdown/compact
-
-**CLI Surface Cleanup:** CLI reduced from 29 to 8 commands (-5000+ lines). Remaining:
-- [x] view.rs: unified ViewNode abstraction for directories, files, and symbols. --calls/--called-by moved to analyze.
-- [ ] Command/subcommand/flag names should be self-documenting (no abbreviations, clear meaning)
+**CLI Surface Cleanup:**
+- [x] view.rs: unified ViewNode abstraction for directories, files, and symbols
+- [ ] Command/subcommand/flag names should be self-documenting
+- [ ] OutputFormatter trait for consistent JSON/text output
 
 **Code Quality:**
 - Audit Rust codebase for tuple returns - replace with structs unconditionally
@@ -69,11 +115,8 @@ See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to 
 
 ## Deferred
 
-- Driver integration improvements
-- Python edit separate targeting (LLM-based)
 - Remaining docs: prior-art.md, hybrid-loops.md
 - Memory system: layered cross-session learning
-- Agent TUI: terminal state reset after nested commands
 
 ## Implementation Notes
 
