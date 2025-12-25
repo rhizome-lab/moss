@@ -76,7 +76,7 @@ Consolidate to subcommands:
 - [x] Remove pyproject.toml, uv.lock, StyleGuide.py
 - [x] Update flake.nix (remove python313, uv, ruff)
 - [x] Update pre-commit hook (Rust-only)
-- [ ] Update installation docs (README, etc.)
+- [x] Update installation docs (README rewritten for Rust CLI)
 
 **Python Package Inventory (pre-deletion reference):**
 
