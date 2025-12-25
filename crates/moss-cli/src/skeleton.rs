@@ -73,13 +73,6 @@ impl SkeletonResult {
         ViewNode::file(&file_name, &self.file_path).with_children(children)
     }
 
-    /// Format skeleton as text output
-    pub fn format(&self, include_docstrings: bool) -> String {
-        let mut lines = Vec::new();
-        format_symbols(&self.symbols, include_docstrings, 0, &mut lines);
-        lines.join("\n")
-    }
-
     /// Filter to only type definitions (class, struct, enum, trait, interface)
     /// Returns a new SkeletonResult with only type-like symbols, and strips methods from classes
     pub fn filter_types(&self) -> SkeletonResult {
@@ -123,145 +116,6 @@ impl SkeletonResult {
             file_path: self.file_path.clone(),
         }
     }
-}
-
-fn format_symbols(
-    symbols: &[SkeletonSymbol],
-    include_docstrings: bool,
-    indent: usize,
-    lines: &mut Vec<String>,
-) {
-    let prefix = "    ".repeat(indent);
-
-    for sym in symbols {
-        let size = sym.end_line.saturating_sub(sym.start_line) + 1;
-        lines.push(format!(
-            "{}{}: L{}-{} ({} lines)",
-            prefix, sym.signature, sym.start_line, sym.end_line, size
-        ));
-
-        if include_docstrings {
-            if let Some(doc) = &sym.docstring {
-                // First line only for brevity
-                let first_line = doc.lines().next().unwrap_or("").trim();
-                // Skip useless docstrings that just repeat the function name
-                if !first_line.is_empty() && !is_useless_docstring(&sym.name, first_line) {
-                    lines.push(format!("{}    \"\"\"{}\"\"\"", prefix, first_line));
-                }
-            }
-        }
-
-        if sym.children.is_empty() {
-            lines.push(format!("{}    ...", prefix));
-        } else {
-            format_symbols(&sym.children, include_docstrings, indent + 1, lines);
-        }
-
-        lines.push(String::new()); // Blank line between symbols
-    }
-}
-
-/// Check if a docstring is "useless" - just repeats the function name
-/// Examples: setUserId → "Sets the user id", getUser → "Gets user"
-fn is_useless_docstring(name: &str, docstring: &str) -> bool {
-    // Common filler words to ignore
-    const FILLER_WORDS: &[&str] = &[
-        "the",
-        "a",
-        "an",
-        "this",
-        "that",
-        "given",
-        "specified",
-        "provided",
-        "returns",
-        "return",
-        "get",
-        "gets",
-        "set",
-        "sets",
-        "is",
-        "are",
-        "for",
-        "from",
-        "to",
-        "of",
-        "with",
-        "by",
-        "in",
-        "on",
-        "as",
-    ];
-
-    // Split function name into words (handle camelCase and snake_case)
-    let name_words: Vec<String> = split_identifier(name)
-        .into_iter()
-        .map(|w| w.to_lowercase())
-        .collect();
-
-    // Clean docstring: lowercase, remove punctuation, split into words
-    let doc_clean: String = docstring
-        .chars()
-        .map(|c| {
-            if c.is_alphanumeric() || c.is_whitespace() {
-                c
-            } else {
-                ' '
-            }
-        })
-        .collect();
-    let doc_words: Vec<String> = doc_clean
-        .split_whitespace()
-        .map(|w| w.to_lowercase())
-        .filter(|w| !FILLER_WORDS.contains(&w.as_str()))
-        .collect();
-
-    // If all doc words are in the function name words, it's useless
-    if doc_words.is_empty() {
-        return true; // Only filler words
-    }
-
-    // Check if doc words are subset of name words (or very close)
-    let matching = doc_words
-        .iter()
-        .filter(|dw| {
-            name_words
-                .iter()
-                .any(|nw| nw == *dw || nw.contains(dw.as_str()) || dw.contains(nw.as_str()))
-        })
-        .count();
-
-    // If most doc words match name words, it's useless
-    matching >= doc_words.len().saturating_sub(1) && doc_words.len() <= name_words.len() + 2
-}
-
-/// Split an identifier into words (camelCase, PascalCase, snake_case)
-fn split_identifier(name: &str) -> Vec<String> {
-    let mut words = Vec::new();
-    let mut current_word = String::new();
-
-    for c in name.chars() {
-        if c == '_' {
-            if !current_word.is_empty() {
-                words.push(current_word);
-                current_word = String::new();
-            }
-        } else if c.is_uppercase() {
-            if !current_word.is_empty() {
-                words.push(current_word);
-                current_word = String::new();
-            }
-            current_word.push(c.to_ascii_lowercase());
-        } else {
-            current_word.push(c);
-        }
-    }
-
-    if !current_word.is_empty() {
-        words.push(current_word);
-    }
-
-    words
 }
 
 /// Recursively adjust line numbers for nested symbols
@@ -592,7 +446,7 @@ impl Foo {
     }
 
     #[test]
-    fn test_format_skeleton() {
+    fn test_to_view_node() {
         let mut extractor = SkeletonExtractor::new();
         let content = r#"
 def greet(name: str) -> str:
@@ -600,10 +454,16 @@ def greet(name: str) -> str:
     return f"Hello, {name}"
 "#;
         let result = extractor.extract(&PathBuf::from("test.py"), content);
-        let formatted = result.format(true);
+        let view_node = result.to_view_node();
 
-        assert!(formatted.contains("def greet(name: str) -> str:"));
-        assert!(formatted.contains("\"\"\"Return a personalized greeting message.\"\"\""));
+        assert_eq!(view_node.name, "test.py");
+        assert!(view_node.children.len() >= 1);
+        let greet = &view_node.children[0];
+        assert_eq!(greet.name, "greet");
+        assert!(greet
+            .signature
+            .as_ref()
+            .map_or(false, |s| s.contains("def greet")));
     }
 
     #[test]
@@ -873,41 +733,6 @@ end
     }
 
     #[test]
-    fn test_useless_docstring_detection() {
-        // Useless docstrings - just repeat the function name
-        assert!(is_useless_docstring("setUserId", "Sets the user id"));
-        assert!(is_useless_docstring("setUserId", "Set user id."));
-        assert!(is_useless_docstring("getUser", "Gets the user"));
-        assert!(is_useless_docstring("get_user", "Get the user."));
-        assert!(is_useless_docstring("processData", "Process data"));
-        assert!(is_useless_docstring("handleRequest", "Handle request."));
-        assert!(is_useless_docstring("parse", "Parse."));
-        assert!(is_useless_docstring("init", "Initialize."));
-
-        // Useful docstrings - provide additional context
-        assert!(!is_useless_docstring(
-            "setUserId",
-            "Update the user ID from the authentication token"
-        ));
-        assert!(!is_useless_docstring(
-            "parse",
-            "Parse JSON string into structured data"
-        ));
-        assert!(!is_useless_docstring(
-            "getUser",
-            "Fetch user from database by ID"
-        ));
-        assert!(!is_useless_docstring(
-            "process",
-            "Apply validation rules and normalize input"
-        ));
-        assert!(!is_useless_docstring(
-            "init",
-            "Set up database connection pool with retry logic"
-        ));
-    }
-
-    #[test]
     fn test_scala_skeleton() {
         let mut extractor = SkeletonExtractor::new();
         let content = r#"
@@ -1009,21 +834,6 @@ trait MyTrait {
         assert!(names.contains(&"MyTrait"), "Should have trait");
         // Top-level functions should be filtered out
         assert!(!names.contains(&"helper"));
-    }
-
-    #[test]
-    fn test_split_identifier() {
-        assert_eq!(split_identifier("setUserId"), vec!["set", "user", "id"]);
-        assert_eq!(split_identifier("get_user_id"), vec!["get", "user", "id"]);
-        assert_eq!(
-            split_identifier("HTTPRequest"),
-            vec!["h", "t", "t", "p", "request"]
-        );
-        assert_eq!(
-            split_identifier("parseJSON"),
-            vec!["parse", "j", "s", "o", "n"]
-        );
-        assert_eq!(split_identifier("simple"), vec!["simple"]);
     }
 
     #[test]
