@@ -43,6 +43,7 @@ See `docs/language-support.md` for design. Future languages: OCaml, Haskell, Clo
 
 **Tooling:**
 - Avoid web search for Rust crate features: `cargo info <crate> --features` or similar offline lookup
+- Structured TODO.md editing: first-class `moss todo` command to add/complete/move items without losing content (LLM text editing is lossy)
 
 **View Filtering:**
 - Filter out tests from views (--no-tests or --exclude=tests)
