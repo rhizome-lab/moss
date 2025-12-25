@@ -28,7 +28,7 @@ impl Language for PowerShell {
     }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["command_expression"] // Import-Module, using module
+        &["pipeline"] // Import-Module is a command in a pipeline
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
@@ -159,7 +159,7 @@ impl Language for PowerShell {
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
-        if node.kind() != "command_expression" {
+        if node.kind() != "pipeline" {
             return Vec::new();
         }
 

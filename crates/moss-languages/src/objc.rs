@@ -16,7 +16,7 @@ impl Language for ObjC {
     fn has_symbols(&self) -> bool { true }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["class_interface", "class_implementation", "protocol_declaration", "category_interface"]
+        &["class_interface", "class_implementation", "protocol_declaration"]
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
@@ -24,11 +24,11 @@ impl Language for ObjC {
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["struct_specifier", "enum_specifier", "typedef_declaration"]
+        &["struct_specifier", "enum_specifier", "type_definition"]
     }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["preproc_import", "preproc_include"]
+        &["preproc_include"]
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
@@ -69,11 +69,11 @@ impl Language for ObjC {
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "switch_statement", "while_statement", "for_statement", "for_in_statement"]
+        &["if_statement", "switch_statement", "while_statement", "for_statement"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "switch_statement", "while_statement", "for_statement", "for_in_statement"]
+        &["if_statement", "switch_statement", "while_statement", "for_statement"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
@@ -104,7 +104,7 @@ impl Language for ObjC {
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
         match node.kind() {
-            "class_interface" | "class_implementation" | "protocol_declaration" | "category_interface" => {
+            "class_interface" | "class_implementation" | "protocol_declaration" => {
                 let name = self.node_name(node, content)?;
                 let text = &content[node.byte_range()];
                 let first_line = text.lines().next().unwrap_or(text);
@@ -126,7 +126,7 @@ impl Language for ObjC {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         match node.kind() {
-            "struct_specifier" | "enum_specifier" | "typedef_declaration" => {
+            "struct_specifier" | "enum_specifier" | "type_definition" => {
                 let name = self.node_name(node, content)?;
                 let text = &content[node.byte_range()];
                 let first_line = text.lines().next().unwrap_or(text);
@@ -150,7 +150,7 @@ impl Language for ObjC {
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
         match node.kind() {
-            "preproc_import" | "preproc_include" => {
+            "preproc_include" => {
                 let text = &content[node.byte_range()];
                 vec![Import {
                     module: text.trim().to_string(),
@@ -263,7 +263,7 @@ mod tests {
             "protocol_forward_declaration", "qualified_protocol_interface_declaration",
             "compatibility_alias_declaration",
             // Type system
-            "type_name", "type_identifier", "type_qualifier", "type_definition",
+            "type_name", "type_identifier", "type_qualifier",
             "sized_type_specifier", "array_type_specifier", "macro_type_specifier",
             "typedefed_specifier", "union_specifier", "generic_specifier",
             // Method-related

@@ -26,7 +26,7 @@ impl Language for Asm {
     fn type_kinds(&self) -> &'static [&'static str] { &[] }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["preproc_include"]
+        &[]  // asm grammar doesn't have preprocessor includes
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
@@ -93,20 +93,8 @@ impl Language for Asm {
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> { None }
     fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> { None }
 
-    fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
-        if node.kind() != "preproc_include" {
-            return Vec::new();
-        }
-
-        let text = &content[node.byte_range()];
-        vec![Import {
-            module: text.trim().to_string(),
-            names: Vec::new(),
-            alias: None,
-            is_wildcard: false,
-            is_relative: false,
-            line: node.start_position().row + 1,
-        }]
+    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
+        Vec::new()  // asm grammar doesn't have imports
     }
 
     fn is_public(&self, _node: &Node, _content: &str) -> bool { true }

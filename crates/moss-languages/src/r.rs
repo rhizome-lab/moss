@@ -28,7 +28,7 @@ impl Language for R {
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["left_assignment", "equals_assignment"]
+        &["binary_operator"]  // assignments in R are binary operators
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -37,7 +37,14 @@ impl Language for R {
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         // Look for assignments like: foo <- function(...) or foo = function(...)
-        if node.kind() != "left_assignment" && node.kind() != "equals_assignment" {
+        // In R grammar, these are binary_operator nodes
+        if node.kind() != "binary_operator" {
+            return Vec::new();
+        }
+
+        // Check if it's an assignment (contains <- or =)
+        let text = &content[node.byte_range()];
+        if !text.contains("<-") && !text.contains("=") {
             return Vec::new();
         }
 
@@ -67,7 +74,7 @@ impl Language for R {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function_definition", "brace_list"]
+        &["function_definition", "braced_expression"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
@@ -79,14 +86,14 @@ impl Language for R {
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["function_definition", "if_statement", "for_statement", "brace_list"]
+        &["function_definition", "if_statement", "for_statement", "braced_expression"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         // R functions are typically assigned: name <- function(...) {}
-        // We need to look at the parent assignment
+        // We need to look at the parent assignment (binary_operator in R grammar)
         let parent = node.parent()?;
-        if parent.kind() != "left_assignment" && parent.kind() != "equals_assignment" {
+        if parent.kind() != "binary_operator" {
             return None;
         }
 
@@ -260,7 +267,7 @@ mod tests {
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
-            "binary_operator", "braced_expression", "extract_operator", "identifier",
+            "extract_operator", "identifier",
             "namespace_operator", "parenthesized_expression", "return", "unary_operator",
         ];
         validate_unused_kinds_audit(&R, documented_unused)

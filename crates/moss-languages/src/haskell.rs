@@ -16,7 +16,7 @@ impl Language for Haskell {
     fn has_symbols(&self) -> bool { true }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["adt", "newtype", "type_alias", "class", "instance"]
+        &["data_type", "newtype", "type_synomym", "class", "instance"]
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
@@ -24,7 +24,7 @@ impl Language for Haskell {
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["adt", "newtype", "type_alias"]
+        &["data_type", "newtype", "type_synomym"]
     }
 
     fn import_kinds(&self) -> &'static [&'static str] {
@@ -32,7 +32,7 @@ impl Language for Haskell {
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function", "adt", "newtype", "class"]
+        &["function", "data_type", "newtype", "class"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -47,8 +47,8 @@ impl Language for Haskell {
 
         let kind = match node.kind() {
             "function" | "signature" => SymbolKind::Function,
-            "adt" | "newtype" => SymbolKind::Struct,
-            "type_alias" => SymbolKind::Type,
+            "data_type" | "newtype" => SymbolKind::Struct,
+            "type_synomym" => SymbolKind::Type,
             "class" => SymbolKind::Interface,
             _ => return Vec::new(),
         };
@@ -97,9 +97,9 @@ impl Language for Haskell {
         let name = self.node_name(node, content)?;
 
         let (kind, keyword) = match node.kind() {
-            "adt" => (SymbolKind::Struct, "data"),
+            "data_type" => (SymbolKind::Struct, "data"),
             "newtype" => (SymbolKind::Struct, "newtype"),
-            "type_alias" => (SymbolKind::Type, "type"),
+            "type_synomym" => (SymbolKind::Type, "type"),
             "class" => (SymbolKind::Interface, "class"),
             "instance" => (SymbolKind::Class, "instance"),
             _ => return None,
@@ -318,7 +318,7 @@ mod tests {
         let documented_unused: &[&str] = &[
             "associated_type", "class_declarations", "constructor",
             "constructor_operator", "constructor_synonym", "constructor_synonyms",
-            "data_constructor", "data_constructors", "data_type", "declarations",
+            "data_constructor", "data_constructors", "declarations",
             "default_types", "do_module", "explicit_type", "export", "exports",
             "forall", "forall_required", "foreign_export", "foreign_import",
             "function_head_parens", "gadt_constructor", "gadt_constructors",
@@ -330,7 +330,7 @@ mod tests {
             "quasiquote_body", "quoted_expression", "quoted_type", "transform",
             "type_application", "type_binder", "type_family",
             "type_family_injectivity", "type_family_result", "type_instance",
-            "type_params", "type_patterns", "type_role", "type_synomym",
+            "type_params", "type_patterns", "type_role",
             "typed_quote",
         ];
         validate_unused_kinds_audit(&Haskell, documented_unused)

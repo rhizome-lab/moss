@@ -82,7 +82,7 @@ impl Language for ReScript {
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_expression", "switch_expression", "match_case"]
+        &["if_expression", "switch_expression", "switch_match"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
@@ -269,7 +269,7 @@ mod tests {
             // JSX
             "jsx_expression", "jsx_identifier", "nested_jsx_identifier",
             // Pattern matching
-            "switch_match", "exception_pattern", "polyvar_type_pattern",
+            "exception_pattern", "polyvar_type_pattern",
             // Identifiers
             "value_identifier", "value_identifier_path", "variant_identifier",
             "nested_variant_identifier", "polyvar_identifier", "property_identifier",

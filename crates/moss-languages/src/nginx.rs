@@ -55,15 +55,15 @@ impl Language for Nginx {
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if"] // if directive
+        &["block_directive"]  // if blocks are block_directives
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if"]
+        &["block_directive"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["block", "if"]
+        &["block", "block_directive"]
     }
 
     fn extract_function(&self, _node: &Node, _content: &str, _in_container: bool) -> Option<Symbol> { None }
@@ -189,7 +189,7 @@ mod tests {
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
-            "block_directive", "lua_block", "lua_block_directive", "modifier",
+            "lua_block", "lua_block_directive", "modifier",
         ];
         validate_unused_kinds_audit(&Nginx, documented_unused)
             .expect("Nginx unused node kinds audit failed");

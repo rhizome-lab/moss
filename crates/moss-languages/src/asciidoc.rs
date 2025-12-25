@@ -16,18 +16,18 @@ impl Language for AsciiDoc {
     fn has_symbols(&self) -> bool { true }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["section"]
+        &["section_block"]
     }
 
     fn function_kinds(&self) -> &'static [&'static str] { &[] }
     fn type_kinds(&self) -> &'static [&'static str] { &[] }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["include_directive"]
+        &["block_macro"]  // includes are block macros in AsciiDoc
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["section", "title"]
+        &["section_block", "title1", "title2", "title3", "title4", "title5"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -36,7 +36,7 @@ impl Language for AsciiDoc {
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         match node.kind() {
-            "section" | "title" => {
+            "section_block" | "title1" | "title2" | "title3" | "title4" | "title5" => {
                 if let Some(name) = self.node_name(node, content) {
                     return vec![Export {
                         name: name.to_string(),
@@ -51,17 +51,17 @@ impl Language for AsciiDoc {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["section"]
+        &["section_block"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] { &[] }
     fn complexity_nodes(&self) -> &'static [&'static str] { &[] }
-    fn nesting_nodes(&self) -> &'static [&'static str] { &["section"] }
+    fn nesting_nodes(&self) -> &'static [&'static str] { &["section_block"] }
 
     fn extract_function(&self, _node: &Node, _content: &str, _in_container: bool) -> Option<Symbol> { None }
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "section" {
+        if node.kind() != "section_block" {
             return None;
         }
 
@@ -85,11 +85,16 @@ impl Language for AsciiDoc {
     fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> { None }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
-        if node.kind() != "include_directive" {
+        if node.kind() != "block_macro" {
             return Vec::new();
         }
 
         let text = &content[node.byte_range()];
+        // Only include macros are imports
+        if !text.starts_with("include::") {
+            return Vec::new();
+        }
+
         vec![Import {
             module: text.trim().to_string(),
             names: Vec::new(),
@@ -178,7 +183,7 @@ mod tests {
             // Block types - not symbols
             "literal_block", "listing_block", "open_block", "quoted_block",
             "passthrough_block", "delimited_block", "table_block", "ntable_block",
-            "ident_block", "quoted_md_block", "section_block",
+            "ident_block", "quoted_md_block",
             // Block markers and bodies
             "block_comment", "block_comment_start_marker", "block_comment_end_marker",
             "quoted_block_marker", "quoted_block_md_marker", "passthrough_block_marker",
@@ -188,7 +193,7 @@ mod tests {
             "delimited_block_start_marker", "delimited_block_end_marker",
             // Block elements and titles
             "block_title", "block_title_marker", "block_element",
-            "block_macro", "block_macro_name", "block_macro_attr",
+            "block_macro_name", "block_macro_attr",
             // Other content
             "body", "ident_block_line", "admonition_important",
         ];

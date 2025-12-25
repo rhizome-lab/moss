@@ -20,7 +20,7 @@ impl Language for Julia {
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition", "short_function_definition", "macro_definition"]
+        &["function_definition", "arrow_function_expression", "macro_definition"]
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
@@ -46,7 +46,7 @@ impl Language for Julia {
         };
 
         let kind = match node.kind() {
-            "function_definition" | "short_function_definition" => SymbolKind::Function,
+            "function_definition" | "arrow_function_expression" => SymbolKind::Function,
             "macro_definition" => SymbolKind::Function,
             "struct_definition" => SymbolKind::Struct,
             "abstract_definition" => SymbolKind::Interface,
@@ -288,7 +288,7 @@ mod tests {
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
-            "adjoint_expression", "arrow_function_expression", "binary_expression", "block",
+            "adjoint_expression", "binary_expression", "block",
             "block_comment", "break_statement", "broadcast_call_expression", "call_expression",
             "catch_clause", "compound_assignment_expression", "compound_statement",
             "comprehension_expression", "continue_statement", "curly_expression", "else_clause",

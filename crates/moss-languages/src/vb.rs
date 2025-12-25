@@ -16,15 +16,15 @@ impl Language for VB {
     fn has_symbols(&self) -> bool { true }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["class_declaration", "module_declaration", "structure_declaration", "interface_declaration"]
+        &["class_block", "module_block", "structure_block", "interface_block"]
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["sub_statement", "function_statement", "property_statement"]
+        &["method_declaration", "property_declaration"]
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["enum_declaration", "delegate_declaration"]
+        &["enum_block", "delegate_declaration"]
     }
 
     fn import_kinds(&self) -> &'static [&'static str] {
@@ -32,7 +32,7 @@ impl Language for VB {
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["class_declaration", "module_declaration", "sub_statement", "function_statement"]
+        &["class_block", "module_block", "method_declaration"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -41,7 +41,7 @@ impl Language for VB {
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         match node.kind() {
-            "class_declaration" | "module_declaration" | "structure_declaration" => {
+            "class_block" | "module_block" | "structure_block" => {
                 if let Some(name) = self.node_name(node, content) {
                     return vec![Export {
                         name: name.to_string(),
@@ -50,7 +50,7 @@ impl Language for VB {
                     }];
                 }
             }
-            "sub_statement" | "function_statement" => {
+            "method_declaration" => {
                 if let Some(name) = self.node_name(node, content) {
                     return vec![Export {
                         name: name.to_string(),
@@ -65,24 +65,24 @@ impl Language for VB {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["class_declaration", "module_declaration", "sub_statement", "function_statement"]
+        &["class_block", "module_block", "method_declaration"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "select_statement", "while_statement", "for_statement", "for_each_statement", "do_statement"]
+        &["if_statement", "select_case_statement", "while_statement", "for_statement", "for_each_statement", "do_statement"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "select_statement", "while_statement", "for_statement", "for_each_statement", "case_clause"]
+        &["if_statement", "select_case_statement", "while_statement", "for_statement", "for_each_statement", "case_clause"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "select_statement", "while_statement", "for_statement", "do_statement"]
+        &["if_statement", "select_case_statement", "while_statement", "for_statement", "do_statement"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         match node.kind() {
-            "sub_statement" | "function_statement" | "property_statement" => {
+            "method_declaration" | "property_declaration" => {
                 let name = self.node_name(node, content)?;
                 let text = &content[node.byte_range()];
                 let first_line = text.lines().next().unwrap_or(text);
@@ -104,7 +104,7 @@ impl Language for VB {
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
         match node.kind() {
-            "class_declaration" | "module_declaration" | "structure_declaration" | "interface_declaration" => {
+            "class_block" | "module_block" | "structure_block" | "interface_block" => {
                 let name = self.node_name(node, content)?;
                 let text = &content[node.byte_range()];
                 let first_line = text.lines().next().unwrap_or(text);
@@ -126,7 +126,7 @@ impl Language for VB {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         match node.kind() {
-            "enum_declaration" | "delegate_declaration" => {
+            "enum_block" | "delegate_declaration" => {
                 let name = self.node_name(node, content)?;
                 let text = &content[node.byte_range()];
                 let first_line = text.lines().next().unwrap_or(text);
@@ -251,13 +251,11 @@ mod tests {
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
-            // Block types (not declarations)
-            "class_block", "module_block", "structure_block", "interface_block",
-            "namespace_block", "enum_block",
+            // Block types
+            "namespace_block",
             // Declaration types
-            "method_declaration", "property_declaration", "field_declaration",
-            "constructor_declaration", "event_declaration", "type_declaration",
-            "const_declaration", "enum_member",
+            "field_declaration", "constructor_declaration", "event_declaration",
+            "type_declaration", "const_declaration", "enum_member",
             // Statement types
             "statement", "assignment_statement", "compound_assignment_statement",
             "call_statement", "dim_statement", "redim_statement", "re_dim_clause",
@@ -265,8 +263,7 @@ mod tests {
             "label_statement", "throw_statement", "empty_statement",
             // Control flow
             "try_statement", "catch_block", "finally_block",
-            "select_case_statement", "case_block", "case_else_block",
-            "else_clause", "elseif_clause",
+            "case_block", "case_else_block", "else_clause", "elseif_clause",
             "with_statement", "with_initializer",
             "using_statement", "sync_lock_statement",
             // Expression types

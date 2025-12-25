@@ -20,7 +20,7 @@ impl Language for Prolog {
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["clause"]
+        &["clause_term"]
     }
 
     fn type_kinds(&self) -> &'static [&'static str] { &[] }
@@ -30,7 +30,7 @@ impl Language for Prolog {
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["clause", "directive_term"]
+        &["clause_term", "directive_term"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -38,7 +38,7 @@ impl Language for Prolog {
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        if node.kind() != "clause" {
+        if node.kind() != "clause_term" {
             return Vec::new();
         }
 
@@ -54,7 +54,7 @@ impl Language for Prolog {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["clause"]
+        &["clause_term"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
@@ -62,15 +62,15 @@ impl Language for Prolog {
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["clause"] // Each clause adds complexity
+        &["clause_term"] // Each clause adds complexity
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["clause"]
+        &["clause_term"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "clause" {
+        if node.kind() != "clause_term" {
             return None;
         }
 
@@ -228,7 +228,7 @@ mod tests {
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
-            "binary_operator", "clause_term", "functional_notation",
+            "binary_operator", "functional_notation",
             "operator_notation", "prefix_operator", "prexif_operator",
         ];
         validate_unused_kinds_audit(&Prolog, documented_unused)

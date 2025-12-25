@@ -78,15 +78,16 @@ impl Language for Ada {
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "case_statement", "loop_statement", "exit_statement", "return_statement"]
+        // Ada grammar uses expression-based nodes
+        &["case_expression", "if_expression", "quantified_expression"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "case_statement", "loop_statement", "exception_handler"]
+        &["case_expression", "if_expression", "case_expression_alternative"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "case_statement", "loop_statement", "block_statement"]
+        &["case_expression", "if_expression", "declare_expression"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
@@ -301,8 +302,9 @@ mod tests {
             "delay_relative_statement", "delay_until_statement", "goto_statement", "null_statement",
             "procedure_call_statement", "raise_statement", "requeue_statement", "simple_return_statement",
             // Expressions
-            "case_expression", "case_expression_alternative", "declare_expression", "if_expression",
-            "qualified_expression", "quantified_expression", "raise_expression",
+            "qualified_expression", "raise_expression",
+            // Potentially useful - control flow
+            "exception_handler", "if_statement", "exit_statement", "case_statement",
             // Representation clauses
             "at_clause", "attribute_definition_clause", "component_clause", "enumeration_aggregate",
             "enumeration_representation_clause", "mod_clause", "record_representation_clause",

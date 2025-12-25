@@ -20,11 +20,11 @@ impl Language for Lean {
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["definition", "theorem", "lemma", "def"]
+        &["def", "theorem", "constant", "axiom", "example"]
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["abbreviation", "alias"]
+        &["abbrev"]
     }
 
     fn import_kinds(&self) -> &'static [&'static str] {
@@ -32,7 +32,7 @@ impl Language for Lean {
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["definition", "theorem", "structure", "inductive", "class"]
+        &["def", "theorem", "structure", "inductive", "instance"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -41,7 +41,7 @@ impl Language for Lean {
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         match node.kind() {
-            "definition" | "theorem" | "lemma" | "def" => {
+            "def" | "theorem" | "constant" | "axiom" | "example" => {
                 if let Some(name) = self.node_name(node, content) {
                     return vec![Export {
                         name: name.to_string(),
@@ -65,24 +65,24 @@ impl Language for Lean {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["namespace", "section", "definition", "theorem", "where"]
+        &["namespace", "section", "def", "theorem", "where_decl"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if", "match"]
+        &["if_then_else", "match"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if", "match", "match_arm"]
+        &["if_then_else", "match", "match_alt"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["if", "match", "do", "namespace", "section"]
+        &["if_then_else", "match", "do", "namespace", "section"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         match node.kind() {
-            "definition" | "theorem" | "lemma" | "def" => {
+            "def" | "theorem" | "constant" | "axiom" | "example" => {
                 let name = self.node_name(node, content)?;
                 let text = &content[node.byte_range()];
                 let first_line = text.lines().next().unwrap_or(text);
@@ -126,7 +126,7 @@ impl Language for Lean {
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
         match node.kind() {
-            "abbreviation" | "alias" => {
+            "abbrev" => {
                 let name = self.node_name(node, content)?;
                 let text = &content[node.byte_range()];
                 let first_line = text.lines().next().unwrap_or(text);
@@ -246,11 +246,11 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             // Expression nodes (not declarations)
-            "for_in", "if_then_else", "binary_expression", "unary_expression",
+            "for_in", "binary_expression", "unary_expression",
             "type_ascription", "forall", "subtype", "structure_instance",
             "anonymous_constructor", "lift_method",
             // Parts of declarations
-            "constructor", "match_alt", "declaration", "identifier",
+            "constructor", "declaration", "identifier",
             // Module system
             "module", "export",
             // Control flow

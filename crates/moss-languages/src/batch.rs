@@ -20,17 +20,17 @@ impl Language for Batch {
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["label"]
+        &["function_definition"]
     }
 
     fn type_kinds(&self) -> &'static [&'static str] { &[] }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["call_command"] // call to other batch files
+        &[]  // batch grammar doesn't have import nodes
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["label", "variable_assignment"]
+        &["function_definition", "variable_declaration"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -39,7 +39,7 @@ impl Language for Batch {
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         match node.kind() {
-            "label" => {
+            "function_definition" => {
                 if let Some(name) = self.node_name(node, content) {
                     return vec![Export {
                         name: name.to_string(),
@@ -48,7 +48,7 @@ impl Language for Batch {
                     }];
                 }
             }
-            "variable_assignment" => {
+            "variable_declaration" => {
                 if let Some(name) = self.node_name(node, content) {
                     return vec![Export {
                         name: name.to_string(),
@@ -63,23 +63,23 @@ impl Language for Batch {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["label"]
+        &["function_definition"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "for_statement", "goto_statement"]
+        &[]  // batch grammar doesn't have control flow nodes
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "for_statement"]
+        &[]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "for_statement"]
+        &[]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "label" {
+        if node.kind() != "function_definition" {
             return None;
         }
 
@@ -102,20 +102,8 @@ impl Language for Batch {
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> { None }
     fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> { None }
 
-    fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
-        if node.kind() != "call_command" {
-            return Vec::new();
-        }
-
-        let text = &content[node.byte_range()];
-        vec![Import {
-            module: text.trim().to_string(),
-            names: Vec::new(),
-            alias: None,
-            is_wildcard: false,
-            is_relative: false,
-            line: node.start_position().row + 1,
-        }]
+    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> {
+        Vec::new()  // batch grammar doesn't have import nodes
     }
 
     fn is_public(&self, _node: &Node, _content: &str) -> bool { true }
@@ -127,30 +115,16 @@ impl Language for Batch {
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool { false }
 
     fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
-        match node.kind() {
-            "label" => {
-                let text = &content[node.byte_range()];
-                // Labels start with : and the name follows
-                if text.starts_with(':') {
-                    Some(text[1..].trim())
-                } else {
-                    Some(text.trim())
-                }
-            }
-            "variable_assignment" => {
-                if let Some(name_node) = node.child_by_field_name("name") {
-                    return Some(&content[name_node.byte_range()]);
-                }
-                let mut cursor = node.walk();
-                for child in node.children(&mut cursor) {
-                    if child.kind() == "variable" {
-                        return Some(&content[child.byte_range()]);
-                    }
-                }
-                None
-            }
-            _ => None,
+        if let Some(name_node) = node.child_by_field_name("name") {
+            return Some(&content[name_node.byte_range()]);
         }
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == "identifier" {
+                return Some(&content[child.byte_range()]);
+            }
+        }
+        None
     }
 
     fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
@@ -207,7 +181,7 @@ mod tests {
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
-            "function_definition", "identifier", "variable_declaration",
+            "identifier",
         ];
         validate_unused_kinds_audit(&Batch, documented_unused)
             .expect("Batch unused node kinds audit failed");

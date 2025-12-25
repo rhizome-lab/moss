@@ -16,23 +16,23 @@ impl Language for Idris {
     fn has_symbols(&self) -> bool { true }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["data_declaration", "record_declaration", "interface_declaration"]
+        &["data", "record", "interface"]
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "function_signature"]
+        &["function", "signature"]
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["type_alias"]
+        &[]  // Idris grammar doesn't have type alias node
     }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_statement"]
+        &["import"]
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "data_declaration", "record_declaration"]
+        &["function", "data", "record"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -41,7 +41,7 @@ impl Language for Idris {
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
         match node.kind() {
-            "function_declaration" | "function_signature" => {
+            "function" | "signature" => {
                 if let Some(name) = self.node_name(node, content) {
                     return vec![Export {
                         name: name.to_string(),
@@ -50,7 +50,7 @@ impl Language for Idris {
                     }];
                 }
             }
-            "data_declaration" | "record_declaration" | "interface_declaration" => {
+            "data" | "record" | "interface" => {
                 if let Some(name) = self.node_name(node, content) {
                     return vec![Export {
                         name: name.to_string(),
@@ -65,24 +65,24 @@ impl Language for Idris {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "where_clause", "let_expression", "do_block"]
+        &["function", "where", "exp_let_in", "exp_do"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_expression", "case_expression"]
+        &["exp_if", "exp_case"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_expression", "case_expression", "guard"]
+        &["exp_if", "exp_case", "alt"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["if_expression", "case_expression", "do_block", "let_expression"]
+        &["exp_if", "exp_case", "exp_do", "exp_let_in"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         match node.kind() {
-            "function_declaration" | "function_signature" => {
+            "function" | "signature" => {
                 let name = self.node_name(node, content)?;
                 let text = &content[node.byte_range()];
                 let first_line = text.lines().next().unwrap_or(text);
@@ -104,7 +104,7 @@ impl Language for Idris {
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
         match node.kind() {
-            "data_declaration" | "record_declaration" | "interface_declaration" => {
+            "data" | "record" | "interface" => {
                 let name = self.node_name(node, content)?;
                 let text = &content[node.byte_range()];
                 let first_line = text.lines().next().unwrap_or(text);
@@ -124,31 +124,14 @@ impl Language for Idris {
         }
     }
 
-    fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "type_alias" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Type,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-        })
+    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> {
+        None  // Type extraction handled by container for data/record
     }
 
     fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> { None }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
-        if node.kind() != "import_statement" {
+        if node.kind() != "import" {
             return Vec::new();
         }
 
@@ -238,7 +221,7 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             // Expression nodes
-            "exp_if", "exp_else", "exp_case", "exp_with", "exp_lambda", "exp_lambda_case",
+            "exp_else", "exp_with", "exp_lambda", "exp_lambda_case",
             "exp_list_comprehension", "lambda_exp", "lambda_args",
             // Type-related
             "type_signature", "type_parens", "type_braces", "type_var", "forall",
@@ -246,14 +229,14 @@ mod tests {
             "parameters_body", "namespace_body", "mutual_body", "data_body",
             "record_body", "interface_body", "implementation_body",
             // Interface and module
-            "interface", "interface_head", "interface_name", "module",
+            "interface_head", "interface_name", "module",
             // Operators
             "operator", "qualified_operator", "qualified_dot_operators", "dot_operator",
             "ticked_operator", "tuple_operator",
             // Qualified names
             "qualified_loname", "qualified_caname",
             // Other constructs
-            "function", "constructor", "import", "statement", "declarations",
+            "constructor", "statement", "declarations",
             "with", "with_pat", "with_arg",
             // Pragmas
             "pragma_export", "pragma_foreign", "pragma_foreign_impl", "pragma_transform",

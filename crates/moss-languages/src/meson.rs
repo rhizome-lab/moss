@@ -16,21 +16,21 @@ impl Language for Meson {
     fn has_symbols(&self) -> bool { true }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
+        &[]  // Meson doesn't have traditional containers
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_definition"]
+        &["normal_command"]  // function calls
     }
 
     fn type_kinds(&self) -> &'static [&'static str] { &[] }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["function_expression"] // subproject(), dependency()
+        &["normal_command"]  // subproject(), dependency() are function calls
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function_definition", "assignment_statement"]
+        &["expression_statement"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -38,93 +38,47 @@ impl Language for Meson {
     }
 
     fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
-        match node.kind() {
-            "function_definition" => {
-                if let Some(name) = self.node_name(node, content) {
-                    return vec![Export {
-                        name: name.to_string(),
-                        kind: SymbolKind::Function,
-                        line: node.start_position().row + 1,
-                    }];
-                }
+        if node.kind() == "expression_statement" {
+            if let Some(name) = self.node_name(node, content) {
+                return vec![Export {
+                    name: name.to_string(),
+                    kind: SymbolKind::Variable,
+                    line: node.start_position().row + 1,
+                }];
             }
-            "assignment_statement" => {
-                if let Some(name) = self.node_name(node, content) {
-                    return vec![Export {
-                        name: name.to_string(),
-                        kind: SymbolKind::Variable,
-                        line: node.start_position().row + 1,
-                    }];
-                }
-            }
-            _ => {}
         }
         Vec::new()
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function_definition", "if_statement", "foreach_statement"]
+        &["if_command", "foreach_command"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "foreach_statement"]
+        &["if_command", "foreach_command"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "foreach_statement"]
+        &["if_command", "foreach_command", "if_condition"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "foreach_statement", "function_definition"]
+        &["if_command", "foreach_command"]
     }
 
-    fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "function_definition" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-        })
+    fn extract_function(&self, _node: &Node, _content: &str, _in_container: bool) -> Option<Symbol> {
+        None  // Meson uses function calls, not definitions
     }
 
-    fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "function_definition" {
-            return None;
-        }
-
-        let name = self.node_name(node, content)?;
-        let text = &content[node.byte_range()];
-        let first_line = text.lines().next().unwrap_or(text);
-
-        Some(Symbol {
-            name: name.to_string(),
-            kind: SymbolKind::Function,
-            signature: first_line.trim().to_string(),
-            docstring: None,
-            start_line: node.start_position().row + 1,
-            end_line: node.end_position().row + 1,
-            visibility: Visibility::Public,
-            children: Vec::new(),
-        })
+    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> {
+        None  // Meson doesn't have containers
     }
 
     fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> { None }
     fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> { None }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
-        if node.kind() != "function_expression" {
+        if node.kind() != "normal_command" {
             return Vec::new();
         }
 
@@ -221,9 +175,9 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             // Control flow commands
-            "else_command", "elseif_command", "foreach_command", "if_command", "if_condition",
+            "else_command", "elseif_command",
             // Expression-related
-            "expression_statement", "formatunit", "identifier", "operatorunit", "ternaryoperator",
+            "formatunit", "identifier", "operatorunit", "ternaryoperator",
         ];
         validate_unused_kinds_audit(&Meson, documented_unused)
             .expect("Meson unused node kinds audit failed");

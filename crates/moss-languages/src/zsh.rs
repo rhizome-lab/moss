@@ -57,7 +57,7 @@ impl Language for Zsh {
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "for_statement", "while_statement", "case_statement", "select_statement"]
+        &["if_statement", "for_statement", "while_statement", "case_statement"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {

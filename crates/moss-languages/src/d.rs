@@ -20,7 +20,7 @@ impl Language for D {
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "constructor"]
+        &["function_literal", "auto_declaration"]
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
@@ -32,7 +32,7 @@ impl Language for D {
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["module_declaration", "class_declaration", "struct_declaration", "function_declaration"]
+        &["module_declaration", "class_declaration", "struct_declaration", "auto_declaration"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -61,7 +61,7 @@ impl Language for D {
                     }
                 }
             }
-            "function_declaration" => {
+            "auto_declaration" | "function_literal" => {
                 if self.is_public(node, content) {
                     if let Some(name) = self.node_name(node, content) {
                         return vec![Export {
@@ -78,7 +78,7 @@ impl Language for D {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "class_declaration", "struct_declaration", "block_statement"]
+        &["function_literal", "class_declaration", "struct_declaration", "block_statement"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
@@ -86,7 +86,7 @@ impl Language for D {
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "switch_statement", "while_statement", "for_statement", "foreach_statement", "catch_clause"]
+        &["if_statement", "switch_statement", "while_statement", "for_statement", "foreach_statement", "catch"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
@@ -95,7 +95,7 @@ impl Language for D {
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         match node.kind() {
-            "function_declaration" | "constructor" => {
+            "function_literal" | "auto_declaration" => {
                 let name = self.node_name(node, content)?;
                 let text = &content[node.byte_range()];
                 let first_line = text.lines().next().unwrap_or(text);
@@ -315,7 +315,7 @@ mod tests {
             // Declarations
             "anonymous_enum_declaration", "anonymous_enum_member",
             "anonymous_enum_members", "anon_struct_declaration", "anon_union_declaration",
-            "auto_declaration", "auto_func_declaration", "class_template_declaration",
+            "auto_func_declaration", "class_template_declaration",
             "conditional_declaration", "debug_specification", "destructor", "empty_declaration",
             "enum_body", "enum_member", "enum_member_attribute", "enum_member_attributes",
             "enum_members", "func_declaration", "interface_template_declaration", "mixin_declaration",
@@ -329,7 +329,7 @@ mod tests {
             "range_foreach", "static_foreach",
             // Function-related
             "constructor_args", "constructor_template", "function_attribute_kwd",
-            "function_attributes", "function_contracts", "function_literal", "function_literal_body",
+            "function_attributes", "function_contracts", "function_literal_body",
             "function_literal_body2", "member_function_attribute", "member_function_attributes",
             "missing_function_body", "out_contract_expression", "in_contract_expression",
             "in_statement", "parameter_with_attributes", "parameter_with_member_attributes",
@@ -338,7 +338,7 @@ mod tests {
             "template_type_parameter", "template_type_parameter_default",
             "template_type_parameter_specialization", "type_specialization",
             // Type-related
-            "aggregate_body", "basic_type", "catch", "catch_parameter", "catches",
+            "aggregate_body", "basic_type", "catch_parameter", "catches", "constructor",
             "else_statement", "enum_base_type", "finally_statement", "fundamental_type",
             "if_condition", "interfaces", "linkage_type", "module_alias_identifier",
             "module_attributes", "module_fully_qualified_name", "module_name", "mixin_type",

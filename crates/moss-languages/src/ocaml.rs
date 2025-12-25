@@ -28,7 +28,7 @@ impl Language for OCaml {
     }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["open_statement"]
+        &["open_module"]
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
@@ -142,7 +142,7 @@ impl Language for OCaml {
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
-        if node.kind() != "open_statement" {
+        if node.kind() != "open_module" {
             return Vec::new();
         }
 
@@ -330,7 +330,7 @@ mod tests {
             "module_binding", "module_name", "module_parameter", "module_path",
             "module_type_constraint", "module_type_name", "module_type_of",
             "module_type_path", "mult_operator", "new_expression", "object_copy_expression",
-            "object_expression", "object_type", "open_module", "or_operator",
+            "object_expression", "object_type", "or_operator",
             "package_expression", "package_type", "packed_module",
             "parenthesized_class_expression", "parenthesized_expression",
             "parenthesized_module_expression", "parenthesized_module_type",

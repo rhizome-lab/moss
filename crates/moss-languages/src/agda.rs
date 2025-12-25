@@ -20,7 +20,7 @@ impl Language for Agda {
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_clause"]
+        &["function", "signature"]
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
@@ -32,7 +32,7 @@ impl Language for Agda {
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["module", "data", "record", "function_clause"]
+        &["module", "data", "record", "function"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -59,7 +59,7 @@ impl Language for Agda {
                     }];
                 }
             }
-            "function_clause" => {
+            "function" | "signature" => {
                 if let Some(name) = self.node_name(node, content) {
                     return vec![Export {
                         name: name.to_string(),
@@ -74,7 +74,7 @@ impl Language for Agda {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["module", "where_clause"]
+        &["module", "where"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
@@ -82,15 +82,15 @@ impl Language for Agda {
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["function_clause"] // Pattern matching
+        &["function", "lambda_clause"] // Pattern matching
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["module", "where_clause"]
+        &["module", "where", "do"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
-        if node.kind() != "function_clause" {
+        if node.kind() != "function" && node.kind() != "signature" {
             return None;
         }
 
@@ -248,8 +248,8 @@ mod tests {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
             // Function and lambda definitions
-            "catchall_pragma", "forall", "function", "function_name", "lambda",
-            "lambda_clause", "lambda_clause_absurd", "type_signature",
+            "catchall_pragma", "forall", "function_name", "lambda",
+            "lambda_clause_absurd", "type_signature",
             // Module-related
             "import_directive", "module_application", "module_assignment", "module_macro",
             "module_name",

@@ -16,23 +16,23 @@ impl Language for Groovy {
     fn has_symbols(&self) -> bool { true }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["class_definition", "interface_definition", "trait_definition", "enum_definition"]
+        &["class_definition"]  // Groovy grammar only has class_definition
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["method_definition", "closure"]
+        &["function_definition", "closure"]
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["class_definition", "interface_definition", "trait_definition", "enum_definition"]
+        &["class_definition"]
     }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_statement"]
+        &["groovy_import"]
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["class_definition", "method_definition", "interface_definition"]
+        &["class_definition", "function_definition"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -47,10 +47,7 @@ impl Language for Groovy {
 
         let kind = match node.kind() {
             "class_definition" => SymbolKind::Class,
-            "interface_definition" => SymbolKind::Interface,
-            "trait_definition" => SymbolKind::Interface,
-            "enum_definition" => SymbolKind::Enum,
-            "method_definition" => SymbolKind::Function,
+            "function_definition" => SymbolKind::Function,
             _ => return Vec::new(),
         };
 
@@ -62,21 +59,21 @@ impl Language for Groovy {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["class_definition", "method_definition", "closure", "block"]
+        &["class_definition", "function_definition", "closure"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "for_statement", "while_statement", "switch_statement",
+        &["if_statement", "for_loop", "for_in_loop", "while_loop", "switch_statement",
           "try_statement"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "else_clause", "for_statement", "while_statement",
-          "switch_statement", "case_clause", "catch_clause", "ternary_expression"]
+        &["if_statement", "for_loop", "for_in_loop", "while_loop",
+          "switch_statement", "case", "ternary_op"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["class_definition", "method_definition", "if_statement", "for_statement",
+        &["class_definition", "function_definition", "if_statement", "for_loop",
           "closure"]
     }
 
@@ -102,9 +99,6 @@ impl Language for Groovy {
 
         let kind = match node.kind() {
             "class_definition" => SymbolKind::Class,
-            "interface_definition" => SymbolKind::Interface,
-            "trait_definition" => SymbolKind::Interface,
-            "enum_definition" => SymbolKind::Enum,
             _ => return None,
         };
 
@@ -154,7 +148,7 @@ impl Language for Groovy {
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
-        if node.kind() != "import_statement" {
+        if node.kind() != "groovy_import" {
             return Vec::new();
         }
 
@@ -303,12 +297,12 @@ mod tests {
     fn unused_node_kinds_audit() {
         #[rustfmt::skip]
         let documented_unused: &[&str] = &[
-            "access_modifier", "array_type", "builtintype", "case", "declaration",
-            "do_while_loop", "dotted_identifier", "for_in_loop", "for_loop", "for_parameters",
-            "function_call", "function_declaration", "function_definition", "groovy_doc_throws",
-            "groovy_import", "identifier", "juxt_function_call", "modifier",
+            "access_modifier", "array_type", "builtintype", "declaration",
+            "do_while_loop", "dotted_identifier", "for_parameters",
+            "function_call", "function_declaration", "groovy_doc_throws",
+            "identifier", "juxt_function_call", "modifier",
             "parenthesized_expression", "qualified_name", "return", "switch_block",
-            "type_with_generics", "while_loop", "wildcard_import",
+            "type_with_generics", "wildcard_import",
         ];
         validate_unused_kinds_audit(&Groovy, documented_unused)
             .expect("Groovy unused node kinds audit failed");

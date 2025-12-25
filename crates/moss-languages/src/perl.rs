@@ -26,7 +26,7 @@ impl Language for Perl {
     fn type_kinds(&self) -> &'static [&'static str] { &[] }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["use_statement", "require_statement"]
+        &["use_statement", "require_expression"]
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
@@ -60,17 +60,16 @@ impl Language for Perl {
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "unless_statement", "while_statement", "until_statement",
-          "for_statement", "foreach_statement"]
+        &["conditional_statement", "loop_statement", "for_statement", "cstyle_for_statement"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "unless_statement", "while_statement", "foreach_statement",
+        &["conditional_statement", "loop_statement", "for_statement",
           "conditional_expression"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["subroutine_declaration_statement", "if_statement", "while_statement", "block"]
+        &["subroutine_declaration_statement", "conditional_statement", "loop_statement", "block"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
@@ -275,20 +274,20 @@ mod tests {
             "anonymous_subroutine_expression", "array_deref_expression",
             "array_element_expression", "arraylen_deref_expression", "assignment_expression",
             "await_expression", "binary_expression", "block_statement", "class_phaser_statement",
-            "class_statement", "coderef_call_expression", "conditional_statement",
-            "cstyle_for_statement", "defer_statement", "do_expression", "else", "elsif",
+            "class_statement", "coderef_call_expression",
+            "defer_statement", "do_expression", "else", "elsif",
             "equality_expression", "eval_expression", "expression_statement",
             "fileglob_expression", "func0op_call_expression", "func1op_call_expression",
             "function", "function_call_expression", "glob_deref_expression",
             "glob_slot_expression", "goto_expression", "hash_deref_expression",
             "hash_element_expression", "identifier", "keyval_expression",
-            "list_expression", "localization_expression", "loop_statement",
+            "list_expression", "localization_expression",
             "loopex_expression", "lowprec_logical_expression", "map_grep_expression",
             "match_regexp", "match_regexp_modifiers", "method", "method_call_expression",
             "method_declaration_statement", "phaser_statement", "postfix_conditional_expression",
             "postfix_for_expression", "postfix_loop_expression", "postinc_expression",
             "preinc_expression", "prototype", "quoted_regexp_modifiers", "readline_expression",
-            "refgen_expression", "relational_expression", "require_expression",
+            "refgen_expression", "relational_expression",
             "require_version_expression", "return_expression", "role_statement",
             "scalar_deref_expression", "slice_expression", "sort_expression", "statement_label",
             "stub_expression", "substitution_regexp_modifiers", "transliteration_expression",
