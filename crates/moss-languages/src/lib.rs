@@ -167,6 +167,30 @@ pub mod cmake;
 #[cfg(feature = "lang-vim")]
 pub mod vim;
 
+#[cfg(feature = "lang-awk")]
+pub mod awk;
+
+#[cfg(feature = "lang-fish")]
+pub mod fish;
+
+#[cfg(feature = "lang-jq")]
+pub mod jq;
+
+#[cfg(feature = "lang-powershell")]
+pub mod powershell;
+
+#[cfg(feature = "lang-zsh")]
+pub mod zsh;
+
+#[cfg(feature = "lang-groovy")]
+pub mod groovy;
+
+#[cfg(feature = "lang-glsl")]
+pub mod glsl;
+
+#[cfg(feature = "lang-hlsl")]
+pub mod hlsl;
+
 // Re-exports from registry
 pub use registry::{register, support_for_extension, support_for_grammar, support_for_path, supported_languages, validate_unused_kinds_audit};
 
@@ -311,3 +335,27 @@ pub use cmake::CMake;
 
 #[cfg(feature = "lang-vim")]
 pub use vim::Vim;
+
+#[cfg(feature = "lang-awk")]
+pub use awk::Awk;
+
+#[cfg(feature = "lang-fish")]
+pub use fish::Fish;
+
+#[cfg(feature = "lang-jq")]
+pub use jq::Jq;
+
+#[cfg(feature = "lang-powershell")]
+pub use powershell::PowerShell;
+
+#[cfg(feature = "lang-zsh")]
+pub use zsh::Zsh;
+
+#[cfg(feature = "lang-groovy")]
+pub use groovy::Groovy;
+
+#[cfg(feature = "lang-glsl")]
+pub use glsl::Glsl;
+
+#[cfg(feature = "lang-hlsl")]
+pub use hlsl::Hlsl;

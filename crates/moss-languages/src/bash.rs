@@ -10,7 +10,7 @@ pub struct Bash;
 
 impl Language for Bash {
     fn name(&self) -> &'static str { "Bash" }
-    fn extensions(&self) -> &'static [&'static str] { &["sh", "bash", "zsh"] }
+    fn extensions(&self) -> &'static [&'static str] { &["sh", "bash"] }
     fn grammar_name(&self) -> &'static str { "bash" }
 
     fn has_symbols(&self) -> bool { true }
@@ -113,7 +113,7 @@ impl Language for Bash {
     fn is_stdlib_import(&self, _: &str, _: &Path) -> bool { false }
     fn get_version(&self, _: &Path) -> Option<String> { None }
     fn find_package_cache(&self, _: &Path) -> Option<PathBuf> { None }
-    fn indexable_extensions(&self) -> &'static [&'static str] { &["sh", "bash", "zsh"] }
+    fn indexable_extensions(&self) -> &'static [&'static str] { &["sh", "bash"] }
     fn find_stdlib(&self, _: &Path) -> Option<PathBuf> { None }
     fn package_module_name(&self, name: &str) -> String { name.to_string() }
     fn package_sources(&self, _: &Path) -> Vec<crate::PackageSource> { Vec::new() }
@@ -125,7 +125,7 @@ impl Language for Bash {
     fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
         use crate::traits::{skip_dotfiles, has_extension};
         if skip_dotfiles(name) { return true; }
-        !is_dir && !has_extension(name, &["sh", "bash", "zsh"])
+        !is_dir && !has_extension(name, &["sh", "bash"])
     }
 }
 

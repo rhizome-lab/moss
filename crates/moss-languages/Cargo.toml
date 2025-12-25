@@ -24,7 +24,8 @@ all-languages = [
     "lang-fsharp", "lang-sql", "lang-graphql", "lang-hcl", "lang-scss",
     "lang-svelte", "lang-xml", "lang-clojure", "lang-haskell", "lang-ocaml",
     "lang-nix", "lang-perl", "lang-r", "lang-julia", "lang-elm", "lang-cmake",
-    "lang-vim",
+    "lang-vim", "lang-awk", "lang-fish", "lang-jq", "lang-powershell",
+    "lang-zsh", "lang-groovy", "lang-glsl", "lang-hlsl",
 ]
 
 # Tier 1: Most common languages
@@ -81,3 +82,11 @@ lang-julia = ["arborium/lang-julia"]
 lang-elm = ["arborium/lang-elm"]
 lang-cmake = ["arborium/lang-cmake"]
 lang-vim = ["arborium/lang-vim"]
+lang-awk = ["arborium/lang-awk"]
+lang-fish = ["arborium/lang-fish"]
+lang-jq = ["arborium/lang-jq"]
+lang-powershell = ["arborium/lang-powershell"]
+lang-zsh = ["arborium/lang-zsh"]
+lang-groovy = ["arborium/lang-groovy"]
+lang-glsl = ["arborium/lang-glsl"]
+lang-hlsl = ["arborium/lang-hlsl"]

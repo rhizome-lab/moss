@@ -161,6 +161,30 @@ fn init_builtin() {
 
         #[cfg(feature = "lang-vim")]
         register(&crate::vim::Vim);
+
+        #[cfg(feature = "lang-awk")]
+        register(&crate::awk::Awk);
+
+        #[cfg(feature = "lang-fish")]
+        register(&crate::fish::Fish);
+
+        #[cfg(feature = "lang-jq")]
+        register(&crate::jq::Jq);
+
+        #[cfg(feature = "lang-powershell")]
+        register(&crate::powershell::PowerShell);
+
+        #[cfg(feature = "lang-zsh")]
+        register(&crate::zsh::Zsh);
+
+        #[cfg(feature = "lang-groovy")]
+        register(&crate::groovy::Groovy);
+
+        #[cfg(feature = "lang-glsl")]
+        register(&crate::glsl::Glsl);
+
+        #[cfg(feature = "lang-hlsl")]
+        register(&crate::hlsl::Hlsl);
     });
 }
 
