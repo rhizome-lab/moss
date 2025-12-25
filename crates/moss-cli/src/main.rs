@@ -340,6 +340,10 @@ enum Commands {
         /// Output in SARIF format
         #[arg(long)]
         sarif: bool,
+
+        /// Watch for file changes and re-run on save
+        #[arg(short, long)]
+        watch: bool,
     },
 
     /// Start a moss server (MCP, HTTP, LSP)
@@ -541,6 +545,7 @@ fn main() {
             category,
             list,
             sarif,
+            watch,
         } => commands::lint::cmd_lint(
             target.as_deref(),
             root.as_deref(),
@@ -549,6 +554,7 @@ fn main() {
             category.as_deref(),
             list,
             sarif,
+            watch,
             cli.json,
         ),
         Commands::Serve { protocol, root } => match protocol {
