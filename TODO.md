@@ -7,20 +7,13 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - Investigate slow `moss analyze --health` (+500ms over baseline)
 - view.rs internal cleanup (see CLI Surface Cleanup)
 - Rust crate feature lookup (see Tooling)
-- Add more languages (16 remaining)
 
-Test Status: 93 passing, 0 failing
+Test Status: 107 passing, 0 failing (moss-languages)
 
 ## Backlog
 
-**Language Support:** 82 languages implemented, 16 remaining from arborium.
-See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to refresh.
-
-Missing languages (grouped by category):
-- **Systems/Low-level:** verilog, vhdl, x86asm
-- **Scientific:** uiua
-- **Config/Data:** caddy, capnp, devicetree, jinja2, ninja, query, ron, sparql, ssh-config, starlark, textproto, thrift, tlaplus, wit, yuri
-- **Docs:** postscript
+**Language Support:** 98 languages implemented - all arborium grammars covered.
+See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to verify.
 
 **CLI Redundancy:** See `docs/llm-code-consistency.md`
 - [ ] Rust: OutputFormatter trait for JSON/text output
