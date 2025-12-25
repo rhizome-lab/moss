@@ -58,7 +58,7 @@ Run `scripts/missing-grammars.sh` for all 64 remaining arborium grammars.
 - YOLO mode evaluation
 - Diffusion-like parallel refactors
 - Claude Code over-reliance on Explore agents: spawns agents for direct tool tasks. Symptom of deeper issue?
-- Session analysis: detect correction patterns ("You're right", "Good point", "isn't working")
+- Session analysis: detect correction patterns ("You're right", "Good point", "Fair point", "isn't working")
 - LLM code consistency: see `docs/llm-code-consistency.md` for research notes
 
 **Session Tooling:**
