@@ -74,21 +74,21 @@ impl DaemonClient {
     }
 
     pub fn is_available(&self) -> bool {
-        Path::new(&self.socket_path).exists()
+        if !Path::new(&self.socket_path).exists() {
+            return false;
+        }
+        // Socket exists - verify daemon is actually responding
+        self.query(&Request::Status).is_ok()
     }
 
     /// Ensure daemon is running, starting it if necessary
     /// Returns true if daemon is running (was running or was started)
     pub fn ensure_running(&self) -> bool {
         if self.is_available() {
-            // Verify it's actually responding
-            if self.query(&Request::Status).is_ok() {
-                return true;
-            }
-            // Socket exists but daemon not responding - clean up stale socket
-            let _ = std::fs::remove_file(&self.socket_path);
+            return true;
         }
-
+        // Clean up stale socket if it exists but daemon isn't responding
+        let _ = std::fs::remove_file(&self.socket_path);
         // Try to start daemon
         self.start_daemon().is_ok()
     }
@@ -103,14 +103,18 @@ impl DaemonClient {
                 .map_err(|e| format!("Failed to create moss directory: {}", e))?;
         }
 
-        // Try to start moss-server with Unix socket
         let socket_path = moss_dir.join("daemon.sock");
 
+        // Get current executable to spawn daemon subprocess
+        let current_exe = std::env::current_exe()
+            .map_err(|e| format!("Failed to get current executable: {}", e))?;
+
         // Spawn as background process (detached)
-        let result = Command::new("moss-server")
+        let result = Command::new(&current_exe)
+            .arg("daemon")
+            .arg("run")
+            .arg("--root")
             .arg(&self.root_path)
-            .arg("--socket")
-            .arg(&socket_path)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
