@@ -28,7 +28,7 @@ mod implementation {
     /// Request for the moss tool.
     #[derive(Debug, Deserialize, JsonSchema)]
     pub struct MossRequest {
-        /// view <path|symbol> [--deps|--focus|--full] | analyze [--health|--complexity|--storage] | grep <pattern> [--glob]
+        /// view <path> [--deps|--focus|--full] | edit <path> --delete|--replace|--before|--after|--prepend|--append | analyze [--health|--complexity] | grep <pattern>
         pub command: String,
     }
 
