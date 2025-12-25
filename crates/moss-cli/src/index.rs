@@ -301,7 +301,11 @@ impl FileIndex {
             }
             if let Ok(rel) = path.strip_prefix(&self.root) {
                 let rel_str = rel.to_string_lossy().to_string();
-                if rel_str.is_empty() || rel_str.starts_with(".moss") {
+                // Skip internal directories
+                if rel_str.is_empty()
+                    || rel_str == ".git"
+                    || rel_str.starts_with(".git/")
+                {
                     continue;
                 }
                 seen.insert(rel_str.clone());
@@ -401,7 +405,11 @@ impl FileIndex {
             let path = entry.path();
             if let Ok(rel) = path.strip_prefix(&self.root) {
                 let rel_str = rel.to_string_lossy().to_string();
-                if rel_str.is_empty() {
+                // Skip internal directories
+                if rel_str.is_empty()
+                    || rel_str == ".git"
+                    || rel_str.starts_with(".git/")
+                {
                     continue;
                 }
 

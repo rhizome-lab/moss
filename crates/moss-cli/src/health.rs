@@ -186,27 +186,27 @@ pub fn analyze_health(root: &Path) -> HealthReport {
     // Thread-safe language file counts
     let files_by_language: Mutex<HashMap<String, usize>> = Mutex::new(HashMap::new());
 
-    // Shared analyzer - GrammarStore is expensive to create, so share it across threads
+    // Shared analyzer - GrammarStore is expensive to create, share it across threads
     let analyzer = ComplexityAnalyzer::new();
 
-    // Process files in parallel
+    // Process only code files (files with language support) in parallel
     let stats: Vec<FileStats> = files
         .par_iter()
         .filter_map(|file| {
             let path = root.join(&file.path);
-            let lang = moss_languages::support_for_path(&path);
+            let lang = moss_languages::support_for_path(&path)?;
 
             // Count files by language
-            if let Some(l) = lang {
+            {
                 let mut counts = files_by_language.lock().unwrap();
-                *counts.entry(l.name().to_string()).or_insert(0) += 1;
+                *counts.entry(lang.name().to_string()).or_insert(0) += 1;
             }
 
             let content = std::fs::read_to_string(&path).ok()?;
             let lines = content.lines().count();
 
             // Skip complexity analysis for files without symbol support
-            if lang.is_none() || !lang.unwrap().has_symbols() {
+            if !lang.has_symbols() {
                 return Some(FileStats {
                     path: file.path.clone(),
                     lines,

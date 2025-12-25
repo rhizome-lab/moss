@@ -325,10 +325,12 @@ fn get_paths_for_query(root: &Path, query: &str) -> Vec<(String, bool)> {
         let path = entry.path();
         if let Ok(rel) = path.strip_prefix(root) {
             let rel_str = rel.to_string_lossy().to_string();
-            if !rel_str.is_empty() {
-                let is_dir = path.is_dir();
-                all_paths.push((rel_str, is_dir));
+            // Skip empty paths and .git directory
+            if rel_str.is_empty() || rel_str == ".git" || rel_str.starts_with(".git/") {
+                continue;
             }
+            let is_dir = path.is_dir();
+            all_paths.push((rel_str, is_dir));
         }
     }
 
