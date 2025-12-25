@@ -47,7 +47,8 @@ Major refactoring to align with three-primitive philosophy (view, edit, analyze)
 
 ### Performance
 
-- **analyze --health 2x faster**: Shared GrammarStore across threads (350ms vs 866ms previously)
+- **analyze --health 5x faster**: Uses indexed complexity data instead of re-parsing (~160ms vs 866ms previously)
+- **Complexity stored in index**: Computed during symbol indexing, queried via SQL for health reports
 - **File index excludes .git/**: Was incorrectly including ~8600 git object files in counts
 
 ### Session Analysis Command

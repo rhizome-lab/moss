@@ -28,6 +28,8 @@ See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to 
   - Also fixed: `IndexedCounts`, `CollapsedChain`, `ParsedPackage`, `ExtractedDeps`
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
+- Deduplicate SQL queries in moss-cli: many ad-hoc queries could use shared prepared statements or query builders
+- Cache line counts in index: `analyze --health` still reads all files for line counting, could store in files table
 
 **Bugs:**
 - Call graph shows same-named method on different object as self-call (e.g., `suggest_tool` calls `router.suggest_tool`)

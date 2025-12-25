@@ -11,8 +11,8 @@ use crate::symbols::{Import, Symbol, SymbolParser};
 /// Parsed data for a single file, ready for database insertion
 struct ParsedFileData {
     file_path: String,
-    /// (name, kind, start_line, end_line, parent)
-    symbols: Vec<(String, String, usize, usize, Option<String>)>,
+    /// (name, kind, start_line, end_line, parent, complexity)
+    symbols: Vec<(String, String, usize, usize, Option<String>, Option<usize>)>,
     /// (caller_symbol, callee_name, callee_qualifier, line)
     calls: Vec<(String, String, Option<String>, usize)>,
     /// imports (for Python files only)
@@ -20,7 +20,7 @@ struct ParsedFileData {
 }
 
 // Not yet public - just delete .moss/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
 
 /// Supported source file extensions for call graph indexing
 const SOURCE_EXTENSIONS: &[&str] = &[
@@ -170,7 +170,8 @@ impl FileIndex {
                 kind TEXT NOT NULL,
                 start_line INTEGER NOT NULL,
                 end_line INTEGER NOT NULL,
-                parent TEXT
+                parent TEXT,
+                complexity INTEGER
             );
             CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
             CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file);
@@ -217,6 +218,11 @@ impl FileIndex {
             conn,
             root: root.to_path_buf(),
         })
+    }
+
+    /// Get a reference to the underlying SQLite connection for direct queries
+    pub fn connection(&self) -> &Connection {
+        &self.conn
     }
 
     /// Check if index needs refresh based on .moss directory mtime
@@ -514,8 +520,8 @@ impl FileIndex {
         // Insert symbols
         for sym in symbols {
             self.conn.execute(
-                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![path, sym.name, sym.kind.as_str(), sym.start_line, sym.end_line, sym.parent],
+                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, complexity) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![path, sym.name, sym.kind.as_str(), sym.start_line, sym.end_line, sym.parent, sym.complexity],
             )?;
         }
 
@@ -950,6 +956,7 @@ impl FileIndex {
                         sym.start_line,
                         sym.end_line,
                         sym.parent.clone(),
+                        sym.complexity,
                     ));
 
                     // Only index calls for functions/methods
@@ -987,7 +994,7 @@ impl FileIndex {
         // Pre-compile statements for batch insertion (much faster than tx.execute per row)
         {
             let mut sym_stmt = tx.prepare_cached(
-                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"
+                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, complexity) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
             )?;
             let mut call_stmt = tx.prepare_cached(
                 "INSERT INTO calls (caller_file, caller_symbol, callee_name, callee_qualifier, line) VALUES (?1, ?2, ?3, ?4, ?5)"
@@ -997,8 +1004,8 @@ impl FileIndex {
             )?;
 
             for data in &parsed_data {
-                for (name, kind, start_line, end_line, parent) in &data.symbols {
-                    sym_stmt.execute(params![data.file_path, name, kind, start_line, end_line, parent])?;
+                for (name, kind, start_line, end_line, parent, complexity) in &data.symbols {
+                    sym_stmt.execute(params![data.file_path, name, kind, start_line, end_line, parent, complexity])?;
                     symbol_count += 1;
                 }
 
@@ -1071,8 +1078,8 @@ impl FileIndex {
 
             for sym in &symbols {
                 tx.execute(
-                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                    params![file_path, sym.name, sym.kind.as_str(), sym.start_line, sym.end_line, sym.parent],
+                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, complexity) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![file_path, sym.name, sym.kind.as_str(), sym.start_line, sym.end_line, sym.parent, sym.complexity],
                 )?;
                 symbol_count += 1;
 

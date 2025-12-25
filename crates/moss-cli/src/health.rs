@@ -5,12 +5,8 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Mutex;
 
-use rayon::prelude::*;
-
-use crate::complexity::ComplexityAnalyzer;
-use crate::path_resolve;
+use crate::index::FileIndex;
 
 /// Large file info for reporting
 #[derive(Debug, Clone)]
@@ -169,104 +165,97 @@ fn is_lockfile(path: &str) -> bool {
     )
 }
 
-/// Per-file analysis result for parallel aggregation
-struct FileStats {
-    path: String,
-    lines: usize,
-    functions: usize,
-    complexity_sum: usize,
-    max_complexity: usize,
-    high_risk: usize,
-}
-
 pub fn analyze_health(root: &Path) -> HealthReport {
-    let all_files = path_resolve::all_files(root);
-    let files: Vec<_> = all_files.iter().filter(|f| f.kind == "file").collect();
+    // Open the index (creates/refreshes if needed)
+    let mut index = match FileIndex::open(root) {
+        Ok(idx) => idx,
+        Err(_) => {
+            return HealthReport {
+                total_files: 0,
+                files_by_language: HashMap::new(),
+                total_lines: 0,
+                avg_complexity: 0.0,
+                max_complexity: 0,
+                high_risk_functions: 0,
+                total_functions: 0,
+                large_files: Vec::new(),
+            };
+        }
+    };
 
-    // Thread-safe language file counts
-    let files_by_language: Mutex<HashMap<String, usize>> = Mutex::new(HashMap::new());
+    // Ensure file index is up to date (fast check)
+    if index.needs_refresh() {
+        let _ = index.refresh();
+    }
+    // Note: We don't call refresh_call_graph() here - it's slow.
+    // Complexity is computed during symbol indexing, which happens via other commands.
 
-    // Shared analyzer - GrammarStore is expensive to create, share it across threads
-    let analyzer = ComplexityAnalyzer::new();
+    // Query complexity stats from the index
+    let conn = index.connection();
 
-    // Process only code files (files with language support) in parallel
-    let stats: Vec<FileStats> = files
-        .par_iter()
-        .filter_map(|file| {
-            let path = root.join(&file.path);
-            let lang = moss_languages::support_for_path(&path)?;
+    // Get file counts by language (using file extensions)
+    let mut files_by_language: HashMap<String, usize> = HashMap::new();
+    let mut total_files = 0;
 
-            // Count files by language
-            {
-                let mut counts = files_by_language.lock().unwrap();
-                *counts.entry(lang.name().to_string()).or_insert(0) += 1;
-            }
-
-            let content = std::fs::read_to_string(&path).ok()?;
-            let lines = content.lines().count();
-
-            // Skip complexity analysis for files without symbol support
-            if !lang.has_symbols() {
-                return Some(FileStats {
-                    path: file.path.clone(),
-                    lines,
-                    functions: 0,
-                    complexity_sum: 0,
-                    max_complexity: 0,
-                    high_risk: 0,
-                });
-            }
-
-            let report = analyzer.analyze(&path, &content);
-
-            let mut functions = 0;
-            let mut complexity_sum = 0;
-            let mut max_complexity = 0;
-            let mut high_risk = 0;
-
-            for func in &report.functions {
-                functions += 1;
-                complexity_sum += func.complexity;
-                if func.complexity > max_complexity {
-                    max_complexity = func.complexity;
-                }
-                if func.complexity > 10 {
-                    high_risk += 1;
+    if let Ok(mut stmt) = conn.prepare(
+        "SELECT path FROM files WHERE is_dir = 0"
+    ) {
+        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+            for path_result in rows.flatten() {
+                total_files += 1;
+                let path = std::path::Path::new(&path_result);
+                if let Some(lang) = moss_languages::support_for_path(path) {
+                    *files_by_language.entry(lang.name().to_string()).or_insert(0) += 1;
                 }
             }
+        }
+    }
 
-            Some(FileStats {
-                path: file.path.clone(),
-                lines,
-                functions,
-                complexity_sum,
-                max_complexity,
-                high_risk,
-            })
-        })
-        .collect();
+    // Get complexity stats from symbols table
+    let mut total_functions = 0usize;
+    let mut total_complexity = 0usize;
+    let mut max_complexity = 0usize;
+    let mut high_risk_functions = 0usize;
 
-    // Aggregate results
-    let mut total_lines = 0;
-    let mut total_functions = 0;
-    let mut total_complexity = 0;
-    let mut max_complexity = 0;
-    let mut high_risk_functions = 0;
+    if let Ok(mut stmt) = conn.prepare(
+        "SELECT complexity FROM symbols WHERE complexity IS NOT NULL"
+    ) {
+        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, i64>(0)) {
+            for complexity_result in rows.flatten() {
+                let complexity = complexity_result as usize;
+                total_functions += 1;
+                total_complexity += complexity;
+                if complexity > max_complexity {
+                    max_complexity = complexity;
+                }
+                if complexity > 10 {
+                    high_risk_functions += 1;
+                }
+            }
+        }
+    }
+
+    // Count total lines (still need to read files for this)
+    // TODO: Cache line counts in the index
+    let mut total_lines = 0usize;
     let mut large_files = Vec::new();
 
-    for stat in stats {
-        total_lines += stat.lines;
-        total_functions += stat.functions;
-        total_complexity += stat.complexity_sum;
-        if stat.max_complexity > max_complexity {
-            max_complexity = stat.max_complexity;
-        }
-        high_risk_functions += stat.high_risk;
-        if stat.lines >= LARGE_FILE_THRESHOLD && !is_lockfile(&stat.path) {
-            large_files.push(LargeFile {
-                path: stat.path,
-                lines: stat.lines,
-            });
+    if let Ok(files) = index.all_files() {
+        for file in files {
+            if file.is_dir {
+                continue;
+            }
+            let full_path = root.join(&file.path);
+            if let Ok(content) = std::fs::read_to_string(&full_path) {
+                let lines = content.lines().count();
+                total_lines += lines;
+                if lines >= LARGE_FILE_THRESHOLD && !is_lockfile(&file.path) {
+                    large_files.push(LargeFile {
+                        path: file.path,
+                        lines,
+                    });
+                }
+            }
         }
     }
 
@@ -279,11 +268,9 @@ pub fn analyze_health(root: &Path) -> HealthReport {
         0.0
     };
 
-    let lang_counts = files_by_language.into_inner().unwrap();
-
     HealthReport {
-        total_files: files.len(),
-        files_by_language: lang_counts,
+        total_files,
+        files_by_language,
         total_lines,
         avg_complexity,
         max_complexity,

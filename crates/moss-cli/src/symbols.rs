@@ -9,6 +9,8 @@ pub struct Symbol {
     pub start_line: usize,
     pub end_line: usize,
     pub parent: Option<String>,
+    /// Cyclomatic complexity (only for functions/methods)
+    pub complexity: Option<usize>,
 }
 
 /// An import statement (from X import Y as Z)
@@ -89,6 +91,39 @@ impl SymbolParser {
         symbols
     }
 
+    /// Compute cyclomatic complexity for a function node.
+    /// Complexity = 1 (base) + number of decision points (if, for, while, match arms, etc.)
+    fn compute_complexity(node: &tree_sitter::Node, support: &dyn Language) -> usize {
+        let mut complexity = 1; // Base complexity
+        let complexity_nodes = support.complexity_nodes();
+        let mut cursor = node.walk();
+
+        if !cursor.goto_first_child() {
+            return complexity;
+        }
+
+        loop {
+            if complexity_nodes.contains(&cursor.node().kind()) {
+                complexity += 1;
+            }
+
+            if cursor.goto_first_child() {
+                continue;
+            }
+            if cursor.goto_next_sibling() {
+                continue;
+            }
+            loop {
+                if !cursor.goto_parent() {
+                    return complexity;
+                }
+                if cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+        }
+    }
+
     fn collect_with_trait(
         &self,
         cursor: &mut tree_sitter::TreeCursor,
@@ -135,6 +170,7 @@ impl SymbolParser {
                         start_line: sym.start_line,
                         end_line: sym.end_line,
                         parent: parent.map(String::from),
+                        complexity: None,
                     });
 
                     // Recurse into container to find methods
@@ -152,12 +188,14 @@ impl SymbolParser {
             // Check for function
             if support.function_kinds().contains(&kind) {
                 if let Some(sym) = support.extract_function(&node, content, parent.is_some()) {
+                    let complexity = Self::compute_complexity(&node, support);
                     symbols.push(Symbol {
                         name: sym.name,
                         kind: convert_symbol_kind(sym.kind),
                         start_line: sym.start_line,
                         end_line: sym.end_line,
                         parent: parent.map(String::from),
+                        complexity: Some(complexity),
                     });
                 }
             }
@@ -171,6 +209,7 @@ impl SymbolParser {
                         start_line: sym.start_line,
                         end_line: sym.end_line,
                         parent: parent.map(String::from),
+                        complexity: None,
                     });
                 }
             }
