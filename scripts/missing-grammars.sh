@@ -22,7 +22,11 @@ echo -e "\n"
 
 echo "=== arborium: $arborium_count available ==="
 missing=$(comm -23 <(echo "$arborium_langs") <(echo "$moss_langs"))
-missing_count=$(echo "$missing" | wc -l)
 
-echo "=== Missing: $missing_count ==="
-echo "$missing"
+if [[ -z "$missing" ]]; then
+    echo "=== All grammars implemented! ==="
+else
+    missing_count=$(echo "$missing" | wc -l)
+    echo "=== Missing: $missing_count ==="
+    echo "$missing"
+fi
