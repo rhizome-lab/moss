@@ -1,5 +1,5 @@
 site_name: Moss
-site_description: Tooling orchestration with structural awareness
+site_description: Code intelligence CLI with structural awareness
 site_url: https://pterror.github.io/moss/
 repo_url: https://github.com/pterror/moss
 repo_name: pterror/moss
@@ -35,32 +35,8 @@ theme:
   icon:
     repo: fontawesome/brands/github
 
-extra_css:
-  - stylesheets/custom.css
-
 plugins:
   - search
-  - mkdocstrings:
-      default_handler: python
-      handlers:
-        python:
-          paths: [src]
-          options:
-            docstring_style: google
-            show_source: true
-            show_root_heading: true
-            show_root_full_path: false
-            show_symbol_type_heading: true
-            show_symbol_type_toc: true
-            members_order: source
-            merge_init_into_class: true
-            separate_signature: true
-            signature_crossrefs: true
-  - gen-files:
-      scripts:
-        - scripts/gen_ref_pages.py
-  - literate-nav:
-      nav_file: SUMMARY.md
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -93,16 +69,8 @@ nav:
     - Quickstart: getting-started/quickstart.md
   - Architecture:
     - Overview: architecture/overview.md
-    - Event System: architecture/events.md
-    - Plugin System: architecture/plugins.md
-  - Synthesis:
-    - Overview: synthesis/overview.md
-    - Strategies: synthesis/strategies.md
-    - Generators: synthesis/generators.md
-    - Roadmap: synthesis/roadmap.md
   - CLI Reference:
     - Commands: cli/commands.md
-  - API Reference: reference/
 
 extra:
   social:

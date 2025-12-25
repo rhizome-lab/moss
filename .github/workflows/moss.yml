@@ -1,5 +1,5 @@
 # Moss CI workflow
-# Runs linting and uploads SARIF results to GitHub Code Scanning
+# Runs Rust analysis and uploads SARIF results to GitHub Code Scanning
 
 name: Moss Analysis
 
@@ -15,25 +15,29 @@ permissions:
 
 jobs:
   analyze:
-    name: Lint and Analysis
+    name: Rust Analysis
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          python-version: '3.13'
+          components: clippy
 
-      - name: Install dependencies
-        run: |
-          pip install ruff
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "crates -> target"
 
-      - name: Run ruff check (SARIF output)
+      - name: Install clippy-sarif
+        run: cargo install clippy-sarif sarif-fmt
+
+      - name: Run clippy (SARIF output)
         run: |
-          ruff check . --output-format sarif -o results.sarif || true
+          cargo clippy --workspace --all-features --message-format=json 2>&1 | clippy-sarif | tee results.sarif || true
 
       - name: Upload SARIF results
         uses: github/codeql-action/upload-sarif@v4

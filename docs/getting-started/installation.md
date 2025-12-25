@@ -1,8 +1,8 @@
 # Installation
 
-## Quick Install (CLI Binary)
+## Quick Install (Recommended)
 
-The fastest way to get the `moss` CLI:
+Download the pre-built binary for your platform:
 
 ```bash
 # Linux / macOS
@@ -21,80 +21,19 @@ After install, update anytime with:
 moss update
 ```
 
-## From Source (Development)
+## From Source
 
 ### Prerequisites
 
-- Python 3.13+
-- Rust (for CLI)
+- [Rust](https://rustup.rs/) (stable)
 - Git
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
-### Using uv (Recommended)
-
-```bash
-# Clone the repository
-git clone https://github.com/pterror/moss
-cd moss
-
-# Install dependencies
-uv sync --extra all --extra dev
-```
-
-## Using pip
+### Build
 
 ```bash
 # Clone the repository
 git clone https://github.com/pterror/moss
 cd moss
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate
-
-# Install in development mode
-pip install -e ".[dev]"
-```
-
-## Optional Dependencies
-
-Install additional features as needed:
-
-```bash
-# Documentation tools
-pip install -e ".[docs]"
-
-# LLM integration
-pip install -e ".[llm]"
-
-# Tree-sitter parsing
-pip install -e ".[tree-sitter]"
-
-# All optional dependencies
-pip install -e ".[dev,docs,llm,tree-sitter]"
-```
-
-## Verify Installation
-
-```bash
-# Check CLI is available
-moss --help
-
-# Run tests
-pytest
-
-# Check code quality
-ruff check
-ruff format --check
-```
-
-## Building the Rust CLI
-
-The `moss` CLI is written in Rust for performance. To build from source:
-
-```bash
-# Install Rust if needed
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Build release binary
 cargo build --release -p moss-cli
@@ -103,28 +42,54 @@ cargo build --release -p moss-cli
 sudo cp target/release/moss /usr/local/bin/
 ```
 
-## Editor Setup
+### Development
 
-### VS Code
+```bash
+# Run tests
+cargo test --workspace
 
-Install the Python extension and configure:
+# Run with verbose output
+cargo run -p moss-cli -- --help
 
-```json
-{
-    "python.defaultInterpreterPath": ".venv/bin/python",
-    "python.formatting.provider": "none",
-    "[python]": {
-        "editor.defaultFormatter": "charliermarsh.ruff",
-        "editor.formatOnSave": true
-    }
-}
+# Check code
+cargo fmt --check
+cargo clippy
 ```
 
-### Neovim
+## Verify Installation
 
-With nvim-lspconfig:
+```bash
+# Check CLI is available
+moss --help
 
-```lua
-require('lspconfig').ruff.setup{}
-require('lspconfig').pyright.setup{}
+# Check version
+moss --version
+
+# Run on current directory
+moss view .
+```
+
+## Updating
+
+The CLI can update itself:
+
+```bash
+# Check for updates
+moss update --check
+
+# Install update
+moss update
+```
+
+## Uninstall
+
+Remove the binary:
+
+```bash
+# Linux / macOS
+sudo rm /usr/local/bin/moss
+
+# Windows (PowerShell)
+Remove-Item "$env:LOCALAPPDATA\moss" -Recurse
+# Also remove from PATH in System Properties > Environment Variables
 ```

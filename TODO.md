@@ -6,7 +6,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 1. Trait-based FFI detection: refactor cross_refs detection to use traits instead of hardcoded patterns
 2. OutputFormatter trait for consistent JSON/text output across commands
-3. Test and publish VS Code extension to marketplace
+3. Command/subcommand/flag names should be self-documenting
 
 Test Status: 107 passing, 0 failing (moss-languages)
 
@@ -203,7 +203,7 @@ Current scaffold is TOML state machines. Needs design work:
 
 ## Deferred
 
-- VS Code extension: test and publish to marketplace
+- VS Code extension: test and publish to marketplace (after first CLI release)
 - Remaining docs: prior-art.md, hybrid-loops.md
 - Memory system: layered cross-session learning
 
