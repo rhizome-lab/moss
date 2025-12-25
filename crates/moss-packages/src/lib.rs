@@ -85,6 +85,20 @@ pub struct Dependency {
     pub optional: bool,
 }
 
+/// A node in the dependency tree.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TreeNode {
+    pub name: String,
+    pub version: String,
+    pub dependencies: Vec<TreeNode>,
+}
+
+/// Full dependency tree.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DependencyTree {
+    pub roots: Vec<TreeNode>,
+}
+
 /// Error type for package operations.
 #[derive(Debug)]
 pub enum PackageError {
@@ -151,9 +165,9 @@ pub trait Ecosystem: Send + Sync {
     /// List declared dependencies from manifest file.
     fn list_dependencies(&self, project_root: &Path) -> Result<Vec<Dependency>, PackageError>;
 
-    /// Get dependency tree using native package manager.
-    /// Returns formatted tree output as a string.
-    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError>;
+    /// Get dependency tree from lockfile.
+    /// Returns structured tree data.
+    fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError>;
 
     /// Find the first available tool in PATH.
     fn find_tool(&self) -> Option<&'static str> {
@@ -248,6 +262,11 @@ fn is_executable(path: &Path) -> bool {
 /// Detect ecosystem from project files in the given directory.
 pub fn detect_ecosystem(project_root: &Path) -> Option<&'static dyn Ecosystem> {
     ecosystems::detect(project_root)
+}
+
+/// Detect all ecosystems from project files in the given directory.
+pub fn detect_all_ecosystems(project_root: &Path) -> Vec<&'static dyn Ecosystem> {
+    ecosystems::detect_all(project_root)
 }
 
 /// Get all registered ecosystems.

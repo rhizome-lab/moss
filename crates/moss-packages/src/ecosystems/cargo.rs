@@ -1,6 +1,6 @@
 //! Cargo (Rust) ecosystem.
 
-use crate::{Dependency, Ecosystem, Feature, LockfileManager, PackageError, PackageInfo, PackageQuery};
+use crate::{Dependency, DependencyTree, Ecosystem, Feature, LockfileManager, PackageError, PackageInfo, PackageQuery, TreeNode};
 use std::path::Path;
 use std::process::Command;
 
@@ -78,7 +78,7 @@ impl Ecosystem for Cargo {
         Ok(deps)
     }
 
-    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+    fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError> {
         // Find Cargo.lock - may be in parent if this is a workspace member
         let (lockfile, workspace_root) = find_cargo_lock(project_root)?;
         let content = std::fs::read_to_string(&lockfile)
@@ -95,13 +95,11 @@ impl Ecosystem for Cargo {
 
         // Determine root package(s) to show
         let root_names: Vec<String> = if let Some(pkg) = manifest_parsed.get("package") {
-            // Single package (or workspace member specified directly)
             pkg.get("name")
                 .and_then(|n| n.as_str())
                 .map(|s| vec![s.to_string()])
                 .unwrap_or_default()
         } else if let Some(workspace) = manifest_parsed.get("workspace") {
-            // Workspace root: get all member package names
             workspace
                 .get("members")
                 .and_then(|m| m.as_array())
@@ -146,42 +144,41 @@ impl Ecosystem for Cargo {
             }
         }
 
-        // Build tree string
-        let mut output = String::new();
+        // Build tree structure
         let mut visited = std::collections::HashSet::new();
 
-        fn print_tree(
+        fn build_node(
             name: &str,
             packages: &std::collections::HashMap<String, (String, Vec<String>)>,
             visited: &mut std::collections::HashSet<String>,
-            output: &mut String,
-            depth: usize,
-        ) {
-            let indent = "  ".repeat(depth);
-            if let Some((version, deps)) = packages.get(name) {
-                let marker = if visited.contains(name) { " (*)" } else { "" };
-                output.push_str(&format!("{}{} v{}{}\n", indent, name, version, marker));
+        ) -> TreeNode {
+            let (version, deps) = packages
+                .get(name)
+                .map(|(v, d)| (v.clone(), d.clone()))
+                .unwrap_or_default();
 
-                if !visited.contains(name) {
-                    visited.insert(name.to_string());
-                    for dep in deps {
-                        print_tree(dep, packages, visited, output, depth + 1);
-                    }
-                }
+            let children = if visited.contains(name) {
+                Vec::new() // Already visited, don't recurse
             } else {
-                output.push_str(&format!("{}{}\n", indent, name));
+                visited.insert(name.to_string());
+                deps.iter()
+                    .map(|dep| build_node(dep, packages, visited))
+                    .collect()
+            };
+
+            TreeNode {
+                name: name.to_string(),
+                version,
+                dependencies: children,
             }
         }
 
-        for root in &root_names {
-            print_tree(root, &packages, &mut visited, &mut output, 0);
-        }
+        let roots: Vec<TreeNode> = root_names
+            .iter()
+            .map(|name| build_node(name, &packages, &mut visited))
+            .collect();
 
-        if output.is_empty() {
-            output.push_str("(no workspace members found)\n");
-        }
-
-        Ok(output)
+        Ok(DependencyTree { roots })
     }
 }
 

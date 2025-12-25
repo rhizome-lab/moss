@@ -1,6 +1,6 @@
 //! RubyGems ecosystem.
 
-use crate::{PackageQuery, Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo, PackageQuery, TreeNode};
 use std::path::Path;
 use std::process::Command;
 
@@ -97,14 +97,13 @@ impl Ecosystem for Gem {
         Ok(deps)
     }
 
-    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+    fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError> {
         // Parse Gemfile.lock for all gems
         let lockfile = project_root.join("Gemfile.lock");
         let content = std::fs::read_to_string(&lockfile)
             .map_err(|e| PackageError::ParseError(format!("failed to read Gemfile.lock: {}", e)))?;
 
-        let mut output = String::new();
-        output.push_str("Gemfile.lock\n");
+        let mut deps = Vec::new();
 
         // Parse specs section: "    gem_name (version)"
         let mut in_specs = false;
@@ -119,12 +118,29 @@ impl Ecosystem for Gem {
             if in_specs {
                 let trimmed = line.trim();
                 if !trimmed.is_empty() {
-                    output.push_str(&format!("  {}\n", trimmed));
+                    // Parse "gem_name (version)" format
+                    if let Some(paren_start) = trimmed.find('(') {
+                        let name = trimmed[..paren_start].trim();
+                        let version = trimmed[paren_start + 1..]
+                            .trim_end_matches(')')
+                            .to_string();
+                        deps.push(TreeNode {
+                            name: name.to_string(),
+                            version,
+                            dependencies: Vec::new(),
+                        });
+                    }
                 }
             }
         }
 
-        Ok(output)
+        Ok(DependencyTree {
+            roots: vec![TreeNode {
+                name: "Gemfile.lock".to_string(),
+                version: String::new(),
+                dependencies: deps,
+            }],
+        })
     }
 }
 

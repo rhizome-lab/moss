@@ -1,6 +1,6 @@
 //! Nix ecosystem.
 
-use crate::{Dependency, PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo, PackageQuery, TreeNode};
 use std::path::Path;
 use std::process::Command;
 
@@ -74,7 +74,7 @@ impl Ecosystem for Nix {
         Err(PackageError::ParseError("no flake.nix found".to_string()))
     }
 
-    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+    fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError> {
         // Parse flake.lock for input revisions
         let lockfile = project_root.join("flake.lock");
         let content = std::fs::read_to_string(&lockfile)
@@ -82,8 +82,7 @@ impl Ecosystem for Nix {
         let parsed: serde_json::Value = serde_json::from_str(&content)
             .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
 
-        let mut output = String::new();
-        output.push_str("flake.lock\n");
+        let mut deps = Vec::new();
 
         if let Some(nodes) = parsed.get("nodes").and_then(|n| n.as_object()) {
             for (name, node) in nodes {
@@ -94,13 +93,23 @@ impl Ecosystem for Nix {
                     .get("locked")
                     .and_then(|l| l.get("rev"))
                     .and_then(|r| r.as_str())
-                    .map(|r| &r[..7.min(r.len())])
-                    .unwrap_or("");
-                output.push_str(&format!("  {} {}\n", name, rev));
+                    .map(|r| r[..7.min(r.len())].to_string())
+                    .unwrap_or_default();
+                deps.push(TreeNode {
+                    name: name.clone(),
+                    version: rev,
+                    dependencies: Vec::new(),
+                });
             }
         }
 
-        Ok(output)
+        Ok(DependencyTree {
+            roots: vec![TreeNode {
+                name: "flake.lock".to_string(),
+                version: String::new(),
+                dependencies: deps,
+            }],
+        })
     }
 }
 

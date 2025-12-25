@@ -1,6 +1,6 @@
 //! Conan (C++) ecosystem.
 
-use crate::{Dependency, PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo, PackageQuery, TreeNode};
 use std::path::Path;
 use std::process::Command;
 
@@ -122,7 +122,7 @@ impl Ecosystem for Conan {
         Err(PackageError::ParseError("no conanfile found".to_string()))
     }
 
-    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+    fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError> {
         // Parse conan.lock
         let lockfile = project_root.join("conan.lock");
         let content = std::fs::read_to_string(&lockfile)
@@ -130,18 +130,34 @@ impl Ecosystem for Conan {
         let parsed: serde_json::Value = serde_json::from_str(&content)
             .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
 
-        let mut output = String::new();
-        output.push_str("conan.lock\n");
+        let mut deps = Vec::new();
 
         if let Some(nodes) = parsed.get("graph_lock").and_then(|g| g.get("nodes")).and_then(|n| n.as_object()) {
             for (_, node) in nodes {
                 if let Some(ref_str) = node.get("ref").and_then(|r| r.as_str()) {
-                    output.push_str(&format!("  {}\n", ref_str));
+                    // Format: "pkg/version" or "pkg/version@user/channel"
+                    let (name, version) = if let Some((n, rest)) = ref_str.split_once('/') {
+                        let v = rest.split('@').next().unwrap_or(rest);
+                        (n.to_string(), v.to_string())
+                    } else {
+                        (ref_str.to_string(), String::new())
+                    };
+                    deps.push(TreeNode {
+                        name,
+                        version,
+                        dependencies: Vec::new(),
+                    });
                 }
             }
         }
 
-        Ok(output)
+        Ok(DependencyTree {
+            roots: vec![TreeNode {
+                name: "conan.lock".to_string(),
+                version: String::new(),
+                dependencies: deps,
+            }],
+        })
     }
 }
 

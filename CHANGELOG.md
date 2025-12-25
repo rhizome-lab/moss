@@ -11,13 +11,14 @@ New `moss package` command queries package registries without web search:
 - **moss-packages crate**: Ecosystem trait with implementations for 11 ecosystems
 - **Ecosystems**: cargo, npm, python, go, hex, gem, composer, maven, nuget, nix, conan
 - Auto-detection from manifest files (Cargo.toml → cargo, package.json → npm, etc.)
+- **Multi-ecosystem projects**: `list` and `tree` show all ecosystems when multiple detected
 - Tool detection from lockfiles with fallback to fastest available
 - Most ecosystems use HTTP APIs directly (no local tool required)
 - Unified output: name, version, description, license, features, dependencies
 - `list`: Parse manifest for declared dependencies
 - `tree`: Show full dependency tree from lockfile (handles workspaces)
 - `outdated`: Compare installed versions (from lockfile) to latest
-- `--json` for structured output
+- `--json` for structured output (DependencyTree with nested TreeNode objects)
 
 ### Language Node Kind Audits
 

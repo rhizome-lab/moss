@@ -1,6 +1,6 @@
 //! Composer (PHP) ecosystem.
 
-use crate::{PackageQuery, Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo, PackageQuery, TreeNode};
 use std::path::Path;
 use std::process::Command;
 
@@ -83,7 +83,7 @@ impl Ecosystem for Composer {
         Ok(deps)
     }
 
-    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+    fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError> {
         // Parse composer.lock for full dependency list
         let lockfile = project_root.join("composer.lock");
         let content = std::fs::read_to_string(&lockfile)
@@ -91,20 +91,29 @@ impl Ecosystem for Composer {
         let parsed: serde_json::Value = serde_json::from_str(&content)
             .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
 
-        let mut output = String::new();
-        output.push_str("composer.lock\n");
+        let mut deps = Vec::new();
 
         for key in ["packages", "packages-dev"] {
             if let Some(pkgs) = parsed.get(key).and_then(|p| p.as_array()) {
                 for pkg in pkgs {
                     let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
                     let version = pkg.get("version").and_then(|v| v.as_str()).unwrap_or("");
-                    output.push_str(&format!("  {} {}\n", name, version));
+                    deps.push(TreeNode {
+                        name: name.to_string(),
+                        version: version.to_string(),
+                        dependencies: Vec::new(),
+                    });
                 }
             }
         }
 
-        Ok(output)
+        Ok(DependencyTree {
+            roots: vec![TreeNode {
+                name: "composer.lock".to_string(),
+                version: String::new(),
+                dependencies: deps,
+            }],
+        })
     }
 }
 

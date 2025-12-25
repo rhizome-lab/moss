@@ -1,6 +1,6 @@
 //! Go modules ecosystem.
 
-use crate::{Dependency, PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo, PackageQuery, TreeNode};
 use std::path::Path;
 use std::process::Command;
 
@@ -95,26 +95,27 @@ impl Ecosystem for Go {
         Ok(deps)
     }
 
-    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+    fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError> {
         // go.sum has all dependencies but not the tree structure
         // go.mod has direct deps, go.sum has transitive
-        // For now, show flat list from go.sum
         let go_sum = project_root.join("go.sum");
         let content = std::fs::read_to_string(&go_sum)
             .map_err(|e| PackageError::ParseError(format!("failed to read go.sum: {}", e)))?;
 
-        let mut output = String::new();
-
         // Get module name from go.mod
         let go_mod = project_root.join("go.mod");
-        if let Ok(mod_content) = std::fs::read_to_string(&go_mod) {
-            if let Some(line) = mod_content.lines().find(|l| l.starts_with("module ")) {
-                let name = line.strip_prefix("module ").unwrap_or("root").trim();
-                output.push_str(&format!("{}\n", name));
-            }
-        }
+        let root_name = std::fs::read_to_string(&go_mod)
+            .ok()
+            .and_then(|mod_content| {
+                mod_content
+                    .lines()
+                    .find(|l| l.starts_with("module "))
+                    .map(|line| line.strip_prefix("module ").unwrap_or("root").trim().to_string())
+            })
+            .unwrap_or_else(|| "root".to_string());
 
         // Parse go.sum: each line is "module version hash"
+        let mut deps = Vec::new();
         let mut seen = std::collections::HashSet::new();
         for line in content.lines() {
             let parts: Vec<&str> = line.split_whitespace().collect();
@@ -122,12 +123,22 @@ impl Ecosystem for Go {
                 let module = parts[0];
                 let version = parts[1].trim_end_matches("/go.mod");
                 if seen.insert(format!("{}@{}", module, version)) {
-                    output.push_str(&format!("  {} {}\n", module, version));
+                    deps.push(TreeNode {
+                        name: module.to_string(),
+                        version: version.to_string(),
+                        dependencies: Vec::new(),
+                    });
                 }
             }
         }
 
-        Ok(output)
+        Ok(DependencyTree {
+            roots: vec![TreeNode {
+                name: root_name,
+                version: String::new(),
+                dependencies: deps,
+            }],
+        })
     }
 }
 

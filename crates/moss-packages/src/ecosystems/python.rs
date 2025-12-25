@@ -1,6 +1,6 @@
 //! Python (pip/uv/poetry) ecosystem.
 
-use crate::{Dependency, Ecosystem, Feature, LockfileManager, PackageError, PackageInfo, PackageQuery};
+use crate::{Dependency, DependencyTree, Ecosystem, Feature, LockfileManager, PackageError, PackageInfo, PackageQuery, TreeNode};
 use std::path::Path;
 use std::process::Command;
 
@@ -180,7 +180,7 @@ impl Ecosystem for Python {
         Err(PackageError::ParseError("no manifest found".to_string()))
     }
 
-    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+    fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError> {
         // Try uv.lock first (TOML with package entries and dependencies)
         let uv_lock = project_root.join("uv.lock");
         if let Ok(content) = std::fs::read_to_string(&uv_lock) {
@@ -201,7 +201,7 @@ impl Ecosystem for Python {
     }
 }
 
-fn build_python_tree(parsed: &toml::Value, project_root: &Path) -> Result<String, PackageError> {
+fn build_python_tree(parsed: &toml::Value, project_root: &Path) -> Result<DependencyTree, PackageError> {
     // Get project name from pyproject.toml
     let pyproject = project_root.join("pyproject.toml");
     let root_name = if let Ok(content) = std::fs::read_to_string(&pyproject) {
@@ -250,44 +250,53 @@ fn build_python_tree(parsed: &toml::Value, project_root: &Path) -> Result<String
         }
     }
 
-    let mut output = String::new();
-    output.push_str(&format!("{}\n", root_name));
-
-    let mut visited = std::collections::HashSet::new();
-
-    fn print_tree(
+    fn build_node(
         name: &str,
         packages: &std::collections::HashMap<String, (String, Vec<String>)>,
         visited: &mut std::collections::HashSet<String>,
-        output: &mut String,
-        depth: usize,
-    ) {
+    ) -> Option<TreeNode> {
         let normalized = name.to_lowercase().replace(['-', '.'], "_");
-        let indent = "  ".repeat(depth);
-        if let Some((version, deps)) = packages.get(&normalized) {
-            let marker = if visited.contains(&normalized) { " (*)" } else { "" };
-            output.push_str(&format!("{}{} v{}{}\n", indent, name, version, marker));
+        let (version, deps) = packages.get(&normalized)?;
 
+        let children = if visited.contains(&normalized) {
+            Vec::new()
+        } else {
+            visited.insert(normalized);
+            deps.iter()
+                .filter_map(|dep| build_node(dep, packages, visited))
+                .collect()
+        };
+
+        Some(TreeNode {
+            name: name.to_string(),
+            version: version.clone(),
+            dependencies: children,
+        })
+    }
+
+    // Build tree from all packages
+    let mut visited = std::collections::HashSet::new();
+    let mut root_deps = Vec::new();
+
+    if let Some(pkgs) = parsed.get("package").and_then(|p| p.as_array()) {
+        for pkg in pkgs {
+            let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
+            let normalized = name.to_lowercase().replace(['-', '.'], "_");
             if !visited.contains(&normalized) {
-                visited.insert(normalized);
-                for dep in deps {
-                    print_tree(dep, packages, visited, output, depth + 1);
+                if let Some(node) = build_node(name, &packages, &mut visited) {
+                    root_deps.push(node);
                 }
             }
         }
     }
 
-    // Print direct dependencies
-    if let Some(pkgs) = parsed.get("package").and_then(|p| p.as_array()) {
-        for pkg in pkgs {
-            let name = pkg.get("name").and_then(|n| n.as_str()).unwrap_or("");
-            if !visited.contains(&name.to_lowercase().replace(['-', '.'], "_")) {
-                print_tree(name, &packages, &mut visited, &mut output, 1);
-            }
-        }
-    }
+    let root = TreeNode {
+        name: root_name,
+        version: String::new(),
+        dependencies: root_deps,
+    };
 
-    Ok(output)
+    Ok(DependencyTree { roots: vec![root] })
 }
 
 fn fetch_pypi_info(query: &PackageQuery) -> Result<PackageInfo, PackageError> {

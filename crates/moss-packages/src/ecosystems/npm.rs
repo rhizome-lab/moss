@@ -1,6 +1,6 @@
 //! npm/yarn/pnpm (Node.js) ecosystem.
 
-use crate::{Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo, PackageQuery};
+use crate::{Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo, PackageQuery, TreeNode};
 use std::path::Path;
 use std::process::Command;
 
@@ -144,7 +144,7 @@ impl Ecosystem for Npm {
         Ok(deps)
     }
 
-    fn dependency_tree(&self, project_root: &Path) -> Result<String, crate::PackageError> {
+    fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, crate::PackageError> {
         // Find package-lock.json, searching up for monorepo root
         let lockfile = find_npm_lockfile(project_root)?;
         let content = std::fs::read_to_string(&lockfile)
@@ -179,15 +179,14 @@ fn find_npm_lockfile(project_root: &Path) -> Result<std::path::PathBuf, crate::P
     )))
 }
 
-fn build_npm_tree(parsed: &serde_json::Value) -> Result<String, crate::PackageError> {
+fn build_npm_tree(parsed: &serde_json::Value) -> Result<DependencyTree, crate::PackageError> {
     let name = parsed.get("name").and_then(|n| n.as_str()).unwrap_or("root");
     let version = parsed.get("version").and_then(|v| v.as_str()).unwrap_or("0.0.0");
 
-    let mut output = String::new();
-    output.push_str(&format!("{} v{}\n", name, version));
-
     // v2/v3 format: packages["node_modules/..."]
-    if let Some(packages) = parsed.get("packages").and_then(|p| p.as_object()) {
+    let packages = parsed.get("packages").and_then(|p| p.as_object());
+
+    if let Some(packages) = packages {
         // Build adjacency map from node_modules structure
         let mut deps_map: std::collections::HashMap<String, Vec<(String, String)>> = std::collections::HashMap::new();
 
@@ -214,38 +213,67 @@ fn build_npm_tree(parsed: &serde_json::Value) -> Result<String, crate::PackageEr
                 .push((pkg_name.to_string(), pkg_version.to_string()));
         }
 
-        // Print tree from root
-        fn print_deps(
-            parent: &str,
+        fn build_node(
+            name: &str,
+            version: &str,
+            parent_path: &str,
             deps_map: &std::collections::HashMap<String, Vec<(String, String)>>,
-            output: &mut String,
-            depth: usize,
             visited: &mut std::collections::HashSet<String>,
-        ) {
-            if let Some(deps) = deps_map.get(parent) {
-                for (name, version) in deps {
-                    let indent = "  ".repeat(depth);
-                    let marker = if visited.contains(name) { " (*)" } else { "" };
-                    output.push_str(&format!("{}{} v{}{}\n", indent, name, version, marker));
+        ) -> TreeNode {
+            let children = if visited.contains(name) {
+                Vec::new()
+            } else {
+                visited.insert(name.to_string());
+                let child_path = if parent_path.is_empty() {
+                    name.to_string()
+                } else {
+                    format!("{}/node_modules/{}", parent_path, name)
+                };
+                deps_map
+                    .get(&child_path)
+                    .map(|deps| {
+                        deps.iter()
+                            .map(|(n, v)| build_node(n, v, &child_path, deps_map, visited))
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            };
 
-                    if !visited.contains(name) {
-                        visited.insert(name.clone());
-                        let child_path = if parent.is_empty() {
-                            name.clone()
-                        } else {
-                            format!("{}/node_modules/{}", parent, name)
-                        };
-                        print_deps(&child_path, deps_map, output, depth + 1, visited);
-                    }
-                }
+            TreeNode {
+                name: name.to_string(),
+                version: version.to_string(),
+                dependencies: children,
             }
         }
 
+        // Build root children
         let mut visited = std::collections::HashSet::new();
-        print_deps("", &deps_map, &mut output, 1, &mut visited);
-    }
+        let root_deps = deps_map
+            .get("")
+            .map(|deps| {
+                deps.iter()
+                    .map(|(n, v)| build_node(n, v, "", &deps_map, &mut visited))
+                    .collect()
+            })
+            .unwrap_or_default();
 
-    Ok(output)
+        let root = TreeNode {
+            name: name.to_string(),
+            version: version.to_string(),
+            dependencies: root_deps,
+        };
+
+        Ok(DependencyTree { roots: vec![root] })
+    } else {
+        // No packages section, return minimal tree
+        Ok(DependencyTree {
+            roots: vec![TreeNode {
+                name: name.to_string(),
+                version: version.to_string(),
+                dependencies: Vec::new(),
+            }],
+        })
+    }
 }
 
 fn fetch_npm_info(package: &str, tool: &str, args: &[&str]) -> Result<PackageInfo, PackageError> {

@@ -1,7 +1,7 @@
 //! Package registry queries.
 
 use clap::Subcommand;
-use moss_packages::{detect_ecosystem, all_ecosystems, PackageInfo, PackageError};
+use moss_packages::{detect_all_ecosystems, all_ecosystems, PackageInfo, PackageError};
 use std::path::Path;
 
 #[derive(Subcommand)]
@@ -28,29 +28,116 @@ pub fn cmd_package(
     let project_root = root.unwrap_or(Path::new("."));
 
     // Get ecosystem either by name or by detection
-    let eco: &dyn moss_packages::Ecosystem = if let Some(name) = ecosystem {
+    if let Some(name) = ecosystem {
+        // Explicit ecosystem specified
         match find_ecosystem_by_name(name) {
-            Some(e) => e,
+            Some(eco) => run_for_ecosystem(eco, &action, project_root, json),
             None => {
                 eprintln!("error: unknown ecosystem '{}'", name);
                 eprintln!("available: {}", available_ecosystems().join(", "));
-                return 1;
+                1
             }
         }
     } else {
-        match detect_ecosystem(project_root) {
-            Some(e) => e,
-            None => {
-                eprintln!("error: could not detect ecosystem from project files");
-                eprintln!("hint: use --ecosystem to specify explicitly");
-                eprintln!("available: {}", available_ecosystems().join(", "));
-                return 1;
+        // Auto-detect ecosystems
+        let ecosystems = detect_all_ecosystems(project_root);
+        if ecosystems.is_empty() {
+            eprintln!("error: could not detect ecosystem from project files");
+            eprintln!("hint: use --ecosystem to specify explicitly");
+            eprintln!("available: {}", available_ecosystems().join(", "));
+            return 1;
+        }
+
+        // For list/tree, run for all detected ecosystems
+        // For info/outdated, use first ecosystem only
+        match &action {
+            PackageAction::List | PackageAction::Tree => {
+                if json && ecosystems.len() > 1 {
+                    // Collect all results into a JSON array
+                    run_all_ecosystems_json(&ecosystems, &action, project_root)
+                } else {
+                    let mut exit_code = 0;
+                    for (i, eco) in ecosystems.iter().enumerate() {
+                        if i > 0 {
+                            println!(); // Separator between ecosystems
+                        }
+                        let result = run_for_ecosystem(*eco, &action, project_root, json);
+                        if result != 0 {
+                            exit_code = result;
+                        }
+                    }
+                    exit_code
+                }
+            }
+            _ => {
+                if ecosystems.len() > 1 {
+                    let names: Vec<_> = ecosystems.iter().map(|e| e.name()).collect();
+                    eprintln!("note: multiple ecosystems detected: {}", names.join(", "));
+                    eprintln!("hint: use --ecosystem to specify which one");
+                }
+                run_for_ecosystem(ecosystems[0], &action, project_root, json)
             }
         }
-    };
+    }
+}
 
+fn run_all_ecosystems_json(
+    ecosystems: &[&dyn moss_packages::Ecosystem],
+    action: &PackageAction,
+    project_root: &Path,
+) -> i32 {
+    let mut results = serde_json::Map::new();
+
+    for eco in ecosystems {
+        match action {
+            PackageAction::List => {
+                match eco.list_dependencies(project_root) {
+                    Ok(deps) => {
+                        results.insert(eco.name().to_string(), serde_json::json!({
+                            "dependencies": deps.iter().map(|d| serde_json::json!({
+                                "name": d.name,
+                                "version_req": d.version_req,
+                                "optional": d.optional,
+                            })).collect::<Vec<_>>()
+                        }));
+                    }
+                    Err(e) => {
+                        results.insert(eco.name().to_string(), serde_json::json!({
+                            "error": e.to_string()
+                        }));
+                    }
+                }
+            }
+            PackageAction::Tree => {
+                match eco.dependency_tree(project_root) {
+                    Ok(tree) => {
+                        results.insert(eco.name().to_string(), serde_json::json!({
+                            "tree": tree
+                        }));
+                    }
+                    Err(e) => {
+                        results.insert(eco.name().to_string(), serde_json::json!({
+                            "error": e.to_string()
+                        }));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    println!("{}", serde_json::Value::Object(results));
+    0
+}
+
+fn run_for_ecosystem(
+    eco: &dyn moss_packages::Ecosystem,
+    action: &PackageAction,
+    project_root: &Path,
+    json: bool,
+) -> i32 {
     match action {
-        PackageAction::Info { package } => cmd_info(eco, &package, project_root, json),
+        PackageAction::Info { package } => cmd_info(eco, package, project_root, json),
         PackageAction::List => cmd_list(eco, project_root, json),
         PackageAction::Tree => cmd_tree(eco, project_root, json),
         PackageAction::Outdated => cmd_outdated(eco, project_root, json),
@@ -124,7 +211,7 @@ fn cmd_tree(eco: &dyn moss_packages::Ecosystem, project_root: &Path, json: bool)
                     "tree": tree,
                 }));
             } else {
-                print!("{}", tree);
+                print_tree(&tree);
             }
             0
         }
@@ -132,6 +219,24 @@ fn cmd_tree(eco: &dyn moss_packages::Ecosystem, project_root: &Path, json: bool)
             eprintln!("error: {}", e);
             1
         }
+    }
+}
+
+fn print_tree(tree: &moss_packages::DependencyTree) {
+    for root in &tree.roots {
+        print_node(root, 0);
+    }
+}
+
+fn print_node(node: &moss_packages::TreeNode, depth: usize) {
+    let indent = "  ".repeat(depth);
+    if node.version.is_empty() {
+        println!("{}{}", indent, node.name);
+    } else {
+        println!("{}{} v{}", indent, node.name, node.version);
+    }
+    for child in &node.dependencies {
+        print_node(child, depth + 1);
     }
 }
 

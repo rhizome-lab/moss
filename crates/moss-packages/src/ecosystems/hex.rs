@@ -1,6 +1,6 @@
 //! Hex (Elixir/Erlang) ecosystem.
 
-use crate::{PackageQuery, Dependency, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo, PackageQuery, TreeNode};
 use std::path::Path;
 use std::process::Command;
 
@@ -83,14 +83,13 @@ impl Ecosystem for Hex {
         Ok(deps)
     }
 
-    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+    fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError> {
         // Parse mix.lock for all deps
         let lockfile = project_root.join("mix.lock");
         let content = std::fs::read_to_string(&lockfile)
             .map_err(|e| PackageError::ParseError(format!("failed to read mix.lock: {}", e)))?;
 
-        let mut output = String::new();
-        output.push_str("mix.lock\n");
+        let mut deps = Vec::new();
 
         // Format: "package": {:hex, :package, "version", ...}
         for line in content.lines() {
@@ -105,14 +104,24 @@ impl Ecosystem for Hex {
                         let after = &line[ver_start + pattern.len()..];
                         if let Some(ver_end) = after.find('"') {
                             let version = &after[..ver_end];
-                            output.push_str(&format!("  {} v{}\n", name, version));
+                            deps.push(TreeNode {
+                                name: name.to_string(),
+                                version: version.to_string(),
+                                dependencies: Vec::new(),
+                            });
                         }
                     }
                 }
             }
         }
 
-        Ok(output)
+        Ok(DependencyTree {
+            roots: vec![TreeNode {
+                name: "mix.lock".to_string(),
+                version: String::new(),
+                dependencies: deps,
+            }],
+        })
     }
 }
 

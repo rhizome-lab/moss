@@ -1,6 +1,6 @@
 //! Maven (Java) ecosystem.
 
-use crate::{Dependency, PackageQuery, Ecosystem, LockfileManager, PackageError, PackageInfo};
+use crate::{Dependency, DependencyTree, Ecosystem, LockfileManager, PackageError, PackageInfo, PackageQuery, TreeNode};
 use std::path::Path;
 use std::process::Command;
 
@@ -79,12 +79,11 @@ impl Ecosystem for Maven {
         Err(PackageError::ParseError("no manifest found".to_string()))
     }
 
-    fn dependency_tree(&self, project_root: &Path) -> Result<String, PackageError> {
+    fn dependency_tree(&self, project_root: &Path) -> Result<DependencyTree, PackageError> {
         // Try gradle.lockfile first
         let lockfile = project_root.join("gradle.lockfile");
         if let Ok(content) = std::fs::read_to_string(&lockfile) {
-            let mut output = String::new();
-            output.push_str("gradle.lockfile\n");
+            let mut deps = Vec::new();
 
             for line in content.lines() {
                 let line = line.trim();
@@ -93,22 +92,47 @@ impl Ecosystem for Maven {
                 }
                 // Format: group:artifact:version=hash
                 if let Some(coord) = line.split('=').next() {
-                    output.push_str(&format!("  {}\n", coord));
+                    let parts: Vec<&str> = coord.split(':').collect();
+                    let (name, version) = if parts.len() >= 3 {
+                        (format!("{}:{}", parts[0], parts[1]), parts[2].to_string())
+                    } else {
+                        (coord.to_string(), String::new())
+                    };
+                    deps.push(TreeNode {
+                        name,
+                        version,
+                        dependencies: Vec::new(),
+                    });
                 }
             }
 
-            return Ok(output);
+            return Ok(DependencyTree {
+                roots: vec![TreeNode {
+                    name: "gradle.lockfile".to_string(),
+                    version: String::new(),
+                    dependencies: deps,
+                }],
+            });
         }
 
         // Fall back to listing direct deps from manifest
-        let deps = self.list_dependencies(project_root)?;
-        let mut output = String::new();
-        output.push_str("dependencies\n");
-        for dep in deps {
-            let version = dep.version_req.as_deref().unwrap_or("*");
-            output.push_str(&format!("  {} {}\n", dep.name, version));
-        }
-        Ok(output)
+        let manifest_deps = self.list_dependencies(project_root)?;
+        let deps: Vec<TreeNode> = manifest_deps
+            .into_iter()
+            .map(|dep| TreeNode {
+                name: dep.name,
+                version: dep.version_req.unwrap_or_default(),
+                dependencies: Vec::new(),
+            })
+            .collect();
+
+        Ok(DependencyTree {
+            roots: vec![TreeNode {
+                name: "dependencies".to_string(),
+                version: String::new(),
+                dependencies: deps,
+            }],
+        })
     }
 }
 
