@@ -215,6 +215,30 @@ pub mod dot;
 #[cfg(feature = "lang-kdl")]
 pub mod kdl;
 
+#[cfg(feature = "lang-ada")]
+pub mod ada;
+
+#[cfg(feature = "lang-agda")]
+pub mod agda;
+
+#[cfg(feature = "lang-d")]
+pub mod d;
+
+#[cfg(feature = "lang-matlab")]
+pub mod matlab;
+
+#[cfg(feature = "lang-meson")]
+pub mod meson;
+
+#[cfg(feature = "lang-nginx")]
+pub mod nginx;
+
+#[cfg(feature = "lang-prolog")]
+pub mod prolog;
+
+#[cfg(feature = "lang-batch")]
+pub mod batch;
+
 // Re-exports from registry
 pub use registry::{register, support_for_extension, support_for_grammar, support_for_path, supported_languages, validate_unused_kinds_audit};
 
@@ -407,3 +431,27 @@ pub use dot::Dot;
 
 #[cfg(feature = "lang-kdl")]
 pub use kdl::Kdl;
+
+#[cfg(feature = "lang-ada")]
+pub use ada::Ada;
+
+#[cfg(feature = "lang-agda")]
+pub use agda::Agda;
+
+#[cfg(feature = "lang-d")]
+pub use d::D;
+
+#[cfg(feature = "lang-matlab")]
+pub use matlab::Matlab;
+
+#[cfg(feature = "lang-meson")]
+pub use meson::Meson;
+
+#[cfg(feature = "lang-nginx")]
+pub use nginx::Nginx;
+
+#[cfg(feature = "lang-prolog")]
+pub use prolog::Prolog;
+
+#[cfg(feature = "lang-batch")]
+pub use batch::Batch;

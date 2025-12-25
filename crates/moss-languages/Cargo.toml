@@ -28,6 +28,8 @@ all-languages = [
     "lang-zsh", "lang-groovy", "lang-glsl", "lang-hlsl",
     "lang-commonlisp", "lang-elisp", "lang-gleam", "lang-scheme",
     "lang-ini", "lang-diff", "lang-dot", "lang-kdl",
+    "lang-ada", "lang-agda", "lang-d", "lang-matlab",
+    "lang-meson", "lang-nginx", "lang-prolog", "lang-batch",
 ]
 
 # Tier 1: Most common languages
@@ -100,3 +102,11 @@ lang-ini = ["arborium/lang-ini"]
 lang-diff = ["arborium/lang-diff"]
 lang-dot = ["arborium/lang-dot"]
 lang-kdl = ["arborium/lang-kdl"]
+lang-ada = ["arborium/lang-ada"]
+lang-agda = ["arborium/lang-agda"]
+lang-d = ["arborium/lang-d"]
+lang-matlab = ["arborium/lang-matlab"]
+lang-meson = ["arborium/lang-meson"]
+lang-nginx = ["arborium/lang-nginx"]
+lang-prolog = ["arborium/lang-prolog"]
+lang-batch = ["arborium/lang-batch"]

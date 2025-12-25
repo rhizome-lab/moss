@@ -209,6 +209,30 @@ fn init_builtin() {
 
         #[cfg(feature = "lang-kdl")]
         register(&crate::kdl::Kdl);
+
+        #[cfg(feature = "lang-ada")]
+        register(&crate::ada::Ada);
+
+        #[cfg(feature = "lang-agda")]
+        register(&crate::agda::Agda);
+
+        #[cfg(feature = "lang-d")]
+        register(&crate::d::D);
+
+        #[cfg(feature = "lang-matlab")]
+        register(&crate::matlab::Matlab);
+
+        #[cfg(feature = "lang-meson")]
+        register(&crate::meson::Meson);
+
+        #[cfg(feature = "lang-nginx")]
+        register(&crate::nginx::Nginx);
+
+        #[cfg(feature = "lang-prolog")]
+        register(&crate::prolog::Prolog);
+
+        #[cfg(feature = "lang-batch")]
+        register(&crate::batch::Batch);
     });
 }
 
