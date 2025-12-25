@@ -4,6 +4,23 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Lint Performance
+
+Reduced `moss lint list` from ~12s to ~0.5s:
+- Filesystem-first tool detection: check `node_modules/.bin/`, `.venv/bin/` before spawning processes
+- Removed remote fallbacks (npx, pnpm dlx, pipx run) - only detect locally installed tools
+- Detection order: check relevance (score) before availability (expensive process spawn)
+- ESLint requires config file to be detected (not just package.json)
+- Oxlint detects based on JS/TS files, not package.json presence
+
+### Index Performance
+
+Cached line counts in file index:
+- Schema v5: `files` table has `lines` column
+- Line counting during indexing with 1MB file size limit
+- `analyze --health` uses cached counts instead of reading files
+- All index operations use `incremental_refresh()` (not just daemon)
+
 ### Symbol Extraction Consolidation
 
 Unified extraction layer in `extract.rs`:
