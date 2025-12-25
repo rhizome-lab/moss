@@ -129,7 +129,8 @@ fn format_symbols(
     let prefix = "    ".repeat(indent);
 
     for sym in symbols {
-        lines.push(format!("{}{}:", prefix, sym.signature));
+        let size = sym.end_line.saturating_sub(sym.start_line) + 1;
+        lines.push(format!("{}{}: L{}-{} ({} lines)", prefix, sym.signature, sym.start_line, sym.end_line, size));
 
         if include_docstrings {
             if let Some(doc) = &sym.docstring {

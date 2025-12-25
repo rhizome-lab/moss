@@ -7,6 +7,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - view.rs: depth 2+ on directories should show symbols inside files (currently only shows file tree)
 - view.rs: symbol JSON output uses old format, not ViewNode (inconsistent with directory/file output)
 - index: lazy reindex on query (check file mtimes, update changed files before querying)
+- Python CLI consolidation: 55 commands → ~15 (see _main.py audit). Remove redundant (cmd_toml - jaq handles it), merge related into subcommands
 - Single installation: maturin wheel with embedded Rust binary
 
 Test Status: 107 passing, 0 failing (moss-languages)
