@@ -15,16 +15,19 @@ impl Language for Vue {
 
     fn has_symbols(&self) -> bool { true }
 
-    fn container_kinds(&self) -> &'static [&'static str] { &["script_element"] }
-    fn function_kinds(&self) -> &'static [&'static str] { &["function_declaration", "method_definition"] }
+    fn container_kinds(&self) -> &'static [&'static str] {
+        &["script_element", "template_element", "style_element"]
+    }
+    fn function_kinds(&self) -> &'static [&'static str] {
+        &[] // JS functions are in embedded script, not Vue grammar
+    }
     fn type_kinds(&self) -> &'static [&'static str] { &[] }
-    // Vue uses JS/TS inside <script> blocks - these are JS node kinds
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_statement"]
+        &[] // JS imports are in embedded script, not Vue grammar
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["export_statement"]
+        &[] // JS exports are in embedded script, not Vue grammar
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -32,60 +35,19 @@ impl Language for Vue {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &[
-            "for_statement",
-            "for_in_statement",
-            "arrow_function",
-            "function_expression",
-        ]
+        &["element"] // Vue template elements create scope
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "for_in_statement",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "try_statement",
-            "return_statement",
-            "break_statement",
-            "continue_statement",
-            "throw_statement",
-        ]
+        &["directive_attribute"] // v-if, v-for, v-show are directives
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "for_in_statement",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "case",
-            "try_statement",
-            "catch_clause",
-            "&&",
-            "||",
-            "??",
-            "ternary_expression",
-        ]
+        &["directive_attribute", "interpolation"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &[
-            "if_statement",
-            "for_statement",
-            "for_in_statement",
-            "while_statement",
-            "do_statement",
-            "switch_statement",
-            "try_statement",
-            "function_declaration",
-            "arrow_function",
-        ]
+        &["element", "template_element", "script_element"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {

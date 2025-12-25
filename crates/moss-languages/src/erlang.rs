@@ -24,7 +24,7 @@ impl Language for Erlang {
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["type_declaration", "record_declaration"]
+        &["type_alias", "record_decl"]
     }
 
     fn import_kinds(&self) -> &'static [&'static str] {
@@ -55,20 +55,20 @@ impl Language for Erlang {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["case_expression", "if_expression", "receive_expression", "try_expression", "fun_expression"]
+        &["case_expr", "if_expr", "receive_expr", "try_expr", "fun_clause"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["case_expression", "if_expression", "receive_expression", "try_expression"]
+        &["case_expr", "if_expr", "receive_expr", "try_expr"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["case_clause", "if_clause", "receive_clause", "catch_clause", "guard"]
+        &["cr_clause", "if_clause", "catch_clause", "guard"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["case_expression", "if_expression", "receive_expression", "try_expression",
-          "function_clause", "fun_expression"]
+        &["case_expr", "if_expr", "receive_expr", "try_expr",
+          "function_clause", "fun_clause"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
@@ -132,12 +132,12 @@ impl Language for Erlang {
     }
 
     fn extract_type(&self, node: &Node, content: &str) -> Option<Symbol> {
-        if node.kind() != "type_declaration" && node.kind() != "record_declaration" {
+        if node.kind() != "type_alias" && node.kind() != "record_decl" {
             return None;
         }
 
         let name = self.node_name(node, content)?;
-        let kind = if node.kind() == "record_declaration" {
+        let kind = if node.kind() == "record_decl" {
             SymbolKind::Struct
         } else {
             SymbolKind::Type

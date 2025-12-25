@@ -20,7 +20,7 @@ impl Language for Lua {
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "function_definition", "local_function"]
+        &["function_declaration", "function_definition"]
     }
 
     fn type_kinds(&self) -> &'static [&'static str] { &[] }
@@ -52,22 +52,22 @@ impl Language for Lua {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["do_statement", "for_statement", "for_in_statement", "while_statement", "repeat_statement"]
+        &["do_statement", "for_statement", "while_statement", "repeat_statement"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "for_statement", "for_in_statement", "while_statement",
+        &["if_statement", "for_statement", "while_statement",
           "repeat_statement", "return_statement", "break_statement", "goto_statement"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "elseif_statement", "for_statement", "for_in_statement",
+        &["if_statement", "elseif_statement", "for_statement",
           "while_statement", "repeat_statement", "and", "or"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "for_statement", "for_in_statement", "while_statement",
-          "repeat_statement", "function_declaration", "function_definition", "local_function"]
+        &["if_statement", "for_statement", "while_statement",
+          "repeat_statement", "function_declaration", "function_definition"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
@@ -77,7 +77,9 @@ impl Language for Lua {
             .map(|p| content[p.byte_range()].to_string())
             .unwrap_or_else(|| "()".to_string());
 
-        let is_local = node.kind() == "local_function";
+        // Check if function text starts with "local"
+        let text = &content[node.byte_range()];
+        let is_local = text.trim_start().starts_with("local ");
         let keyword = if is_local { "local function" } else { "function" };
         let signature = format!("{} {}{}", keyword, name, params);
 
@@ -161,12 +163,14 @@ impl Language for Lua {
         Vec::new()
     }
 
-    fn is_public(&self, node: &Node, _content: &str) -> bool {
-        node.kind() != "local_function"
+    fn is_public(&self, node: &Node, content: &str) -> bool {
+        let text = &content[node.byte_range()];
+        !text.trim_start().starts_with("local ")
     }
 
-    fn get_visibility(&self, node: &Node, _content: &str) -> Visibility {
-        if node.kind() == "local_function" {
+    fn get_visibility(&self, node: &Node, content: &str) -> Visibility {
+        let text = &content[node.byte_range()];
+        if text.trim_start().starts_with("local ") {
             Visibility::Private
         } else {
             Visibility::Public

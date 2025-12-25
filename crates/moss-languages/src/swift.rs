@@ -16,8 +16,7 @@ impl Language for Swift {
     fn has_symbols(&self) -> bool { true }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["class_declaration", "struct_declaration", "protocol_declaration",
-          "enum_declaration", "extension_declaration", "actor_declaration"]
+        &["class_declaration", "protocol_declaration"]
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
@@ -26,15 +25,13 @@ impl Language for Swift {
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["class_declaration", "struct_declaration", "protocol_declaration",
-          "enum_declaration", "typealias_declaration", "actor_declaration"]
+        &["class_declaration", "protocol_declaration", "typealias_declaration"]
     }
 
     fn import_kinds(&self) -> &'static [&'static str] { &["import_declaration"] }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["class_declaration", "struct_declaration", "protocol_declaration",
-          "enum_declaration", "function_declaration", "actor_declaration"]
+        &["class_declaration", "protocol_declaration", "function_declaration"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -70,24 +67,23 @@ impl Language for Swift {
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
         &["for_statement", "while_statement", "repeat_while_statement",
-          "do_statement", "catch_pattern", "switch_statement", "guard_statement"]
+          "do_statement", "catch_block", "switch_statement", "guard_statement"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
         &["if_statement", "for_statement", "while_statement", "repeat_while_statement",
-          "switch_statement", "guard_statement", "do_statement", "return_statement",
-          "break_statement", "continue_statement", "throw_statement", "defer_statement"]
+          "switch_statement", "guard_statement", "do_statement", "control_transfer_statement"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if_statement", "for_statement", "while_statement", "repeat_while_statement",
-          "switch_entry", "catch_pattern", "ternary_expression", "nil_coalescing_expression"]
+          "switch_statement", "catch_block", "ternary_expression", "nil_coalescing_expression"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
         &["if_statement", "for_statement", "while_statement", "repeat_while_statement",
           "switch_statement", "do_statement", "function_declaration", "class_declaration",
-          "struct_declaration", "closure_expression"]
+          "lambda_literal"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {

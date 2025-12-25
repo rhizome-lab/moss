@@ -16,23 +16,23 @@ impl Language for Zig {
     fn has_symbols(&self) -> bool { true }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["struct_declaration", "enum_declaration", "union_declaration"]
+        &["ContainerDecl"]
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "test_declaration"]
+        &["FnProto", "TestDecl"]
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["struct_declaration", "enum_declaration", "union_declaration"]
+        &["ContainerDecl"]
     }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["builtin_call_expression"] // @import("module")
+        &["SuffixExpr"] // @import("module") is a builtin call suffix
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "struct_declaration", "enum_declaration", "union_declaration"]
+        &["FnProto", "ContainerDecl"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -50,10 +50,8 @@ impl Language for Zig {
         };
 
         let kind = match node.kind() {
-            "function_declaration" => SymbolKind::Function,
-            "struct_declaration" => SymbolKind::Struct,
-            "enum_declaration" => SymbolKind::Enum,
-            "union_declaration" => SymbolKind::Struct,
+            "FnProto" | "TestDecl" => SymbolKind::Function,
+            "ContainerDecl" => SymbolKind::Struct, // Could be struct/enum/union
             _ => return Vec::new(),
         };
 
@@ -65,22 +63,21 @@ impl Language for Zig {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["block", "for_loop", "while_loop"]
+        &["Block", "ForStatement", "WhileStatement"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "for_loop", "while_loop", "switch_expression",
-          "return_statement", "break_expression", "continue_expression"]
+        &["IfStatement", "ForStatement", "WhileStatement", "SwitchExpr"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "for_loop", "while_loop", "switch_expression",
-          "catch_clause", "orelse_clause", "and", "or"]
+        &["IfStatement", "ForStatement", "WhileStatement", "SwitchExpr",
+          "ErrorUnionExpr", "BinaryExpr"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "for_loop", "while_loop", "switch_expression",
-          "function_declaration", "struct_declaration"]
+        &["IfStatement", "ForStatement", "WhileStatement", "SwitchExpr",
+          "FnProto", "ContainerDecl"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
@@ -116,11 +113,8 @@ impl Language for Zig {
 
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
-        let (kind, keyword) = match node.kind() {
-            "enum_declaration" => (SymbolKind::Enum, "enum"),
-            "union_declaration" => (SymbolKind::Struct, "union"),
-            _ => (SymbolKind::Struct, "struct"),
-        };
+        // ContainerDecl covers struct, enum, union - default to struct
+        let (kind, keyword) = (SymbolKind::Struct, "struct");
 
         let is_pub = self.is_public(node, content);
         let prefix = if is_pub { format!("pub {}", keyword) } else { keyword.to_string() };

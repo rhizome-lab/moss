@@ -16,8 +16,8 @@ impl Language for GraphQL {
     fn has_symbols(&self) -> bool { true }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["type_definition", "interface_definition", "enum_definition",
-          "union_definition", "input_object_type_definition"]
+        &["object_type_definition", "interface_type_definition", "enum_type_definition",
+          "union_type_definition", "input_object_type_definition"]
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
@@ -25,14 +25,14 @@ impl Language for GraphQL {
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["type_definition", "interface_definition", "enum_definition",
-          "union_definition", "input_object_type_definition", "scalar_definition"]
+        &["object_type_definition", "interface_type_definition", "enum_type_definition",
+          "union_type_definition", "input_object_type_definition", "scalar_type_definition"]
     }
 
     fn import_kinds(&self) -> &'static [&'static str] { &[] }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["type_definition", "interface_definition", "operation_definition"]
+        &["object_type_definition", "interface_type_definition", "operation_definition"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -46,12 +46,11 @@ impl Language for GraphQL {
         };
 
         let kind = match node.kind() {
-            "type_definition" | "object_type_definition" => SymbolKind::Struct,
-            "interface_definition" | "interface_type_definition" => SymbolKind::Interface,
-            "enum_definition" | "enum_type_definition" => SymbolKind::Enum,
-            "union_definition" | "union_type_definition" => SymbolKind::Enum,
+            "object_type_definition" => SymbolKind::Struct,
+            "interface_type_definition" => SymbolKind::Interface,
+            "enum_type_definition" | "union_type_definition" => SymbolKind::Enum,
             "input_object_type_definition" => SymbolKind::Struct,
-            "scalar_definition" | "scalar_type_definition" => SymbolKind::Type,
+            "scalar_type_definition" => SymbolKind::Type,
             "operation_definition" => SymbolKind::Function,
             "field_definition" => SymbolKind::Method,
             _ => return Vec::new(),
@@ -70,7 +69,7 @@ impl Language for GraphQL {
 
     fn control_flow_kinds(&self) -> &'static [&'static str] { &[] }
     fn complexity_nodes(&self) -> &'static [&'static str] { &["selection_set"] }
-    fn nesting_nodes(&self) -> &'static [&'static str] { &["selection_set", "type_definition"] }
+    fn nesting_nodes(&self) -> &'static [&'static str] { &["selection_set", "object_type_definition"] }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
@@ -93,11 +92,11 @@ impl Language for GraphQL {
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
         let (kind, keyword) = match node.kind() {
-            "interface_definition" | "interface_type_definition" => (SymbolKind::Interface, "interface"),
-            "enum_definition" | "enum_type_definition" => (SymbolKind::Enum, "enum"),
-            "union_definition" | "union_type_definition" => (SymbolKind::Enum, "union"),
+            "interface_type_definition" => (SymbolKind::Interface, "interface"),
+            "enum_type_definition" => (SymbolKind::Enum, "enum"),
+            "union_type_definition" => (SymbolKind::Enum, "union"),
             "input_object_type_definition" => (SymbolKind::Struct, "input"),
-            "scalar_definition" | "scalar_type_definition" => (SymbolKind::Type, "scalar"),
+            "scalar_type_definition" => (SymbolKind::Type, "scalar"),
             _ => (SymbolKind::Struct, "type"),
         };
 

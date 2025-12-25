@@ -199,9 +199,7 @@ mod tests {
 
     /// Validate that all node kinds returned by Language trait methods
     /// actually exist in the tree-sitter grammar.
-    /// TODO: Fix 187 invalid node kinds, then remove #[ignore]
     #[test]
-    #[ignore]
     fn validate_node_kinds() {
         let store = GrammarStore::new();
         let mut errors: Vec<String> = Vec::new();

@@ -16,21 +16,21 @@ impl Language for Sql {
     fn has_symbols(&self) -> bool { true }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["create_table_statement", "create_view_statement", "create_schema_statement"]
+        &["create_table", "create_view", "create_schema"]
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["create_function_statement", "create_procedure_statement"]
+        &["create_function"]
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["create_type_statement"]
+        &["create_type"]
     }
 
     fn import_kinds(&self) -> &'static [&'static str] { &[] }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["create_table_statement", "create_view_statement", "create_function_statement"]
+        &["create_table", "create_view", "create_function"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -44,12 +44,11 @@ impl Language for Sql {
         };
 
         let kind = match node.kind() {
-            "create_table_statement" => SymbolKind::Struct,
-            "create_view_statement" => SymbolKind::Struct,
-            "create_function_statement" => SymbolKind::Function,
-            "create_procedure_statement" => SymbolKind::Function,
-            "create_type_statement" => SymbolKind::Type,
-            "create_index_statement" => SymbolKind::Variable,
+            "create_table" => SymbolKind::Struct,
+            "create_view" | "create_materialized_view" => SymbolKind::Struct,
+            "create_function" => SymbolKind::Function,
+            "create_type" => SymbolKind::Type,
+            "create_index" => SymbolKind::Variable,
             _ => return Vec::new(),
         };
 
@@ -65,15 +64,15 @@ impl Language for Sql {
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["case_expression", "if_statement"]
+        &["case"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["case_expression", "join_clause", "where_clause", "having_clause"]
+        &["case", "join", "where", "having"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["subquery", "case_expression"]
+        &["subquery", "case"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
@@ -98,8 +97,8 @@ impl Language for Sql {
     fn extract_container(&self, node: &Node, content: &str) -> Option<Symbol> {
         let name = self.extract_sql_name(node, content)?;
         let (kind, keyword) = match node.kind() {
-            "create_view_statement" => (SymbolKind::Struct, "VIEW"),
-            "create_schema_statement" => (SymbolKind::Module, "SCHEMA"),
+            "create_view" | "create_materialized_view" => (SymbolKind::Struct, "VIEW"),
+            "create_schema" => (SymbolKind::Module, "SCHEMA"),
             _ => (SymbolKind::Struct, "TABLE"),
         };
 

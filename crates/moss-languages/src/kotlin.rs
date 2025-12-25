@@ -17,7 +17,7 @@ impl Language for Kotlin {
     fn has_symbols(&self) -> bool { true }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["class_declaration", "object_declaration", "interface_declaration", "enum_class_body"]
+        &["class_declaration", "object_declaration", "enum_class_body"]
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
@@ -25,13 +25,13 @@ impl Language for Kotlin {
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["class_declaration", "object_declaration", "interface_declaration", "type_alias"]
+        &["class_declaration", "object_declaration", "type_alias"]
     }
 
     fn import_kinds(&self) -> &'static [&'static str] { &["import_header"] }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["class_declaration", "object_declaration", "interface_declaration", "function_declaration"]
+        &["class_declaration", "object_declaration", "function_declaration"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -51,7 +51,6 @@ impl Language for Kotlin {
         let kind = match node.kind() {
             "class_declaration" => SymbolKind::Class,
             "object_declaration" => SymbolKind::Class, // object is a singleton class
-            "interface_declaration" => SymbolKind::Interface,
             "function_declaration" => SymbolKind::Function,
             _ => return Vec::new(),
         };
@@ -68,7 +67,7 @@ impl Language for Kotlin {
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_expression", "for_statement", "while_statement", "do_while_statement", "when_expression", "try_expression", "return_expression", "break_expression", "continue_expression", "throw_expression"]
+        &["if_expression", "for_statement", "while_statement", "do_while_statement", "when_expression", "try_expression", "jump_expression"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
@@ -106,7 +105,6 @@ impl Language for Kotlin {
         let name = self.node_name(node, content)?;
         let (kind, keyword) = match node.kind() {
             "object_declaration" => (SymbolKind::Class, "object"),
-            "interface_declaration" => (SymbolKind::Interface, "interface"),
             _ => (SymbolKind::Class, "class"),
         };
 

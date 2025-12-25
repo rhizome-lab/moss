@@ -20,17 +20,17 @@ impl Language for Svelte {
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration", "arrow_function", "method_definition"]
+        &[] // JS functions are in embedded script, not Svelte grammar
     }
 
     fn type_kinds(&self) -> &'static [&'static str] { &[] }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_statement"]
+        &[] // JS imports are in embedded script, not Svelte grammar
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["function_declaration"]
+        &[] // JS exports are in embedded script, not Svelte grammar
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -61,19 +61,19 @@ impl Language for Svelte {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "each_block", "await_block"]
+        &["if_statement", "each_statement", "await_statement"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "each_block", "await_block"]
+        &["if_statement", "each_statement", "await_statement"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "each_block", "conditional_expression"]
+        &["if_statement", "each_statement", "else_if_block"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "each_block", "await_block", "function_declaration", "script_element"]
+        &["if_statement", "each_statement", "await_statement", "script_element"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
