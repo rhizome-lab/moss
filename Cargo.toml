@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/moss-languages", "crates/moss-cli", "crates/moss-packages"]
+members = ["crates/moss-languages", "crates/moss-cli", "crates/moss-packages", "crates/moss-tools"]
 
 [workspace.package]
 version = "0.1.0"
