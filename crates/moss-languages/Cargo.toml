@@ -15,7 +15,7 @@ default = ["all-languages"]
 
 # Meta-features
 all-languages = [
-    "lang-python", "lang-rust", "lang-javascript", "lang-typescript",
+    "lang-python", "lang-rust", "lang-javascript", "lang-typescript", "lang-tsx",
     "lang-go", "lang-java", "lang-kotlin", "lang-c-sharp", "lang-swift",
     "lang-php", "lang-dockerfile", "lang-c", "lang-cpp", "lang-ruby",
     "lang-scala", "lang-vue", "lang-markdown", "lang-json", "lang-yaml",
@@ -49,6 +49,7 @@ tier1 = [
 lang-python = ["arborium/lang-python"]
 lang-rust = ["arborium/lang-rust"]
 lang-javascript = ["arborium/lang-javascript"]
+lang-tsx = ["arborium/lang-tsx"]
 lang-typescript = ["arborium/lang-typescript"]
 lang-go = ["arborium/lang-go"]
 lang-java = ["arborium/lang-java"]

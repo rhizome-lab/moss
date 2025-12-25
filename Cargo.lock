@@ -199,6 +199,7 @@ dependencies = [
  "arborium-tlaplus",
  "arborium-toml",
  "arborium-tree-sitter",
+ "arborium-tsx",
  "arborium-typescript",
  "arborium-typst",
  "arborium-uiua",
@@ -1172,6 +1173,18 @@ dependencies = [
  "regex",
  "regex-syntax",
  "streaming-iterator",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "arborium-tsx"
+version = "2.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b8a48ea4b77152758f2ab6824b51785a2aa826da82dc498c1b8d42dc38956c3"
+dependencies = [
+ "arborium-javascript",
+ "arborium-sysroot",
+ "cc",
  "tree-sitter-language",
 ]
 

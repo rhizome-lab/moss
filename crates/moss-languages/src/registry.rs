@@ -34,10 +34,10 @@ fn init_builtin() {
         register(&crate::javascript::JavaScript);
 
         #[cfg(feature = "lang-typescript")]
-        {
-            register(&crate::typescript::TypeScript);
-            register(&crate::typescript::Tsx);
-        }
+        register(&crate::typescript::TypeScript);
+
+        #[cfg(feature = "lang-tsx")]
+        register(&crate::typescript::Tsx);
 
         #[cfg(feature = "lang-go")]
         register(&crate::go::Go);
