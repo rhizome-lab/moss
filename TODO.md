@@ -40,17 +40,17 @@ TUI (evaluate):
 - [ ] `cmd_tui` / `cmd_explore` - Textual → ratatui? Or delete?
 
 Delete (redundant with Rust CLI or external tools):
-- [ ] `cmd_toml` - jaq handles TOML natively (expose `moss jq` or document jaq usage)
+- [x] `cmd_toml` - jaq handles TOML natively (deleted from Python CLI)
 - [x] `cmd_complexity` - `moss analyze --complexity` (deleted from Python CLI)
 - [x] `cmd_deps` - `moss view --deps` (deleted from Python CLI)
-- [ ] `cmd_cfg` - control flow graph (who uses this?)
+- [x] `cmd_cfg` - control flow graph (deleted from Python CLI)
 - [x] `cmd_query` - `moss view` with filters (deleted from Python CLI)
-- [ ] `cmd_rag` - duplicates `cmd_search`?
+- [x] `cmd_rag` - duplicates `cmd_search` (deleted from Python CLI)
 - [ ] `cmd_metrics` / `cmd_report` / `cmd_overview` - consolidate to `moss analyze --overview`
 
 Delete (questionable value):
-- [ ] `cmd_mutate` - mutation testing (is it even implemented?)
-- [ ] `cmd_patterns` / `cmd_weaknesses` / `cmd_clones` - used?
+- [x] `cmd_mutate` - mutation testing wrapper (deleted from Python CLI)
+- [x] `cmd_patterns` / `cmd_weaknesses` / `cmd_clones` (deleted from Python CLI)
 - [ ] `cmd_synthesize` - distinct from `cmd_edit`?
 
 Consolidate to subcommands:
