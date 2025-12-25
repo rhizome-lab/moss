@@ -4,9 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Trait-based FFI detection: refactor cross_refs detection to use traits instead of hardcoded patterns
-2. OutputFormatter trait for consistent JSON/text output across commands
-3. Command/subcommand/flag names should be self-documenting
+1. Command/subcommand/flag names should be self-documenting
 
 Test Status: 107 passing, 0 failing (moss-languages)
 
@@ -133,8 +131,8 @@ See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to 
 **CLI Surface Cleanup:**
 - [x] view.rs: unified ViewNode abstraction for directories, files, and symbols
 - [x] view.rs: depth 2+ shows symbols inside files, JSON uses ViewNode format
+- [x] OutputFormatter trait for consistent JSON/text output
 - [ ] Command/subcommand/flag names should be self-documenting
-- [ ] OutputFormatter trait for consistent JSON/text output
 
 **Workflow Engine Design:**
 Current scaffold is TOML state machines. Needs design work:

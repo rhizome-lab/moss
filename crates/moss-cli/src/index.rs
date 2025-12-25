@@ -1235,75 +1235,94 @@ impl FileIndex {
     // =========================================================================
 
     /// Refresh cross-language references by detecting FFI patterns.
-    /// Detects: PyO3, wasm-bindgen, napi-rs, cdylib exports, ctypes/cffi usage.
+    /// Uses trait-based FfiDetector from moss-languages for extensibility.
     pub fn refresh_cross_refs(&mut self) -> rusqlite::Result<usize> {
-        // Collect all cross-refs before starting transaction
-        let mut cross_refs: Vec<(String, &str, String, &str, &str, usize)> = Vec::new();
+        use moss_languages::ffi::{FfiDetector, FfiModule as LangFfiModule};
 
-        // 1. Detect Rust FFI crates and match imports
-        let ffi_modules = self.detect_rust_ffi_modules()?;
+        let detector = FfiDetector::new();
+
+        // Collect all cross-refs before starting transaction
+        let mut cross_refs: Vec<CrossRefData> = Vec::new();
+
+        // 1. Find build files and detect FFI modules
+        let build_files: Vec<String> = {
+            let mut stmt = self
+                .conn
+                .prepare("SELECT path FROM files WHERE path LIKE '%Cargo.toml' OR path LIKE '%pyproject.toml'")?;
+            let rows = stmt.query_map([], |row| row.get(0))?;
+            rows.filter_map(|r| r.ok()).collect()
+        };
+
+        let mut ffi_modules: Vec<LangFfiModule> = Vec::new();
+        for build_path in build_files {
+            let full_path = self.root.join(&build_path);
+            if let Ok(content) = std::fs::read_to_string(&full_path) {
+                ffi_modules.extend(detector.detect_modules(&full_path, &content));
+            }
+        }
+
+        // 2. Match imports to FFI modules
         for module in &ffi_modules {
             let module_name = module.name.replace('-', "_");
-            let ref_type = match module.binding_type {
-                FfiBindingType::PyO3 => "pyo3_import",
-                FfiBindingType::WasmBindgen => "wasm_import",
-                FfiBindingType::NapiRs => "napi_import",
-                FfiBindingType::Cdylib => "ffi_import",
-            };
+            let ref_type = format!("{}_import", module.binding_type);
 
             // Find imports matching this module
-            let mut stmt = self.conn.prepare(
-                "SELECT file, line FROM imports WHERE module = ?1 OR module LIKE ?2 OR name = ?1",
-            )?;
-            let pattern = format!("{}%", module_name);
+            let imports: Vec<(String, Option<String>, String, usize)> = {
+                let mut stmt = self.conn.prepare(
+                    "SELECT file, module, name, line FROM imports WHERE module = ?1 OR module LIKE ?2 OR name = ?1",
+                )?;
+                let pattern = format!("{}%", module_name);
+                let rows = stmt.query_map(params![module_name, pattern], |row| {
+                    Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+                })?;
+                rows.filter_map(|r| r.ok()).collect()
+            };
 
-            let refs: Vec<(String, usize)> = stmt
-                .query_map(params![module_name, pattern], |row| {
-                    Ok((row.get(0)?, row.get(1)?))
-                })?
-                .filter_map(|r| r.ok())
-                .collect();
+            for (file, import_module, import_name, line) in imports {
+                // Check file extension matches binding's consumer extensions
+                let ext = file.rsplit('.').next().unwrap_or("");
+                if !detector.is_consumer_extension(ext) {
+                    continue;
+                }
 
-            for (file, line) in refs {
-                if file.ends_with(".py") {
-                    cross_refs.push((file, "python", module.name.clone(), "rust", ref_type, line));
-                } else if matches!(module.binding_type, FfiBindingType::WasmBindgen)
-                    && (file.ends_with(".js") || file.ends_with(".ts") || file.ends_with(".tsx"))
+                // Determine source language from extension
+                let source_lang = match ext {
+                    "py" => "python",
+                    "js" | "mjs" | "ts" | "tsx" => "javascript",
+                    _ => continue,
+                };
+
+                // Verify import matches using binding's logic
+                let import_mod = import_module.as_deref().unwrap_or("");
+                if detector
+                    .match_import(import_mod, &import_name, &ffi_modules)
+                    .is_some()
                 {
-                    cross_refs.push((
-                        file,
-                        "javascript",
-                        module.name.clone(),
-                        "rust",
-                        "wasm_import",
+                    cross_refs.push(CrossRefData {
+                        source_file: file,
+                        source_lang,
+                        target_module: module.name.clone(),
+                        target_lang: module.target_lang,
+                        ref_type: ref_type.clone(),
                         line,
-                    ));
+                    });
                 }
             }
         }
 
-        // 2. Detect Python ctypes/cffi usage
-        let python_ffi_files = self.detect_python_ffi_imports()?;
-        for (file, line) in python_ffi_files {
-            cross_refs.push((
-                file,
-                "python",
-                "native_lib".to_string(),
-                "c",
-                "ctypes_usage",
-                line,
-            ));
-        }
+        // 3. Detect standalone FFI usage (ctypes/cffi without matching module)
+        let ffi_imports = self.detect_standalone_ffi_imports(&detector)?;
+        cross_refs.extend(ffi_imports);
 
         // Insert all cross-refs in a transaction
         let tx = self.conn.transaction()?;
         tx.execute("DELETE FROM cross_refs", [])?;
 
-        for (source_file, source_lang, target_crate, target_lang, ref_type, line) in &cross_refs {
+        for cr in &cross_refs {
             tx.execute(
                 "INSERT INTO cross_refs (source_file, source_lang, target_crate, target_lang, ref_type, line)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![source_file, source_lang, target_crate, target_lang, ref_type, line],
+                params![cr.source_file, cr.source_lang, cr.target_module, cr.target_lang, cr.ref_type, cr.line],
             )?;
         }
 
@@ -1311,71 +1330,52 @@ impl FileIndex {
         Ok(cross_refs.len())
     }
 
-    /// Detect Rust crates that expose FFI bindings.
-    fn detect_rust_ffi_modules(&self) -> rusqlite::Result<Vec<FfiModule>> {
-        let mut modules = Vec::new();
+    /// Detect standalone FFI imports (ctypes/cffi) that don't match a known module.
+    fn detect_standalone_ffi_imports(
+        &self,
+        detector: &moss_languages::ffi::FfiDetector,
+    ) -> rusqlite::Result<Vec<CrossRefData>> {
+        let mut results = Vec::new();
 
-        let mut stmt = self
-            .conn
-            .prepare("SELECT path FROM files WHERE path LIKE '%Cargo.toml'")?;
-        let cargo_files: Vec<String> = stmt
-            .query_map([], |row| row.get(0))?
-            .filter_map(|r| r.ok())
-            .collect();
+        // Get all imports once
+        let imports: Vec<(String, Option<String>, String, usize)> = {
+            let mut stmt = self
+                .conn
+                .prepare("SELECT file, module, name, line FROM imports")?;
+            let rows = stmt.query_map([], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })?;
+            rows.filter_map(|r| r.ok()).collect()
+        };
 
-        for cargo_path in cargo_files {
-            let full_path = self.root.join(&cargo_path);
-            if let Ok(content) = std::fs::read_to_string(&full_path) {
-                let binding_type = if content.contains("pyo3") || content.contains("PyO3") {
-                    Some(FfiBindingType::PyO3)
-                } else if content.contains("wasm-bindgen") {
-                    Some(FfiBindingType::WasmBindgen)
-                } else if content.contains("napi") || content.contains("napi-rs") {
-                    Some(FfiBindingType::NapiRs)
-                } else if content.contains("cdylib") {
-                    Some(FfiBindingType::Cdylib)
-                } else {
-                    None
-                };
+        // Check each binding for standalone detection
+        for binding in detector.bindings() {
+            // Only ctypes/cffi have standalone detection (no build file)
+            if binding.name() != "ctypes" && binding.name() != "cffi" {
+                continue;
+            }
 
-                if let Some(binding) = binding_type {
-                    if let Some(name) = extract_cargo_crate_name(&content) {
-                        let cargo_dir = full_path.parent().unwrap_or(Path::new(""));
-                        let lib_rs = cargo_dir.join("src").join("lib.rs");
-                        if lib_rs.exists() {
-                            if let Ok(rel_path) = lib_rs.strip_prefix(&self.root) {
-                                modules.push(FfiModule {
-                                    name,
-                                    lib_path: rel_path.to_string_lossy().to_string(),
-                                    binding_type: binding,
-                                });
-                            }
-                        }
-                    }
+            for (file, import_module, import_name, line) in &imports {
+                let ext = file.rsplit('.').next().unwrap_or("");
+                if !binding.consumer_extensions().contains(&ext) {
+                    continue;
+                }
+
+                let import_mod = import_module.as_deref().unwrap_or("");
+                if binding.matches_import(import_mod, import_name, "") {
+                    results.push(CrossRefData {
+                        source_file: file.clone(),
+                        source_lang: binding.source_lang(),
+                        target_module: "native_lib".to_string(),
+                        target_lang: binding.target_lang(),
+                        ref_type: format!("{}_usage", binding.name()),
+                        line: *line,
+                    });
                 }
             }
         }
 
-        Ok(modules)
-    }
-
-    /// Detect Python files using ctypes or cffi to load native libraries.
-    /// Returns (file, line) pairs for each FFI import found.
-    fn detect_python_ffi_imports(&self) -> rusqlite::Result<Vec<(String, usize)>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT file, line FROM imports WHERE module IN ('ctypes', 'cffi') OR name IN ('ctypes', 'cffi', 'CDLL', 'FFI')",
-        )?;
-        let ffi_users: Vec<(String, usize)> = stmt
-            .query_map([], |row| {
-                let file: String = row.get(0)?;
-                let line: usize = row.get(1)?;
-                Ok((file, line))
-            })?
-            .filter_map(|r| r.ok())
-            .filter(|(file, _)| file.ends_with(".py"))
-            .collect();
-
-        Ok(ffi_users)
+        Ok(results)
     }
 
     /// Find cross-language references from a source file.
@@ -1445,26 +1445,14 @@ impl FileIndex {
     }
 }
 
-/// Type of FFI binding detected.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FfiBindingType {
-    /// PyO3 - Rust to Python bindings
-    PyO3,
-    /// wasm-bindgen - Rust to WebAssembly/JavaScript
-    WasmBindgen,
-    /// napi-rs - Rust to Node.js native modules
-    NapiRs,
-    /// Generic cdylib - C ABI shared library
-    Cdylib,
-}
-
-/// Detected FFI module information.
-#[derive(Debug)]
-struct FfiModule {
-    name: String,
-    #[allow(dead_code)] // Will be used for source mapping
-    lib_path: String,
-    binding_type: FfiBindingType,
+/// Internal cross-ref data for collection before insertion.
+struct CrossRefData {
+    source_file: String,
+    source_lang: &'static str,
+    target_module: String,
+    target_lang: &'static str,
+    ref_type: String,
+    line: usize,
 }
 
 /// Cross-language reference record.
@@ -1476,32 +1464,6 @@ pub struct CrossRef {
     pub target_lang: String,
     pub ref_type: String,
     pub line: usize,
-}
-
-/// Extract crate name from Cargo.toml content.
-fn extract_cargo_crate_name(content: &str) -> Option<String> {
-    // Simple TOML parsing for [package] name = "..."
-    let mut in_package = false;
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed == "[package]" {
-            in_package = true;
-            continue;
-        }
-        if trimmed.starts_with('[') {
-            in_package = false;
-            continue;
-        }
-        if in_package && trimmed.starts_with("name") {
-            // name = "foo" or name = 'foo'
-            if let Some(eq_pos) = trimmed.find('=') {
-                let value = trimmed[eq_pos + 1..].trim();
-                let value = value.trim_matches('"').trim_matches('\'');
-                return Some(value.to_string());
-            }
-        }
-    }
-    None
 }
 
 #[cfg(test)]

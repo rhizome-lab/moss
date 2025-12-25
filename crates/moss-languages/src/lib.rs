@@ -28,6 +28,7 @@
 pub mod c_cpp;
 pub mod ecmascript;
 pub mod external_packages;
+pub mod ffi;
 mod registry;
 mod traits;
 

@@ -11,6 +11,7 @@ mod extract;
 mod grep;
 mod health;
 mod index;
+mod output;
 mod overview;
 mod parsers;
 mod path_resolve;

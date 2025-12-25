@@ -23,6 +23,14 @@ Unified ViewNode abstraction for consistent output:
 - Useless docstring filtering (skips docstrings that just repeat the name)
 - JSON and text output are now structurally consistent
 
+### OutputFormatter Trait
+
+Unified output formatting infrastructure (`output.rs`):
+- `OutputFormat` enum: Text, Json, JsonPretty
+- `OutputFormatter` trait for types that support multiple output formats
+- Helper functions: `print_json`, `print_json_pretty`, `print_formatted`
+- Implemented for `GrepResult` as reference pattern
+
 ### Server Protocols
 
 All three server protocols now implemented:
@@ -55,6 +63,7 @@ Detects and indexes cross-language FFI bindings:
 - **Rust → C ABI**: cdylib crates
 - **Python → C**: ctypes/cffi usage detection
 - All refs stored in `cross_refs` table, queryable via daemon
+- **Trait-based architecture**: `FfiBinding` trait in moss-languages allows custom binding detectors
 
 ### Package Management
 

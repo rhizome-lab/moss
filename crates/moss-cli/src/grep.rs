@@ -1,10 +1,12 @@
 //! Fast text search using ripgrep's grep crate.
 
+use crate::output::OutputFormatter;
 use grep_matcher::Matcher;
 use grep_regex::RegexMatcher;
 use grep_searcher::sinks::UTF8;
 use grep_searcher::Searcher;
 use ignore::WalkBuilder;
+use std::fmt::Write;
 use std::io;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -146,6 +148,22 @@ pub fn grep(
         total_matches: total_matches.load(Ordering::Relaxed),
         files_searched: files_searched.load(Ordering::Relaxed),
     })
+}
+
+impl OutputFormatter for GrepResult {
+    fn format_text(&self) -> String {
+        let mut out = String::new();
+        for m in &self.matches {
+            writeln!(out, "{}:{}:{}", m.file, m.line, m.content).unwrap();
+        }
+        write!(
+            out,
+            "\n{} matches in {} files",
+            self.total_matches, self.files_searched
+        )
+        .unwrap();
+        out
+    }
 }
 
 #[cfg(test)]
