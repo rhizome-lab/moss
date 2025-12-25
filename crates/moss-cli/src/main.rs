@@ -220,6 +220,10 @@ enum Commands {
         #[arg(long)]
         overview: bool,
 
+        /// Show storage usage (index database, caches)
+        #[arg(long)]
+        storage: bool,
+
         /// Compact one-line output (for --overview)
         #[arg(short, long)]
         compact: bool,
@@ -382,6 +386,7 @@ fn main() {
             complexity,
             security,
             overview,
+            storage,
             compact,
             threshold,
             kind,
@@ -392,6 +397,7 @@ fn main() {
             complexity,
             security,
             overview,
+            storage,
             compact,
             threshold,
             kind.as_deref(),
