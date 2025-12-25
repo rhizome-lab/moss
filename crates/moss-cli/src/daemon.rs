@@ -1,4 +1,4 @@
-use moss_core::get_moss_dir;
+use crate::paths::get_moss_dir;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Read, Write};

@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use crate::{Export, Import, Language, Symbol, Visibility, VisibilityMechanism};
 use crate::external_packages::ResolvedPackage;
-use moss_core::tree_sitter::Node;
+use arborium::tree_sitter::Node;
 
 /// Jinja2 language support.
 pub struct Jinja2;

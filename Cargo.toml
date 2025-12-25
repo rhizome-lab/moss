@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/moss-core", "crates/moss-languages", "crates/moss-cli", "crates/moss-packages"]
+members = ["crates/moss-languages", "crates/moss-cli", "crates/moss-packages"]
 
 [workspace.package]
 version = "0.1.0"
@@ -59,5 +59,3 @@ arborium = { version = "2.4", features = [
     "lang-vue",
 ] }
 
-# Shared crate
-moss-core = { path = "crates/moss-core" }

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
 use crate::external_packages::ResolvedPackage;
 use crate::c_cpp;
-use moss_core::tree_sitter::Node;
+use arborium::tree_sitter::Node;
 
 /// C language support.
 pub struct C;

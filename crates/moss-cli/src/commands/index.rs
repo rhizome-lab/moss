@@ -3,7 +3,7 @@
 use crate::index;
 use crate::skeleton;
 use clap::Subcommand;
-use moss_core::get_moss_dir;
+use crate::paths::get_moss_dir;
 use moss_languages::external_packages;
 use std::path::{Path, PathBuf};
 

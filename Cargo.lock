@@ -2337,7 +2337,9 @@ dependencies = [
 name = "moss-cli"
 version = "0.1.0"
 dependencies = [
+ "arborium",
  "clap",
+ "dirs",
  "flate2",
  "grep-matcher",
  "grep-regex",
@@ -2346,7 +2348,6 @@ dependencies = [
  "jaq-core",
  "jaq-json",
  "jaq-std",
- "moss-core",
  "moss-languages",
  "moss-packages",
  "notify",
@@ -2365,19 +2366,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "moss-core"
-version = "0.1.0"
-dependencies = [
- "arborium",
- "dirs",
-]
-
-[[package]]
 name = "moss-languages"
 version = "0.1.0"
 dependencies = [
  "arborium",
- "moss-core",
  "rusqlite",
  "serde_json",
 ]

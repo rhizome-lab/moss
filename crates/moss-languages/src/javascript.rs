@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::{Export, Import, Language, Symbol, VisibilityMechanism, Visibility};
 use crate::ecmascript;
 use crate::external_packages::ResolvedPackage;
-use moss_core::tree_sitter::Node;
+use arborium::tree_sitter::Node;
 
 /// JavaScript language support.
 pub struct JavaScript;

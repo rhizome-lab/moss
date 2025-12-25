@@ -3,7 +3,8 @@
 //! Extracts function/class signatures with optional docstrings.
 
 use crate::tree::{ViewNode, ViewNodeKind};
-use moss_core::{tree_sitter, Parsers};
+use arborium::tree_sitter;
+use crate::parsers::Parsers;
 use moss_languages::{support_for_grammar, support_for_path, Language, Symbol as LangSymbol, SymbolKind as LangSymbolKind};
 use std::path::Path;
 

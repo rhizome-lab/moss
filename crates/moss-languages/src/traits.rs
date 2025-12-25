@@ -1,7 +1,7 @@
 //! Core trait for language support.
 
 use std::path::{Path, PathBuf};
-use moss_core::tree_sitter::Node;
+use arborium::tree_sitter::Node;
 use crate::external_packages::ResolvedPackage;
 
 /// Symbol kind classification

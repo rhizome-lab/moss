@@ -2,7 +2,7 @@
 
 use crate::daemon;
 use clap::Subcommand;
-use moss_core::get_moss_dir;
+use crate::paths::get_moss_dir;
 use std::path::Path;
 
 #[derive(Subcommand)]

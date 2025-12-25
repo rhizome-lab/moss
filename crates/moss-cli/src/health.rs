@@ -15,6 +15,11 @@ pub struct LargeFile {
     pub lines: usize,
 }
 
+/// Thresholds for file size severity
+const LARGE_THRESHOLD: usize = 500;
+const VERY_LARGE_THRESHOLD: usize = 1000;
+const MASSIVE_THRESHOLD: usize = 2000;
+
 /// Health metrics for a codebase
 #[derive(Debug)]
 pub struct HealthReport {
@@ -51,14 +56,43 @@ impl HealthReport {
         lines.push(format!("  Maximum: {}", self.max_complexity));
         lines.push(format!("  High risk (>10): {}", self.high_risk_functions));
 
-        if !self.large_files.is_empty() {
+        // Categorize files by severity
+        let massive: Vec<_> = self.large_files.iter().filter(|f| f.lines >= MASSIVE_THRESHOLD).collect();
+        let very_large: Vec<_> = self.large_files.iter()
+            .filter(|f| f.lines >= VERY_LARGE_THRESHOLD && f.lines < MASSIVE_THRESHOLD).collect();
+        let large: Vec<_> = self.large_files.iter()
+            .filter(|f| f.lines >= LARGE_THRESHOLD && f.lines < VERY_LARGE_THRESHOLD).collect();
+
+        if !massive.is_empty() {
             lines.push(String::new());
-            lines.push("## Large Files (>500 lines)".to_string());
-            for lf in self.large_files.iter().take(10) {
+            lines.push(format!("## CRITICAL: Massive Files (>{} lines) - {}", MASSIVE_THRESHOLD, massive.len()));
+            for lf in massive.iter().take(10) {
                 lines.push(format!("  {} ({} lines)", lf.path, lf.lines));
             }
-            if self.large_files.len() > 10 {
-                lines.push(format!("  ... and {} more", self.large_files.len() - 10));
+            if massive.len() > 10 {
+                lines.push(format!("  ... and {} more", massive.len() - 10));
+            }
+        }
+
+        if !very_large.is_empty() {
+            lines.push(String::new());
+            lines.push(format!("## WARNING: Very Large Files (>{} lines) - {}", VERY_LARGE_THRESHOLD, very_large.len()));
+            for lf in very_large.iter().take(5) {
+                lines.push(format!("  {} ({} lines)", lf.path, lf.lines));
+            }
+            if very_large.len() > 5 {
+                lines.push(format!("  ... and {} more", very_large.len() - 5));
+            }
+        }
+
+        if !large.is_empty() {
+            lines.push(String::new());
+            lines.push(format!("## Large Files (>{} lines) - {}", LARGE_THRESHOLD, large.len()));
+            for lf in large.iter().take(5) {
+                lines.push(format!("  {} ({} lines)", lf.path, lf.lines));
+            }
+            if large.len() > 5 {
+                lines.push(format!("  ... and {} more", large.len() - 5));
             }
         }
 
@@ -75,9 +109,10 @@ impl HealthReport {
     }
 
     fn calculate_health_score(&self) -> f64 {
-        // Simple scoring based on complexity
+        // Scoring based on complexity and file sizes
         // Lower average complexity = better
         // Lower high-risk ratio = better
+        // Fewer/smaller large files = better
 
         let complexity_score = if self.avg_complexity <= 3.0 {
             1.0
@@ -113,7 +148,25 @@ impl HealthReport {
             0.3
         };
 
-        (complexity_score + risk_score) / 2.0
+        // Large file penalty: massive files are a serious problem
+        let massive_count = self.large_files.iter().filter(|f| f.lines >= MASSIVE_THRESHOLD).count();
+        let very_large_count = self.large_files.iter()
+            .filter(|f| f.lines >= VERY_LARGE_THRESHOLD && f.lines < MASSIVE_THRESHOLD).count();
+
+        let file_size_score = if massive_count > 0 {
+            // Any massive file is a critical issue
+            0.3_f64.max(0.5 - (massive_count as f64 * 0.1))
+        } else if very_large_count > 5 {
+            0.5
+        } else if very_large_count > 0 {
+            0.7
+        } else {
+            1.0
+        };
+
+        // Weight: complexity 30%, risk 30%, file sizes 40%
+        // File sizes weighted higher because they're more actionable
+        (complexity_score * 0.3) + (risk_score * 0.3) + (file_size_score * 0.4)
     }
 
     fn grade(&self) -> &'static str {
@@ -132,8 +185,6 @@ impl HealthReport {
     }
 }
 
-/// Threshold for "large" files
-const LARGE_FILE_THRESHOLD: usize = 500;
 
 /// Check if a path is a lockfile (generated, not a code smell)
 fn is_lockfile(path: &str) -> bool {
@@ -249,7 +300,7 @@ pub fn analyze_health(root: &Path) -> HealthReport {
             if let Ok(content) = std::fs::read_to_string(&full_path) {
                 let lines = content.lines().count();
                 total_lines += lines;
-                if lines >= LARGE_FILE_THRESHOLD && !is_lockfile(&file.path) {
+                if lines >= LARGE_THRESHOLD && !is_lockfile(&file.path) {
                     large_files.push(LargeFile {
                         path: file.path,
                         lines,

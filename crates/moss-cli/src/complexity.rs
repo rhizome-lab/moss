@@ -3,7 +3,8 @@
 //! Calculates McCabe cyclomatic complexity for functions.
 //! Complexity = number of decision points + 1
 
-use moss_core::{tree_sitter, Parsers};
+use arborium::tree_sitter;
+use crate::parsers::Parsers;
 use moss_languages::{support_for_path, Language};
 use std::path::Path;
 

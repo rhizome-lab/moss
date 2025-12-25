@@ -1,5 +1,5 @@
 use ignore::WalkBuilder;
-use moss_core::get_moss_dir;
+use crate::paths::get_moss_dir;
 use moss_languages::support_for_path;
 use rayon::prelude::*;
 use rusqlite::{params, Connection};

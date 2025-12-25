@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
 use crate::external_packages::ResolvedPackage;
-use moss_core::tree_sitter::Node;
+use arborium::tree_sitter::Node;
 
 // ============================================================================
 // Java external package resolution

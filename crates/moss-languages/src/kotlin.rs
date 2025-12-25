@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
 use crate::external_packages::ResolvedPackage;
 use crate::java::{find_gradle_cache, find_maven_repository, get_java_version};
-use moss_core::tree_sitter::Node;
+use arborium::tree_sitter::Node;
 
 /// Kotlin language support.
 pub struct Kotlin;

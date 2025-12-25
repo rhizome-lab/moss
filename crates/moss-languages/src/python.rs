@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
 use crate::external_packages::ResolvedPackage;
-use moss_core::tree_sitter::Node;
+use arborium::tree_sitter::Node;
 
 // ============================================================================
 // Python path cache (filesystem-based detection, no subprocess calls)
@@ -973,7 +973,15 @@ impl Language for Python {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use moss_core::Parsers;
+    use arborium::{GrammarStore, tree_sitter::Parser};
+
+    fn parse_python(content: &str) -> arborium::tree_sitter::Tree {
+        let store = GrammarStore::new();
+        let grammar = store.get("python").unwrap();
+        let mut parser = Parser::new();
+        parser.set_language(grammar.language()).unwrap();
+        parser.parse(content, None).unwrap()
+    }
 
     #[test]
     fn test_python_function_kinds() {
@@ -985,12 +993,11 @@ mod tests {
     #[test]
     fn test_python_extract_function() {
         let support = Python;
-        let parsers = Parsers::new();
         let content = r#"def foo(x: int) -> str:
     """Convert to string."""
     return str(x)
 "#;
-        let tree = parsers.parse_with_grammar("python", content).unwrap();
+        let tree = parse_python(content);
         let root = tree.root_node();
 
         // Find function node
@@ -1009,12 +1016,11 @@ mod tests {
     #[test]
     fn test_python_extract_class() {
         let support = Python;
-        let parsers = Parsers::new();
         let content = r#"class Foo(Bar):
     """A foo class."""
     pass
 "#;
-        let tree = parsers.parse_with_grammar("python", content).unwrap();
+        let tree = parse_python(content);
         let root = tree.root_node();
 
         let mut cursor = root.walk();
@@ -1032,13 +1038,12 @@ mod tests {
     #[test]
     fn test_python_visibility() {
         let support = Python;
-        let parsers = Parsers::new();
         let content = r#"def public(): pass
 def _protected(): pass
 def __private(): pass
 def __dunder__(): pass
 "#;
-        let tree = parsers.parse_with_grammar("python", content).unwrap();
+        let tree = parse_python(content);
         let root = tree.root_node();
 
         let mut cursor = root.walk();

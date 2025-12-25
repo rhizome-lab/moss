@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use crate::{Export, Import, Symbol, SymbolKind, Visibility};
 use crate::external_packages::ResolvedPackage;
-use moss_core::tree_sitter::Node;
+use arborium::tree_sitter::Node;
 
 // ============================================================================
 // Node kind constants

@@ -382,7 +382,7 @@ pub fn supported_languages() -> Vec<&'static dyn Language> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use moss_core::arborium::GrammarStore;
+    use arborium::GrammarStore;
 
     /// Dump all valid node kinds for a grammar (useful for fixing invalid kinds).
     /// Run with: cargo test -p moss-languages dump_node_kinds -- --nocapture
@@ -554,7 +554,7 @@ pub fn validate_unused_kinds_audit(
     documented_unused: &[&str],
 ) -> Result<(), String> {
     use std::collections::HashSet;
-    use moss_core::arborium::GrammarStore;
+    use arborium::GrammarStore;
 
     let store = GrammarStore::new();
     let grammar = store.get(lang.grammar_name())

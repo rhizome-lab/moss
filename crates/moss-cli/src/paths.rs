@@ -13,9 +13,9 @@ use std::path::{Path, PathBuf};
 /// 3. Otherwise, use <root>/.moss
 ///
 /// Examples:
-/// - MOSS_INDEX_DIR="/tmp/moss-data" → /tmp/moss-data
-/// - MOSS_INDEX_DIR="myproject" → ~/.local/share/moss/myproject
-/// - (unset) → <root>/.moss
+/// - MOSS_INDEX_DIR="/tmp/moss-data" -> /tmp/moss-data
+/// - MOSS_INDEX_DIR="myproject" -> ~/.local/share/moss/myproject
+/// - (unset) -> <root>/.moss
 pub fn get_moss_dir(root: &Path) -> PathBuf {
     if let Ok(index_dir) = std::env::var("MOSS_INDEX_DIR") {
         let path = PathBuf::from(&index_dir);

@@ -44,7 +44,8 @@ walkdir.workspace = true
 ignore.workspace = true
 nucleo-matcher.workspace = true
 rusqlite.workspace = true
-moss-core.workspace = true
+arborium.workspace = true
+dirs = "5"
 moss-languages = { path = "../moss-languages", default-features = false }
 moss-packages = { path = "../moss-packages" }
 grep-matcher.workspace = true

@@ -2,7 +2,8 @@
 //!
 //! Extracts imports and exports from source files.
 
-use moss_core::{tree_sitter, Parsers};
+use arborium::tree_sitter;
+use crate::parsers::Parsers;
 use moss_languages::{support_for_grammar, support_for_path, Language, SymbolKind as LangSymbolKind};
 use moss_languages::Import as LangImport;
 use moss_languages::Export as LangExport;
