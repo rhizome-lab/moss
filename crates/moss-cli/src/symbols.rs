@@ -827,8 +827,19 @@ impl SymbolParser {
 
             let symbols = self.parse_file(&full_path, &content);
             for symbol in symbols {
-                let callees = self.find_callees(&full_path, &content, &symbol.name);
-                if callees.contains(&symbol_name.to_string()) {
+                let callees = self.find_callees_for_symbol(&full_path, &content, &symbol);
+                // Check if any callee matches, considering qualifiers
+                let is_caller = callees.iter().any(|(name, _, qualifier)| {
+                    if name != symbol_name {
+                        return false;
+                    }
+                    // Match if: no qualifier, or qualifier is self/Self
+                    match qualifier {
+                        None => true,
+                        Some(q) => q == "self" || q == "Self",
+                    }
+                });
+                if is_caller {
                     callers.push((path.clone(), symbol.name.clone()));
                 }
             }

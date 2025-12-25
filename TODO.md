@@ -4,7 +4,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Storage usage command (`moss analyze --storage` or similar)
 - Call graph bug: same-named method on different object shows as self-call
 - `moss package` subcommands: list, tree, outdated
 - view.rs internal cleanup (see CLI Surface Cleanup)
