@@ -5,8 +5,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ## Next Up
 
 - Investigate slow `moss analyze --health` (+500ms over baseline)
-- view.rs internal cleanup: consolidated but messy, needs proper unification
-- Rust crate feature lookup: avoid web search for feature lists
+- view.rs internal cleanup (see CLI Surface Cleanup)
+- Rust crate feature lookup (see Tooling)
 
 Test Status: 74 passing, 0 failing
 
@@ -18,7 +18,10 @@ See `docs/language-support.md` for design. Future languages: OCaml, Haskell, Clo
 **CLI Redundancy:** See `docs/llm-code-consistency.md`
 - [ ] Rust: OutputFormatter trait for JSON/text output
 - [ ] Python: output helpers for JSON/markdown/compact
-- [ ] Command/subcommand/flag names should be self-documenting
+
+**CLI Surface Cleanup:** CLI reduced from 29 to 8 commands (-5000+ lines). Remaining:
+- [ ] view.rs: consolidated but messy internally - problem shifted, not solved. Needs proper unification.
+- [ ] Command/subcommand/flag names should be self-documenting (no abbreviations, clear meaning)
 
 **Code Quality:**
 - Audit Rust codebase for tuple returns - replace with structs unconditionally
