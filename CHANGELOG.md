@@ -4,6 +4,38 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Server Protocols
+
+All three server protocols now implemented:
+- **moss serve mcp**: MCP server for LLM integration (stdio, `--features mcp`)
+- **moss serve http**: REST API on configurable port (axum-based)
+  - `/health`, `/files`, `/files/*path`, `/symbols`, `/symbols/:name`, `/search`
+- **moss serve lsp**: LSP server for IDE integration (tower-lsp)
+  - Document symbols (nested structure from skeleton extraction)
+  - Workspace symbol search (from index)
+  - Hover (symbol kind, signature, docstring)
+
+### Package Management
+
+New `moss package` subcommands:
+- **why**: Show reverse dependency path for a package (`moss package why tokio`)
+- **audit**: Security vulnerability scanning across ecosystems
+  - cargo (cargo-audit), npm (npm audit), python (pip-audit), go (govulncheck), gem (bundle-audit)
+  - Human-readable and `--json` output
+
+### Unified Linting
+
+New adapters added to moss-tools:
+- **mypy**: Python type checker
+- **pyright**: Python type checker (faster)
+- **eslint**: JavaScript/TypeScript linter
+- **deno-check**: TypeScript type checking via Deno
+
+Watch mode (`moss lint --watch`):
+- Monitors file changes with 500ms debounce
+- Auto-filters by relevant file extensions
+- Skips hidden files/directories
+
 ### Package Registry Queries
 
 New `moss package` command queries package registries without web search:

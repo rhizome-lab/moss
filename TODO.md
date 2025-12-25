@@ -4,14 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. More lint adapters: mypy, pyright, eslint, deno check (follow existing pattern)
-2. `moss package why <dep>` - show why a dependency is in the tree
-3. view.rs: depth 2+ on directories should show symbols inside files
-4. view.rs: symbol JSON output should use ViewNode format
-5. Watch mode: run relevant linters on file changes
-6. `moss package audit` - vuln/license checking
-7. `moss serve http` - REST API
-8. `moss serve lsp` - LSP server
+1. Integration: wire linters into `moss analyze` as unified check runner
+2. OutputFormatter trait for consistent JSON/text output
+3. VS Code extension: test and publish to marketplace
+4. `moss analyze --hotspots` - git history analysis
 
 Test Status: 107 passing, 0 failing (moss-languages)
 
@@ -38,8 +34,8 @@ Core (port to Rust):
 Servers (port to Rust):
 - [x] `moss serve {mcp,http,lsp}` - command structure added
 - [x] `moss serve mcp` - working with rmcp 0.12 (`--features mcp`)
-- [ ] `moss serve http` - REST API (consider exposing commands as library first)
-- [ ] `moss serve lsp` - LSP server
+- [x] `moss serve http` - REST API with axum (health, files, symbols, search)
+- [x] `moss serve lsp` - LSP server with tower-lsp (symbols, hover)
 
 TUI (evaluate):
 - [x] `cmd_tui` / `cmd_explore` / `cmd_shell` - deleted (Textual too expensive to port, HTTP API + web UI preferred)
@@ -66,8 +62,8 @@ Delete (broken - used non-existent moss meta-package):
 
 Consider porting to Rust:
 - [ ] `cmd_check_refs` - bidirectional code/doc reference checking (could be `moss analyze --check-refs`)
-- [ ] `cmd_external_deps` - dependency analysis with vuln/license checking (could be `moss package audit`)
-- [ ] `moss package why <dep>` - show why a dependency is in the tree (like `npm why`)
+- [x] `moss package audit` - dependency analysis with vuln checking
+- [x] `moss package why <dep>` - show why a dependency is in the tree (like `npm why`)
 - [ ] `cmd_git_hotspots` - git history analysis (could be `moss analyze --hotspots`)
 
 Consolidate to subcommands:
@@ -137,6 +133,7 @@ See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to 
 
 **CLI Surface Cleanup:**
 - [x] view.rs: unified ViewNode abstraction for directories, files, and symbols
+- [x] view.rs: depth 2+ shows symbols inside files, JSON uses ViewNode format
 - [ ] Command/subcommand/flag names should be self-documenting
 - [ ] OutputFormatter trait for consistent JSON/text output
 
@@ -167,13 +164,12 @@ Current scaffold is TOML state machines. Needs design work:
 
 **Unified Linting Infrastructure (moss-tools):**
 - [x] Core: Tool trait, ToolRegistry, SARIF 2.1.0 output
-- [x] Adapters: ruff, oxlint, oxfmt, biome, prettier, tsc, tsgo, clippy, rustfmt, gofmt, go-vet
+- [x] Adapters: ruff, oxlint, oxfmt, biome, prettier, tsc, tsgo, clippy, rustfmt, gofmt, go-vet, mypy, pyright, eslint, deno-check
 - [x] CLI: `moss lint` with auto-detection, --fix, --sarif, --category filter
 - [x] Custom tools: .moss/tools.toml config, SARIF/JSON consumption
 - [x] Package manager cascade: pnpm exec, npx, pnpm dlx, global (JS); uv run, pipx run, global (Python)
-- [ ] More adapters: mypy, pyright, eslint, deno check, clangd, pylint
+- [x] Watch mode: run relevant linters on file changes with debounce
 - [ ] Integration: wire into `moss analyze` as unified check runner
-- [ ] Watch mode: run relevant linters on file changes
 
 **VS Code Extension (editors/vscode/):**
 - [x] Update extension to use Rust CLI instead of Python
