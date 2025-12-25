@@ -12,7 +12,7 @@ pub enum IndexAction {
     /// Rebuild the file index
     Rebuild {
         /// Also rebuild the call graph (slower, parses all files)
-        #[arg(short, long)]
+        #[arg(short, long = "call-graph")]
         call_graph: bool,
     },
 

@@ -19,8 +19,8 @@ pub fn cmd_analyze(
     compact: bool,
     threshold: Option<usize>,
     kind_filter: Option<&str>,
-    calls: bool,
-    called_by: bool,
+    callees: bool,
+    callers: bool,
     lint: bool,
     hotspots: bool,
     json: bool,
@@ -39,16 +39,16 @@ pub fn cmd_analyze(
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    // --calls or --called-by: show call graph info
-    if calls || called_by {
+    // --callees or --callers: show call graph info
+    if callees || callers {
         let target = match target {
             Some(t) => t,
             None => {
-                eprintln!("--calls and --called-by require a target symbol");
+                eprintln!("--callees and --callers require a target symbol");
                 return 1;
             }
         };
-        return cmd_call_graph(&root, target, called_by, calls, json);
+        return cmd_call_graph(&root, target, callers, callees, json);
     }
 
     // --lint runs linter analysis

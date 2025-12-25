@@ -63,7 +63,7 @@ pub fn cmd_view(
     raw: bool,
     focus: Option<&str>,
     resolve_imports: bool,
-    show_all: bool,
+    include_private: bool,
     full: bool,
     json: bool,
 ) -> i32 {
@@ -174,7 +174,7 @@ pub fn cmd_view(
             types_only,
             focus,
             resolve_imports,
-            show_all,
+            include_private,
             json,
         )
     } else {
@@ -380,7 +380,7 @@ fn cmd_view_file(
     types_only: bool,
     focus: Option<&str>,
     resolve_imports: bool,
-    show_all: bool,
+    include_private: bool,
     json: bool,
 ) -> i32 {
     let full_path = root.join(file_path);
@@ -419,7 +419,7 @@ fn cmd_view_file(
     }
 
     // Skeleton view
-    let extractor = if show_all {
+    let extractor = if include_private {
         skeleton::SkeletonExtractor::with_all()
     } else {
         skeleton::SkeletonExtractor::new()

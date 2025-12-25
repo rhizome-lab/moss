@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Command/subcommand/flag names should be self-documenting
+(empty - pick from backlog)
 
 Test Status: 110 passing, 0 failing (moss-languages)
 
@@ -132,7 +132,7 @@ See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to 
 - [x] view.rs: unified ViewNode abstraction for directories, files, and symbols
 - [x] view.rs: depth 2+ shows symbols inside files, JSON uses ViewNode format
 - [x] OutputFormatter trait for consistent JSON/text output
-- [ ] Command/subcommand/flag names should be self-documenting
+- [x] Command/subcommand/flag names are self-documenting (kebab-case, clear naming)
 
 **Workflow Engine Design:**
 Current scaffold is TOML state machines. Needs design work:

@@ -31,6 +31,14 @@ Unified output formatting infrastructure (`output.rs`):
 - Helper functions: `print_json`, `print_json_pretty`, `print_formatted`
 - Implemented for `GrepResult` as reference pattern
 
+### CLI Naming Cleanup
+
+Self-documenting flag and subcommand names:
+- **Kebab-case flags**: `--types-only`, `--call-graph` (previously snake_case)
+- **Symmetric call graph**: `--callees` and `--callers` (previously `--calls` and `--called-by`)
+- **Clearer visibility**: `--include-private` in view (previously `--all`)
+- **Lint subcommands**: `moss lint list` (previously `--list` flag), `moss lint run --watch`
+
 ### Server Protocols
 
 All three server protocols now implemented:

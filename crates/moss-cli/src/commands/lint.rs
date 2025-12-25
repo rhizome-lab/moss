@@ -7,28 +7,18 @@ use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 
 /// Run linting tools on the codebase.
-pub fn cmd_lint(
+pub fn cmd_lint_run(
     target: Option<&str>,
     root: Option<&Path>,
     fix: bool,
     tools: Option<&str>,
     category: Option<&str>,
-    list: bool,
     sarif: bool,
-    watch: bool,
     json: bool,
 ) -> i32 {
-    if watch {
-        return cmd_lint_watch(target, root, fix, tools, category, json);
-    }
     let root = root.unwrap_or_else(|| Path::new("."));
     // Load built-in tools + custom tools from .moss/tools.toml
     let registry = registry_with_custom(root);
-
-    // List available tools
-    if list {
-        return cmd_list_tools(&registry, json);
-    }
 
     // Parse category filter
     let category_filter: Option<ToolCategory> = category.and_then(|c| match c {
@@ -69,7 +59,7 @@ pub fn cmd_lint(
             println!("{{\"tools\": [], \"diagnostics\": []}}");
         } else {
             eprintln!("No relevant tools found for this project.");
-            eprintln!("Use --list to see available tools.");
+            eprintln!("Use 'moss lint list' to see available tools.");
         }
         return 0;
     }
@@ -205,7 +195,10 @@ pub fn cmd_lint(
     }
 }
 
-fn cmd_list_tools(registry: &ToolRegistry, json: bool) -> i32 {
+/// List available linting tools.
+pub fn cmd_lint_list(root: Option<&Path>, json: bool) -> i32 {
+    let root = root.unwrap_or_else(|| Path::new("."));
+    let registry = registry_with_custom(root);
     let tools: Vec<_> = registry
         .tools()
         .iter()
@@ -260,7 +253,7 @@ fn cmd_list_tools(registry: &ToolRegistry, json: bool) -> i32 {
 }
 
 /// Watch mode for linters - re-run on file changes.
-fn cmd_lint_watch(
+pub fn cmd_lint_watch(
     target: Option<&str>,
     root: Option<&Path>,
     fix: bool,

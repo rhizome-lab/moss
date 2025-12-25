@@ -64,7 +64,7 @@ enum Commands {
 
         /// Show only type definitions (class, struct, enum, interface, type alias)
         /// Filters out functions/methods for architectural overview
-        #[arg(long)]
+        #[arg(long = "types-only")]
         types_only: bool,
 
         /// Disable smart display (no collapsing single-child dirs)
@@ -83,8 +83,8 @@ enum Commands {
         resolve_imports: bool,
 
         /// Show all symbols including private ones (normally filtered by convention)
-        #[arg(long)]
-        all: bool,
+        #[arg(long = "include-private")]
+        include_private: bool,
 
         /// Show full source code (for symbols: complete implementation, for files: raw content)
         #[arg(long)]
@@ -233,13 +233,13 @@ enum Commands {
         #[arg(long)]
         kind: Option<String>,
 
-        /// Show what functions the target calls (callees)
+        /// Show what functions the target calls
         #[arg(long)]
-        calls: bool,
+        callees: bool,
 
-        /// Show what functions call the target (callers)
+        /// Show what functions call the target
         #[arg(long)]
-        called_by: bool,
+        callers: bool,
 
         /// Run linters and include results in analysis
         #[arg(long)]
@@ -324,12 +324,31 @@ enum Commands {
 
     /// Run linters, formatters, and type checkers
     Lint {
-        /// Target path to check (defaults to current directory)
-        target: Option<String>,
+        #[command(subcommand)]
+        action: Option<LintAction>,
 
         /// Root directory (defaults to current directory)
-        #[arg(short, long)]
+        #[arg(short, long, global = true)]
         root: Option<PathBuf>,
+    },
+
+    /// Start a moss server (MCP, HTTP, LSP)
+    Serve {
+        #[command(subcommand)]
+        protocol: ServeProtocol,
+
+        /// Root directory (defaults to current directory)
+        #[arg(short, long, global = true)]
+        root: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum LintAction {
+    /// Run linters on target (default when no subcommand given)
+    Run {
+        /// Target path to check (defaults to current directory)
+        target: Option<String>,
 
         /// Fix issues automatically where possible
         #[arg(short, long)]
@@ -343,10 +362,6 @@ enum Commands {
         #[arg(short, long)]
         category: Option<String>,
 
-        /// List available tools
-        #[arg(short, long)]
-        list: bool,
-
         /// Output in SARIF format
         #[arg(long)]
         sarif: bool,
@@ -356,15 +371,8 @@ enum Commands {
         watch: bool,
     },
 
-    /// Start a moss server (MCP, HTTP, LSP)
-    Serve {
-        #[command(subcommand)]
-        protocol: ServeProtocol,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long, global = true)]
-        root: Option<PathBuf>,
-    },
+    /// List available linting tools
+    List,
 }
 
 #[derive(Subcommand)]
@@ -410,7 +418,7 @@ fn main() {
             raw,
             focus,
             resolve_imports,
-            all,
+            include_private,
             full,
         } => commands::view::cmd_view(
             target.as_deref(),
@@ -423,7 +431,7 @@ fn main() {
             raw,
             focus.as_deref(),
             resolve_imports,
-            all,
+            include_private,
             full,
             cli.json,
         ),
@@ -485,8 +493,8 @@ fn main() {
             compact,
             threshold,
             kind,
-            calls,
-            called_by,
+            callees,
+            callers,
             lint,
             hotspots,
         } => commands::analyze::cmd_analyze(
@@ -500,8 +508,8 @@ fn main() {
             compact,
             threshold,
             kind.as_deref(),
-            calls,
-            called_by,
+            callees,
+            callers,
             lint,
             hotspots,
             cli.json,
@@ -551,26 +559,48 @@ fn main() {
         Commands::Workflow { action, root } => {
             commands::workflow::cmd_workflow(action, root.as_deref(), cli.json)
         }
-        Commands::Lint {
-            target,
-            root,
-            fix,
-            tools,
-            category,
-            list,
-            sarif,
-            watch,
-        } => commands::lint::cmd_lint(
-            target.as_deref(),
-            root.as_deref(),
-            fix,
-            tools.as_deref(),
-            category.as_deref(),
-            list,
-            sarif,
-            watch,
-            cli.json,
-        ),
+        Commands::Lint { action, root } => {
+            let action = action.unwrap_or(LintAction::Run {
+                target: None,
+                fix: false,
+                tools: None,
+                category: None,
+                sarif: false,
+                watch: false,
+            });
+            match action {
+                LintAction::Run {
+                    target,
+                    fix,
+                    tools,
+                    category,
+                    sarif,
+                    watch,
+                } => {
+                    if watch {
+                        commands::lint::cmd_lint_watch(
+                            target.as_deref(),
+                            root.as_deref(),
+                            fix,
+                            tools.as_deref(),
+                            category.as_deref(),
+                            cli.json,
+                        )
+                    } else {
+                        commands::lint::cmd_lint_run(
+                            target.as_deref(),
+                            root.as_deref(),
+                            fix,
+                            tools.as_deref(),
+                            category.as_deref(),
+                            sarif,
+                            cli.json,
+                        )
+                    }
+                }
+                LintAction::List => commands::lint::cmd_lint_list(root.as_deref(), cli.json),
+            }
+        }
         Commands::Serve { protocol, root } => match protocol {
             ServeProtocol::Mcp => serve::mcp::cmd_serve_mcp(root.as_deref(), cli.json),
             ServeProtocol::Http { port } => {
