@@ -246,8 +246,7 @@ impl FileIndex {
     }
 
     /// Fast heuristic check: are there likely any changes?
-    /// Checks index emptiness and key directory mtimes vs last_indexed timestamp.
-    /// False negatives are OK (we'll catch changes on next full walk).
+    /// Checks index emptiness, staleness, and key directory mtimes.
     fn likely_has_changes(&self) -> bool {
         // Check if index is empty
         let file_count: i64 = self
@@ -272,8 +271,17 @@ impl FileIndex {
             return true;
         }
 
-        // Check mtimes of common source directories
-        for dir in &["src", "lib", "crates", "packages", "apps"] {
+        // Force full walk if stale (>60s) to catch changes in unchecked directories
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        if now - last_indexed > 60 {
+            return true;
+        }
+
+        // Check mtimes of common source directories for fast detection
+        for dir in &["src", "lib", "crates", "packages", "apps", "test", "tests"] {
             let path = self.root.join(dir);
             if path.exists() {
                 if let Ok(meta) = path.metadata() {
