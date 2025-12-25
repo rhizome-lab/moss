@@ -2,4 +2,5 @@
 //!
 //! Servers expose moss functionality over various protocols.
 
+pub mod http;
 pub mod mcp;

@@ -560,8 +560,9 @@ fn main() {
         Commands::Serve { protocol, root } => match protocol {
             ServeProtocol::Mcp => serve::mcp::cmd_serve_mcp(root.as_deref(), cli.json),
             ServeProtocol::Http { port } => {
-                eprintln!("HTTP server not yet implemented (port {})", port);
-                1
+                let root = root.unwrap_or_else(|| std::path::PathBuf::from("."));
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(serve::http::run_http_server(&root, port))
             }
             ServeProtocol::Lsp => {
                 eprintln!("LSP server not yet implemented");

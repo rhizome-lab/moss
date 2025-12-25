@@ -60,6 +60,7 @@ grep-regex.workspace = true
 grep-searcher.workspace = true
 rayon.workspace = true
 tokio.workspace = true
+axum.workspace = true
 notify.workspace = true
 ureq = { version = "2", features = ["json"] }
 flate2 = "1"
