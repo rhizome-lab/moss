@@ -4,6 +4,16 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Symbol Extraction Consolidation
+
+Unified extraction layer in `extract.rs`:
+- Both `skeleton.rs` and `symbols.rs` now use shared `Extractor` class
+- Eliminates ~250 lines of duplicate tree-walking code
+- `compute_complexity` moved to shared module
+- Each consumer still processes output differently:
+  - skeleton: nested children, signatures, docstrings (for viewing)
+  - symbols: flat with parent refs, complexity (for indexing)
+
 ### View Command Improvements
 
 Unified ViewNode abstraction for consistent output:
