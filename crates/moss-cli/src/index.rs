@@ -20,7 +20,7 @@ struct ParsedFileData {
 }
 
 // Not yet public - just delete .moss/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 4;
+const SCHEMA_VERSION: i64 = 5;
 
 /// Supported source file extensions for call graph indexing
 const SOURCE_EXTENSIONS: &[&str] = &[
@@ -48,6 +48,7 @@ pub struct IndexedFile {
     pub path: String,
     pub is_dir: bool,
     pub mtime: i64,
+    pub lines: usize,
 }
 
 /// Result from symbol search
@@ -146,7 +147,8 @@ impl FileIndex {
             CREATE TABLE IF NOT EXISTS files (
                 path TEXT PRIMARY KEY,
                 is_dir INTEGER NOT NULL,
-                mtime INTEGER NOT NULL
+                mtime INTEGER NOT NULL,
+                lines INTEGER NOT NULL DEFAULT 0
             );
             CREATE INDEX IF NOT EXISTS idx_files_name ON files(path);
 
@@ -241,54 +243,6 @@ impl FileIndex {
     /// Get a reference to the underlying SQLite connection for direct queries
     pub fn connection(&self) -> &Connection {
         &self.conn
-    }
-
-    /// Check if index needs refresh based on .moss directory mtime
-    pub fn needs_refresh(&self) -> bool {
-        // Check if index is empty
-        let file_count: i64 = self
-            .conn
-            .query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))
-            .unwrap_or(0);
-        if file_count == 0 {
-            return true;
-        }
-
-        let last_indexed: i64 = self
-            .conn
-            .query_row(
-                "SELECT CAST(value AS INTEGER) FROM meta WHERE key = 'last_indexed'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap_or(0);
-
-        // If never indexed, refresh
-        if last_indexed == 0 {
-            return true;
-        }
-
-        // Check if any common directories have changed
-        // This is a heuristic - check src/, lib/, etc.
-        // Note: "." changes too often, skip it
-        for dir in &["src", "lib", "crates"] {
-            let path = self.root.join(dir);
-            if path.exists() {
-                if let Ok(meta) = path.metadata() {
-                    if let Ok(mtime) = meta.modified() {
-                        let mtime_secs = mtime
-                            .duration_since(UNIX_EPOCH)
-                            .map(|d| d.as_secs() as i64)
-                            .unwrap_or(0);
-                        if mtime_secs > last_indexed {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-
-        false
     }
 
     /// Get files that have changed since last index
@@ -387,10 +341,22 @@ impl FileIndex {
                 .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                 .map(|d| d.as_secs() as i64)
                 .unwrap_or(0);
+            // Count lines for text files under 1MB (skip binary/large files)
+            let lines = if is_dir {
+                0
+            } else {
+                full_path
+                    .metadata()
+                    .ok()
+                    .filter(|m| m.len() < 1_000_000)
+                    .and_then(|_| std::fs::read_to_string(&full_path).ok())
+                    .map(|s| s.lines().count())
+                    .unwrap_or(0)
+            };
 
             tx.execute(
-                "INSERT OR REPLACE INTO files (path, is_dir, mtime) VALUES (?1, ?2, ?3)",
-                params![path, is_dir as i64, mtime],
+                "INSERT OR REPLACE INTO files (path, is_dir, mtime, lines) VALUES (?1, ?2, ?3, ?4)",
+                params![path, is_dir as i64, mtime, lines as i64],
             )?;
         }
 
@@ -439,10 +405,21 @@ impl FileIndex {
                     .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                     .map(|d| d.as_secs() as i64)
                     .unwrap_or(0);
+                // Count lines for text files under 1MB (skip binary/large files)
+                let lines = if is_dir {
+                    0
+                } else {
+                    path.metadata()
+                        .ok()
+                        .filter(|m| m.len() < 1_000_000)
+                        .and_then(|_| std::fs::read_to_string(path).ok())
+                        .map(|s| s.lines().count())
+                        .unwrap_or(0)
+                };
 
                 tx.execute(
-                    "INSERT INTO files (path, is_dir, mtime) VALUES (?1, ?2, ?3)",
-                    params![rel_str, is_dir as i64, mtime],
+                    "INSERT INTO files (path, is_dir, mtime, lines) VALUES (?1, ?2, ?3, ?4)",
+                    params![rel_str, is_dir as i64, mtime, lines as i64],
                 )?;
                 count += 1;
             }
@@ -464,13 +441,16 @@ impl FileIndex {
 
     /// Get all files from the index
     pub fn all_files(&self) -> rusqlite::Result<Vec<IndexedFile>> {
-        let mut stmt = self.conn.prepare("SELECT path, is_dir, mtime FROM files")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT path, is_dir, mtime, lines FROM files")?;
         let files = stmt
             .query_map([], |row| {
                 Ok(IndexedFile {
                     path: row.get(0)?,
                     is_dir: row.get::<_, i64>(1)? != 0,
                     mtime: row.get(2)?,
+                    lines: row.get::<_, i64>(3)? as usize,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -480,15 +460,16 @@ impl FileIndex {
     /// Search files by exact name match
     pub fn find_by_name(&self, name: &str) -> rusqlite::Result<Vec<IndexedFile>> {
         let pattern = format!("%/{}", name);
-        let mut stmt = self
-            .conn
-            .prepare("SELECT path, is_dir, mtime FROM files WHERE path LIKE ?1 OR path = ?2")?;
+        let mut stmt = self.conn.prepare(
+            "SELECT path, is_dir, mtime, lines FROM files WHERE path LIKE ?1 OR path = ?2",
+        )?;
         let files = stmt
             .query_map(params![pattern, name], |row| {
                 Ok(IndexedFile {
                     path: row.get(0)?,
                     is_dir: row.get::<_, i64>(1)? != 0,
                     mtime: row.get(2)?,
+                    lines: row.get::<_, i64>(3)? as usize,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -500,13 +481,14 @@ impl FileIndex {
         let pattern = format!("%/{}%", stem);
         let mut stmt = self
             .conn
-            .prepare("SELECT path, is_dir, mtime FROM files WHERE path LIKE ?1")?;
+            .prepare("SELECT path, is_dir, mtime, lines FROM files WHERE path LIKE ?1")?;
         let files = stmt
             .query_map(params![pattern], |row| {
                 Ok(IndexedFile {
                     path: row.get(0)?,
                     is_dir: row.get::<_, i64>(1)? != 0,
                     mtime: row.get(2)?,
+                    lines: row.get::<_, i64>(3)? as usize,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -1173,7 +1155,8 @@ impl FileIndex {
     pub fn find_like(&self, query: &str) -> rusqlite::Result<Vec<IndexedFile>> {
         // Handle extension patterns (e.g., ".rs", ".py")
         if query.starts_with('.') && !query.contains('/') {
-            let sql = "SELECT path, is_dir, mtime FROM files WHERE LOWER(path) LIKE ?1 LIMIT 1000";
+            let sql =
+                "SELECT path, is_dir, mtime, lines FROM files WHERE LOWER(path) LIKE ?1 LIMIT 1000";
             let pattern = format!("%{}", query.to_lowercase());
             let mut stmt = self.conn.prepare(sql)?;
             let files = stmt
@@ -1182,6 +1165,7 @@ impl FileIndex {
                         path: row.get(0)?,
                         is_dir: row.get::<_, i64>(1)? != 0,
                         mtime: row.get(2)?,
+                        lines: row.get::<_, i64>(3)? as usize,
                     })
                 })?
                 .filter_map(|r| r.ok())
@@ -1204,7 +1188,7 @@ impl FileIndex {
             .map(|i| format!("LOWER(path) LIKE ?{}", i + 1))
             .collect();
         let sql = format!(
-            "SELECT path, is_dir, mtime FROM files WHERE {} LIMIT 50",
+            "SELECT path, is_dir, mtime, lines FROM files WHERE {} LIMIT 50",
             conditions.join(" AND ")
         );
 
@@ -1223,6 +1207,7 @@ impl FileIndex {
                     path: row.get(0)?,
                     is_dir: row.get::<_, i64>(1)? != 0,
                     mtime: row.get(2)?,
+                    lines: row.get::<_, i64>(3)? as usize,
                 })
             })?
             .filter_map(|r| r.ok())

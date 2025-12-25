@@ -176,28 +176,27 @@ pub fn has_config_file(root: &Path, names: &[&str]) -> bool {
     names.iter().any(|name| root.join(name).exists())
 }
 
-/// Find a JS ecosystem tool via package managers.
+/// Find a JS ecosystem tool (local installs only, no remote downloads).
 ///
 /// Tries in order:
-/// 1. pnpm exec (local install via pnpm)
-/// 2. npx (npm/yarn local or remote)
-/// 3. pnpm dlx (remote, like npx for pnpm)
-/// 4. global install
-///
-/// Arguments:
-/// - `bin_name`: The binary name (e.g., "biome", "oxlint")
-/// - `pkg_name`: The npm package name if different (e.g., "@biomejs/biome"), or None to use bin_name
+/// 1. node_modules/.bin/ (local install)
+/// 2. pnpm exec (local install via pnpm)
+/// 3. global install
 ///
 /// Returns (command, base_args) or None if not found.
 pub fn find_js_tool(
     bin_name: &str,
-    pkg_name: Option<&str>,
+    _pkg_name: Option<&str>,
 ) -> Option<(&'static str, Vec<&'static str>)> {
     use std::process::Command;
 
-    let pkg = pkg_name.unwrap_or(bin_name);
+    // Check node_modules/.bin/ first (no process spawn needed)
+    let local_bin = std::path::Path::new("node_modules/.bin").join(bin_name);
+    if local_bin.exists() {
+        return Some((leak_str(&local_bin.to_string_lossy()), vec![]));
+    }
 
-    // pnpm exec (local install)
+    // pnpm exec (local install only, not remote)
     if Command::new("pnpm")
         .args(["exec", bin_name, "--version"])
         .output()
@@ -205,26 +204,6 @@ pub fn find_js_tool(
         .unwrap_or(false)
     {
         return Some(("pnpm", vec!["exec", leak_str(bin_name)]));
-    }
-
-    // npx (npm/yarn local or remote)
-    if Command::new("npx")
-        .args([pkg, "--version"])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-    {
-        return Some(("npx", vec![leak_str(pkg)]));
-    }
-
-    // pnpm dlx (remote, like npx)
-    if Command::new("pnpm")
-        .args(["dlx", pkg, "--version"])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-    {
-        return Some(("pnpm", vec!["dlx", leak_str(pkg)]));
     }
 
     // Global install
@@ -246,18 +225,24 @@ fn leak_str(s: &str) -> &'static str {
     Box::leak(s.to_string().into_boxed_str())
 }
 
-/// Find a Python ecosystem tool via package managers.
+/// Find a Python ecosystem tool (local installs only, no remote downloads).
 ///
 /// Tries in order:
-/// 1. uv run (if in a uv project)
-/// 2. pipx run (isolated execution)
+/// 1. .venv/bin/ (local virtualenv)
+/// 2. uv run (if in a uv project with local deps)
 /// 3. global install
 ///
 /// Returns (command, base_args) or None if not found.
 pub fn find_python_tool(tool: &str) -> Option<(&'static str, Vec<&'static str>)> {
     use std::process::Command;
 
-    // uv run (uv project)
+    // Check .venv/bin/ first (no process spawn needed)
+    let local_bin = std::path::Path::new(".venv/bin").join(tool);
+    if local_bin.exists() {
+        return Some((leak_str(&local_bin.to_string_lossy()), vec![]));
+    }
+
+    // uv run (uv project - uses local deps from pyproject.toml)
     if Command::new("uv")
         .args(["run", tool, "--version"])
         .output()
@@ -265,16 +250,6 @@ pub fn find_python_tool(tool: &str) -> Option<(&'static str, Vec<&'static str>)>
         .unwrap_or(false)
     {
         return Some(("uv", vec!["run", leak_str(tool)]));
-    }
-
-    // pipx run (isolated)
-    if Command::new("pipx")
-        .args(["run", tool, "--version"])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-    {
-        return Some(("pipx", vec!["run", leak_str(tool)]));
     }
 
     // Global install

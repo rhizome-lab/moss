@@ -57,15 +57,20 @@ mod implementation {
         ) -> Result<CallToolResult, McpError> {
             let root = self.root.clone();
             let command = req.command;
-            let (output, exit_code) =
-                tokio::task::spawn_blocking(move || execute_moss_command(&command, &root))
-                    .await
-                    .unwrap_or_else(|e| (format!("Task panicked: {}", e), 1));
+            let result = tokio::task::spawn_blocking(move || execute_moss_command(&command, &root))
+                .await
+                .unwrap_or_else(|e| CommandResult {
+                    output: format!("Task panicked: {}", e),
+                    exit_code: 1,
+                });
 
-            let content = if exit_code == 0 {
-                Content::text(&output)
+            let content = if result.exit_code == 0 {
+                Content::text(&result.output)
             } else {
-                Content::text(&format!("Error (exit {}): {}", exit_code, output))
+                Content::text(&format!(
+                    "Error (exit {}): {}",
+                    result.exit_code, result.output
+                ))
             };
 
             Ok(CallToolResult::success(vec![content]))
@@ -85,18 +90,30 @@ mod implementation {
         }
     }
 
+    /// Result of executing a moss CLI command.
+    struct CommandResult {
+        output: String,
+        exit_code: i32,
+    }
+
     /// Execute a moss CLI command.
-    fn execute_moss_command(command: &str, root: &str) -> (String, i32) {
+    fn execute_moss_command(command: &str, root: &str) -> CommandResult {
         let current_exe = match std::env::current_exe() {
             Ok(exe) => exe,
             Err(e) => {
-                return (format!("Failed to get current executable: {}", e), 1);
+                return CommandResult {
+                    output: format!("Failed to get current executable: {}", e),
+                    exit_code: 1,
+                };
             }
         };
 
         let args: Vec<&str> = command.split_whitespace().collect();
         if args.is_empty() {
-            return ("Empty command".to_string(), 1);
+            return CommandResult {
+                output: "Empty command".to_string(),
+                exit_code: 1,
+            };
         }
 
         let output = match Command::new(&current_exe)
@@ -106,7 +123,10 @@ mod implementation {
         {
             Ok(out) => out,
             Err(e) => {
-                return (format!("Failed to execute command: {}", e), 1);
+                return CommandResult {
+                    output: format!("Failed to execute command: {}", e),
+                    exit_code: 1,
+                };
             }
         };
 
@@ -115,11 +135,20 @@ mod implementation {
         let exit_code = output.status.code().unwrap_or(1);
 
         if exit_code == 0 {
-            (stdout, 0)
+            CommandResult {
+                output: stdout,
+                exit_code: 0,
+            }
         } else if stderr.is_empty() {
-            (stdout, exit_code)
+            CommandResult {
+                output: stdout,
+                exit_code,
+            }
         } else {
-            (format!("{}\nError: {}", stdout, stderr), exit_code)
+            CommandResult {
+                output: format!("{}\nError: {}", stdout, stderr),
+                exit_code,
+            }
         }
     }
 

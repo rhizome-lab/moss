@@ -56,16 +56,18 @@ impl ToolRegistry {
     /// Detect which tools are relevant for a project.
     ///
     /// Returns tools sorted by relevance (highest first).
+    /// Note: Only checks availability for tools with positive detection scores
+    /// (avoids spawning processes for irrelevant tools).
     pub fn detect(&self, root: &Path) -> Vec<(&dyn Tool, f32)> {
         let mut relevant: Vec<_> = self
             .tools
             .iter()
-            .filter(|t| t.is_available())
             .map(|t| {
                 let score = t.detect(root);
                 (t.as_ref(), score)
             })
             .filter(|(_, score)| *score > 0.0)
+            .filter(|(t, _)| t.is_available())
             .collect();
 
         relevant.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));

@@ -142,13 +142,14 @@ Current scaffold is TOML state machines. Needs design work:
 - Unify or separate: scripted workflows vs interactive agent loops
 
 **Code Quality:**
-- Audit Rust codebase for tuple returns - replace with structs unconditionally
-  - Already fixed: `find_symbols` → `SymbolMatch`, `call_graph_stats` → `CallGraphStats`, `get_changed_files` → `ChangedFiles`
-  - Also fixed: `IndexedCounts`, `CollapsedChain`, `ParsedPackage`, `ExtractedDeps`
+- [x] Audit Rust codebase for tuple returns - replace with structs unconditionally
+  - `find_symbols` → `SymbolMatch`, `call_graph_stats` → `CallGraphStats`, `get_changed_files` → `ChangedFiles`
+  - `IndexedCounts`, `CollapsedChain`, `ParsedPackage`, `ExtractedDeps`
+  - `execute_moss_command` → `CommandResult`, `extract_word_with_range` → `WordAtPosition`
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss-cli: many ad-hoc queries could use shared prepared statements or query builders
-- Cache line counts in index: `analyze --health` still reads all files for line counting, could store in files table
+- [x] Cache line counts in index: files table has `lines` column, used by `analyze --health`
 - [x] Consolidate skeleton.rs and symbols.rs: shared extract.rs with Extractor class
 
 **Integration:**
@@ -165,9 +166,10 @@ Current scaffold is TOML state machines. Needs design work:
 - [x] Adapters: ruff, oxlint, oxfmt, biome, prettier, tsc, tsgo, clippy, rustfmt, gofmt, go-vet, mypy, pyright, eslint, deno-check
 - [x] CLI: `moss lint` with auto-detection, --fix, --sarif, --category filter
 - [x] Custom tools: .moss/tools.toml config, SARIF/JSON consumption
-- [x] Package manager cascade: pnpm exec, npx, pnpm dlx, global (JS); uv run, pipx run, global (Python)
+- [x] Package manager cascade: node_modules/.bin, pnpm exec, global (JS); .venv/bin, uv run, global (Python)
 - [x] Watch mode: run relevant linters on file changes with debounce
 - [x] Integration: `moss analyze --lint` runs all detected linters
+- [ ] `lint list` still ~0.5s due to version checks; could cache or parallelize
 
 **VS Code Extension (editors/vscode/):**
 - [x] Update extension to use Rust CLI instead of Python

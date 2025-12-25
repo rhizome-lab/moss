@@ -199,16 +199,21 @@ pub fn cmd_lint_run(
 pub fn cmd_lint_list(root: Option<&Path>, json: bool) -> i32 {
     let root = root.unwrap_or_else(|| Path::new("."));
     let registry = registry_with_custom(root);
-    let tools: Vec<_> = registry
-        .tools()
+
+    // Only check tools relevant to this codebase (detected via config files, lockfiles, etc.)
+    // Use version() to infer availability - avoids duplicate process spawns
+    let detected = registry.detect(root);
+    let tools: Vec<_> = detected
         .iter()
-        .map(|t| {
+        .map(|(t, _)| {
             let info = t.info();
+            let version = t.version();
+            let available = version.is_some();
             (
                 info.name,
                 info.category.as_str(),
-                t.is_available(),
-                t.version(),
+                available,
+                version,
                 info.extensions.join(", "),
                 info.website,
             )
@@ -233,16 +238,11 @@ pub fn cmd_lint_list(root: Option<&Path>, json: bool) -> i32 {
             .collect();
         println!("{}", serde_json::to_string_pretty(&output).unwrap());
     } else {
-        println!("Available tools:\n");
+        println!("Detected tools:\n");
         for (name, category, available, version, extensions, website) in tools {
-            let status = if available {
-                version.unwrap_or_else(|| "installed".to_string())
-            } else {
-                "not installed".to_string()
-            };
-
-            println!("  {} ({})", name, category);
-            println!("    Status: {}", status);
+            let status = if available { "✓" } else { "✗" };
+            let ver = version.as_deref().unwrap_or("not installed");
+            println!("  {} {} ({}) - {}", status, name, category, ver);
             println!("    Extensions: {}", extensions);
             println!("    Website: {}", website);
             println!();

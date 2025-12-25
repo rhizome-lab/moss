@@ -277,9 +277,7 @@ pub fn resolve(query: &str, root: &Path) -> Vec<PathMatch> {
     // Handle extension patterns (e.g., ".rs", ".py") - return all matches directly
     if query.starts_with('.') && !query.contains('/') {
         if let Ok(mut index) = FileIndex::open(root) {
-            if index.needs_refresh() {
-                let _ = index.refresh();
-            }
+            let _ = index.incremental_refresh();
             if let Ok(files) = index.find_like(query) {
                 return files
                     .into_iter()
@@ -302,9 +300,7 @@ pub fn resolve(query: &str, root: &Path) -> Vec<PathMatch> {
 /// Get paths matching query using LIKE, fallback to all files
 fn get_paths_for_query(root: &Path, query: &str) -> Vec<(String, bool)> {
     if let Ok(mut index) = FileIndex::open(root) {
-        if index.needs_refresh() {
-            let _ = index.refresh();
-        }
+        let _ = index.incremental_refresh();
         // Try LIKE first for faster queries
         if !query.is_empty() {
             if let Ok(files) = index.find_like(query) {

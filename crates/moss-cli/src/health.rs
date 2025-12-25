@@ -262,10 +262,8 @@ pub fn analyze_health(root: &Path) -> HealthReport {
         }
     };
 
-    // Ensure file index is up to date (fast check)
-    if index.needs_refresh() {
-        let _ = index.refresh();
-    }
+    // Ensure file index is up to date (incremental - only changed files)
+    let _ = index.incremental_refresh();
     // Note: We don't call refresh_call_graph() here - it's slow.
     // Complexity is computed during symbol indexing, which happens via other commands.
 
@@ -314,8 +312,7 @@ pub fn analyze_health(root: &Path) -> HealthReport {
         }
     }
 
-    // Count total lines (still need to read files for this)
-    // TODO: Cache line counts in the index
+    // Use cached line counts from index
     let mut total_lines = 0usize;
     let mut large_files = Vec::new();
 
@@ -324,16 +321,12 @@ pub fn analyze_health(root: &Path) -> HealthReport {
             if file.is_dir {
                 continue;
             }
-            let full_path = root.join(&file.path);
-            if let Ok(content) = std::fs::read_to_string(&full_path) {
-                let lines = content.lines().count();
-                total_lines += lines;
-                if lines >= LARGE_THRESHOLD && !is_lockfile(&file.path) {
-                    large_files.push(LargeFile {
-                        path: file.path,
-                        lines,
-                    });
-                }
+            total_lines += file.lines;
+            if file.lines >= LARGE_THRESHOLD && !is_lockfile(&file.path) {
+                large_files.push(LargeFile {
+                    path: file.path,
+                    lines: file.lines,
+                });
             }
         }
     }

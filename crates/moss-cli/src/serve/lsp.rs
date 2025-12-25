@@ -481,9 +481,9 @@ impl LanguageServer for MossBackend {
 
         let line = lines[line_idx];
         let col = position.character as usize;
-        let (word, start_col, end_col) = extract_word_with_range(line, col);
+        let word_info = extract_word_with_range(line, col);
 
-        if word.is_empty() {
+        if word_info.word.is_empty() {
             return Ok(None);
         }
 
@@ -496,13 +496,13 @@ impl LanguageServer for MossBackend {
 
         // Check if symbol exists in index
         if index
-            .find_symbol(&word)
+            .find_symbol(&word_info.word)
             .map(|m| m.is_empty())
             .unwrap_or(true)
         {
             // Also check if it's a caller (referenced symbol)
             if index
-                .find_callers(&word)
+                .find_callers(&word_info.word)
                 .map(|m| m.is_empty())
                 .unwrap_or(true)
             {
@@ -513,11 +513,11 @@ impl LanguageServer for MossBackend {
         Ok(Some(PrepareRenameResponse::Range(Range {
             start: Position {
                 line: position.line,
-                character: start_col as u32,
+                character: word_info.start_col as u32,
             },
             end: Position {
                 line: position.line,
-                character: end_col as u32,
+                character: word_info.end_col as u32,
             },
         })))
     }
@@ -545,7 +545,7 @@ impl LanguageServer for MossBackend {
 
         let line = lines[line_idx];
         let col = position.character as usize;
-        let (old_name, _, _) = extract_word_with_range(line, col);
+        let old_name = extract_word_with_range(line, col).word;
 
         if old_name.is_empty() {
             return Ok(None);
@@ -611,11 +611,22 @@ impl LanguageServer for MossBackend {
     }
 }
 
+/// Word at a position with its range.
+struct WordAtPosition {
+    word: String,
+    start_col: usize,
+    end_col: usize,
+}
+
 /// Extract the word at a given column position in a line, with start/end positions.
-fn extract_word_with_range(line: &str, col: usize) -> (String, usize, usize) {
+fn extract_word_with_range(line: &str, col: usize) -> WordAtPosition {
     let chars: Vec<char> = line.chars().collect();
     if col >= chars.len() {
-        return (String::new(), 0, 0);
+        return WordAtPosition {
+            word: String::new(),
+            start_col: 0,
+            end_col: 0,
+        };
     }
 
     // Find start of word
@@ -630,7 +641,11 @@ fn extract_word_with_range(line: &str, col: usize) -> (String, usize, usize) {
         end += 1;
     }
 
-    (chars[start..end].iter().collect(), start, end)
+    WordAtPosition {
+        word: chars[start..end].iter().collect(),
+        start_col: start,
+        end_col: end,
+    }
 }
 
 /// Find a rename edit for a symbol at a given line.

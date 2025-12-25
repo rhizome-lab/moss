@@ -81,9 +81,7 @@ impl Tool for Eslint {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        let mut score: f32 = 0.0;
-
-        // ESLint config files
+        // ESLint config files - require explicit config
         let config_files = [
             ".eslintrc",
             ".eslintrc.js",
@@ -95,20 +93,11 @@ impl Tool for Eslint {
             "eslint.config.mjs",
             "eslint.config.cjs",
         ];
-        if crate::tools::has_config_file(root, &config_files) {
-            score += 0.6;
+        if !crate::tools::has_config_file(root, &config_files) {
+            return 0.0;
         }
 
-        // JS project indicators
-        let lock_files = [
-            "package-lock.json",
-            "pnpm-lock.yaml",
-            "yarn.lock",
-            "bun.lock",
-        ];
-        if crate::tools::has_config_file(root, &lock_files) {
-            score += 0.2;
-        }
+        let mut score: f32 = 0.6;
 
         // JS/TS files exist
         if crate::tools::has_files_with_extensions(root, self.info.extensions) {
