@@ -242,6 +242,10 @@ enum Commands {
         /// Run linters and include results in analysis
         #[arg(long)]
         lint: bool,
+
+        /// Show git history hotspots (high churn + high complexity)
+        #[arg(long)]
+        hotspots: bool,
     },
 
     /// Search for text patterns in files (fast ripgrep-based search)
@@ -482,6 +486,7 @@ fn main() {
             calls,
             called_by,
             lint,
+            hotspots,
         } => commands::analyze::cmd_analyze(
             target.as_deref(),
             root.as_deref(),
@@ -496,6 +501,7 @@ fn main() {
             calls,
             called_by,
             lint,
+            hotspots,
             cli.json,
         ),
         Commands::Grep {

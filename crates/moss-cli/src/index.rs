@@ -679,6 +679,19 @@ impl FileIndex {
         Ok(symbols)
     }
 
+    /// Get complexity stats for a file (avg, max)
+    pub fn file_complexity(&self, file: &str) -> rusqlite::Result<(f64, usize)> {
+        let mut stmt = self.conn.prepare(
+            "SELECT AVG(complexity), MAX(complexity) FROM symbols WHERE file = ?1 AND complexity > 0",
+        )?;
+        let result = stmt.query_row(params![file], |row| {
+            let avg: Option<f64> = row.get(0)?;
+            let max: Option<usize> = row.get(1)?;
+            Ok((avg.unwrap_or(0.0), max.unwrap_or(0)))
+        })?;
+        Ok(result)
+    }
+
     /// Find symbols by name with fuzzy matching, optional kind filter, and limit
     pub fn find_symbols(
         &self,

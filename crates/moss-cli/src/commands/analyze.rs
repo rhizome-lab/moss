@@ -22,6 +22,7 @@ pub fn cmd_analyze(
     calls: bool,
     called_by: bool,
     lint: bool,
+    hotspots: bool,
     json: bool,
 ) -> i32 {
     // --overview runs the overview report
@@ -53,6 +54,11 @@ pub fn cmd_analyze(
     // --lint runs linter analysis
     if lint {
         return cmd_lint_analyze(&root, target, json);
+    }
+
+    // --hotspots runs git history hotspot analysis
+    if hotspots {
+        return cmd_hotspots(&root, json);
     }
 
     // If no specific flags, run all analyses
@@ -497,4 +503,221 @@ fn format_size(bytes: u64) -> String {
     } else {
         format!("{} B", bytes)
     }
+}
+
+/// Hotspot data for a file
+#[derive(Debug)]
+struct FileHotspot {
+    path: String,
+    commits: usize,
+    lines_added: usize,
+    lines_deleted: usize,
+    avg_complexity: f64,
+    max_complexity: usize,
+    score: f64,
+}
+
+/// Analyze git history hotspots
+fn cmd_hotspots(root: &Path, json: bool) -> i32 {
+    // Check if git repo
+    let git_dir = root.join(".git");
+    if !git_dir.exists() {
+        eprintln!("Not a git repository");
+        return 1;
+    }
+
+    // Get file commit counts and churn from git log
+    let output = match std::process::Command::new("git")
+        .args(["log", "--format=", "--numstat"])
+        .current_dir(root)
+        .output()
+    {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("Failed to run git log: {}", e);
+            return 1;
+        }
+    };
+
+    if !output.status.success() {
+        eprintln!("git log failed");
+        return 1;
+    }
+
+    // Parse numstat output: added<TAB>deleted<TAB>path
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut file_stats: std::collections::HashMap<String, (usize, usize, usize)> =
+        std::collections::HashMap::new();
+
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() == 3 {
+            let added = parts[0].parse::<usize>().unwrap_or(0);
+            let deleted = parts[1].parse::<usize>().unwrap_or(0);
+            let path = parts[2].to_string();
+
+            // Skip binary files (shown as -)
+            if parts[0] == "-" || parts[1] == "-" {
+                continue;
+            }
+
+            let entry = file_stats.entry(path).or_insert((0, 0, 0));
+            entry.0 += 1; // commits
+            entry.1 += added;
+            entry.2 += deleted;
+        }
+    }
+
+    // Get complexity from index
+    let idx = match index::FileIndex::open(root) {
+        Ok(i) => i,
+        Err(_) => {
+            // No index, just use churn data
+            let mut hotspots: Vec<FileHotspot> = file_stats
+                .into_iter()
+                .filter(|(path, _)| {
+                    // Filter to source files only
+                    let p = Path::new(path);
+                    p.exists() && is_source_file(p)
+                })
+                .map(|(path, (commits, added, deleted))| {
+                    let churn = added + deleted;
+                    FileHotspot {
+                        path,
+                        commits,
+                        lines_added: added,
+                        lines_deleted: deleted,
+                        avg_complexity: 0.0,
+                        max_complexity: 0,
+                        score: (commits as f64) * (churn as f64).sqrt(),
+                    }
+                })
+                .collect();
+
+            hotspots.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+            hotspots.truncate(20);
+
+            return print_hotspots(&hotspots, json);
+        }
+    };
+
+    // Combine with complexity data
+    let mut hotspots: Vec<FileHotspot> = Vec::new();
+
+    for (path, (commits, added, deleted)) in file_stats {
+        let p = Path::new(&path);
+        if !p.exists() || !is_source_file(p) {
+            continue;
+        }
+
+        // Get complexity from index
+        let (avg_complexity, max_complexity) = idx.file_complexity(&path).unwrap_or_default();
+
+        let churn = added + deleted;
+        // Score: commits * sqrt(churn) * (1 + avg_complexity/10)
+        let complexity_factor = 1.0 + avg_complexity / 10.0;
+        let score = (commits as f64) * (churn as f64).sqrt() * complexity_factor;
+
+        hotspots.push(FileHotspot {
+            path,
+            commits,
+            lines_added: added,
+            lines_deleted: deleted,
+            avg_complexity,
+            max_complexity,
+            score,
+        });
+    }
+
+    hotspots.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+    hotspots.truncate(20);
+
+    print_hotspots(&hotspots, json)
+}
+
+/// Check if a path is a source file we care about
+fn is_source_file(path: &Path) -> bool {
+    match path.extension().and_then(|e| e.to_str()) {
+        Some(ext) => matches!(
+            ext,
+            "rs" | "py"
+                | "js"
+                | "ts"
+                | "tsx"
+                | "jsx"
+                | "go"
+                | "java"
+                | "c"
+                | "cpp"
+                | "h"
+                | "hpp"
+                | "rb"
+                | "php"
+                | "swift"
+                | "kt"
+                | "scala"
+                | "cs"
+                | "ex"
+                | "exs"
+        ),
+        None => false,
+    }
+}
+
+/// Print hotspots report
+fn print_hotspots(hotspots: &[FileHotspot], json: bool) -> i32 {
+    if hotspots.is_empty() {
+        if json {
+            println!("[]");
+        } else {
+            println!("No hotspots found (no git history or source files)");
+        }
+        return 0;
+    }
+
+    if json {
+        let output: Vec<_> = hotspots
+            .iter()
+            .map(|h| {
+                serde_json::json!({
+                    "path": h.path,
+                    "commits": h.commits,
+                    "lines_added": h.lines_added,
+                    "lines_deleted": h.lines_deleted,
+                    "churn": h.lines_added + h.lines_deleted,
+                    "avg_complexity": (h.avg_complexity * 10.0).round() / 10.0,
+                    "max_complexity": h.max_complexity,
+                    "score": (h.score * 10.0).round() / 10.0,
+                })
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    } else {
+        println!("Git Hotspots (high churn + complexity)");
+        println!();
+        println!(
+            "{:<50} {:>8} {:>8} {:>8} {:>8}",
+            "File", "Commits", "Churn", "AvgCx", "Score"
+        );
+        println!("{}", "-".repeat(90));
+
+        for h in hotspots {
+            let churn = h.lines_added + h.lines_deleted;
+            let display_path = if h.path.len() > 48 {
+                format!("...{}", &h.path[h.path.len() - 45..])
+            } else {
+                h.path.clone()
+            };
+            println!(
+                "{:<50} {:>8} {:>8} {:>8.1} {:>8.0}",
+                display_path, h.commits, churn, h.avg_complexity, h.score
+            );
+        }
+
+        println!();
+        println!("Score = commits × √churn × (1 + avgComplexity/10)");
+        println!("High scores indicate bug-prone files that change often and are complex.");
+    }
+
+    0
 }
