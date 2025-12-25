@@ -421,6 +421,8 @@ impl Language for Rust {
         Visibility::Private
     }
 
+    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> { None }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("body")
     }

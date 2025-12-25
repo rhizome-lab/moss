@@ -3,7 +3,7 @@
 //! Extracts function/class signatures with optional docstrings.
 
 use moss_core::{tree_sitter, Parsers};
-use moss_languages::{support_for_path, Language, Symbol as LangSymbol, SymbolKind as LangSymbolKind};
+use moss_languages::{support_for_grammar, support_for_path, Language, Symbol as LangSymbol, SymbolKind as LangSymbolKind};
 use std::path::Path;
 
 /// A code symbol with its signature
@@ -178,6 +178,15 @@ fn split_identifier(name: &str) -> Vec<String> {
     words
 }
 
+/// Recursively adjust line numbers for nested symbols
+fn adjust_children_lines(children: &mut [SkeletonSymbol], offset: usize) {
+    for child in children {
+        child.start_line += offset;
+        child.end_line += offset;
+        adjust_children_lines(&mut child.children, offset);
+    }
+}
+
 /// Convert a moss_languages::Symbol to SkeletonSymbol
 fn convert_symbol(sym: &LangSymbol) -> SkeletonSymbol {
     let kind = match sym.kind {
@@ -230,14 +239,8 @@ impl SkeletonExtractor {
     pub fn extract(&mut self, path: &Path, content: &str) -> SkeletonResult {
         let support = support_for_path(path);
 
-        let symbols = match support.map(|s| s.grammar_name()) {
-            // Vue needs special handling for script element parsing
-            Some("vue") => self.extract_vue(content),
-            // All other languages use trait-based extraction
-            Some(_) => {
-                let support = support.unwrap();
-                self.extract_with_trait(content, support)
-            }
+        let symbols = match support {
+            Some(s) => self.extract_with_trait(content, s),
             None => Vec::new(),
         };
 
@@ -342,6 +345,31 @@ impl SkeletonExtractor {
             let node = cursor.node();
             let kind = node.kind();
 
+            // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
+            if let Some(embedded) = support.embedded_content(&node, content) {
+                if let Some(sub_lang) = support_for_grammar(embedded.grammar) {
+                    if let Some(sub_tree) = self.parsers.parse_with_grammar(embedded.grammar, &embedded.content) {
+                        let mut sub_symbols = Vec::new();
+                        let sub_root = sub_tree.root_node();
+                        let mut sub_cursor = sub_root.walk();
+                        self.collect_with_trait(&mut sub_cursor, &embedded.content, sub_lang, &mut sub_symbols, false);
+
+                        // Adjust line numbers for embedded content offset
+                        for mut sym in sub_symbols {
+                            sym.start_line += embedded.start_line - 1;
+                            sym.end_line += embedded.start_line - 1;
+                            adjust_children_lines(&mut sym.children, embedded.start_line - 1);
+                            symbols.push(sym);
+                        }
+                    }
+                }
+                // Don't descend into embedded nodes - we've already processed them
+                if cursor.goto_next_sibling() {
+                    continue;
+                }
+                break;
+            }
+
             // Check if this is a function
             if support.function_kinds().contains(&kind) {
                 if let Some(sym) = support.extract_function(&node, content, in_container) {
@@ -392,124 +420,6 @@ impl SkeletonExtractor {
             // Descend into children for other nodes
             if cursor.goto_first_child() {
                 self.collect_with_trait(cursor, content, support, symbols, in_container);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-
-    // Vue extraction - extracts script section as JavaScript/TypeScript
-    fn extract_vue(&mut self, content: &str) -> Vec<SkeletonSymbol> {
-        let tree = match self.parsers.parse_with_grammar("vue", content) {
-            Some(t) => t,
-            None => return Vec::new(),
-        };
-
-        let mut symbols = Vec::new();
-        let root = tree.root_node();
-
-        // Vue files have component structure; look for script_element
-        let mut cursor = root.walk();
-        Self::collect_vue_symbols(&mut cursor, content, &mut symbols);
-        symbols
-    }
-
-    fn collect_vue_symbols(
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        symbols: &mut Vec<SkeletonSymbol>,
-    ) {
-        loop {
-            let node = cursor.node();
-            let kind = node.kind();
-
-            // Extract component name from script setup or defineComponent
-            if kind == "script_element" {
-                // Script section - recurse into it for JS/TS symbols
-                if cursor.goto_first_child() {
-                    Self::collect_vue_script_symbols(cursor, content, symbols);
-                    cursor.goto_parent();
-                }
-                if cursor.goto_next_sibling() {
-                    continue;
-                }
-                break;
-            }
-
-            if cursor.goto_first_child() {
-                Self::collect_vue_symbols(cursor, content, symbols);
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-    }
-
-    fn collect_vue_script_symbols(
-        cursor: &mut tree_sitter::TreeCursor,
-        content: &str,
-        symbols: &mut Vec<SkeletonSymbol>,
-    ) {
-        // Look for function declarations, const exports, etc. in script
-        loop {
-            let node = cursor.node();
-            let kind = node.kind();
-
-            match kind {
-                "function_declaration" => {
-                    if let Some(name_node) = node.child_by_field_name("name") {
-                        let name = content[name_node.byte_range()].to_string();
-                        let params = node
-                            .child_by_field_name("parameters")
-                            .map(|p| content[p.byte_range()].to_string())
-                            .unwrap_or_else(|| "()".to_string());
-                        symbols.push(SkeletonSymbol {
-                            name: name.clone(),
-                            kind: "function",
-                            signature: format!("function {}{}", name, params),
-                            docstring: None,
-                            start_line: node.start_position().row + 1,
-                            end_line: node.end_position().row + 1,
-                            children: Vec::new(),
-                        });
-                    }
-                }
-                "lexical_declaration" | "variable_declaration" => {
-                    // Look for const/let declarations that might be composables
-                    for i in 0..node.child_count() {
-                        if let Some(child) = node.child(i) {
-                            if child.kind() == "variable_declarator" {
-                                if let Some(name_node) = child.child_by_field_name("name") {
-                                    let name = content[name_node.byte_range()].to_string();
-                                    // Check if it's a function (arrow function or function expression)
-                                    if let Some(value) = child.child_by_field_name("value") {
-                                        if value.kind() == "arrow_function" || value.kind() == "function_expression" {
-                                            symbols.push(SkeletonSymbol {
-                                                name: name.clone(),
-                                                kind: "function",
-                                                signature: format!("const {}", name),
-                                                docstring: None,
-                                                start_line: node.start_position().row + 1,
-                                                end_line: node.end_position().row + 1,
-                                                children: Vec::new(),
-                                            });
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-
-            if cursor.goto_first_child() {
-                Self::collect_vue_script_symbols(cursor, content, symbols);
                 cursor.goto_parent();
             }
 

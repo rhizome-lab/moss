@@ -1,5 +1,5 @@
 use moss_core::{tree_sitter, Parsers};
-use moss_languages::{support_for_path, Language, SymbolKind as LangSymbolKind};
+use moss_languages::{support_for_grammar, support_for_path, Language, SymbolKind as LangSymbolKind};
 use std::path::Path;
 
 #[derive(Debug, Clone)]
@@ -101,6 +101,30 @@ impl SymbolParser {
             let node = cursor.node();
             let kind = node.kind();
 
+            // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
+            if let Some(embedded) = support.embedded_content(&node, content) {
+                if let Some(sub_lang) = support_for_grammar(embedded.grammar) {
+                    if let Some(sub_tree) = self.parsers.parse_with_grammar(embedded.grammar, &embedded.content) {
+                        let mut sub_symbols = Vec::new();
+                        let sub_root = sub_tree.root_node();
+                        let mut sub_cursor = sub_root.walk();
+                        self.collect_with_trait(&mut sub_cursor, &embedded.content, sub_lang, &mut sub_symbols, parent);
+
+                        // Adjust line numbers for embedded content offset
+                        for mut sym in sub_symbols {
+                            sym.start_line += embedded.start_line - 1;
+                            sym.end_line += embedded.start_line - 1;
+                            symbols.push(sym);
+                        }
+                    }
+                }
+                // Don't descend into embedded nodes - we've already processed them
+                if cursor.goto_next_sibling() {
+                    continue;
+                }
+                break;
+            }
+
             // Check for container (class, struct, etc.)
             if support.container_kinds().contains(&kind) {
                 if let Some(sym) = support.extract_container(&node, content) {
@@ -198,6 +222,29 @@ impl SymbolParser {
         loop {
             let node = cursor.node();
             let kind = node.kind();
+
+            // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
+            if let Some(embedded) = support.embedded_content(&node, content) {
+                if let Some(sub_lang) = support_for_grammar(embedded.grammar) {
+                    if let Some(sub_tree) = self.parsers.parse_with_grammar(embedded.grammar, &embedded.content) {
+                        let mut sub_imports = Vec::new();
+                        let sub_root = sub_tree.root_node();
+                        let mut sub_cursor = sub_root.walk();
+                        self.collect_imports_with_trait(&mut sub_cursor, &embedded.content, sub_lang, &mut sub_imports);
+
+                        // Adjust line numbers for embedded content offset
+                        for mut imp in sub_imports {
+                            imp.line += embedded.start_line - 1;
+                            imports.push(imp);
+                        }
+                    }
+                }
+                // Don't descend into embedded nodes - we've already processed them
+                if cursor.goto_next_sibling() {
+                    continue;
+                }
+                break;
+            }
 
             // Check for import nodes
             if support.import_kinds().contains(&kind) {

@@ -739,6 +739,8 @@ impl Language for Python {
         }
     }
 
+    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> { None }
+
     fn body_has_docstring(&self, body: &Node, content: &str) -> bool {
         let _ = content;
         body.child(0)

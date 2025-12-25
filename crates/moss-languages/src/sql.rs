@@ -158,6 +158,8 @@ impl Language for Sql {
     fn is_public(&self, _node: &Node, _content: &str) -> bool { true }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility { Visibility::Public }
 
+    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> { None }
+
     fn container_body<'a>(&self, _node: &'a Node<'a>) -> Option<Node<'a>> { None }
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool { false }
     fn node_name<'a>(&self, _node: &Node, _content: &'a str) -> Option<&'a str> { None }

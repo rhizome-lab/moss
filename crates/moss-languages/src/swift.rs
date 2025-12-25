@@ -282,6 +282,8 @@ impl Language for Swift {
         Visibility::Protected
     }
 
+    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> { None }
+
     fn lang_key(&self) -> &'static str { "swift" }
 
     fn resolve_local_import(

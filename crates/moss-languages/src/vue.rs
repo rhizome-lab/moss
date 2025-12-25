@@ -75,6 +75,31 @@ impl Language for Vue {
 
     fn is_public(&self, _node: &Node, _content: &str) -> bool { true }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility { Visibility::Public }
+
+    fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {
+        match node.kind() {
+            "script_element" => {
+                let raw = find_raw_text_child(node)?;
+                let grammar = detect_script_lang(node, content);
+                Some(crate::EmbeddedBlock {
+                    grammar,
+                    content: content[raw.byte_range()].to_string(),
+                    start_line: raw.start_position().row + 1,
+                })
+            }
+            "style_element" => {
+                let raw = find_raw_text_child(node)?;
+                let grammar = detect_style_lang(node, content);
+                Some(crate::EmbeddedBlock {
+                    grammar,
+                    content: content[raw.byte_range()].to_string(),
+                    start_line: raw.start_position().row + 1,
+                })
+            }
+            _ => None,
+        }
+    }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> { node.child_by_field_name("body") }
     fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool { false }
 
@@ -110,4 +135,68 @@ impl Language for Vue {
         if is_dir && name == "node_modules" { return true; }
         !is_dir && !has_extension(name, &["vue"])
     }
+}
+
+/// Find the raw_text child of a script/style element.
+fn find_raw_text_child<'a>(node: &'a Node<'a>) -> Option<Node<'a>> {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "raw_text" {
+            return Some(child);
+        }
+    }
+    None
+}
+
+/// Detect script language from the lang attribute (e.g., <script lang="ts">).
+fn detect_script_lang(node: &Node, content: &str) -> &'static str {
+    if let Some(lang) = get_lang_attribute(node, content) {
+        match lang {
+            "ts" | "typescript" => return "typescript",
+            "tsx" => return "tsx",
+            _ => {}
+        }
+    }
+    "javascript"
+}
+
+/// Detect style language from the lang attribute (e.g., <style lang="scss">).
+fn detect_style_lang(node: &Node, content: &str) -> &'static str {
+    if let Some(lang) = get_lang_attribute(node, content) {
+        match lang {
+            "scss" | "sass" => return "scss",
+            "less" => return "css", // No less grammar, fall back to CSS
+            _ => {}
+        }
+    }
+    "css"
+}
+
+/// Get the lang attribute value from a script/style element.
+fn get_lang_attribute<'a>(node: &Node, content: &'a str) -> Option<&'a str> {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        // Look for start_tag which contains the attributes
+        if child.kind() == "start_tag" {
+            let mut inner_cursor = child.walk();
+            for attr in child.children(&mut inner_cursor) {
+                if attr.kind() == "attribute" {
+                    // Check if this is a lang attribute
+                    let mut attr_cursor = attr.walk();
+                    let mut is_lang = false;
+                    for part in attr.children(&mut attr_cursor) {
+                        if part.kind() == "attribute_name" {
+                            let name = &content[part.byte_range()];
+                            is_lang = name == "lang";
+                        } else if is_lang && part.kind() == "quoted_attribute_value" {
+                            // Get the value inside quotes
+                            let value = &content[part.byte_range()];
+                            return Some(value.trim_matches('"').trim_matches('\''));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
 }

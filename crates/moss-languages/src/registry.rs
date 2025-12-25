@@ -12,6 +12,9 @@ static INITIALIZED: OnceLock<()> = OnceLock::new();
 /// Cached extension → language lookup table.
 static EXTENSION_MAP: OnceLock<HashMap<&'static str, &'static dyn Language>> = OnceLock::new();
 
+/// Cached grammar_name → language lookup table.
+static GRAMMAR_MAP: OnceLock<HashMap<&'static str, &'static dyn Language>> = OnceLock::new();
+
 /// Register a language in the global registry.
 /// Called internally by language modules.
 pub fn register(lang: &'static dyn Language) {
@@ -142,6 +145,18 @@ fn extension_map() -> &'static HashMap<&'static str, &'static dyn Language> {
     })
 }
 
+fn grammar_map() -> &'static HashMap<&'static str, &'static dyn Language> {
+    init_builtin();
+    GRAMMAR_MAP.get_or_init(|| {
+        let mut map = HashMap::new();
+        let langs = LANGUAGES.read().unwrap();
+        for lang in langs.iter() {
+            map.insert(lang.grammar_name(), *lang);
+        }
+        map
+    })
+}
+
 /// Get language support for a file extension.
 ///
 /// Returns `None` if the extension is not recognized or the feature is not enabled.
@@ -150,6 +165,13 @@ pub fn support_for_extension(ext: &str) -> Option<&'static dyn Language> {
         .get(ext)
         .or_else(|| extension_map().get(ext.to_lowercase().as_str()))
         .copied()
+}
+
+/// Get language support by grammar name.
+///
+/// Returns `None` if the grammar is not recognized or the feature is not enabled.
+pub fn support_for_grammar(grammar: &str) -> Option<&'static dyn Language> {
+    grammar_map().get(grammar).copied()
 }
 
 /// Get language support from a file path.

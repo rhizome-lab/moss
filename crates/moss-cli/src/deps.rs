@@ -3,7 +3,7 @@
 //! Extracts imports and exports from source files.
 
 use moss_core::{tree_sitter, Parsers};
-use moss_languages::{support_for_path, Language, SymbolKind as LangSymbolKind};
+use moss_languages::{support_for_grammar, support_for_path, Language, SymbolKind as LangSymbolKind};
 use moss_languages::Import as LangImport;
 use moss_languages::Export as LangExport;
 use std::path::Path;
@@ -222,6 +222,34 @@ impl DepsExtractor {
         loop {
             let node = cursor.node();
             let kind = node.kind();
+
+            // Check for embedded content (e.g., <script> in Vue/Svelte/HTML)
+            if let Some(embedded) = support.embedded_content(&node, content) {
+                if let Some(sub_lang) = support_for_grammar(embedded.grammar) {
+                    if let Some(sub_tree) = self.parsers.parse_with_grammar(embedded.grammar, &embedded.content) {
+                        let mut sub_imports = Vec::new();
+                        let mut sub_exports = Vec::new();
+                        let sub_root = sub_tree.root_node();
+                        let mut sub_cursor = sub_root.walk();
+                        self.collect_with_trait(&mut sub_cursor, &embedded.content, sub_lang, &mut sub_imports, &mut sub_exports);
+
+                        // Adjust line numbers for embedded content offset
+                        for mut imp in sub_imports {
+                            imp.line += embedded.start_line - 1;
+                            imports.push(imp);
+                        }
+                        for mut exp in sub_exports {
+                            exp.line += embedded.start_line - 1;
+                            exports.push(exp);
+                        }
+                    }
+                }
+                // Don't descend into embedded nodes - we've already processed them
+                if cursor.goto_next_sibling() {
+                    continue;
+                }
+                break;
+            }
 
             // Check for import nodes
             if support.import_kinds().contains(&kind) {
@@ -717,5 +745,60 @@ var PublicVar = "hello"
         assert!(!result.exports.iter().any(|e| e.name == "main"));
         assert!(!result.exports.iter().any(|e| e.name == "privateFunc"));
         assert!(!result.exports.iter().any(|e| e.name == "privateType"));
+    }
+
+    #[test]
+    fn test_vue_embedded_imports() {
+        let extractor = DepsExtractor::new();
+        let content = r#"
+<template>
+  <div>{{ message }}</div>
+</template>
+
+<script lang="ts">
+import { ref, computed } from 'vue';
+import { useStore } from './store';
+
+export function greet(name: string): string {
+  return `Hello, ${name}`;
+}
+
+const message = ref('Hello World');
+</script>
+"#;
+        let result = extractor.extract(&PathBuf::from("App.vue"), content);
+
+        // Check imports from embedded script
+        assert!(!result.imports.is_empty(), "Should extract imports from Vue script: {:?}", result.imports);
+        assert!(result.imports.iter().any(|i| i.module == "vue"), "Should have vue import");
+        assert!(result.imports.iter().any(|i| i.module == "./store" && i.is_relative), "Should have relative store import");
+
+        // Verify line numbers are correctly offset
+        let vue_import = result.imports.iter().find(|i| i.module == "vue").unwrap();
+        assert!(vue_import.line >= 7, "Vue import should be on line 7 or later (was {})", vue_import.line);
+    }
+
+    #[test]
+    fn test_html_embedded_imports() {
+        let extractor = DepsExtractor::new();
+        let content = r#"
+<!DOCTYPE html>
+<html>
+<body>
+  <script type="module">
+    import { init } from './app.js';
+
+    function main() {
+      init();
+    }
+  </script>
+</body>
+</html>
+"#;
+        let result = extractor.extract(&PathBuf::from("index.html"), content);
+
+        // Check imports from embedded script
+        assert!(!result.imports.is_empty(), "Should extract imports from HTML script");
+        assert!(result.imports.iter().any(|i| i.module == "./app.js"), "Should have app.js import");
     }
 }

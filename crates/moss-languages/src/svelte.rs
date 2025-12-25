@@ -200,6 +200,30 @@ impl Language for Svelte {
         }
     }
 
+    fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {
+        match node.kind() {
+            "script_element" => {
+                let raw = find_raw_text_child(node)?;
+                let grammar = detect_script_lang(node, content);
+                Some(crate::EmbeddedBlock {
+                    grammar,
+                    content: content[raw.byte_range()].to_string(),
+                    start_line: raw.start_position().row + 1,
+                })
+            }
+            "style_element" => {
+                let raw = find_raw_text_child(node)?;
+                let grammar = detect_style_lang(node, content);
+                Some(crate::EmbeddedBlock {
+                    grammar,
+                    content: content[raw.byte_range()].to_string(),
+                    start_line: raw.start_position().row + 1,
+                })
+            }
+            _ => None,
+        }
+    }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         // Find the content of script/style elements
         let mut cursor = node.walk();
@@ -340,4 +364,66 @@ impl Language for Svelte {
     fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
         if path.is_file() { Some(path.to_path_buf()) } else { None }
     }
+}
+
+/// Find the raw_text child of a script/style element.
+fn find_raw_text_child<'a>(node: &'a Node<'a>) -> Option<Node<'a>> {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "raw_text" {
+            return Some(child);
+        }
+    }
+    None
+}
+
+/// Detect script language from the lang attribute (e.g., <script lang="ts">).
+fn detect_script_lang(node: &Node, content: &str) -> &'static str {
+    if let Some(lang) = get_lang_attribute(node, content) {
+        match lang {
+            "ts" | "typescript" => return "typescript",
+            _ => {}
+        }
+    }
+    "javascript"
+}
+
+/// Detect style language from the lang attribute (e.g., <style lang="scss">).
+fn detect_style_lang(node: &Node, content: &str) -> &'static str {
+    if let Some(lang) = get_lang_attribute(node, content) {
+        match lang {
+            "scss" | "sass" => return "scss",
+            _ => {}
+        }
+    }
+    "css"
+}
+
+/// Get the lang attribute value from a script/style element.
+fn get_lang_attribute<'a>(node: &Node, content: &'a str) -> Option<&'a str> {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        // Look for start_tag which contains the attributes
+        if child.kind() == "start_tag" {
+            let mut inner_cursor = child.walk();
+            for attr in child.children(&mut inner_cursor) {
+                if attr.kind() == "attribute" {
+                    // Check if this is a lang attribute
+                    let mut attr_cursor = attr.walk();
+                    let mut is_lang = false;
+                    for part in attr.children(&mut attr_cursor) {
+                        if part.kind() == "attribute_name" {
+                            let name = &content[part.byte_range()];
+                            is_lang = name == "lang";
+                        } else if is_lang && part.kind() == "quoted_attribute_value" {
+                            // Get the value inside quotes
+                            let value = &content[part.byte_range()];
+                            return Some(value.trim_matches('"').trim_matches('\''));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
 }

@@ -4,6 +4,14 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Embedded Content Support
+
+Template languages now extract symbols and imports from embedded code:
+- Vue/Svelte/HTML: `<script>` blocks parsed with JavaScript/TypeScript grammar
+- Vue/Svelte/HTML: `<style>` blocks parsed with CSS/SCSS grammar
+- Automatic lang detection: `<script lang="ts">` uses TypeScript, `<style lang="scss">` uses SCSS
+- Line numbers correctly adjusted for embedded content offset
+
 ### CLI Surface Cleanup
 
 Major refactoring to align with three-primitive philosophy (view, edit, analyze):

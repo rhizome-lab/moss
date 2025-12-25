@@ -99,6 +99,17 @@ pub struct Export {
     pub line: usize,
 }
 
+/// Embedded content block (e.g., JS in Vue, CSS in HTML)
+#[derive(Debug, Clone)]
+pub struct EmbeddedBlock {
+    /// Grammar to use for parsing (e.g., "javascript", "css")
+    pub grammar: &'static str,
+    /// Extracted source content
+    pub content: String,
+    /// 1-indexed start line in the parent file
+    pub start_line: usize,
+}
+
 // === Helper functions for should_skip_package_entry ===
 
 /// Check if name is a dotfile/dotdir (starts with '.')
@@ -209,6 +220,12 @@ pub trait Language: Send + Sync {
 
     /// Get visibility of a node
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility;
+
+    // === Embedded Languages ===
+
+    /// Extract embedded content from a node (e.g., JS/CSS in Vue/HTML).
+    /// Returns None for nodes that don't contain embedded code in another language.
+    fn embedded_content(&self, node: &Node, content: &str) -> Option<EmbeddedBlock>;
 
     // === Edit Support ===
 

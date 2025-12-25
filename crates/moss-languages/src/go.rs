@@ -455,6 +455,8 @@ impl Language for Go {
         }
     }
 
+    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> { None }
+
     fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> {
         // Go doc comments could be extracted but need special handling
         None

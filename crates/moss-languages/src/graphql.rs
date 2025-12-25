@@ -140,6 +140,8 @@ impl Language for GraphQL {
     fn is_public(&self, _node: &Node, _content: &str) -> bool { true }
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility { Visibility::Public }
 
+    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> { None }
+
     fn container_body<'a>(&self, node: &'a Node<'a>) -> Option<Node<'a>> {
         node.child_by_field_name("fields_definition")
     }

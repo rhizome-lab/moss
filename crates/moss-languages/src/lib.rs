@@ -135,11 +135,11 @@ pub mod scss;
 pub mod svelte;
 
 // Re-exports from registry
-pub use registry::{register, support_for_extension, support_for_path, supported_languages};
+pub use registry::{register, support_for_extension, support_for_grammar, support_for_path, supported_languages};
 
 // Re-exports from traits
 pub use traits::{
-    Export, Import, Language, PackageSource, PackageSourceKind, Symbol, SymbolKind,
+    EmbeddedBlock, Export, Import, Language, PackageSource, PackageSourceKind, Symbol, SymbolKind,
     Visibility, VisibilityMechanism, skip_dotfiles, has_extension,
 };
 
