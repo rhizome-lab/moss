@@ -22,6 +22,8 @@ See `docs/language-support.md` for design. Future languages: OCaml, Haskell, Clo
 
 **Code Quality:**
 - Audit Rust codebase for tuple returns - replace with structs unconditionally
+  - Already fixed: `find_symbols` → `SymbolMatch`, `call_graph_stats` → `CallGraphStats`, `get_changed_files` → `ChangedFiles`
+  - Also fixed: `IndexedCounts`, `CollapsedChain`, `ParsedPackage`, `ExtractedDeps`
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 
 **Bugs:**
@@ -40,16 +42,23 @@ See `docs/language-support.md` for design. Future languages: OCaml, Haskell, Clo
 **View Filtering:**
 - Filter out tests from views (--no-tests or --exclude=tests)
 - Filter by category: tests, config files, build files, etc.
+- Inverse: show only specific categories (--only=tests)
 - Filter view children by type/name (needs design: glob patterns? symbol kinds?)
 
 **Agent Research:**
 - Conversational loop pattern (vs hierarchical)
 - YOLO mode evaluation
 - Diffusion-like parallel refactors
-- Claude Code over-reliance on Explore agents
+- Claude Code over-reliance on Explore agents: spawns agents for direct tool tasks. Symptom of deeper issue?
+- LLM code consistency: see `docs/llm-code-consistency.md` for research notes
 
 **Session Tooling:**
-- End-of-session summary workflow (.moss/workflows/session-summary.toml, no LLM)
+- End-of-session summary workflow (.moss/workflows/session-summary.toml, no LLM):
+  - Test status: passing/failing count
+  - `git diff --shortstat` (files changed, insertions, deletions)
+  - Commits ahead of remote
+  - Uncommitted changes summary
+  - TODO.md delta (items added/completed)
 
 ## Deferred
 
