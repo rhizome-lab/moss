@@ -1,7 +1,7 @@
-//! Prettier adapter - code formatter.
+//! Oxfmt adapter - fast JavaScript/TypeScript formatter.
 //!
-//! Prettier is an opinionated code formatter supporting many languages.
-//! https://prettier.io/
+//! Oxfmt is an extremely fast JavaScript/TypeScript formatter, written in Rust.
+//! https://oxc.rs/
 
 use crate::{
     Diagnostic, DiagnosticSeverity, Location, Tool, ToolCategory, ToolError, ToolInfo, ToolResult,
@@ -9,49 +9,46 @@ use crate::{
 use std::path::Path;
 use std::process::Command;
 
-fn prettier_command() -> Option<(&'static str, Vec<&'static str>)> {
-    crate::tools::find_js_tool("prettier", None)
+fn oxfmt_command() -> Option<(&'static str, Vec<&'static str>)> {
+    crate::tools::find_js_tool("oxfmt", None)
 }
 
-/// Prettier formatter adapter.
-pub struct Prettier {
+/// Oxfmt JavaScript/TypeScript formatter adapter.
+pub struct Oxfmt {
     info: ToolInfo,
 }
 
-impl Prettier {
+impl Oxfmt {
     pub fn new() -> Self {
         Self {
             info: ToolInfo {
-                name: "prettier",
+                name: "oxfmt",
                 category: ToolCategory::Formatter,
-                extensions: &[
-                    "js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts", "json", "md", "yaml",
-                    "yml", "css", "scss", "less", "html", "vue", "svelte", "graphql",
-                ],
-                check_cmd: &["prettier", "--version"],
-                website: "https://prettier.io/",
+                extensions: &["js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts"],
+                check_cmd: &["oxfmt", "--version"],
+                website: "https://oxc.rs/",
             },
         }
     }
 }
 
-impl Default for Prettier {
+impl Default for Oxfmt {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Tool for Prettier {
+impl Tool for Oxfmt {
     fn info(&self) -> &ToolInfo {
         &self.info
     }
 
     fn is_available(&self) -> bool {
-        prettier_command().is_some()
+        oxfmt_command().is_some()
     }
 
     fn version(&self) -> Option<String> {
-        let (cmd, base_args) = prettier_command()?;
+        let (cmd, base_args) = oxfmt_command()?;
         let mut command = Command::new(cmd);
         command.args(&base_args).arg("--version");
         command
@@ -63,38 +60,29 @@ impl Tool for Prettier {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        let mut score: f32 = 0.0;
-
-        // Prettier config files - strong signal
-        let prettier_configs = [
-            ".prettierrc",
-            ".prettierrc.json",
-            ".prettierrc.yaml",
-            ".prettierrc.yml",
-            ".prettierrc.js",
-            ".prettierrc.cjs",
-            "prettier.config.js",
-            "prettier.config.cjs",
-        ];
-        if crate::tools::has_config_file(root, &prettier_configs) {
-            score += 0.7;
+        // Oxfmt is a JS ecosystem tool - require package.json
+        if !crate::tools::has_config_file(root, &["package.json"]) {
+            return 0.0;
         }
 
-        // Package.json required - prettier is a JS ecosystem tool
-        // Don't run on non-JS projects just because they have .json/.md files
-        if crate::tools::has_config_file(root, &["package.json"]) {
-            score += 0.3;
-        } else {
-            // No package.json = not a JS project, don't run prettier
-            return 0.0;
+        let mut score: f32 = 0.3;
+
+        // Oxfmt-specific config - strong signal
+        if crate::tools::has_config_file(root, &[".oxfmtrc.json", ".oxfmtrc.jsonc", "oxfmt.json"]) {
+            score += 0.5;
+        }
+
+        // TypeScript config
+        if crate::tools::has_config_file(root, &["tsconfig.json", "jsconfig.json"]) {
+            score += 0.2;
         }
 
         score.min(1.0)
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = prettier_command()
-            .ok_or_else(|| ToolError::NotAvailable("prettier not found".to_string()))?;
+        let (cmd, base_args) = oxfmt_command()
+            .ok_or_else(|| ToolError::NotAvailable("oxfmt not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
             vec!["."]
@@ -108,37 +96,36 @@ impl Tool for Prettier {
 
         let output = command.args(&path_args).current_dir(root).output()?;
 
-        // Exit code 0 = all formatted, 1 = some need formatting
+        // Exit code 0 = all formatted, non-zero = some need formatting
         if output.status.success() {
-            return Ok(ToolResult::success("prettier", vec![]));
+            return Ok(ToolResult::success("oxfmt", vec![]));
         }
 
         // Parse output for files needing formatting
-        // Format varies, but typically lists files that differ
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
         let combined = format!("{}{}", stdout, stderr);
 
         let diagnostics: Vec<Diagnostic> = combined
             .lines()
-            .filter(|line| {
-                // Skip info messages
-                !line.starts_with("Checking")
-                    && !line.starts_with("[warn]")
-                    && !line.is_empty()
-                    && !line.contains("Code style issues")
-            })
+            .filter(|line| !line.trim().is_empty() && !line.contains("oxfmt"))
             .filter_map(|line| {
-                // Files needing formatting are often just listed as paths
+                // Files needing formatting are typically listed as paths
                 let file = line.trim();
-                if file.is_empty() || file.starts_with("error") {
+                if file.is_empty() {
                     return None;
                 }
 
                 // Check if it looks like a file path
-                if file.contains('.') && !file.contains("prettier") {
+                if file.ends_with(".js")
+                    || file.ends_with(".jsx")
+                    || file.ends_with(".ts")
+                    || file.ends_with(".tsx")
+                    || file.ends_with(".mjs")
+                    || file.ends_with(".cjs")
+                {
                     Some(Diagnostic {
-                        tool: "prettier".to_string(),
+                        tool: "oxfmt".to_string(),
                         rule_id: "formatting".to_string(),
                         message: "File needs formatting".to_string(),
                         severity: DiagnosticSeverity::Warning,
@@ -158,7 +145,7 @@ impl Tool for Prettier {
             })
             .collect();
 
-        Ok(ToolResult::success("prettier", diagnostics))
+        Ok(ToolResult::success("oxfmt", diagnostics))
     }
 
     fn can_fix(&self) -> bool {
@@ -166,8 +153,8 @@ impl Tool for Prettier {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
-        let (cmd, base_args) = prettier_command()
-            .ok_or_else(|| ToolError::NotAvailable("prettier not found".to_string()))?;
+        let (cmd, base_args) = oxfmt_command()
+            .ok_or_else(|| ToolError::NotAvailable("oxfmt not found".to_string()))?;
 
         let path_args: Vec<&str> = if paths.is_empty() {
             vec!["."]
@@ -183,9 +170,9 @@ impl Tool for Prettier {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Ok(ToolResult::failure("prettier", stderr.to_string()));
+            return Ok(ToolResult::failure("oxfmt", stderr.to_string()));
         }
 
-        Ok(ToolResult::success("prettier", vec![]))
+        Ok(ToolResult::success("oxfmt", vec![]))
     }
 }

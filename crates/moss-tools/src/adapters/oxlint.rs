@@ -1,6 +1,7 @@
 //! Oxlint adapter - fast JavaScript/TypeScript linter.
 //!
 //! Oxlint is an extremely fast JavaScript linter, written in Rust.
+//! Supports type-aware linting with --type-aware flag when tsconfig.json is present.
 //! https://oxc.rs/docs/guide/usage/linter.html
 
 use crate::{
@@ -23,7 +24,7 @@ impl Oxlint {
                 category: ToolCategory::Linter,
                 extensions: &["js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts"],
                 check_cmd: &["oxlint", "--version"],
-                website: "https://oxc.rs/docs/guide/usage/linter.html",
+                website: "https://oxc.rs/",
             },
         }
     }
@@ -33,6 +34,14 @@ impl Default for Oxlint {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn oxlint_command() -> Option<(&'static str, Vec<&'static str>)> {
+    crate::tools::find_js_tool("oxlint", None)
+}
+
+fn has_tsconfig(root: &Path) -> bool {
+    crate::tools::has_config_file(root, &["tsconfig.json"])
 }
 
 /// Oxlint JSON output format.
@@ -81,16 +90,14 @@ impl Tool for Oxlint {
     }
 
     fn is_available(&self) -> bool {
-        Command::new("oxlint")
-            .arg("--version")
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
+        oxlint_command().is_some()
     }
 
     fn version(&self) -> Option<String> {
-        Command::new("oxlint")
-            .arg("--version")
+        let (cmd, base_args) = oxlint_command()?;
+        let mut command = Command::new(cmd);
+        command.args(&base_args).arg("--version");
+        command
             .output()
             .ok()
             .filter(|o| o.status.success())
@@ -125,17 +132,25 @@ impl Tool for Oxlint {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
+        let (cmd, base_args) = oxlint_command()
+            .ok_or_else(|| ToolError::NotAvailable("oxlint not found".to_string()))?;
+
         let path_args: Vec<&str> = if paths.is_empty() {
             vec!["."]
         } else {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let output = Command::new("oxlint")
-            .arg("--format=json")
-            .args(&path_args)
-            .current_dir(root)
-            .output()?;
+        let mut command = Command::new(cmd);
+        command.args(&base_args);
+        command.arg("--format=json");
+
+        // Enable type-aware linting when tsconfig.json is present
+        if has_tsconfig(root) {
+            command.arg("--type-aware");
+        }
+
+        let output = command.args(&path_args).current_dir(root).output()?;
 
         // Oxlint returns exit code 1 if there are violations
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -196,18 +211,25 @@ impl Tool for Oxlint {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
+        let (cmd, base_args) = oxlint_command()
+            .ok_or_else(|| ToolError::NotAvailable("oxlint not found".to_string()))?;
+
         let path_args: Vec<&str> = if paths.is_empty() {
             vec!["."]
         } else {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let output = Command::new("oxlint")
-            .arg("--fix")
-            .arg("--format=json")
-            .args(&path_args)
-            .current_dir(root)
-            .output()?;
+        let mut command = Command::new(cmd);
+        command.args(&base_args);
+        command.arg("--fix").arg("--format=json");
+
+        // Enable type-aware linting when tsconfig.json is present
+        if has_tsconfig(root) {
+            command.arg("--type-aware");
+        }
+
+        let output = command.args(&path_args).current_dir(root).output()?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 

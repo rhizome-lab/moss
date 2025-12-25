@@ -10,6 +10,10 @@ use serde::Deserialize;
 use std::path::Path;
 use std::process::Command;
 
+fn ruff_command() -> Option<(&'static str, Vec<&'static str>)> {
+    crate::tools::find_python_tool("ruff")
+}
+
 /// Ruff Python linter/formatter adapter.
 pub struct Ruff {
     info: ToolInfo,
@@ -67,16 +71,14 @@ impl Tool for Ruff {
     }
 
     fn is_available(&self) -> bool {
-        Command::new("ruff")
-            .arg("--version")
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
+        ruff_command().is_some()
     }
 
     fn version(&self) -> Option<String> {
-        Command::new("ruff")
-            .arg("--version")
+        let (cmd, base_args) = ruff_command()?;
+        let mut command = Command::new(cmd);
+        command.args(&base_args).arg("--version");
+        command
             .output()
             .ok()
             .filter(|o| o.status.success())
@@ -114,18 +116,20 @@ impl Tool for Ruff {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
+        let (cmd, base_args) =
+            ruff_command().ok_or_else(|| ToolError::NotAvailable("ruff not found".to_string()))?;
+
         let path_args: Vec<&str> = if paths.is_empty() {
             vec!["."]
         } else {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let output = Command::new("ruff")
-            .arg("check")
-            .arg("--output-format=json")
-            .args(&path_args)
-            .current_dir(root)
-            .output()?;
+        let mut command = Command::new(cmd);
+        command.args(&base_args);
+        command.arg("check").arg("--output-format=json");
+
+        let output = command.args(&path_args).current_dir(root).output()?;
 
         // Ruff returns exit code 1 if there are violations, which is expected
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -185,19 +189,23 @@ impl Tool for Ruff {
     }
 
     fn fix(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
+        let (cmd, base_args) =
+            ruff_command().ok_or_else(|| ToolError::NotAvailable("ruff not found".to_string()))?;
+
         let path_args: Vec<&str> = if paths.is_empty() {
             vec!["."]
         } else {
             paths.iter().map(|p| p.to_str().unwrap_or(".")).collect()
         };
 
-        let output = Command::new("ruff")
+        let mut command = Command::new(cmd);
+        command.args(&base_args);
+        command
             .arg("check")
             .arg("--fix")
-            .arg("--output-format=json")
-            .args(&path_args)
-            .current_dir(root)
-            .output()?;
+            .arg("--output-format=json");
+
+        let output = command.args(&path_args).current_dir(root).output()?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 

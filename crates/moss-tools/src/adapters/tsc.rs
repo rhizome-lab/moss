@@ -9,6 +9,11 @@ use crate::{
 use std::path::Path;
 use std::process::Command;
 
+fn tsc_command() -> Option<(&'static str, Vec<&'static str>)> {
+    // tsc binary comes from the "typescript" package
+    crate::tools::find_js_tool("tsc", Some("typescript"))
+}
+
 /// TypeScript compiler (tsc) type checker adapter.
 pub struct Tsc {
     info: ToolInfo,
@@ -40,34 +45,18 @@ impl Tool for Tsc {
     }
 
     fn is_available(&self) -> bool {
-        // Try npx tsc first, then global tsc
-        Command::new("npx")
-            .args(["tsc", "--version"])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-            || Command::new("tsc")
-                .arg("--version")
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false)
+        tsc_command().is_some()
     }
 
     fn version(&self) -> Option<String> {
-        Command::new("npx")
-            .args(["tsc", "--version"])
+        let (cmd, base_args) = tsc_command()?;
+        let mut command = Command::new(cmd);
+        command.args(&base_args).arg("--version");
+        command
             .output()
             .ok()
             .filter(|o| o.status.success())
             .and_then(|o| String::from_utf8(o.stdout).ok())
-            .or_else(|| {
-                Command::new("tsc")
-                    .arg("--version")
-                    .output()
-                    .ok()
-                    .filter(|o| o.status.success())
-                    .and_then(|o| String::from_utf8(o.stdout).ok())
-            })
             .map(|s| s.trim().to_string())
     }
 
@@ -101,21 +90,13 @@ impl Tool for Tsc {
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
+        let (cmd_name, base_args) =
+            tsc_command().ok_or_else(|| ToolError::NotAvailable("tsc not found".to_string()))?;
+
         // tsc --noEmit for type checking only
         // Use --pretty false for machine-readable output
-        let mut cmd = if Command::new("npx")
-            .args(["tsc", "--version"])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-        {
-            let mut c = Command::new("npx");
-            c.arg("tsc");
-            c
-        } else {
-            Command::new("tsc")
-        };
-
+        let mut cmd = Command::new(cmd_name);
+        cmd.args(&base_args);
         cmd.arg("--noEmit").arg("--pretty").arg("false");
 
         // If specific paths provided, we can't easily pass them to tsc
