@@ -88,6 +88,33 @@ Added 5 new languages with full Language trait implementations:
 
 Total languages now supported: 24
 
+### Phase 5 Language Support (continued)
+
+Added 11 more languages:
+
+**Systems/Low-level:**
+- Lua: require(), LDoc comments, local/global visibility
+- Zig: @import(), /// doc comments, pub visibility
+
+**Functional/Backend:**
+- Elixir: defmodule, def/defp, @doc/@moduledoc, Hex hints
+- Erlang: -module(), function clauses, -export, rebar3 hints
+- F#: modules, functions, /// XML docs, NuGet hints
+
+**Mobile:**
+- Dart: classes, functions, /// docs, pub.dev hints
+
+**Data/Config:**
+- SQL: CREATE TABLE/VIEW/FUNCTION/TYPE extraction
+- GraphQL: types, interfaces, enums, unions, scalars
+- HCL: Terraform blocks (resource, data, module, variable)
+
+**Frontend:**
+- SCSS: @mixin, @function, @import/@use/@forward, SassDoc
+- Svelte: script/style extraction, SvelteKit $lib alias
+
+Total languages now supported: 35
+
 ### Tree View (additional improvements)
 
 - **Boilerplate-aware depth**: Directories like `src/`, `lib/`, `crates/` don't count against `max_depth` limit
