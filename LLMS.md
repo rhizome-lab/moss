@@ -5,80 +5,124 @@ Quick reference for AI agents working with codebases using Moss.
 ## Quick Start
 
 ```bash
-# Get instant project snapshot
-moss --compact overview
+# Get project overview
+moss analyze --overview
 
-# Example output:
-# health: B (82%) - 45 files, 12K lines (45% docs)
-#   - docs: Documentation coverage is only 45%
-# deps: 5 direct, 2 dev
-# docs: 45% coverage
-# todos: 3 pending, 8 done
-#   - Add input validation to forms
-#   - Refactor auth module
-# refs: ok
+# View codebase structure
+moss view
+
+# View a specific file's symbols
+moss view src/main.rs
 ```
 
 ## Essential Commands
 
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
-| `moss --compact overview` | Project health snapshot | First thing when entering a codebase |
-| `moss skeleton src/` | Code structure (classes, functions) | Understanding architecture |
-| `moss deps FILE` | Import/export analysis | Before modifying a file |
-| `moss external-deps` | PyPI/npm dependency tree | Checking for vulns, bloat |
-| `moss summarize` | Codebase summary | Getting oriented |
-| `moss check-refs` | Find broken references | After refactoring |
+| `moss analyze --overview` | Project health snapshot | First thing when entering a codebase |
+| `moss view src/` | Code structure (symbols, hierarchy) | Understanding architecture |
+| `moss view --deps FILE` | Import/export analysis | Before modifying a file |
+| `moss analyze --health` | Codebase metrics and health score | Checking project state |
+| `moss grep "pattern"` | Search code | Finding usage, definitions |
+| `moss package audit` | Security vulnerability scan | Checking dependencies |
 
 ## Output Modes
 
 ```bash
-moss CMD                 # Human-readable (full details)
-moss --compact CMD       # Concise but informative (recommended for LLMs)
-moss --json CMD          # Structured data (verbose, not token-efficient)
+moss view FILE           # Human-readable tree format
+moss view FILE --json    # Structured JSON output
 ```
 
-Prefer `--compact` over `--json` - JSON has lots of quotes and braces that waste tokens.
-
-## Presets for CI/Quick Checks
-
-```bash
-moss overview --preset ci      # health + deps, strict mode
-moss overview --preset quick   # just health check
-moss overview --preset full    # all checks
-```
+JSON is useful for parsing but more verbose. Plain text is token-efficient.
 
 ## Common Workflows
 
 **Starting work on a codebase:**
 ```bash
-moss --compact overview        # Quick health check
-moss skeleton src/             # See structure
-moss summarize                 # Get summary
+moss analyze --overview   # Quick health check
+moss view                 # See structure
+moss view src/            # Drill into source
 ```
 
 **Before modifying a file:**
 ```bash
-moss deps src/module.py        # What does it import/export?
-moss skeleton src/module.py    # What's in it?
+moss view --deps FILE     # What does it import/export?
+moss view FILE            # What symbols are in it?
+moss view FILE/ClassName  # View specific symbol
+```
+
+**Understanding a symbol:**
+```bash
+moss view FILE/symbol            # See signature and docstring
+moss view --full FILE/symbol     # Full source code
+moss analyze --calls FILE/symbol # What does it call?
+moss analyze --called-by symbol  # What calls it?
 ```
 
 **After making changes:**
 ```bash
-moss check-refs                # Any broken imports?
-moss --compact health          # Did we break anything?
+moss lint                  # Run linters
+moss analyze --lint        # Full lint analysis
+moss analyze --health      # Health check
 ```
 
 **Checking dependencies:**
 ```bash
-moss external-deps --check-vulns    # Security vulnerabilities
-moss external-deps --warn-weight 5  # Heavy dependencies
+moss package list          # Show dependencies
+moss package tree          # Dependency tree
+moss package audit         # Security vulnerabilities
+moss package why tokio     # Why is this included?
+```
+
+**Finding code:**
+```bash
+moss grep "TODO"           # Search for patterns
+moss grep "fn main" -i     # Case insensitive
+```
+
+## Key Commands
+
+### view - Navigate Code
+
+```bash
+moss view                     # Project tree
+moss view src/main.rs         # File symbols
+moss view src/main.rs/MyClass # Specific symbol
+moss view --full FILE/symbol  # Full source
+moss view --deps FILE         # Dependencies
+moss view -d 2                # Depth 2 (nested symbols)
+```
+
+### analyze - Analysis
+
+```bash
+moss analyze                  # Health + complexity + security
+moss analyze --overview       # Comprehensive overview
+moss analyze --health         # Health metrics
+moss analyze --complexity     # Cyclomatic complexity
+moss analyze --lint           # Run all linters
+moss analyze --hotspots       # High-churn files
+```
+
+### lint - Linters
+
+```bash
+moss lint                     # Auto-detect and run
+moss lint --fix               # Auto-fix issues
+moss lint --list              # Available tools
+```
+
+### grep - Search
+
+```bash
+moss grep "pattern"           # Full codebase search
+moss grep "TODO" --glob "*.rs"
 ```
 
 ## Key Insights
 
-- Use `--compact` for informative yet concise output (best for LLMs)
-- `overview` shows health, issues, TODOs, and next actions in one command
-- `skeleton` shows structure without reading full files
-- `deps` shows what a file imports and exports
-- Avoid `--json` unless you need structured data - plain text is more token-efficient
+- `moss view` is the primary navigation command - works on dirs, files, and symbols
+- `moss analyze` is the primary analysis command - health, complexity, security, lint
+- `moss grep` for text search, `moss view` for structural navigation
+- Use `--json` when you need to parse output programmatically
+- The index (`.moss/index.sqlite`) caches symbols for fast lookups
