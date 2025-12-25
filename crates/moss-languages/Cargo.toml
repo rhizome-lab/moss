@@ -26,6 +26,8 @@ all-languages = [
     "lang-nix", "lang-perl", "lang-r", "lang-julia", "lang-elm", "lang-cmake",
     "lang-vim", "lang-awk", "lang-fish", "lang-jq", "lang-powershell",
     "lang-zsh", "lang-groovy", "lang-glsl", "lang-hlsl",
+    "lang-commonlisp", "lang-elisp", "lang-gleam", "lang-scheme",
+    "lang-ini", "lang-diff", "lang-dot", "lang-kdl",
 ]
 
 # Tier 1: Most common languages
@@ -90,3 +92,11 @@ lang-zsh = ["arborium/lang-zsh"]
 lang-groovy = ["arborium/lang-groovy"]
 lang-glsl = ["arborium/lang-glsl"]
 lang-hlsl = ["arborium/lang-hlsl"]
+lang-commonlisp = ["arborium/lang-commonlisp"]
+lang-elisp = ["arborium/lang-elisp"]
+lang-gleam = ["arborium/lang-gleam"]
+lang-scheme = ["arborium/lang-scheme"]
+lang-ini = ["arborium/lang-ini"]
+lang-diff = ["arborium/lang-diff"]
+lang-dot = ["arborium/lang-dot"]
+lang-kdl = ["arborium/lang-kdl"]

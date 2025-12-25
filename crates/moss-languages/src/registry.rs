@@ -185,6 +185,30 @@ fn init_builtin() {
 
         #[cfg(feature = "lang-hlsl")]
         register(&crate::hlsl::Hlsl);
+
+        #[cfg(feature = "lang-commonlisp")]
+        register(&crate::commonlisp::CommonLisp);
+
+        #[cfg(feature = "lang-elisp")]
+        register(&crate::elisp::Elisp);
+
+        #[cfg(feature = "lang-gleam")]
+        register(&crate::gleam::Gleam);
+
+        #[cfg(feature = "lang-scheme")]
+        register(&crate::scheme::Scheme);
+
+        #[cfg(feature = "lang-ini")]
+        register(&crate::ini::Ini);
+
+        #[cfg(feature = "lang-diff")]
+        register(&crate::diff::Diff);
+
+        #[cfg(feature = "lang-dot")]
+        register(&crate::dot::Dot);
+
+        #[cfg(feature = "lang-kdl")]
+        register(&crate::kdl::Kdl);
     });
 }
 

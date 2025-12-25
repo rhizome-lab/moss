@@ -191,6 +191,30 @@ pub mod glsl;
 #[cfg(feature = "lang-hlsl")]
 pub mod hlsl;
 
+#[cfg(feature = "lang-commonlisp")]
+pub mod commonlisp;
+
+#[cfg(feature = "lang-elisp")]
+pub mod elisp;
+
+#[cfg(feature = "lang-gleam")]
+pub mod gleam;
+
+#[cfg(feature = "lang-scheme")]
+pub mod scheme;
+
+#[cfg(feature = "lang-ini")]
+pub mod ini;
+
+#[cfg(feature = "lang-diff")]
+pub mod diff;
+
+#[cfg(feature = "lang-dot")]
+pub mod dot;
+
+#[cfg(feature = "lang-kdl")]
+pub mod kdl;
+
 // Re-exports from registry
 pub use registry::{register, support_for_extension, support_for_grammar, support_for_path, supported_languages, validate_unused_kinds_audit};
 
@@ -359,3 +383,27 @@ pub use glsl::Glsl;
 
 #[cfg(feature = "lang-hlsl")]
 pub use hlsl::Hlsl;
+
+#[cfg(feature = "lang-commonlisp")]
+pub use commonlisp::CommonLisp;
+
+#[cfg(feature = "lang-elisp")]
+pub use elisp::Elisp;
+
+#[cfg(feature = "lang-gleam")]
+pub use gleam::Gleam;
+
+#[cfg(feature = "lang-scheme")]
+pub use scheme::Scheme;
+
+#[cfg(feature = "lang-ini")]
+pub use ini::Ini;
+
+#[cfg(feature = "lang-diff")]
+pub use diff::Diff;
+
+#[cfg(feature = "lang-dot")]
+pub use dot::Dot;
+
+#[cfg(feature = "lang-kdl")]
+pub use kdl::Kdl;
