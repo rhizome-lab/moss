@@ -245,6 +245,54 @@ impl FileIndex {
         &self.conn
     }
 
+    /// Fast heuristic check: are there likely any changes?
+    /// Checks index emptiness and key directory mtimes vs last_indexed timestamp.
+    /// False negatives are OK (we'll catch changes on next full walk).
+    fn likely_has_changes(&self) -> bool {
+        // Check if index is empty
+        let file_count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))
+            .unwrap_or(0);
+        if file_count == 0 {
+            return true;
+        }
+
+        let last_indexed: i64 = self
+            .conn
+            .query_row(
+                "SELECT CAST(value AS INTEGER) FROM meta WHERE key = 'last_indexed'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+
+        // If never indexed, need refresh
+        if last_indexed == 0 {
+            return true;
+        }
+
+        // Check mtimes of common source directories
+        for dir in &["src", "lib", "crates", "packages", "apps"] {
+            let path = self.root.join(dir);
+            if path.exists() {
+                if let Ok(meta) = path.metadata() {
+                    if let Ok(mtime) = meta.modified() {
+                        let mtime_secs = mtime
+                            .duration_since(UNIX_EPOCH)
+                            .map(|d| d.as_secs() as i64)
+                            .unwrap_or(0);
+                        if mtime_secs > last_indexed {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
     /// Get files that have changed since last index
     pub fn get_changed_files(&self) -> rusqlite::Result<ChangedFiles> {
         let mut result = ChangedFiles::default();
@@ -316,6 +364,12 @@ impl FileIndex {
     /// Refresh only files that have changed (faster than full refresh)
     /// Returns number of files updated
     pub fn incremental_refresh(&mut self) -> rusqlite::Result<usize> {
+        // Fast path: check if any common source directories have changed
+        // This avoids expensive full filesystem walk when nothing changed
+        if !self.likely_has_changes() {
+            return Ok(0);
+        }
+
         let changed = self.get_changed_files()?;
         let total_changes = changed.added.len() + changed.modified.len() + changed.deleted.len();
 
