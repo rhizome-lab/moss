@@ -263,6 +263,66 @@ pub mod rescript;
 #[cfg(feature = "lang-lean")]
 pub mod lean;
 
+#[cfg(feature = "lang-caddy")]
+pub mod caddy;
+
+#[cfg(feature = "lang-capnp")]
+pub mod capnp;
+
+#[cfg(feature = "lang-devicetree")]
+pub mod devicetree;
+
+#[cfg(feature = "lang-jinja2")]
+pub mod jinja2;
+
+#[cfg(feature = "lang-ninja")]
+pub mod ninja;
+
+#[cfg(feature = "lang-postscript")]
+pub mod postscript;
+
+#[cfg(feature = "lang-query")]
+pub mod query;
+
+#[cfg(feature = "lang-ron")]
+pub mod ron;
+
+#[cfg(feature = "lang-sparql")]
+pub mod sparql;
+
+#[cfg(feature = "lang-ssh-config")]
+pub mod sshconfig;
+
+#[cfg(feature = "lang-starlark")]
+pub mod starlark;
+
+#[cfg(feature = "lang-textproto")]
+pub mod textproto;
+
+#[cfg(feature = "lang-thrift")]
+pub mod thrift;
+
+#[cfg(feature = "lang-tlaplus")]
+pub mod tlaplus;
+
+#[cfg(feature = "lang-uiua")]
+pub mod uiua;
+
+#[cfg(feature = "lang-verilog")]
+pub mod verilog;
+
+#[cfg(feature = "lang-vhdl")]
+pub mod vhdl;
+
+#[cfg(feature = "lang-wit")]
+pub mod wit;
+
+#[cfg(feature = "lang-x86asm")]
+pub mod x86asm;
+
+#[cfg(feature = "lang-yuri")]
+pub mod yuri;
+
 // Re-exports from registry
 pub use registry::{register, support_for_extension, support_for_grammar, support_for_path, supported_languages, validate_unused_kinds_audit};
 
@@ -503,3 +563,63 @@ pub use rescript::ReScript;
 
 #[cfg(feature = "lang-lean")]
 pub use lean::Lean;
+
+#[cfg(feature = "lang-caddy")]
+pub use caddy::Caddy;
+
+#[cfg(feature = "lang-capnp")]
+pub use capnp::Capnp;
+
+#[cfg(feature = "lang-devicetree")]
+pub use devicetree::DeviceTree;
+
+#[cfg(feature = "lang-jinja2")]
+pub use jinja2::Jinja2;
+
+#[cfg(feature = "lang-ninja")]
+pub use ninja::Ninja;
+
+#[cfg(feature = "lang-postscript")]
+pub use postscript::PostScript;
+
+#[cfg(feature = "lang-query")]
+pub use query::Query;
+
+#[cfg(feature = "lang-ron")]
+pub use ron::Ron;
+
+#[cfg(feature = "lang-sparql")]
+pub use sparql::Sparql;
+
+#[cfg(feature = "lang-ssh-config")]
+pub use sshconfig::SshConfig;
+
+#[cfg(feature = "lang-starlark")]
+pub use starlark::Starlark;
+
+#[cfg(feature = "lang-textproto")]
+pub use textproto::TextProto;
+
+#[cfg(feature = "lang-thrift")]
+pub use thrift::Thrift;
+
+#[cfg(feature = "lang-tlaplus")]
+pub use tlaplus::TlaPlus;
+
+#[cfg(feature = "lang-uiua")]
+pub use uiua::Uiua;
+
+#[cfg(feature = "lang-verilog")]
+pub use verilog::Verilog;
+
+#[cfg(feature = "lang-vhdl")]
+pub use vhdl::Vhdl;
+
+#[cfg(feature = "lang-wit")]
+pub use wit::Wit;
+
+#[cfg(feature = "lang-x86asm")]
+pub use x86asm::X86Asm;
+
+#[cfg(feature = "lang-yuri")]
+pub use yuri::Yuri;

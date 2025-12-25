@@ -32,6 +32,11 @@ all-languages = [
     "lang-meson", "lang-nginx", "lang-prolog", "lang-batch",
     "lang-asm", "lang-objc", "lang-typst", "lang-asciidoc",
     "lang-vb", "lang-idris", "lang-rescript", "lang-lean",
+    "lang-caddy", "lang-capnp", "lang-devicetree", "lang-jinja2",
+    "lang-ninja", "lang-postscript", "lang-query", "lang-ron",
+    "lang-sparql", "lang-ssh-config", "lang-starlark", "lang-textproto",
+    "lang-thrift", "lang-tlaplus", "lang-uiua",
+    "lang-verilog", "lang-vhdl", "lang-wit", "lang-x86asm", "lang-yuri",
 ]
 
 # Tier 1: Most common languages
@@ -120,3 +125,23 @@ lang-vb = ["arborium/lang-vb"]
 lang-idris = ["arborium/lang-idris"]
 lang-rescript = ["arborium/lang-rescript"]
 lang-lean = ["arborium/lang-lean"]
+lang-caddy = ["arborium/lang-caddy"]
+lang-capnp = ["arborium/lang-capnp"]
+lang-devicetree = ["arborium/lang-devicetree"]
+lang-jinja2 = ["arborium/lang-jinja2"]
+lang-ninja = ["arborium/lang-ninja"]
+lang-postscript = ["arborium/lang-postscript"]
+lang-query = ["arborium/lang-query"]
+lang-ron = ["arborium/lang-ron"]
+lang-sparql = ["arborium/lang-sparql"]
+lang-ssh-config = ["arborium/lang-ssh-config"]
+lang-starlark = ["arborium/lang-starlark"]
+lang-textproto = ["arborium/lang-textproto"]
+lang-thrift = ["arborium/lang-thrift"]
+lang-tlaplus = ["arborium/lang-tlaplus"]
+lang-uiua = ["arborium/lang-uiua"]
+lang-verilog = ["arborium/lang-verilog"]
+lang-vhdl = ["arborium/lang-vhdl"]
+lang-wit = ["arborium/lang-wit"]
+lang-x86asm = ["arborium/lang-x86asm"]
+lang-yuri = ["arborium/lang-yuri"]

@@ -1,0 +1,133 @@
+//! Tree-sitter query language support.
+
+use std::path::{Path, PathBuf};
+use crate::{Export, Import, Language, Symbol, SymbolKind, Visibility, VisibilityMechanism};
+use crate::external_packages::ResolvedPackage;
+use moss_core::tree_sitter::Node;
+
+/// Tree-sitter query language support.
+pub struct Query;
+
+impl Language for Query {
+    fn name(&self) -> &'static str { "Query" }
+    fn extensions(&self) -> &'static [&'static str] { &["scm"] }
+    fn grammar_name(&self) -> &'static str { "query" }
+
+    fn has_symbols(&self) -> bool { true }
+
+    fn container_kinds(&self) -> &'static [&'static str] { &[] }
+
+    fn function_kinds(&self) -> &'static [&'static str] { &[] }
+
+    fn type_kinds(&self) -> &'static [&'static str] { &[] }
+
+    fn import_kinds(&self) -> &'static [&'static str] { &[] }
+
+    fn public_symbol_kinds(&self) -> &'static [&'static str] {
+        &["named_node", "capture"]
+    }
+
+    fn visibility_mechanism(&self) -> VisibilityMechanism {
+        VisibilityMechanism::AllPublic
+    }
+
+    fn extract_public_symbols(&self, node: &Node, content: &str) -> Vec<Export> {
+        let kind = match node.kind() {
+            "named_node" => SymbolKind::Type,
+            "capture" => SymbolKind::Variable,
+            _ => return Vec::new(),
+        };
+
+        if let Some(name) = self.node_name(node, content) {
+            return vec![Export {
+                name: name.to_string(),
+                kind,
+                line: node.start_position().row + 1,
+            }];
+        }
+        Vec::new()
+    }
+
+    fn scope_creating_kinds(&self) -> &'static [&'static str] {
+        &["grouping"]
+    }
+
+    fn control_flow_kinds(&self) -> &'static [&'static str] { &[] }
+    fn complexity_nodes(&self) -> &'static [&'static str] { &[] }
+    fn nesting_nodes(&self) -> &'static [&'static str] { &["grouping"] }
+
+    fn extract_function(&self, _node: &Node, _content: &str, _in_container: bool) -> Option<Symbol> { None }
+    fn extract_container(&self, _node: &Node, _content: &str) -> Option<Symbol> { None }
+    fn extract_type(&self, _node: &Node, _content: &str) -> Option<Symbol> { None }
+    fn extract_docstring(&self, _node: &Node, _content: &str) -> Option<String> { None }
+
+    fn extract_imports(&self, _node: &Node, _content: &str) -> Vec<Import> { Vec::new() }
+
+    fn is_public(&self, _node: &Node, _content: &str) -> bool { true }
+    fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility { Visibility::Public }
+
+    fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> { None }
+
+    fn container_body<'a>(&self, _node: &'a Node<'a>) -> Option<Node<'a>> { None }
+
+    fn body_has_docstring(&self, _body: &Node, _content: &str) -> bool { false }
+
+    fn node_name<'a>(&self, node: &Node, content: &'a str) -> Option<&'a str> {
+        node.child_by_field_name("name")
+            .map(|n| &content[n.byte_range()])
+    }
+
+    fn file_path_to_module_name(&self, path: &Path) -> Option<String> {
+        let ext = path.extension()?.to_str()?;
+        if ext != "scm" { return None; }
+        let stem = path.file_stem()?.to_str()?;
+        Some(stem.to_string())
+    }
+
+    fn module_name_to_paths(&self, module: &str) -> Vec<String> {
+        vec![format!("{}.scm", module)]
+    }
+
+    fn lang_key(&self) -> &'static str { "query" }
+
+    fn is_stdlib_import(&self, _: &str, _: &Path) -> bool { false }
+    fn find_stdlib(&self, _: &Path) -> Option<PathBuf> { None }
+    fn resolve_local_import(&self, _: &str, _: &Path, _: &Path) -> Option<PathBuf> { None }
+    fn resolve_external_import(&self, _: &str, _: &Path) -> Option<ResolvedPackage> { None }
+    fn get_version(&self, _: &Path) -> Option<String> { None }
+    fn find_package_cache(&self, _: &Path) -> Option<PathBuf> { None }
+    fn indexable_extensions(&self) -> &'static [&'static str] { &["scm"] }
+    fn package_sources(&self, _: &Path) -> Vec<crate::PackageSource> { Vec::new() }
+
+    fn should_skip_package_entry(&self, name: &str, is_dir: bool) -> bool {
+        use crate::traits::{skip_dotfiles, has_extension};
+        if skip_dotfiles(name) { return true; }
+        !is_dir && !has_extension(name, &["scm"])
+    }
+
+    fn discover_packages(&self, _: &crate::PackageSource) -> Vec<(String, PathBuf)> { Vec::new() }
+
+    fn package_module_name(&self, entry_name: &str) -> String {
+        entry_name.strip_suffix(".scm").unwrap_or(entry_name).to_string()
+    }
+
+    fn find_package_entry(&self, path: &Path) -> Option<PathBuf> {
+        if path.is_file() { Some(path.to_path_buf()) } else { None }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validate_unused_kinds_audit;
+
+    #[test]
+    fn unused_node_kinds_audit() {
+        #[rustfmt::skip]
+        let documented_unused: &[&str] = &[
+            "identifier", "quantifier", "field_definition", "predicate_type",
+        ];
+        validate_unused_kinds_audit(&Query, documented_unused)
+            .expect("Query unused node kinds audit failed");
+    }
+}

@@ -257,6 +257,66 @@ fn init_builtin() {
 
         #[cfg(feature = "lang-lean")]
         register(&crate::lean::Lean);
+
+        #[cfg(feature = "lang-caddy")]
+        register(&crate::caddy::Caddy);
+
+        #[cfg(feature = "lang-capnp")]
+        register(&crate::capnp::Capnp);
+
+        #[cfg(feature = "lang-devicetree")]
+        register(&crate::devicetree::DeviceTree);
+
+        #[cfg(feature = "lang-jinja2")]
+        register(&crate::jinja2::Jinja2);
+
+        #[cfg(feature = "lang-ninja")]
+        register(&crate::ninja::Ninja);
+
+        #[cfg(feature = "lang-postscript")]
+        register(&crate::postscript::PostScript);
+
+        #[cfg(feature = "lang-query")]
+        register(&crate::query::Query);
+
+        #[cfg(feature = "lang-ron")]
+        register(&crate::ron::Ron);
+
+        #[cfg(feature = "lang-sparql")]
+        register(&crate::sparql::Sparql);
+
+        #[cfg(feature = "lang-ssh-config")]
+        register(&crate::sshconfig::SshConfig);
+
+        #[cfg(feature = "lang-starlark")]
+        register(&crate::starlark::Starlark);
+
+        #[cfg(feature = "lang-textproto")]
+        register(&crate::textproto::TextProto);
+
+        #[cfg(feature = "lang-thrift")]
+        register(&crate::thrift::Thrift);
+
+        #[cfg(feature = "lang-tlaplus")]
+        register(&crate::tlaplus::TlaPlus);
+
+        #[cfg(feature = "lang-uiua")]
+        register(&crate::uiua::Uiua);
+
+        #[cfg(feature = "lang-verilog")]
+        register(&crate::verilog::Verilog);
+
+        #[cfg(feature = "lang-vhdl")]
+        register(&crate::vhdl::Vhdl);
+
+        #[cfg(feature = "lang-wit")]
+        register(&crate::wit::Wit);
+
+        #[cfg(feature = "lang-x86asm")]
+        register(&crate::x86asm::X86Asm);
+
+        #[cfg(feature = "lang-yuri")]
+        register(&crate::yuri::Yuri);
     });
 }
 
