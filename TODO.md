@@ -4,10 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-1. Integration: wire linters into `moss analyze` as unified check runner
-2. OutputFormatter trait for consistent JSON/text output
-3. VS Code extension: test and publish to marketplace
-4. `moss analyze --hotspots` - git history analysis
+1. OutputFormatter trait for consistent JSON/text output
+2. VS Code extension: test and publish to marketplace
+3. Daemon integration: complete FileIndex API methods
+4. LSP refactor actions (rename symbol across files)
 
 Test Status: 107 passing, 0 failing (moss-languages)
 
@@ -64,7 +64,7 @@ Consider porting to Rust:
 - [ ] `cmd_check_refs` - bidirectional code/doc reference checking (could be `moss analyze --check-refs`)
 - [x] `moss package audit` - dependency analysis with vuln checking
 - [x] `moss package why <dep>` - show why a dependency is in the tree (like `npm why`)
-- [ ] `cmd_git_hotspots` - git history analysis (could be `moss analyze --hotspots`)
+- [x] `moss analyze --hotspots` - git history analysis (churn + complexity)
 
 Consolidate to subcommands:
 - [x] `cmd_analyze_session` / `cmd_telemetry` / `cmd_extract_preferences` → `moss session {analyze,telemetry,prefs}` (deleted from Python CLI)
@@ -169,7 +169,7 @@ Current scaffold is TOML state machines. Needs design work:
 - [x] Custom tools: .moss/tools.toml config, SARIF/JSON consumption
 - [x] Package manager cascade: pnpm exec, npx, pnpm dlx, global (JS); uv run, pipx run, global (Python)
 - [x] Watch mode: run relevant linters on file changes with debounce
-- [ ] Integration: wire into `moss analyze` as unified check runner
+- [x] Integration: `moss analyze --lint` runs all detected linters
 
 **VS Code Extension (editors/vscode/):**
 - [x] Update extension to use Rust CLI instead of Python

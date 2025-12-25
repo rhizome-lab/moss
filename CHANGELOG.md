@@ -23,6 +23,15 @@ New `moss package` subcommands:
   - cargo (cargo-audit), npm (npm audit), python (pip-audit), go (govulncheck), gem (bundle-audit)
   - Human-readable and `--json` output
 
+### Analyze Command Enhancements
+
+New flags for comprehensive codebase analysis:
+- **--lint**: Run all detected linters and show diagnostics
+- **--hotspots**: Git history analysis (churn × complexity scoring)
+  - Shows top 20 bug-prone files sorted by risk score
+  - Score = commits × √churn × (1 + avgComplexity/10)
+  - Combines git log data with indexed complexity
+
 ### Unified Linting
 
 New adapters added to moss-tools:
