@@ -239,6 +239,30 @@ pub mod prolog;
 #[cfg(feature = "lang-batch")]
 pub mod batch;
 
+#[cfg(feature = "lang-asm")]
+pub mod asm;
+
+#[cfg(feature = "lang-objc")]
+pub mod objc;
+
+#[cfg(feature = "lang-typst")]
+pub mod typst;
+
+#[cfg(feature = "lang-asciidoc")]
+pub mod asciidoc;
+
+#[cfg(feature = "lang-vb")]
+pub mod vb;
+
+#[cfg(feature = "lang-idris")]
+pub mod idris;
+
+#[cfg(feature = "lang-rescript")]
+pub mod rescript;
+
+#[cfg(feature = "lang-lean")]
+pub mod lean;
+
 // Re-exports from registry
 pub use registry::{register, support_for_extension, support_for_grammar, support_for_path, supported_languages, validate_unused_kinds_audit};
 
@@ -455,3 +479,27 @@ pub use prolog::Prolog;
 
 #[cfg(feature = "lang-batch")]
 pub use batch::Batch;
+
+#[cfg(feature = "lang-asm")]
+pub use asm::Asm;
+
+#[cfg(feature = "lang-objc")]
+pub use objc::ObjC;
+
+#[cfg(feature = "lang-typst")]
+pub use typst::Typst;
+
+#[cfg(feature = "lang-asciidoc")]
+pub use asciidoc::AsciiDoc;
+
+#[cfg(feature = "lang-vb")]
+pub use vb::VB;
+
+#[cfg(feature = "lang-idris")]
+pub use idris::Idris;
+
+#[cfg(feature = "lang-rescript")]
+pub use rescript::ReScript;
+
+#[cfg(feature = "lang-lean")]
+pub use lean::Lean;

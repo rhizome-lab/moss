@@ -30,6 +30,8 @@ all-languages = [
     "lang-ini", "lang-diff", "lang-dot", "lang-kdl",
     "lang-ada", "lang-agda", "lang-d", "lang-matlab",
     "lang-meson", "lang-nginx", "lang-prolog", "lang-batch",
+    "lang-asm", "lang-objc", "lang-typst", "lang-asciidoc",
+    "lang-vb", "lang-idris", "lang-rescript", "lang-lean",
 ]
 
 # Tier 1: Most common languages
@@ -110,3 +112,11 @@ lang-meson = ["arborium/lang-meson"]
 lang-nginx = ["arborium/lang-nginx"]
 lang-prolog = ["arborium/lang-prolog"]
 lang-batch = ["arborium/lang-batch"]
+lang-asm = ["arborium/lang-asm"]
+lang-objc = ["arborium/lang-objc"]
+lang-typst = ["arborium/lang-typst"]
+lang-asciidoc = ["arborium/lang-asciidoc"]
+lang-vb = ["arborium/lang-vb"]
+lang-idris = ["arborium/lang-idris"]
+lang-rescript = ["arborium/lang-rescript"]
+lang-lean = ["arborium/lang-lean"]

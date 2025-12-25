@@ -233,6 +233,30 @@ fn init_builtin() {
 
         #[cfg(feature = "lang-batch")]
         register(&crate::batch::Batch);
+
+        #[cfg(feature = "lang-asm")]
+        register(&crate::asm::Asm);
+
+        #[cfg(feature = "lang-objc")]
+        register(&crate::objc::ObjC);
+
+        #[cfg(feature = "lang-typst")]
+        register(&crate::typst::Typst);
+
+        #[cfg(feature = "lang-asciidoc")]
+        register(&crate::asciidoc::AsciiDoc);
+
+        #[cfg(feature = "lang-vb")]
+        register(&crate::vb::VB);
+
+        #[cfg(feature = "lang-idris")]
+        register(&crate::idris::Idris);
+
+        #[cfg(feature = "lang-rescript")]
+        register(&crate::rescript::ReScript);
+
+        #[cfg(feature = "lang-lean")]
+        register(&crate::lean::Lean);
     });
 }
 
