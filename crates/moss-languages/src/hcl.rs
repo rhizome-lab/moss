@@ -64,11 +64,11 @@ impl Language for Hcl {
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["conditional", "for_expression"]
+        &["conditional", "for_expr"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["conditional", "for_expression"]
+        &["conditional", "for_expr"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {

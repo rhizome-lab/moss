@@ -28,7 +28,7 @@ impl Language for Dart {
     }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_specification", "export_statement"]
+        &["import_specification", "library_export"]
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
@@ -73,12 +73,12 @@ impl Language for Dart {
     fn control_flow_kinds(&self) -> &'static [&'static str] {
         &["if_statement", "for_statement", "while_statement", "do_statement",
           "switch_statement", "try_statement", "return_statement", "break_statement",
-          "continue_statement", "throw_expression", "rethrow_statement"]
+          "continue_statement", "throw_expression", "rethrow_expression"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
         &["if_statement", "for_statement", "while_statement", "do_statement",
-          "switch_case", "catch_clause", "conditional_expression", "logical_and_expression", "logical_or_expression"]
+          "switch_statement_case", "catch_clause", "conditional_expression", "logical_and_expression", "logical_or_expression"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
@@ -179,7 +179,7 @@ impl Language for Dart {
     }
 
     fn extract_imports(&self, node: &Node, content: &str) -> Vec<Import> {
-        if node.kind() != "import_specification" && node.kind() != "export_statement" {
+        if node.kind() != "import_specification" && node.kind() != "library_export" {
             return Vec::new();
         }
 

@@ -33,10 +33,7 @@ impl Language for Bash {
             "if_statement",
             "for_statement",
             "while_statement",
-            "until_statement",
             "case_statement",
-            "return_statement",
-            "exit_statement",
         ]
     }
 
@@ -46,7 +43,6 @@ impl Language for Bash {
             "elif_clause",
             "for_statement",
             "while_statement",
-            "until_statement",
             "case_statement",
             "case_item",
             "pipeline", // | chains
@@ -59,7 +55,6 @@ impl Language for Bash {
             "if_statement",
             "for_statement",
             "while_statement",
-            "until_statement",
             "case_statement",
             "function_definition",
             "subshell",

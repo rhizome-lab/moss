@@ -52,7 +52,6 @@ impl Language for Ruby {
             "next",
             "redo",
             "retry",
-            "raise",
             "begin",
         ]
     }

@@ -16,7 +16,7 @@ impl Language for FSharp {
     fn has_symbols(&self) -> bool { true }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        &["module_defn", "type_definition", "class_definition"]
+        &["module_defn", "type_definition"]
     }
 
     fn function_kinds(&self) -> &'static [&'static str] {
@@ -24,11 +24,11 @@ impl Language for FSharp {
     }
 
     fn type_kinds(&self) -> &'static [&'static str] {
-        &["type_definition", "record_type_defn", "union_type_defn", "class_definition"]
+        &["type_definition", "record_type_defn", "union_type_defn"]
     }
 
     fn import_kinds(&self) -> &'static [&'static str] {
-        &["import_decl", "open_decl"]
+        &["import_decl"]
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
@@ -54,7 +54,6 @@ impl Language for FSharp {
             "member_defn" => SymbolKind::Method,
             "type_definition" | "record_type_defn" => SymbolKind::Struct,
             "union_type_defn" => SymbolKind::Enum,
-            "class_definition" => SymbolKind::Class,
             "module_defn" => SymbolKind::Module,
             _ => return Vec::new(),
         };
@@ -76,7 +75,7 @@ impl Language for FSharp {
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_expression", "match_clause", "for_expression", "while_expression",
+        &["if_expression", "rule", "for_expression", "while_expression",
           "try_expression", "infix_expression"]
     }
 
@@ -112,7 +111,6 @@ impl Language for FSharp {
         let (kind, keyword) = match node.kind() {
             "union_type_defn" => (SymbolKind::Enum, "type"),
             "record_type_defn" => (SymbolKind::Struct, "type"),
-            "class_definition" => (SymbolKind::Class, "type"),
             "module_defn" => (SymbolKind::Module, "module"),
             _ => (SymbolKind::Struct, "type"),
         };

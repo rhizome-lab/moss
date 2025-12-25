@@ -310,19 +310,19 @@ impl Language for Go {
     }
 
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
-        &["for_statement", "if_statement", "switch_statement", "select_statement", "block"]
+        &["for_statement", "if_statement", "expression_switch_statement", "type_switch_statement", "select_statement", "block"]
     }
 
     fn control_flow_kinds(&self) -> &'static [&'static str] {
-        &["if_statement", "for_statement", "switch_statement", "select_statement", "return_statement", "break_statement", "continue_statement", "goto_statement", "defer_statement"]
+        &["if_statement", "for_statement", "expression_switch_statement", "type_switch_statement", "select_statement", "return_statement", "break_statement", "continue_statement", "goto_statement", "defer_statement"]
     }
 
     fn complexity_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "for_statement", "switch_statement", "select_statement", "expression_case", "type_case", "communication_case", "binary_expression"]
+        &["if_statement", "for_statement", "expression_switch_statement", "type_switch_statement", "select_statement", "expression_case", "type_case", "communication_case", "binary_expression"]
     }
 
     fn nesting_nodes(&self) -> &'static [&'static str] {
-        &["if_statement", "for_statement", "switch_statement", "select_statement", "function_declaration", "method_declaration"]
+        &["if_statement", "for_statement", "expression_switch_statement", "type_switch_statement", "select_statement", "function_declaration", "method_declaration"]
     }
 
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {

@@ -30,7 +30,7 @@ impl Language for Scss {
     }
 
     fn public_symbol_kinds(&self) -> &'static [&'static str] {
-        &["mixin_statement", "function_statement", "variable_declaration"]
+        &["mixin_statement", "function_statement"]
     }
 
     fn visibility_mechanism(&self) -> VisibilityMechanism {
@@ -49,9 +49,7 @@ impl Language for Scss {
         }
 
         let kind = match node.kind() {
-            "mixin_statement" => SymbolKind::Function,
-            "function_statement" => SymbolKind::Function,
-            "variable_declaration" => SymbolKind::Variable,
+            "mixin_statement" | "function_statement" => SymbolKind::Function,
             _ => return Vec::new(),
         };
 
