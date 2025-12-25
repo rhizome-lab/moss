@@ -128,6 +128,21 @@ fn init_builtin() {
 
         #[cfg(feature = "lang-svelte")]
         register(&crate::svelte::Svelte);
+
+        #[cfg(feature = "lang-xml")]
+        register(&crate::xml::Xml);
+
+        #[cfg(feature = "lang-clojure")]
+        register(&crate::clojure::Clojure);
+
+        #[cfg(feature = "lang-haskell")]
+        register(&crate::haskell::Haskell);
+
+        #[cfg(feature = "lang-ocaml")]
+        register(&crate::ocaml::OCaml);
+
+        #[cfg(feature = "lang-nix")]
+        register(&crate::nix::Nix);
     });
 }
 

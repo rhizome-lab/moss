@@ -22,7 +22,8 @@ all-languages = [
     "lang-toml", "lang-html", "lang-css", "lang-bash",
     "lang-lua", "lang-zig", "lang-elixir", "lang-erlang", "lang-dart",
     "lang-fsharp", "lang-sql", "lang-graphql", "lang-hcl", "lang-scss",
-    "lang-svelte",
+    "lang-svelte", "lang-xml", "lang-clojure", "lang-haskell", "lang-ocaml",
+    "lang-nix",
 ]
 
 # Tier 1: Most common languages
@@ -68,10 +69,8 @@ lang-graphql = ["arborium/lang-graphql"]
 lang-hcl = ["arborium/lang-hcl"]
 lang-scss = ["arborium/lang-scss"]
 lang-svelte = ["arborium/lang-svelte"]
-
-# Future languages (commented until implemented)
-# lang-ocaml = ["arborium/lang-ocaml"]
-# lang-haskell = ["arborium/lang-haskell"]
-# lang-clojure = ["arborium/lang-clojure"]
-# lang-nim = ["arborium/lang-nim"]
-# lang-crystal = ["arborium/lang-crystal"]
+lang-xml = ["arborium/lang-xml"]
+lang-clojure = ["arborium/lang-clojure"]
+lang-haskell = ["arborium/lang-haskell"]
+lang-ocaml = ["arborium/lang-ocaml"]
+lang-nix = ["arborium/lang-nix"]

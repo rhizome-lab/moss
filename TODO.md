@@ -4,24 +4,24 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Add high-priority languages: xml, clojure, haskell, ocaml, nix
 - Investigate slow `moss analyze --health` (+500ms over baseline)
 - view.rs internal cleanup (see CLI Surface Cleanup)
 - Rust crate feature lookup (see Tooling)
+- Add more languages (59 remaining)
 
-Test Status: 80 passing, 0 failing
+Test Status: 85 passing, 0 failing
 
 ## Backlog
 
-**Language Support:** 34 languages implemented, 64 remaining from arborium.
+**Language Support:** 39 languages implemented, 59 remaining from arborium.
 See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to refresh.
 
 Missing languages (grouped by category):
-- **Functional:** clojure, commonlisp, elisp, elm, gleam, haskell, idris, lean, ocaml, prolog, rescript, scheme
+- **Functional:** commonlisp, elisp, elm, gleam, idris, lean, prolog, rescript, scheme
 - **Systems/Low-level:** ada, asm, d, objc, verilog, vhdl, x86asm
 - **Scripting:** awk, fish, jq, perl, powershell, r, vim, zsh
 - **Scientific:** agda, julia, matlab, typst, uiua
-- **Config/Data:** caddy, capnp, devicetree, diff, dot, ini, jinja2, kdl, meson, nginx, ninja, nix, query, ron, sparql, ssh-config, starlark, textproto, thrift, tlaplus, wit, xml, yuri
+- **Config/Data:** caddy, capnp, devicetree, diff, dot, ini, jinja2, kdl, meson, nginx, ninja, query, ron, sparql, ssh-config, starlark, textproto, thrift, tlaplus, wit, yuri
 - **Build:** batch, cmake, groovy
 - **Shaders:** glsl, hlsl
 - **Docs:** asciidoc, postscript

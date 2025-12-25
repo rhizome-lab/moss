@@ -134,6 +134,21 @@ pub mod scss;
 #[cfg(feature = "lang-svelte")]
 pub mod svelte;
 
+#[cfg(feature = "lang-xml")]
+pub mod xml;
+
+#[cfg(feature = "lang-clojure")]
+pub mod clojure;
+
+#[cfg(feature = "lang-haskell")]
+pub mod haskell;
+
+#[cfg(feature = "lang-ocaml")]
+pub mod ocaml;
+
+#[cfg(feature = "lang-nix")]
+pub mod nix;
+
 // Re-exports from registry
 pub use registry::{register, support_for_extension, support_for_grammar, support_for_path, supported_languages, validate_unused_kinds_audit};
 
@@ -245,3 +260,18 @@ pub use scss::Scss;
 
 #[cfg(feature = "lang-svelte")]
 pub use svelte::Svelte;
+
+#[cfg(feature = "lang-xml")]
+pub use xml::Xml;
+
+#[cfg(feature = "lang-clojure")]
+pub use clojure::Clojure;
+
+#[cfg(feature = "lang-haskell")]
+pub use haskell::Haskell;
+
+#[cfg(feature = "lang-ocaml")]
+pub use ocaml::OCaml;
+
+#[cfg(feature = "lang-nix")]
+pub use nix::Nix;
