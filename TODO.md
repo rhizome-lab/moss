@@ -69,6 +69,9 @@ Phase 5 - Expand (new languages):
 - LSP refactor actions (rename symbol across files)
 - Cross-language reference tracking (Python ↔ Rust)
 
+**Tooling:**
+- Avoid web search for Rust crate features: `cargo info <crate> --features` or similar offline lookup
+
 **View Filtering:**
 - Filter out tests from views (--no-tests or --exclude=tests)
 - Filter by category: tests, config files, build files, etc.

@@ -101,6 +101,39 @@ pub mod css;
 #[cfg(feature = "lang-bash")]
 pub mod bash;
 
+#[cfg(feature = "lang-lua")]
+pub mod lua;
+
+#[cfg(feature = "lang-zig")]
+pub mod zig;
+
+#[cfg(feature = "lang-elixir")]
+pub mod elixir;
+
+#[cfg(feature = "lang-erlang")]
+pub mod erlang;
+
+#[cfg(feature = "lang-dart")]
+pub mod dart;
+
+#[cfg(feature = "lang-fsharp")]
+pub mod fsharp;
+
+#[cfg(feature = "lang-sql")]
+pub mod sql;
+
+#[cfg(feature = "lang-graphql")]
+pub mod graphql;
+
+#[cfg(feature = "lang-hcl")]
+pub mod hcl;
+
+#[cfg(feature = "lang-scss")]
+pub mod scss;
+
+#[cfg(feature = "lang-svelte")]
+pub mod svelte;
+
 // Re-exports from registry
 pub use registry::{register, support_for_extension, support_for_path, supported_languages};
 
@@ -179,3 +212,36 @@ pub use css::Css;
 
 #[cfg(feature = "lang-bash")]
 pub use bash::Bash;
+
+#[cfg(feature = "lang-lua")]
+pub use lua::Lua;
+
+#[cfg(feature = "lang-zig")]
+pub use zig::Zig;
+
+#[cfg(feature = "lang-elixir")]
+pub use elixir::Elixir;
+
+#[cfg(feature = "lang-erlang")]
+pub use erlang::Erlang;
+
+#[cfg(feature = "lang-dart")]
+pub use dart::Dart;
+
+#[cfg(feature = "lang-fsharp")]
+pub use fsharp::FSharp;
+
+#[cfg(feature = "lang-sql")]
+pub use sql::Sql;
+
+#[cfg(feature = "lang-graphql")]
+pub use graphql::GraphQL;
+
+#[cfg(feature = "lang-hcl")]
+pub use hcl::Hcl;
+
+#[cfg(feature = "lang-scss")]
+pub use scss::Scss;
+
+#[cfg(feature = "lang-svelte")]
+pub use svelte::Svelte;

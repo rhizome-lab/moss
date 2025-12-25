@@ -92,6 +92,39 @@ fn init_builtin() {
 
         #[cfg(feature = "lang-bash")]
         register(&crate::bash::Bash);
+
+        #[cfg(feature = "lang-lua")]
+        register(&crate::lua::Lua);
+
+        #[cfg(feature = "lang-zig")]
+        register(&crate::zig::Zig);
+
+        #[cfg(feature = "lang-elixir")]
+        register(&crate::elixir::Elixir);
+
+        #[cfg(feature = "lang-erlang")]
+        register(&crate::erlang::Erlang);
+
+        #[cfg(feature = "lang-dart")]
+        register(&crate::dart::Dart);
+
+        #[cfg(feature = "lang-fsharp")]
+        register(&crate::fsharp::FSharp);
+
+        #[cfg(feature = "lang-sql")]
+        register(&crate::sql::Sql);
+
+        #[cfg(feature = "lang-graphql")]
+        register(&crate::graphql::GraphQL);
+
+        #[cfg(feature = "lang-hcl")]
+        register(&crate::hcl::Hcl);
+
+        #[cfg(feature = "lang-scss")]
+        register(&crate::scss::Scss);
+
+        #[cfg(feature = "lang-svelte")]
+        register(&crate::svelte::Svelte);
     });
 }
 

@@ -20,6 +20,9 @@ all-languages = [
     "lang-php", "lang-dockerfile", "lang-c", "lang-cpp", "lang-ruby",
     "lang-scala", "lang-vue", "lang-markdown", "lang-json", "lang-yaml",
     "lang-toml", "lang-html", "lang-css", "lang-bash",
+    "lang-lua", "lang-zig", "lang-elixir", "lang-erlang", "lang-dart",
+    "lang-fsharp", "lang-sql", "lang-graphql", "lang-hcl", "lang-scss",
+    "lang-svelte",
 ]
 
 # Tier 1: Most common languages
@@ -54,14 +57,21 @@ lang-swift = ["arborium/lang-swift"]
 lang-php = ["arborium/lang-php"]
 lang-dockerfile = ["arborium/lang-dockerfile"]
 
+lang-lua = ["arborium/lang-lua"]
+lang-zig = ["arborium/lang-zig"]
+lang-elixir = ["arborium/lang-elixir"]
+lang-erlang = ["arborium/lang-erlang"]
+lang-dart = ["arborium/lang-dart"]
+lang-fsharp = ["arborium/lang-fsharp"]
+lang-sql = ["arborium/lang-sql"]
+lang-graphql = ["arborium/lang-graphql"]
+lang-hcl = ["arborium/lang-hcl"]
+lang-scss = ["arborium/lang-scss"]
+lang-svelte = ["arborium/lang-svelte"]
+
 # Future languages (commented until implemented)
-# lang-dart = ["arborium/lang-dart"]
-# lang-fsharp = ["arborium/lang-fsharp"]
-# lang-elixir = ["arborium/lang-elixir"]
-# lang-zig = ["arborium/lang-zig"]
-# lang-lua = ["arborium/lang-lua"]
-# lang-sql = ["arborium/lang-sql"]
-# lang-graphql = ["arborium/lang-graphql"]
-# lang-hcl = ["arborium/lang-hcl"]
-# lang-svelte = ["arborium/lang-svelte"]
-# lang-scss = ["arborium/lang-scss"]
+# lang-ocaml = ["arborium/lang-ocaml"]
+# lang-haskell = ["arborium/lang-haskell"]
+# lang-clojure = ["arborium/lang-clojure"]
+# lang-nim = ["arborium/lang-nim"]
+# lang-crystal = ["arborium/lang-crystal"]
