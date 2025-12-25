@@ -5,9 +5,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ## Next Up
 
 1. OutputFormatter trait for consistent JSON/text output
-2. VS Code extension: test and publish to marketplace
-3. Daemon integration: complete FileIndex API methods
-4. LSP refactor actions (rename symbol across files)
+2. Daemon integration: complete FileIndex API methods
+3. LSP refactor actions (rename symbol across files)
+4. Cross-language reference tracking (Python ↔ Rust)
 
 Test Status: 107 passing, 0 failing (moss-languages)
 
@@ -203,6 +203,7 @@ Current scaffold is TOML state machines. Needs design work:
 
 ## Deferred
 
+- VS Code extension: test and publish to marketplace
 - Remaining docs: prior-art.md, hybrid-loops.md
 - Memory system: layered cross-session learning
 

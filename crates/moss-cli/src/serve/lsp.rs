@@ -77,6 +77,8 @@ impl LanguageServer for MossBackend {
                 document_symbol_provider: Some(OneOf::Left(true)),
                 workspace_symbol_provider: Some(OneOf::Left(true)),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
+                definition_provider: Some(OneOf::Left(true)),
+                references_provider: Some(OneOf::Left(true)),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -282,6 +284,200 @@ impl LanguageServer for MossBackend {
             None => Ok(None),
         }
     }
+
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+
+        let file_path = match uri.to_file_path() {
+            Ok(p) => p,
+            Err(_) => return Ok(None),
+        };
+
+        // Read file content to get the word at position
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(_) => return Ok(None),
+        };
+
+        // Get the word at the cursor position
+        let lines: Vec<&str> = content.lines().collect();
+        let line_idx = position.line as usize;
+        if line_idx >= lines.len() {
+            return Ok(None);
+        }
+
+        let line = lines[line_idx];
+        let col = position.character as usize;
+
+        // Find word boundaries
+        let word = extract_word_at_position(line, col);
+        if word.is_empty() {
+            return Ok(None);
+        }
+
+        // Search for symbol definition in index
+        let index = self.index.lock().unwrap();
+        let root = self.root.lock().unwrap();
+
+        let (index, root) = match (index.as_ref(), root.as_ref()) {
+            (Some(i), Some(r)) => (i, r),
+            _ => return Ok(None),
+        };
+
+        // Look up symbol in index
+        let matches = match index.find_symbol(&word) {
+            Ok(m) => m,
+            Err(_) => return Ok(None),
+        };
+
+        if matches.is_empty() {
+            return Ok(None);
+        }
+
+        // Return first match (could enhance to return all)
+        let (file, _kind, start_line, _end_line) = &matches[0];
+        let target_path = root.join(file);
+        let target_uri = match Url::from_file_path(&target_path) {
+            Ok(u) => u,
+            Err(_) => return Ok(None),
+        };
+
+        Ok(Some(GotoDefinitionResponse::Scalar(Location {
+            uri: target_uri,
+            range: Range {
+                start: Position {
+                    line: start_line.saturating_sub(1) as u32,
+                    character: 0,
+                },
+                end: Position {
+                    line: start_line.saturating_sub(1) as u32,
+                    character: 0,
+                },
+            },
+        })))
+    }
+
+    async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+
+        let file_path = match uri.to_file_path() {
+            Ok(p) => p,
+            Err(_) => return Ok(None),
+        };
+
+        // Read file content to get the word at position
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(_) => return Ok(None),
+        };
+
+        let lines: Vec<&str> = content.lines().collect();
+        let line_idx = position.line as usize;
+        if line_idx >= lines.len() {
+            return Ok(None);
+        }
+
+        let line = lines[line_idx];
+        let col = position.character as usize;
+        let word = extract_word_at_position(line, col);
+        if word.is_empty() {
+            return Ok(None);
+        }
+
+        let index = self.index.lock().unwrap();
+        let root = self.root.lock().unwrap();
+
+        let (index, root) = match (index.as_ref(), root.as_ref()) {
+            (Some(i), Some(r)) => (i, r),
+            _ => return Ok(None),
+        };
+
+        let mut locations = Vec::new();
+
+        // Include definition if requested
+        if params.context.include_declaration {
+            if let Ok(defs) = index.find_symbol(&word) {
+                for (file, _kind, start_line, _end_line) in defs {
+                    let target_path = root.join(&file);
+                    if let Ok(target_uri) = Url::from_file_path(&target_path) {
+                        locations.push(Location {
+                            uri: target_uri,
+                            range: Range {
+                                start: Position {
+                                    line: start_line.saturating_sub(1) as u32,
+                                    character: 0,
+                                },
+                                end: Position {
+                                    line: start_line.saturating_sub(1) as u32,
+                                    character: 0,
+                                },
+                            },
+                        });
+                    }
+                }
+            }
+        }
+
+        // Find callers (references)
+        if let Ok(callers) = index.find_callers(&word) {
+            for (file, _caller_name, line) in callers {
+                let target_path = root.join(&file);
+                if let Ok(target_uri) = Url::from_file_path(&target_path) {
+                    locations.push(Location {
+                        uri: target_uri,
+                        range: Range {
+                            start: Position {
+                                line: line.saturating_sub(1) as u32,
+                                character: 0,
+                            },
+                            end: Position {
+                                line: line.saturating_sub(1) as u32,
+                                character: 0,
+                            },
+                        },
+                    });
+                }
+            }
+        }
+
+        if locations.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(locations))
+        }
+    }
+}
+
+/// Extract the word at a given column position in a line.
+fn extract_word_at_position(line: &str, col: usize) -> String {
+    let chars: Vec<char> = line.chars().collect();
+    if col >= chars.len() {
+        return String::new();
+    }
+
+    // Find start of word
+    let mut start = col;
+    while start > 0 && is_identifier_char(chars[start - 1]) {
+        start -= 1;
+    }
+
+    // Find end of word
+    let mut end = col;
+    while end < chars.len() && is_identifier_char(chars[end]) {
+        end += 1;
+    }
+
+    chars[start..end].iter().collect()
+}
+
+/// Check if a character is valid in an identifier.
+fn is_identifier_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
 }
 
 /// Start the LSP server on stdio.
