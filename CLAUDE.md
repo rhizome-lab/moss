@@ -134,6 +134,8 @@ Keep TODO.md lean (<100 lines). Move completed items to CHANGELOG.md.
 - Active Backlog: pending items only, no completed
 - Future Work: categories with brief items
 - To Consolidate: new ideas before proper categorization
+- When completing items: mark as `[x]`, don't delete or rewrite sections
+- When cleaning up: ONLY delete `[x]` items, preserve everything else verbatim
 - Avoid: verbose descriptions, code examples, duplicate entries
 
 ### Working Style

@@ -4,9 +4,14 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- view.rs: depth 2+ on directories should show symbols inside files (currently only shows file tree)
-- view.rs: symbol JSON output uses old format, not ViewNode (inconsistent with directory/file output)
-- index: lazy reindex on query (check file mtimes, update changed files before querying)
+1. More lint adapters: mypy, pyright, eslint, deno check (follow existing pattern)
+2. `moss package why <dep>` - show why a dependency is in the tree
+3. view.rs: depth 2+ on directories should show symbols inside files
+4. view.rs: symbol JSON output should use ViewNode format
+5. Watch mode: run relevant linters on file changes
+6. `moss package audit` - vuln/license checking
+7. `moss serve http` - REST API
+8. `moss serve lsp` - LSP server
 
 Test Status: 107 passing, 0 failing (moss-languages)
 
