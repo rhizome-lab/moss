@@ -19,8 +19,6 @@ Test Status: 110 passing, 0 failing (moss-languages)
 - Edit routing: workflow engine with LLM decision points
 - Session/checkpoint: workflow state persistence
 - PR/diff analysis: `moss analyze --pr` or similar
-- Context compilation: `moss view --context` combining skeleton + deps
-
 ## Backlog
 
 **Language Support:** 98 languages implemented - all arborium grammars covered.
@@ -42,9 +40,6 @@ Current scaffold is TOML state machines. Needs design work:
 - Multi-codebase: single daemon indexing multiple roots simultaneously
 - Minimal memory footprint (currently loads full index per root)
 
-**Codegen:**
-- JSON Schema codegen: generate types from JSON schema (separate from OpenAPI)
-
 **Tooling:**
 - Structured TODO.md editing: first-class `moss todo` command to add/complete/move items without losing content (Opus 4.5 drops TODO items when editing markdown)
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
@@ -57,9 +52,6 @@ Current scaffold is TOML state machines. Needs design work:
 - Session analysis: detect correction patterns ("You're right", "Good point", "Fair point", "Should have", "Right -", "isn't working")
 - LLM code consistency: see `docs/llm-code-consistency.md` for research notes
 - Analyze long chains of uninterrupted tool calls (friction indicator)
-
-**Session Tooling:**
-- Introspect ~/.claude/plans/ - list/view saved plan files from Claude Code sessions
 
 **Distribution:**
 - Wrapper packages for ecosystems: npm, PyPI, Homebrew, etc. (single binary, wrapper scripts)

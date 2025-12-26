@@ -74,6 +74,32 @@ Added `session-summary` workflow for end-of-session stats:
 - `combine_outputs` option for workflows that collect multiple outputs
 - `shell:` action prefix for arbitrary shell commands in workflows
 
+### JSON Schema Type Codegen
+
+New `moss-jsonschema` crate for generating type definitions from JSON Schema:
+- `moss generate types <schema.json> -l typescript` - TypeScript interfaces
+- `moss generate types <schema.json> -l python` - Python dataclasses
+- `moss generate types <schema.json> -l rust` - Rust structs with serde derives
+- Handles: object, array, enum, allOf, oneOf, $ref, const, nullable types
+- Trait-based design (`JsonSchemaGenerator`) for extensibility
+
+### Context View Mode
+
+Added `--context` flag to `moss view` for LLM-friendly output:
+- Shows file skeleton (symbols) + imports combined
+- Skips docstrings for brevity
+- Ideal for loading file context into LLM prompts
+- Example: `moss view src/main.rs --context`
+
+### Plans Introspection
+
+New `moss plans` command for viewing Claude Code saved plans:
+- `moss plans` - list plans with title, date, size
+- `moss plans <name>` - view specific plan by name or title match
+- Fuzzy matching: `moss plans viewnode` finds "Unified ViewNode for view.rs"
+- Plans stored in `~/.claude/plans/` as markdown files
+- JSON output with `--json`
+
 ### OpenAPI Client Codegen
 
 New `moss-openapi` crate for generating API clients from OpenAPI specs:
