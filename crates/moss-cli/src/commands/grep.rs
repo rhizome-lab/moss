@@ -12,6 +12,7 @@ pub fn cmd_grep(
     limit: usize,
     ignore_case: bool,
     json: bool,
+    jq: Option<&str>,
 ) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
@@ -19,12 +20,12 @@ pub fn cmd_grep(
 
     match grep::grep(pattern, &root, glob_pattern, limit, ignore_case) {
         Ok(result) => {
-            if result.matches.is_empty() && !json {
+            let format = OutputFormat::from_flags(json, jq);
+            if result.matches.is_empty() && !format.is_json() {
                 eprintln!("No matches found for: {}", pattern);
                 return 1;
             }
-            let format = OutputFormat::from_flags(json, false);
-            result.print(format);
+            result.print(&format);
             0
         }
         Err(e) => {

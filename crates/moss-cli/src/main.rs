@@ -34,6 +34,10 @@ struct Cli {
     /// Output as JSON
     #[arg(long, global = true)]
     json: bool,
+
+    /// Filter JSON output with jq expression (implies --json)
+    #[arg(long, global = true, value_name = "EXPR")]
+    jq: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -534,6 +538,7 @@ fn main() {
             limit,
             ignore_case,
             cli.json,
+            cli.jq.as_deref(),
         ),
         Commands::Sessions {
             session,
