@@ -176,6 +176,7 @@ impl WorkflowConfig {
     }
 
     /// Check if this workflow uses LLM.
+    #[allow(dead_code)] // Used in tests, will be used when LLM integration is complete
     pub fn uses_llm(&self) -> bool {
         self.workflow.llm.is_some()
     }

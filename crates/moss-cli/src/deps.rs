@@ -36,6 +36,7 @@ pub struct ReExport {
     pub module: String,
     pub names: Vec<String>, // Empty for "export * from", specific names for "export { x } from"
     pub is_star: bool,      // true for "export * from"
+    #[allow(dead_code)] // Consistent with Import/Export, useful for diagnostics
     pub line: usize,
 }
 

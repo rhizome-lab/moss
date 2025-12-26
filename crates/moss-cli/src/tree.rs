@@ -47,19 +47,6 @@ pub enum ViewNodeKind {
 }
 
 impl ViewNode {
-    /// Create a directory node.
-    pub fn directory(name: impl Into<String>, path: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            kind: ViewNodeKind::Directory,
-            path: path.into(),
-            children: Vec::new(),
-            signature: None,
-            docstring: None,
-            line_range: None,
-        }
-    }
-
     /// Create a file node.
     pub fn file(name: impl Into<String>, path: impl Into<String>) -> Self {
         Self {
@@ -71,47 +58,6 @@ impl ViewNode {
             docstring: None,
             line_range: None,
         }
-    }
-
-    /// Create a symbol node.
-    pub fn symbol(
-        name: impl Into<String>,
-        path: impl Into<String>,
-        kind: impl Into<String>,
-    ) -> Self {
-        Self {
-            name: name.into(),
-            kind: ViewNodeKind::Symbol(kind.into()),
-            path: path.into(),
-            children: Vec::new(),
-            signature: None,
-            docstring: None,
-            line_range: None,
-        }
-    }
-
-    /// Set signature.
-    pub fn with_signature(mut self, sig: impl Into<String>) -> Self {
-        self.signature = Some(sig.into());
-        self
-    }
-
-    /// Set docstring.
-    pub fn with_docstring(mut self, doc: impl Into<String>) -> Self {
-        self.docstring = Some(doc.into());
-        self
-    }
-
-    /// Set line range.
-    pub fn with_line_range(mut self, start: usize, end: usize) -> Self {
-        self.line_range = Some((start, end));
-        self
-    }
-
-    /// Add a child node.
-    pub fn with_child(mut self, child: ViewNode) -> Self {
-        self.children.push(child);
-        self
     }
 
     /// Add multiple children.

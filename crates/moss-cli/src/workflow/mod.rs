@@ -4,14 +4,14 @@
 //! - Step-based execution (linear sequence)
 //! - State machine execution (conditional transitions)
 //!
-//! LLM is an optional plugin, not required for workflow execution.
-//! Enable the "llm" feature to use LLM-powered workflows.
+//! LLM integration is scaffolded but not yet implemented.
 
 mod config;
 mod execute;
+#[allow(dead_code)]
 mod llm;
+#[allow(dead_code)]
 mod strategies;
 
-pub use config::{load_workflow, WorkflowConfig};
+pub use config::load_workflow;
 pub use execute::run_workflow;
-pub use llm::{build_llm_strategy, LlmStrategy};

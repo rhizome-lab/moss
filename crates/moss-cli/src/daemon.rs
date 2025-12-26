@@ -94,20 +94,6 @@ impl DaemonClient {
         self.start_daemon().is_ok()
     }
 
-    /// Ensure daemon is available based on config settings.
-    /// If daemon is enabled and auto_start is true, starts daemon if needed.
-    /// Returns true if daemon is available for queries.
-    pub fn ensure_available_with_config(&self, config: &MossConfig) -> bool {
-        if !config.daemon.enabled {
-            return false;
-        }
-        if config.daemon.auto_start {
-            self.ensure_running()
-        } else {
-            self.is_available()
-        }
-    }
-
     fn start_daemon(&self) -> Result<(), String> {
         use std::process::{Command, Stdio};
 

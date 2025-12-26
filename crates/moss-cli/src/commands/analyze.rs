@@ -744,7 +744,6 @@ struct BrokenRef {
 /// Check documentation references for broken links
 fn cmd_check_refs(root: &Path, json: bool) -> i32 {
     use regex::Regex;
-    use std::collections::HashSet;
 
     // Open index to get known symbols
     let idx = match index::FileIndex::open(root) {
