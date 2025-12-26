@@ -94,6 +94,7 @@ fn run_step_workflow(
     _retry: &mut dyn RetryStrategy,
 ) -> Result<WorkflowResult, String> {
     let mut output = String::new();
+    let mut combined_outputs: Vec<(String, String)> = Vec::new();
     let mut steps_executed = 0;
 
     for step in &config.steps {
@@ -107,6 +108,9 @@ fn run_step_workflow(
         // Check cache
         if let Some(cached) = cache.get(&step.action) {
             context.add(&step.name, &cached);
+            if config.workflow.combine_outputs {
+                combined_outputs.push((step.name.clone(), cached.clone()));
+            }
             output = cached;
             steps_executed += 1;
             continue;
@@ -117,6 +121,9 @@ fn run_step_workflow(
             Ok(result) => {
                 context.add(&step.name, &result);
                 cache.set(&step.action, &result);
+                if config.workflow.combine_outputs {
+                    combined_outputs.push((step.name.clone(), result.clone()));
+                }
                 output = result;
                 steps_executed += 1;
             }
@@ -134,6 +141,15 @@ fn run_step_workflow(
                 context.add(&step.name, &format!("ERROR: {}", e));
             }
         }
+    }
+
+    // Combine outputs if requested
+    if config.workflow.combine_outputs {
+        output = combined_outputs
+            .iter()
+            .map(|(name, out)| format!("=== {} ===\n{}", name, out.trim()))
+            .collect::<Vec<_>>()
+            .join("\n\n");
     }
 
     Ok(WorkflowResult {
@@ -236,8 +252,17 @@ fn run_state_machine(
     }
 }
 
-/// Execute a moss action (shell out to moss CLI).
+/// Execute an action.
+///
+/// Action types:
+/// - `shell: <command>` - Execute shell command
+/// - `<args>` - Execute moss command (default)
 fn execute_action(action: &str, root: &Path) -> Result<String, String> {
+    // Check for shell: prefix
+    if let Some(shell_cmd) = action.strip_prefix("shell:") {
+        return execute_shell(shell_cmd.trim(), root);
+    }
+
     // Parse action into command and args
     let parts: Vec<&str> = action.split_whitespace().collect();
     if parts.is_empty() {
@@ -260,6 +285,33 @@ fn execute_action(action: &str, root: &Path) -> Result<String, String> {
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(format!("Action failed: {}", stderr))
+    }
+}
+
+/// Execute a shell command.
+fn execute_shell(cmd: &str, root: &Path) -> Result<String, String> {
+    let shell = if cfg!(windows) { "cmd" } else { "sh" };
+    let flag = if cfg!(windows) { "/C" } else { "-c" };
+
+    let output = Command::new(shell)
+        .args([flag, cmd])
+        .current_dir(root)
+        .output()
+        .map_err(|e| format!("Failed to execute shell command: {}", e))?;
+
+    // Combine stdout and stderr for shell commands
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    if output.status.success() {
+        Ok(stdout.to_string())
+    } else {
+        // Return stderr if present, otherwise stdout
+        if stderr.is_empty() {
+            Err(format!("Shell command failed: {}", stdout))
+        } else {
+            Err(format!("Shell command failed: {}", stderr))
+        }
     }
 }
 

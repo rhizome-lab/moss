@@ -59,12 +59,6 @@ Current scaffold is TOML state machines. Needs design work:
 - Analyze long chains of uninterrupted tool calls (friction indicator)
 
 **Session Tooling:**
-- End-of-session summary workflow (.moss/workflows/session-summary.toml, no LLM):
-  - Test status: passing/failing count
-  - `git diff --shortstat` (files changed, insertions, deletions)
-  - Commits ahead of remote
-  - Uncommitted changes summary
-  - TODO.md delta (items added/completed)
 - Introspect ~/.claude/plans/ - list/view saved plan files from Claude Code sessions
 
 **Distribution:**

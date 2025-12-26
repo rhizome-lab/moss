@@ -54,6 +54,17 @@ HTTP server now auto-generates OpenAPI spec using utoipa:
 - `moss serve http --openapi` outputs spec without starting server
 - Replaces stale Python-generated spec (was 117KB, now accurate 10KB)
 
+### Session Summary Workflow
+
+Added `session-summary` workflow for end-of-session stats:
+- Git diff stats (files changed, insertions, deletions)
+- Commits ahead of remote
+- Uncommitted changes summary
+- TODO.md delta
+- Test status (cargo/npm/pytest)
+- `combine_outputs` option for workflows that collect multiple outputs
+- `shell:` action prefix for arbitrary shell commands in workflows
+
 ### Unified Filtering
 
 Added `--exclude` and `--only` flags for filtering across commands (`view`, `analyze`, `edit`, `grep`):

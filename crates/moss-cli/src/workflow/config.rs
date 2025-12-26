@@ -34,6 +34,9 @@ pub struct WorkflowMetadata {
     pub retry: RetryConfig,
     #[serde(default)]
     pub llm: Option<LlmConfig>,
+    /// Combine all step outputs into final output (for summary workflows)
+    #[serde(default)]
+    pub combine_outputs: bool,
 }
 
 /// Workflow execution limits.
