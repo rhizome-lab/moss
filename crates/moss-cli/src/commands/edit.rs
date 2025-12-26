@@ -1,9 +1,13 @@
 //! Edit command for moss CLI.
 
+use crate::commands::filter::detect_project_languages;
+use crate::config::MossConfig;
+use crate::filter::Filter;
 use crate::{daemon, edit, path_resolve};
 use std::path::Path;
 
 /// Perform structural edits on a file
+#[allow(clippy::too_many_arguments)]
 pub fn cmd_edit(
     target: &str,
     root: Option<&Path>,
@@ -24,6 +28,8 @@ pub fn cmd_edit(
     swap: Option<&str>,
     dry_run: bool,
     json: bool,
+    exclude: &[String],
+    only: &[String],
 ) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
@@ -74,6 +80,34 @@ pub fn cmd_edit(
     if unified.is_directory {
         eprintln!("Cannot edit a directory: {}", target);
         return 1;
+    }
+
+    // Apply filter if specified
+    if !exclude.is_empty() || !only.is_empty() {
+        let config = MossConfig::load(&root);
+        let languages = detect_project_languages(&root);
+        let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
+
+        let filter = match Filter::new(exclude, only, &config.filter, &lang_refs) {
+            Ok(f) => {
+                for warning in f.warnings() {
+                    eprintln!("warning: {}", warning);
+                }
+                f
+            }
+            Err(e) => {
+                eprintln!("error: {}", e);
+                return 1;
+            }
+        };
+
+        if !filter.matches(Path::new(&unified.file_path)) {
+            eprintln!(
+                "Target '{}' excluded by filter (resolved to {})",
+                target, unified.file_path
+            );
+            return 1;
+        }
     }
 
     let file_path = root.join(&unified.file_path);

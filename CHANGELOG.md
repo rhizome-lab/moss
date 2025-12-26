@@ -39,9 +39,9 @@ Unified extraction layer in `extract.rs`:
   - skeleton: nested children, signatures, docstrings (for viewing)
   - symbols: flat with parent refs, complexity (for indexing)
 
-### View and Analyze Filtering
+### View, Analyze, and Edit Filtering
 
-Added `--exclude` and `--only` flags for filtering `view` and `analyze` output:
+Added `--exclude` and `--only` flags for filtering `view`, `analyze`, and `edit` commands:
 - Glob patterns: `--exclude="*.test.js"`, `--only="*.rs"`
 - Built-in aliases: `--exclude=@tests`, `--only=@docs`
 - Language-aware aliases: `@tests` expands to `*_test.go` for Go, `test_*.py` for Python, etc.

@@ -63,6 +63,7 @@ Current scaffold is TOML state machines. Needs design work:
 - See `docs/view-filtering.md` for design (Option E: @alias sigil with built-ins + config override)
 - [x] `view` command: `--exclude`, `--only` flags with `@alias` and glob support
 - [x] `analyze` command: complexity filtering with `--exclude`, `--only`
+- [x] `edit` command: filter guards target resolution
 - [ ] Cross-command unification: grep, lint (still need filtering)
 
 **Agent Research:**

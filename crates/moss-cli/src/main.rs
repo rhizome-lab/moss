@@ -179,6 +179,14 @@ enum Commands {
         /// Dry run - show what would be changed without applying
         #[arg(long)]
         dry_run: bool,
+
+        /// Exclude files matching patterns or aliases (e.g., @tests, *.test.js)
+        #[arg(long, value_delimiter = ',')]
+        exclude: Vec<String>,
+
+        /// Only include files matching patterns or aliases
+        #[arg(long, value_delimiter = ',')]
+        only: Vec<String>,
     },
 
     /// Manage file index
@@ -502,6 +510,8 @@ fn main() {
             copy_append,
             swap,
             dry_run,
+            exclude,
+            only,
         } => commands::edit::cmd_edit(
             &target,
             root.as_deref(),
@@ -522,6 +532,8 @@ fn main() {
             swap.as_deref(),
             dry_run,
             cli.json,
+            &exclude,
+            &only,
         ),
         Commands::Index { action, root } => {
             commands::index::cmd_index(action, root.as_deref(), cli.json)
