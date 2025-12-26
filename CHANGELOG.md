@@ -41,10 +41,10 @@ Unified extraction layer in `extract.rs`:
 
 ### LLM Adapters
 
-Expanded LLM provider support via rig crate (behind `llm` feature):
-- Anthropic (Claude), OpenAI (GPT), Google (Gemini)
+Expanded LLM provider support via rig crate (behind `llm` feature). 13 providers:
+- Anthropic, OpenAI, Azure, Gemini, Cohere, DeepSeek, Groq, Mistral, Ollama, OpenRouter, Perplexity, Together, xAI
 - Uses rustls for TLS (no OpenSSL dependency)
-- Provider aliases: "claude" → anthropic, "gpt" → openai, "gemini" → google
+- Provider aliases: "claude" → anthropic, "gpt" → openai, "gemini" → google, "grok" → xai
 - Auto-detects API keys from environment variables
 
 ### OpenAPI Auto-Generation

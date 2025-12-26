@@ -1,7 +1,7 @@
 //! LLM strategy for workflow execution.
 //!
 //! This module is only compiled when the "llm" feature is enabled.
-//! Supports multiple providers: anthropic, openai, google, cohere, perplexity, xai.
+//! Supports all providers from rig: anthropic, openai, google, cohere, groq, etc.
 
 #[cfg(feature = "llm")]
 use rig::{
@@ -38,7 +38,17 @@ impl LlmStrategy for NoLlm {
 pub enum Provider {
     Anthropic,
     OpenAI,
-    Google,
+    Azure,
+    Gemini,
+    Cohere,
+    DeepSeek,
+    Groq,
+    Mistral,
+    Ollama,
+    OpenRouter,
+    Perplexity,
+    Together,
+    XAI,
 }
 
 #[cfg(feature = "llm")]
@@ -47,8 +57,18 @@ impl Provider {
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "anthropic" | "claude" => Some(Self::Anthropic),
-            "openai" | "gpt" => Some(Self::OpenAI),
-            "google" | "gemini" => Some(Self::Google),
+            "openai" | "gpt" | "chatgpt" => Some(Self::OpenAI),
+            "azure" | "azure-openai" => Some(Self::Azure),
+            "google" | "gemini" => Some(Self::Gemini),
+            "cohere" => Some(Self::Cohere),
+            "deepseek" => Some(Self::DeepSeek),
+            "groq" => Some(Self::Groq),
+            "mistral" => Some(Self::Mistral),
+            "ollama" => Some(Self::Ollama),
+            "openrouter" => Some(Self::OpenRouter),
+            "perplexity" | "pplx" => Some(Self::Perplexity),
+            "together" | "together-ai" => Some(Self::Together),
+            "xai" | "grok" => Some(Self::XAI),
             _ => None,
         }
     }
@@ -58,7 +78,17 @@ impl Provider {
         match self {
             Self::Anthropic => "claude-sonnet-4-20250514",
             Self::OpenAI => "gpt-4o",
-            Self::Google => "gemini-2.0-flash",
+            Self::Azure => "gpt-4o",
+            Self::Gemini => "gemini-2.0-flash",
+            Self::Cohere => "command-r-plus",
+            Self::DeepSeek => "deepseek-chat",
+            Self::Groq => "llama-3.3-70b-versatile",
+            Self::Mistral => "mistral-large-latest",
+            Self::Ollama => "llama3.2",
+            Self::OpenRouter => "anthropic/claude-3.5-sonnet",
+            Self::Perplexity => "llama-3.1-sonar-large-128k-online",
+            Self::Together => "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+            Self::XAI => "grok-2-latest",
         }
     }
 
@@ -67,8 +97,72 @@ impl Provider {
         match self {
             Self::Anthropic => "ANTHROPIC_API_KEY",
             Self::OpenAI => "OPENAI_API_KEY",
-            Self::Google => "GEMINI_API_KEY",
+            Self::Azure => "AZURE_OPENAI_API_KEY",
+            Self::Gemini => "GEMINI_API_KEY",
+            Self::Cohere => "COHERE_API_KEY",
+            Self::DeepSeek => "DEEPSEEK_API_KEY",
+            Self::Groq => "GROQ_API_KEY",
+            Self::Mistral => "MISTRAL_API_KEY",
+            Self::Ollama => "OLLAMA_API_KEY", // Optional for local
+            Self::OpenRouter => "OPENROUTER_API_KEY",
+            Self::Perplexity => "PERPLEXITY_API_KEY",
+            Self::Together => "TOGETHER_API_KEY",
+            Self::XAI => "XAI_API_KEY",
         }
+    }
+
+    /// List all providers with their info.
+    pub fn all() -> Vec<(Self, &'static str, &'static str, &'static str)> {
+        vec![
+            (
+                Self::Anthropic,
+                "anthropic",
+                "claude-sonnet-4-20250514",
+                "ANTHROPIC_API_KEY",
+            ),
+            (Self::OpenAI, "openai", "gpt-4o", "OPENAI_API_KEY"),
+            (Self::Azure, "azure", "gpt-4o", "AZURE_OPENAI_API_KEY"),
+            (Self::Gemini, "gemini", "gemini-2.0-flash", "GEMINI_API_KEY"),
+            (Self::Cohere, "cohere", "command-r-plus", "COHERE_API_KEY"),
+            (
+                Self::DeepSeek,
+                "deepseek",
+                "deepseek-chat",
+                "DEEPSEEK_API_KEY",
+            ),
+            (
+                Self::Groq,
+                "groq",
+                "llama-3.3-70b-versatile",
+                "GROQ_API_KEY",
+            ),
+            (
+                Self::Mistral,
+                "mistral",
+                "mistral-large-latest",
+                "MISTRAL_API_KEY",
+            ),
+            (Self::Ollama, "ollama", "llama3.2", "OLLAMA_API_KEY"),
+            (
+                Self::OpenRouter,
+                "openrouter",
+                "anthropic/claude-3.5-sonnet",
+                "OPENROUTER_API_KEY",
+            ),
+            (
+                Self::Perplexity,
+                "perplexity",
+                "llama-3.1-sonar-large-128k-online",
+                "PERPLEXITY_API_KEY",
+            ),
+            (
+                Self::Together,
+                "together",
+                "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+                "TOGETHER_API_KEY",
+            ),
+            (Self::XAI, "xai", "grok-2-latest", "XAI_API_KEY"),
+        ]
     }
 }
 
@@ -82,10 +176,10 @@ pub struct RigLlm {
 impl RigLlm {
     pub fn new(provider_str: &str, model: Option<&str>) -> Result<Self, String> {
         let provider = Provider::from_str(provider_str)
-            .ok_or_else(|| format!("Unsupported provider: {}", provider_str))?;
+            .ok_or_else(|| format!("Unsupported provider: {}. Available: anthropic, openai, azure, gemini, cohere, deepseek, groq, mistral, ollama, openrouter, perplexity, together, xai", provider_str))?;
 
-        // Check for API key
-        if std::env::var(provider.env_var()).is_err() {
+        // Check for API key (ollama is optional since it can be local)
+        if provider != Provider::Ollama && std::env::var(provider.env_var()).is_err() {
             return Err(format!(
                 "Missing {} environment variable for {} provider",
                 provider.env_var(),
@@ -101,43 +195,35 @@ impl RigLlm {
     }
 
     async fn complete_async(&self, system: Option<&str>, prompt: &str) -> Result<String, String> {
+        macro_rules! run_provider {
+            ($client:expr) => {{
+                let client = $client;
+                let mut builder = client.agent(&self.model);
+                if let Some(sys) = system {
+                    builder = builder.preamble(sys);
+                }
+                let agent = builder.build();
+                agent
+                    .prompt(prompt)
+                    .await
+                    .map_err(|e| format!("LLM request failed: {}", e))
+            }};
+        }
+
         match self.provider {
-            Provider::Anthropic => {
-                let client = providers::anthropic::Client::from_env();
-                let mut builder = client.agent(&self.model);
-                if let Some(sys) = system {
-                    builder = builder.preamble(sys);
-                }
-                let agent = builder.build();
-                agent
-                    .prompt(prompt)
-                    .await
-                    .map_err(|e| format!("Anthropic request failed: {}", e))
-            }
-            Provider::OpenAI => {
-                let client = providers::openai::Client::from_env();
-                let mut builder = client.agent(&self.model);
-                if let Some(sys) = system {
-                    builder = builder.preamble(sys);
-                }
-                let agent = builder.build();
-                agent
-                    .prompt(prompt)
-                    .await
-                    .map_err(|e| format!("OpenAI request failed: {}", e))
-            }
-            Provider::Google => {
-                let client = providers::gemini::Client::from_env();
-                let mut builder = client.agent(&self.model);
-                if let Some(sys) = system {
-                    builder = builder.preamble(sys);
-                }
-                let agent = builder.build();
-                agent
-                    .prompt(prompt)
-                    .await
-                    .map_err(|e| format!("Google request failed: {}", e))
-            }
+            Provider::Anthropic => run_provider!(providers::anthropic::Client::from_env()),
+            Provider::OpenAI => run_provider!(providers::openai::Client::from_env()),
+            Provider::Azure => run_provider!(providers::azure::Client::from_env()),
+            Provider::Gemini => run_provider!(providers::gemini::Client::from_env()),
+            Provider::Cohere => run_provider!(providers::cohere::Client::from_env()),
+            Provider::DeepSeek => run_provider!(providers::deepseek::Client::from_env()),
+            Provider::Groq => run_provider!(providers::groq::Client::from_env()),
+            Provider::Mistral => run_provider!(providers::mistral::Client::from_env()),
+            Provider::Ollama => run_provider!(providers::ollama::Client::from_env()),
+            Provider::OpenRouter => run_provider!(providers::openrouter::Client::from_env()),
+            Provider::Perplexity => run_provider!(providers::perplexity::Client::from_env()),
+            Provider::Together => run_provider!(providers::together::Client::from_env()),
+            Provider::XAI => run_provider!(providers::xai::Client::from_env()),
         }
     }
 }
@@ -177,11 +263,10 @@ pub fn build_llm_strategy(_provider: Option<&str>, _model: Option<&str>) -> Box<
 /// List available providers.
 #[cfg(feature = "llm")]
 pub fn list_providers() -> Vec<(&'static str, &'static str, &'static str)> {
-    vec![
-        ("anthropic", "claude-sonnet-4-20250514", "ANTHROPIC_API_KEY"),
-        ("openai", "gpt-4o", "OPENAI_API_KEY"),
-        ("google", "gemini-2.0-flash", "GEMINI_API_KEY"),
-    ]
+    Provider::all()
+        .into_iter()
+        .map(|(_, name, model, env)| (name, model, env))
+        .collect()
 }
 
 #[cfg(test)]
@@ -207,8 +292,19 @@ mod tests {
         assert_eq!(Provider::from_str("claude"), Some(Provider::Anthropic));
         assert_eq!(Provider::from_str("openai"), Some(Provider::OpenAI));
         assert_eq!(Provider::from_str("gpt"), Some(Provider::OpenAI));
-        assert_eq!(Provider::from_str("google"), Some(Provider::Google));
-        assert_eq!(Provider::from_str("gemini"), Some(Provider::Google));
+        assert_eq!(Provider::from_str("google"), Some(Provider::Gemini));
+        assert_eq!(Provider::from_str("gemini"), Some(Provider::Gemini));
+        assert_eq!(Provider::from_str("groq"), Some(Provider::Groq));
+        assert_eq!(Provider::from_str("ollama"), Some(Provider::Ollama));
         assert_eq!(Provider::from_str("unknown"), None);
+    }
+
+    #[cfg(feature = "llm")]
+    #[test]
+    fn test_all_providers_have_defaults() {
+        for (provider, _, _, _) in Provider::all() {
+            assert!(!provider.default_model().is_empty());
+            assert!(!provider.env_var().is_empty());
+        }
     }
 }
