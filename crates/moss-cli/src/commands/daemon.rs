@@ -10,8 +10,8 @@ pub enum DaemonAction {
     /// Show daemon status
     Status,
 
-    /// Shutdown the daemon
-    Shutdown,
+    /// Stop the daemon
+    Stop,
 
     /// Start the daemon (background)
     Start,
@@ -81,7 +81,7 @@ pub fn cmd_daemon(action: DaemonAction, root: Option<&Path>, json: bool) -> i32 
             }
         }
 
-        DaemonAction::Shutdown => {
+        DaemonAction::Stop => {
             if !client.is_available() {
                 if json {
                     println!(
@@ -99,7 +99,7 @@ pub fn cmd_daemon(action: DaemonAction, root: Option<&Path>, json: bool) -> i32 
                     if json {
                         println!("{}", serde_json::json!({"success": true}));
                     } else {
-                        println!("Daemon shutdown requested");
+                        println!("Daemon stopped");
                     }
                     0
                 }
@@ -109,11 +109,11 @@ pub fn cmd_daemon(action: DaemonAction, root: Option<&Path>, json: bool) -> i32 
                         if json {
                             println!("{}", serde_json::json!({"success": true}));
                         } else {
-                            println!("Daemon shutdown requested");
+                            println!("Daemon stopped");
                         }
                         0
                     } else {
-                        eprintln!("Failed to shutdown daemon: {}", e);
+                        eprintln!("Failed to stop daemon: {}", e);
                         1
                     }
                 }

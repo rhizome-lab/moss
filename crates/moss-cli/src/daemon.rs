@@ -598,3 +598,25 @@ pub async fn run_daemon(root: &Path) -> Result<i32, Box<dyn std::error::Error>> 
         });
     }
 }
+
+// ============================================================================
+// Auto-start helper
+// ============================================================================
+
+/// Ensure daemon is running based on config.
+///
+/// Loads config from global (~/.config/moss/config.toml) and project (.moss/config.toml),
+/// then starts daemon if auto_start is enabled.
+///
+/// This is a no-op if daemon is disabled or already running.
+pub fn maybe_start_daemon(root: &Path) {
+    let config = MossConfig::load(root);
+    if !config.daemon.enabled || !config.daemon.auto_start {
+        return;
+    }
+
+    let client = DaemonClient::new(root);
+    if !client.is_available() {
+        let _ = client.ensure_running();
+    }
+}

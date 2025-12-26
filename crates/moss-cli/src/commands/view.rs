@@ -1,7 +1,7 @@
 //! View command - unified view of files, directories, and symbols.
 
 use crate::tree::{FormatOptions, ViewNode, ViewNodeKind};
-use crate::{deps, index, path_resolve, skeleton, symbols, tree};
+use crate::{daemon, deps, index, path_resolve, skeleton, symbols, tree};
 use moss_languages::support_for_path;
 use std::path::{Path, PathBuf};
 
@@ -70,6 +70,9 @@ pub fn cmd_view(
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    // Ensure daemon is running if configured
+    daemon::maybe_start_daemon(&root);
 
     // If kind filter is specified without target (or with "."), list matching symbols
     if let Some(kind) = kind_filter {

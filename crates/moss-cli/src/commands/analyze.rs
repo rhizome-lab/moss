@@ -1,6 +1,7 @@
 //! Analyze command - run analysis on target.
 
 use crate::analyze;
+use crate::daemon;
 use crate::index;
 use crate::overview;
 use crate::path_resolve;
@@ -39,6 +40,9 @@ pub fn cmd_analyze(
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    // Ensure daemon is running if configured
+    daemon::maybe_start_daemon(&root);
 
     // --callees or --callers: show call graph info
     if callees || callers {
