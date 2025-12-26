@@ -57,7 +57,7 @@ Current scaffold is TOML state machines. Needs design work:
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
 
 **Linting:**
-- `lint list` now ~0.22s (parallelized detection and version checks with rayon)
+- `lint list` now ~100ms (removed recursive dir scans, config-only detection)
 
 **View Filtering:**
 - Filter out tests from views (--no-tests or --exclude=tests)
