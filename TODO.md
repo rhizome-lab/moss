@@ -77,43 +77,20 @@ Current scaffold is TOML state machines. Needs design work:
 - Remaining docs: prior-art.md, hybrid-loops.md
 - Memory system: layered cross-session learning
 
-## Python Feature Audit
+## Python Features Not Yet Ported
 
-Tracking what was in Python packages, what's been reimplemented, what's intentionally dropped.
+**Orchestration:**
+- Session management with checkpointing
+- Driver protocol for agent decision-making
+- Plugin system (partial - Rust traits exist)
+- Event bus, validators, policies
+- PR review, diff analysis
 
-**moss-orchestration (~112 files):**
-- Session management with checkpointing - not yet in Rust
-- Driver protocol for agent decision-making - not yet in Rust
-- Rules engine with SARIF output - consider semgrep/ruff integration
-- Plugin system - Rust trait-based plugins (partial)
-- Event bus, validators, policies - not yet in Rust
-- PR review, diff analysis - not yet in Rust
-- Watch/test runners - `moss lint --watch` exists
-- Gen commands for MCP/HTTP/gRPC/LSP - MCP/HTTP/LSP in Rust
-
-**moss-intelligence (~36 files):**
-- Skeleton extraction - done
-- Complexity analysis - done
-- Dependency analysis - done
-- Security analysis - done (shells to bandit)
-- Edit routing (LLM-powered) - not yet in Rust
-- Summarization (LLM-powered) - not yet in Rust
-
-**moss-llm:**
-- LLM adapters - not yet in Rust (rig crate available)
-- Model abstraction - not yet in Rust
-
-**moss-context:**
-- Working memory with summarization - not yet in Rust
-- Context compilation (skeleton + deps + summary) - partial via `view --deps`
-
-**moss-mcp/acp:**
-- MCP server - done
-- ACP server - dropped (unused)
-- dwim.py tool resolution - simplified in Rust (3 primitives)
-
-**moss-lsp:**
-- LSP server - done
+**LLM-Powered:**
+- Edit routing
+- Summarization
+- LLM adapters (rig crate available)
+- Working memory with summarization
 
 ## Implementation Notes
 
