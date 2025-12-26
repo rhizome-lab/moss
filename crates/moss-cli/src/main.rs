@@ -96,6 +96,10 @@ enum Commands {
         #[arg(long)]
         full: bool,
 
+        /// Context view: skeleton + imports combined (ideal for LLM context)
+        #[arg(long)]
+        context: bool,
+
         /// Exclude paths matching pattern or @alias (repeatable)
         /// Patterns: globs like "*.test.js", "**/tests/**"
         /// Aliases: @tests, @config, @build, @docs, @generated
@@ -520,6 +524,7 @@ fn main() {
             resolve_imports,
             include_private,
             full,
+            context,
             exclude,
             only,
         } => commands::view::cmd_view(
@@ -535,6 +540,7 @@ fn main() {
             resolve_imports,
             include_private,
             full,
+            context,
             cli.json,
             &exclude,
             &only,

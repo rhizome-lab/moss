@@ -68,6 +68,7 @@ pub fn cmd_view(
     resolve_imports: bool,
     include_private: bool,
     full: bool,
+    context: bool,
     json: bool,
     exclude: &[String],
     only: &[String],
@@ -213,6 +214,7 @@ pub fn cmd_view(
             focus,
             resolve_imports,
             include_private,
+            context,
             json,
         )
     } else {
@@ -469,6 +471,7 @@ fn cmd_view_file(
     focus: Option<&str>,
     resolve_imports: bool,
     include_private: bool,
+    context: bool,
     json: bool,
 ) -> i32 {
     let full_path = root.join(file_path);
@@ -521,8 +524,8 @@ fn cmd_view_file(
         skeleton_result
     };
 
-    // Get deps if showing deps, focus, or resolve_imports mode
-    let deps_result = if show_deps || focus.is_some() || resolve_imports {
+    // Get deps if showing deps, focus, resolve_imports, or context mode
+    let deps_result = if show_deps || focus.is_some() || resolve_imports || context {
         let deps_extractor = deps::DepsExtractor::new();
         Some(deps_extractor.extract(&full_path, &content))
     } else {
@@ -538,7 +541,8 @@ fn cmd_view_file(
         println!("Lines: {}", content.lines().count());
 
         if let Some(ref deps) = deps_result {
-            if show_deps && !deps.imports.is_empty() {
+            let show = show_deps || context;
+            if show && !deps.imports.is_empty() {
                 println!("\n## Imports");
                 for imp in &deps.imports {
                     if imp.names.is_empty() {
@@ -549,14 +553,14 @@ fn cmd_view_file(
                 }
             }
 
-            if show_deps && !deps.exports.is_empty() {
+            if show && !deps.exports.is_empty() {
                 println!("\n## Exports");
                 for exp in &deps.exports {
                     println!("  {}", exp.name);
                 }
             }
 
-            if show_deps && !deps.reexports.is_empty() {
+            if show && !deps.reexports.is_empty() {
                 println!("\n## Re-exports");
                 for reexp in &deps.reexports {
                     if reexp.is_star {
@@ -572,12 +576,12 @@ fn cmd_view_file(
             }
         }
 
-        // Only show symbols if not in deps-only mode
-        if depth >= 1 && !show_deps {
+        // Show symbols if depth >= 1 and not in deps-only mode (or context mode which shows both)
+        if depth >= 1 && (!show_deps || context) {
             // Use ViewNode for consistent formatting
             let view_node = skeleton_result.to_view_node();
             let format_options = FormatOptions {
-                docstrings: true,
+                docstrings: !context, // Skip docstrings in context mode for brevity
                 line_numbers: true,
                 skip_root: true, // Skip file header, we already printed it
                 max_depth: None,
