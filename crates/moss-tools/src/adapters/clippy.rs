@@ -97,19 +97,11 @@ impl Tool for Clippy {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        let mut score: f32 = 0.0;
-
-        // Cargo.toml is definitive for Rust
         if crate::tools::has_config_file(root, &["Cargo.toml"]) {
-            score += 0.8;
+            1.0
+        } else {
+            0.0
         }
-
-        // Rust files exist
-        if crate::tools::has_files_with_extensions(root, self.info.extensions) {
-            score += 0.2;
-        }
-
-        score.min(1.0)
     }
 
     fn run(&self, _paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {

@@ -62,37 +62,12 @@ impl Tool for Tsgo {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        // Tsgo is a JS ecosystem tool - require package.json or tsconfig.json
-        let has_tsconfig = crate::tools::has_config_file(root, &["tsconfig.json"]);
-        let has_package_json = crate::tools::has_config_file(root, &["package.json"]);
-
-        if !has_tsconfig && !has_package_json {
-            return 0.0;
+        // Prefer tsgo over tsc when tsconfig exists (tsgo is faster)
+        if crate::tools::has_config_file(root, &["tsconfig.json"]) {
+            1.0
+        } else {
+            0.0
         }
-
-        // Only prefer tsgo if it's available (it's not as common as tsc yet)
-        if !self.is_available() {
-            return 0.0;
-        }
-
-        let mut score: f32 = 0.0;
-
-        // TypeScript config is definitive
-        if has_tsconfig {
-            score += 0.8; // Slightly higher than tsc since tsgo is faster
-        }
-
-        // Package.json indicates JS ecosystem
-        if has_package_json {
-            score += 0.2;
-        }
-
-        // TypeScript files exist
-        if crate::tools::has_files_with_extensions(root, self.info.extensions) {
-            score += 0.3;
-        }
-
-        score.min(1.0)
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {

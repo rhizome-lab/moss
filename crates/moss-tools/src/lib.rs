@@ -45,9 +45,7 @@ pub use custom::{load_custom_tools, CustomTool, CustomToolConfig, ToolsConfig};
 pub use diagnostic::{Diagnostic, DiagnosticSeverity, Fix, Location};
 pub use registry::ToolRegistry;
 pub use sarif::SarifReport;
-pub use tools::{
-    has_config_file, has_files_with_extensions, Tool, ToolCategory, ToolError, ToolInfo, ToolResult,
-};
+pub use tools::{has_config_file, Tool, ToolCategory, ToolError, ToolInfo, ToolResult};
 
 use std::path::Path;
 

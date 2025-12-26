@@ -146,31 +146,6 @@ pub trait Tool: Send + Sync {
     }
 }
 
-/// Helper to check if any files with given extensions exist.
-pub fn has_files_with_extensions(root: &Path, extensions: &[&str]) -> bool {
-    if let Ok(entries) = std::fs::read_dir(root) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_file() {
-                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    if extensions.contains(&ext) {
-                        return true;
-                    }
-                }
-            } else if path.is_dir()
-                && !path
-                    .file_name()
-                    .is_some_and(|n| n.to_string_lossy().starts_with('.'))
-            {
-                if has_files_with_extensions(&path, extensions) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
 /// Helper to check if a config file exists.
 pub fn has_config_file(root: &Path, names: &[&str]) -> bool {
     names.iter().any(|name| root.join(name).exists())

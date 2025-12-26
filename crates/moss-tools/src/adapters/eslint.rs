@@ -81,7 +81,6 @@ impl Tool for Eslint {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        // ESLint config files - require explicit config
         let config_files = [
             ".eslintrc",
             ".eslintrc.js",
@@ -93,18 +92,11 @@ impl Tool for Eslint {
             "eslint.config.mjs",
             "eslint.config.cjs",
         ];
-        if !crate::tools::has_config_file(root, &config_files) {
-            return 0.0;
+        if crate::tools::has_config_file(root, &config_files) {
+            1.0
+        } else {
+            0.0
         }
-
-        let mut score: f32 = 0.6;
-
-        // JS/TS files exist
-        if crate::tools::has_files_with_extensions(root, self.info.extensions) {
-            score += 0.2;
-        }
-
-        score.min(1.0)
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {

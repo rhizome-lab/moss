@@ -95,26 +95,19 @@ impl Tool for Pyright {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        let mut score: f32 = 0.0;
-
-        // Pyright config files
-        let config_files = ["pyrightconfig.json", "pyproject.toml"];
+        let config_files = [
+            "pyrightconfig.json",
+            "pyproject.toml",
+            "uv.lock",
+            "poetry.lock",
+            "Pipfile.lock",
+            "requirements.txt",
+        ];
         if crate::tools::has_config_file(root, &config_files) {
-            score += 0.5;
+            1.0
+        } else {
+            0.0
         }
-
-        // Python project indicators
-        let lock_files = ["uv.lock", "poetry.lock", "Pipfile.lock", "requirements.txt"];
-        if crate::tools::has_config_file(root, &lock_files) {
-            score += 0.3;
-        }
-
-        // Python files exist
-        if crate::tools::has_files_with_extensions(root, self.info.extensions) {
-            score += 0.2;
-        }
-
-        score.min(1.0)
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {

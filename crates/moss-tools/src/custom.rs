@@ -18,8 +18,7 @@
 //! ```
 
 use crate::{
-    has_config_file, has_files_with_extensions, Diagnostic, SarifReport, Tool, ToolCategory,
-    ToolError, ToolInfo, ToolResult,
+    has_config_file, Diagnostic, SarifReport, Tool, ToolCategory, ToolError, ToolInfo, ToolResult,
 };
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -210,32 +209,14 @@ impl Tool for CustomTool {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        let mut score: f32 = 0.0;
-
-        // Check for config files
+        // Check for config files specified in detect field
         if !self.config.detect.is_empty() {
             let detect_files: Vec<&str> = self.config.detect.iter().map(|s| s.as_str()).collect();
             if has_config_file(root, &detect_files) {
-                score += 0.6;
+                return 1.0;
             }
         }
-
-        // Check for files with matching extensions
-        if !self.config.extensions.is_empty() {
-            let extensions: Vec<&str> = self.config.extensions.iter().map(|s| s.as_str()).collect();
-            if has_files_with_extensions(root, &extensions) {
-                score += 0.3;
-            }
-        }
-
-        // If no detection configured, give a small base score if tool is available
-        if self.config.detect.is_empty() && self.config.extensions.is_empty() {
-            if self.is_available() {
-                score += 0.1;
-            }
-        }
-
-        score.min(1.0)
+        0.0
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {

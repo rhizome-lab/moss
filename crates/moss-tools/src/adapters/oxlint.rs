@@ -106,24 +106,18 @@ impl Tool for Oxlint {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        // Require JS/TS files to exist
-        if !crate::tools::has_files_with_extensions(root, self.info.extensions) {
-            return 0.0;
+        let config_files = [
+            "oxlintrc.json",
+            ".oxlintrc.json",
+            "tsconfig.json",
+            "jsconfig.json",
+            "package.json",
+        ];
+        if crate::tools::has_config_file(root, &config_files) {
+            1.0
+        } else {
+            0.0
         }
-
-        let mut score: f32 = 0.3;
-
-        // Oxlint-specific config
-        if crate::tools::has_config_file(root, &["oxlintrc.json", ".oxlintrc.json"]) {
-            score += 0.5;
-        }
-
-        // TypeScript config
-        if crate::tools::has_config_file(root, &["tsconfig.json", "jsconfig.json"]) {
-            score += 0.2;
-        }
-
-        score.min(1.0)
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {

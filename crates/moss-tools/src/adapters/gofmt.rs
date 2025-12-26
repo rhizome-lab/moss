@@ -59,19 +59,11 @@ impl Tool for Gofmt {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        let mut score: f32 = 0.0;
-
-        // go.mod is definitive for Go
         if crate::tools::has_config_file(root, &["go.mod"]) {
-            score += 0.8;
+            1.0
+        } else {
+            0.0
         }
-
-        // Go files exist
-        if crate::tools::has_files_with_extensions(root, self.info.extensions) {
-            score += 0.2;
-        }
-
-        score.min(1.0)
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
@@ -194,19 +186,11 @@ impl Tool for Govet {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        let mut score: f32 = 0.0;
-
-        // go.mod is definitive for Go
         if crate::tools::has_config_file(root, &["go.mod"]) {
-            score += 0.8;
+            1.0
+        } else {
+            0.0
         }
-
-        // Go files exist
-        if crate::tools::has_files_with_extensions(root, self.info.extensions) {
-            score += 0.2;
-        }
-
-        score.min(1.0)
     }
 
     fn run(&self, paths: &[&Path], root: &Path) -> Result<ToolResult, ToolError> {
