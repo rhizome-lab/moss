@@ -1,7 +1,10 @@
 //! Analyze command - run analysis on target.
 
 use crate::analyze;
+use crate::commands::filter::detect_project_languages;
+use crate::config::MossConfig;
 use crate::daemon;
+use crate::filter::Filter;
 use crate::index;
 use crate::overview;
 use crate::path_resolve;
@@ -27,10 +30,9 @@ pub fn cmd_analyze(
     hotspots: bool,
     check_refs: bool,
     json: bool,
-    _exclude: &[String],
-    _only: &[String],
+    exclude: &[String],
+    only: &[String],
 ) -> i32 {
-    // TODO: Apply exclude/only filters to analysis targets
     // --overview runs the overview report
     if show_overview {
         return cmd_overview(root, compact, json);
@@ -47,6 +49,28 @@ pub fn cmd_analyze(
 
     // Ensure daemon is running if configured
     daemon::maybe_start_daemon(&root);
+
+    // Build filter for --exclude and --only
+    let filter = if !exclude.is_empty() || !only.is_empty() {
+        let config = MossConfig::load(&root);
+        let languages = detect_project_languages(&root);
+        let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
+
+        match Filter::new(exclude, only, &config.filter, &lang_refs) {
+            Ok(f) => {
+                for warning in f.warnings() {
+                    eprintln!("warning: {}", warning);
+                }
+                Some(f)
+            }
+            Err(e) => {
+                eprintln!("error: {}", e);
+                return 1;
+            }
+        }
+    } else {
+        None
+    };
 
     // --callees or --callers: show call graph info
     if callees || callers {
@@ -91,6 +115,7 @@ pub fn cmd_analyze(
         run_security,
         threshold,
         kind_filter,
+        filter.as_ref(),
     );
 
     if json {

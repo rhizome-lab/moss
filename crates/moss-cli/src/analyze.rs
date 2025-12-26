@@ -11,6 +11,7 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::complexity::{ComplexityAnalyzer, ComplexityReport};
+use crate::filter::Filter;
 use crate::health::{analyze_health, HealthReport};
 use crate::path_resolve;
 
@@ -404,6 +405,7 @@ pub fn analyze_codebase_complexity(
     root: &Path,
     limit: usize,
     threshold: Option<usize>,
+    filter: Option<&Filter>,
 ) -> ComplexityReport {
     use crate::path_resolve;
     use rayon::prelude::*;
@@ -419,6 +421,12 @@ pub fn analyze_codebase_complexity(
                     .unwrap_or("");
                 matches!(ext, "py" | "rs")
             }
+        })
+        // Apply filter if provided
+        .filter(|f| {
+            filter
+                .map(|flt| flt.matches(Path::new(&f.path)))
+                .unwrap_or(true)
         })
         .collect();
 
@@ -474,6 +482,7 @@ pub fn analyze(
     run_security: bool,
     complexity_threshold: Option<usize>,
     kind_filter: Option<&str>,
+    filter: Option<&Filter>,
 ) -> AnalyzeReport {
     let target_path = target.unwrap_or(".");
 
@@ -537,6 +546,7 @@ pub fn analyze(
                     &analysis_root,
                     10,
                     complexity_threshold,
+                    filter,
                 ))
             } else {
                 None
