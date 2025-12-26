@@ -1,6 +1,6 @@
 //! Edit command for moss CLI.
 
-use crate::{edit, path_resolve};
+use crate::{daemon, edit, path_resolve};
 use std::path::Path;
 
 /// Perform structural edits on a file
@@ -28,6 +28,9 @@ pub fn cmd_edit(
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    // Ensure daemon is running if configured (will pick up edits)
+    daemon::maybe_start_daemon(&root);
 
     // Count operations to ensure exactly one is specified
     let ops = [
