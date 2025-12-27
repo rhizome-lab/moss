@@ -22,12 +22,15 @@ Test Status: 110 passing, 0 failing (moss-languages)
 **Language Support:** 98 languages implemented - all arborium grammars covered.
 See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to verify.
 
-**Grammar Loading:**
-- Dynamic WASM grammar loading: avoid recompiling grammars into binary each build
-- Upstream tree-sitter has `WasmStore` for loading `.wasm` grammars at runtime
-- arborium-tree-sitter's `wasm` feature is for compiling TO wasm, not loading FROM wasm
-- Options: use tree-sitter directly (bypass arborium), PR arborium, or fork
-- Would cache grammars in `~/.cache/moss/grammars/`, load on demand
+**Grammar Loading (external .so files):**
+Benefits: faster builds, smaller distribution, independent grammar updates, user extensibility
+- Spike confirmed: can compile grammar C to .so, load dynamically via libloading
+- `gcc -shared -fPIC parser.c scanner.c -o lang.so` (size varies: json 28K, toml 131K, go 1.5M, python 3.3M)
+- Symbol: `tree_sitter_{lang}` (except rust uses `tree_sitter_rust_orchard` variant)
+- Scanner uses `ts_calloc`/`ts_free` - resolved at runtime from main binary
+- Need: build script for all grammars, loader in moss-languages, distribute .so files
+- Extension point: `~/.config/moss/grammars/` for user-added grammars
+- WASM alternative exists (tree-sitter `wasm` feature) but native .so is simpler
 
 
 **Workflow Engine:**
