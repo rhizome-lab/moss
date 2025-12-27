@@ -11,6 +11,7 @@
 //! - semver/SemverString.zig: String encoding (inline vs external)
 
 use crate::{DependencyTree, PackageError, TreeNode};
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// Get installed version from bun.lock or bun.lockb
@@ -388,45 +389,111 @@ fn extract_version_from_spec(spec: &str) -> Option<String> {
     }
 }
 
+/// Build a map of package name -> (version, deps) from bun.lock packages
+fn build_deps_map_text(parsed: &serde_json::Value) -> HashMap<String, (String, Vec<String>)> {
+    let mut deps_map = HashMap::new();
+
+    if let Some(packages) = parsed.get("packages").and_then(|p| p.as_object()) {
+        for (pkg_name, pkg_info) in packages {
+            if let Some(arr) = pkg_info.as_array() {
+                // arr[0] = "pkg@version", arr[2] = { dependencies: {...} }
+                let version = arr
+                    .first()
+                    .and_then(|v| v.as_str())
+                    .and_then(extract_version_from_spec)
+                    .unwrap_or_else(|| "?".to_string());
+
+                let mut deps = Vec::new();
+                if let Some(dep_info) = arr.get(2).and_then(|d| d.as_object()) {
+                    for dep_type in ["dependencies", "optionalDependencies"] {
+                        if let Some(dep_map) = dep_info.get(dep_type).and_then(|d| d.as_object()) {
+                            for dep_name in dep_map.keys() {
+                                deps.push(dep_name.clone());
+                            }
+                        }
+                    }
+                }
+
+                deps_map.insert(pkg_name.clone(), (version, deps));
+            }
+        }
+    }
+
+    deps_map
+}
+
+/// Recursively build a TreeNode for bun.lock text format
+fn build_node_text(
+    name: &str,
+    deps_map: &HashMap<String, (String, Vec<String>)>,
+    visited: &mut HashSet<String>,
+    max_depth: usize,
+) -> TreeNode {
+    // Get version from deps map
+    let version = deps_map
+        .get(name)
+        .map(|(v, _)| v.clone())
+        .unwrap_or_else(|| "?".to_string());
+
+    // Avoid cycles and limit depth
+    if visited.contains(name) || max_depth == 0 {
+        return TreeNode {
+            name: name.to_string(),
+            version,
+            dependencies: Vec::new(),
+        };
+    }
+
+    visited.insert(name.to_string());
+
+    let children = if let Some((_, deps)) = deps_map.get(name) {
+        deps.iter()
+            .map(|dep| build_node_text(dep, deps_map, visited, max_depth - 1))
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    visited.remove(name);
+
+    TreeNode {
+        name: name.to_string(),
+        version,
+        dependencies: children,
+    }
+}
+
 fn build_tree_text(
     parsed: &serde_json::Value,
     project_root: &Path,
 ) -> Result<DependencyTree, PackageError> {
     let (name, version) = get_project_info(parsed, project_root);
 
+    // Build the dependency map from packages
+    let deps_map = build_deps_map_text(parsed);
+
     let mut root_deps = Vec::new();
+    let mut visited = HashSet::new();
+    const MAX_DEPTH: usize = 50;
 
     // Get direct dependencies from root workspace
     if let Some(workspaces) = parsed.get("workspaces").and_then(|w| w.as_object()) {
         if let Some(root_ws) = workspaces.get("") {
             for dep_type in ["dependencies", "devDependencies"] {
                 if let Some(deps) = root_ws.get(dep_type).and_then(|d| d.as_object()) {
-                    for (dep_name, _version_req) in deps {
-                        let version = if let Some(packages) =
-                            parsed.get("packages").and_then(|p| p.as_object())
-                        {
-                            packages
-                                .get(dep_name)
-                                .and_then(|p| p.as_array())
-                                .and_then(|arr| arr.first())
-                                .and_then(|v| v.as_str())
-                                .and_then(extract_version_from_spec)
-                                .unwrap_or_else(|| "?".to_string())
-                        } else {
-                            "?".to_string()
-                        };
-
-                        root_deps.push(TreeNode {
-                            name: dep_name.clone(),
-                            version,
-                            dependencies: Vec::new(),
-                        });
+                    for dep_name in deps.keys() {
+                        root_deps.push(build_node_text(
+                            dep_name,
+                            &deps_map,
+                            &mut visited,
+                            MAX_DEPTH,
+                        ));
                     }
                 }
             }
         }
 
-        // Also add workspace packages
+        // Also add workspace packages (without recursing into their deps)
         for (ws_path, ws_info) in workspaces {
             if ws_path.is_empty() {
                 continue;
@@ -454,6 +521,9 @@ fn build_tree_text(
     Ok(DependencyTree { roots: vec![root] })
 }
 
+// NOTE: bun.lockb binary format doesn't yet support transitive deps.
+// The dependency relationships are in the "dependencies" buffer but parsing
+// Bun's zig-based serialization is complex. Use text format (bun.lock) instead.
 fn build_tree_binary(project_root: &Path) -> Result<DependencyTree, PackageError> {
     let lockfile = find_binary_lockfile(project_root)
         .ok_or_else(|| PackageError::ParseError("bun.lockb not found".to_string()))?;
