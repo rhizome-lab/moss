@@ -52,7 +52,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - [x] Binary size optimization: LTO + strip reduced 25MB → 18MB (main contributors: moss 2.1MB, bundled C libs 2MB, moss_languages 1.6MB)
-- Avoid Command::new in crates/moss-packages/src/ecosystems/: use native parsers instead of shelling out to CLI tools (npm, bun, curl). More reliable, faster, works without tools installed. Progress: bun.lock (text) uses serde_json_lenient, bun.lockb (binary) parses inline strings only. Still need: bun.lockb external strings (requires proper string_bytes buffer location), npm audit, jsr fetch (curl), npm view
+- [x] Avoid Command::new in crates/moss-packages/src/ecosystems/: replaced 14 curl calls with ureq HTTP client. bun.lockb properly ported from Bun source (inline + external strings). Remaining Command uses are legitimate CLI tools: npm/cargo/pip-audit/bundle-audit/govulncheck (security audits), nix/nix-env (local queries)
 
 **Daemon Design:**
 - Multi-codebase: single daemon indexing multiple roots simultaneously
