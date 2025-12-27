@@ -2890,6 +2890,7 @@ dependencies = [
  "clap",
  "dirs",
  "flate2",
+ "glob",
  "grep-matcher",
  "grep-regex",
  "grep-searcher",

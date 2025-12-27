@@ -285,6 +285,10 @@ enum Commands {
         #[arg(long)]
         check_refs: bool,
 
+        /// Find docs with stale code references (covered code changed since doc was modified)
+        #[arg(long)]
+        stale_docs: bool,
+
         /// Exclude paths matching pattern or @alias (repeatable)
         #[arg(long, value_name = "PATTERN")]
         exclude: Vec<String>,
@@ -628,6 +632,7 @@ fn main() {
             lint,
             hotspots,
             check_refs,
+            stale_docs,
             exclude,
             only,
         } => commands::analyze::cmd_analyze(
@@ -646,6 +651,7 @@ fn main() {
             lint,
             hotspots,
             check_refs,
+            stale_docs,
             cli.json,
             &exclude,
             &only,
