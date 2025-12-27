@@ -4,7 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-(empty - pick from backlog)
+**Documentation Sync (see `docs/documentation.md`):**
+- External doc tracking: `<!-- covers: src/foo.rs -->` parser, `moss analyze --docs` to detect stale docs
+- Example extraction: `[example: name]` markers in test files, `{{example: path#name}}` expansion in docs
 
 Test Status: 110 passing, 0 failing (moss-languages)
 
