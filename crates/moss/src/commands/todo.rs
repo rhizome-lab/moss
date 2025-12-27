@@ -84,6 +84,7 @@ enum ItemFormat {
 #[derive(Debug)]
 struct Section {
     name: String,
+    path: String, // full path like "Backlog/Language Support"
     header_line: usize,
     header_level: usize, // number of # chars
     items: Vec<Item>,
@@ -115,6 +116,8 @@ fn parse_todo(content: &str) -> Vec<Section> {
     let lines: Vec<&str> = content.lines().collect();
     let mut sections = Vec::new();
     let mut current_section: Option<Section> = None;
+    // Track parent names at each level for building paths
+    let mut parent_stack: Vec<(usize, String)> = Vec::new(); // (level, name)
 
     for (line_num, line) in lines.iter().enumerate() {
         // Detect section headers
@@ -124,8 +127,34 @@ fn parse_todo(content: &str) -> Vec<Section> {
                 section.format = detect_format(&section.items);
                 sections.push(section);
             }
+
+            // Update parent stack - pop anything at same or deeper level
+            while parent_stack
+                .last()
+                .map(|(l, _)| *l >= level)
+                .unwrap_or(false)
+            {
+                parent_stack.pop();
+            }
+
+            // Build path from parent stack
+            let path = if parent_stack.is_empty() {
+                name.clone()
+            } else {
+                let parent_path: String = parent_stack
+                    .iter()
+                    .map(|(_, n)| n.as_str())
+                    .collect::<Vec<_>>()
+                    .join("/");
+                format!("{}/{}", parent_path, name)
+            };
+
+            // Push this section onto the stack
+            parent_stack.push((level, name.clone()));
+
             current_section = Some(Section {
                 name,
+                path,
                 header_line: line_num,
                 header_level: level,
                 items: Vec::new(),
@@ -394,8 +423,7 @@ fn mark_item_done(
 ) -> Result<(String, String), String> {
     let sections = parse_todo(content);
     let section = if let Some(name) = section_name {
-        find_section_by_name(&sections, name)
-            .ok_or_else(|| format!("Section '{}' not found", name))?
+        find_section_by_name(&sections, name)?
     } else {
         let idx = find_primary_section(&sections).ok_or("No sections found")?;
         &sections[idx]
@@ -466,8 +494,7 @@ fn remove_item(
 ) -> Result<(String, String), String> {
     let sections = parse_todo(content);
     let section = if let Some(name) = section_name {
-        find_section_by_name(&sections, name)
-            .ok_or_else(|| format!("Section '{}' not found", name))?
+        find_section_by_name(&sections, name)?
     } else {
         let idx = find_primary_section(&sections).ok_or("No sections found")?;
         &sections[idx]
@@ -538,24 +565,56 @@ fn renumber_section(content: &str, section_name: &str) -> String {
     result
 }
 
-/// Find section by name (fuzzy match)
-fn find_section_by_name<'a>(sections: &'a [Section], name: &str) -> Option<&'a Section> {
-    let name_lower = name.to_lowercase();
-    sections
-        .iter()
-        .find(|s| s.name.to_lowercase().contains(&name_lower))
+/// Find section by name or path (fuzzy match)
+/// Supports:
+/// - Simple name: "Backlog" (matches section with name containing "Backlog")
+/// - Path: "Backlog/Language" (matches section with path containing both parts)
+/// Returns error if multiple matches (ambiguous) or no matches
+fn find_section_by_name<'a>(sections: &'a [Section], query: &str) -> Result<&'a Section, String> {
+    let query_lower = query.to_lowercase();
+
+    let matches: Vec<_> = if query.contains('/') {
+        // Match against full path
+        sections
+            .iter()
+            .filter(|s| s.path.to_lowercase().contains(&query_lower))
+            .collect()
+    } else {
+        // Match against name only
+        sections
+            .iter()
+            .filter(|s| s.name.to_lowercase().contains(&query_lower))
+            .collect()
+    };
+
+    match matches.len() {
+        0 => Err(format!("No section matching '{}' found", query)),
+        1 => Ok(matches[0]),
+        _ => {
+            let mut msg = format!("Multiple sections match '{}'. Be more specific:\n", query);
+            for section in matches {
+                msg.push_str(&format!("  {}\n", section.path));
+            }
+            Err(msg)
+        }
+    }
 }
 
 /// Display sections with proper headers and filtering
 fn display_sections(sections: &[Section], filter: &ListFilter, json: bool) {
     // Determine which sections to show
     let sections_to_show: Vec<&Section> = if let Some(ref section_filter) = filter.section {
+        let filter_lower = section_filter.to_lowercase();
         sections
             .iter()
             .filter(|s| {
-                s.name
-                    .to_lowercase()
-                    .contains(&section_filter.to_lowercase())
+                if section_filter.contains('/') {
+                    // Path query - match against full path
+                    s.path.to_lowercase().contains(&filter_lower)
+                } else {
+                    // Simple name query
+                    s.name.to_lowercase().contains(&filter_lower)
+                }
             })
             .collect()
     } else if filter.all || filter.done {
@@ -601,6 +660,7 @@ fn display_sections(sections: &[Section], filter: &ListFilter, json: bool) {
                     .collect();
                 serde_json::json!({
                     "name": s.name,
+                    "path": s.path,
                     "level": s.header_level,
                     "format": format!("{:?}", s.format),
                     "items": items
@@ -733,7 +793,7 @@ pub fn cmd_todo(action: Option<TodoAction>, json: bool, root: &Path) -> i32 {
                         let section_name = if let Some(ref s) = section {
                             find_section_by_name(&sections, s)
                                 .map(|sec| sec.name.as_str())
-                                .unwrap_or(s)
+                                .unwrap_or(s.as_str())
                         } else {
                             find_primary_section(&sections)
                                 .map(|i| sections[i].name.as_str())
