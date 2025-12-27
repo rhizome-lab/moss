@@ -26,7 +26,8 @@
             mold
             clang
             # VS Code extension (editors/vscode/) and docs
-            nodejs_22
+            nodejs_latest
+            corepack
           ];
 	  LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath buildInputs}:$LD_LIBRARY_PATH";
         };
