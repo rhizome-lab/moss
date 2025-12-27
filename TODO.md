@@ -6,10 +6,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 Test Status: 110 passing, 0 failing (moss-languages)
 
-**moss todo remaining:**
-- `--file PATH` flag, auto-detect (TODO.md, TASKS.md, todo.txt)
-- Config (`[todo]` in moss.toml): file, primary_section, default filters
-
 
 ## Remaining Work
 
@@ -50,6 +46,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 
 **Tooling:**
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
+- Interactive config editor: `moss config` TUI for editing `.moss/config.toml`
 
 **Workspace/Context Management:**
 - Persistent workspace concept (like Notion): files, tool results, context stored permanently

@@ -4,6 +4,15 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Todo Command
+
+`moss todo` for structured TODO.md editing:
+- Auto-detects formats: checkboxes, numbered lists, bullets, headers
+- Subcommands: `list`, `add`, `done`, `rm`, `clean`
+- Section targeting: `--section "Backlog"` or `--section "Backlog/Language Support"`
+- Filters: `--all`, `--done`, `--pending`, `--raw`
+- Config: `[todo]` in `.moss/config.toml` for file, primary_section, show_all
+
 ### Build System
 
 Optimizations for faster development iteration:
