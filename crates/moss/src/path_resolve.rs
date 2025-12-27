@@ -288,6 +288,32 @@ pub fn resolve(query: &str, root: &Path) -> Vec<PathMatch> {
                     })
                     .collect();
             }
+        } else {
+            // Fallback: walk filesystem for extension matches
+            let ext = query;
+            let walker = WalkBuilder::new(root)
+                .hidden(false)
+                .git_ignore(true)
+                .build();
+            return walker
+                .flatten()
+                .filter_map(|entry| {
+                    let path = entry.path();
+                    if path.is_file() {
+                        let path_str = path.to_string_lossy();
+                        if path_str.ends_with(ext) {
+                            if let Ok(rel) = path.strip_prefix(root) {
+                                return Some(PathMatch {
+                                    path: rel.to_string_lossy().to_string(),
+                                    kind: "file".to_string(),
+                                    score: u32::MAX,
+                                });
+                            }
+                        }
+                    }
+                    None
+                })
+                .collect();
         }
     }
 
