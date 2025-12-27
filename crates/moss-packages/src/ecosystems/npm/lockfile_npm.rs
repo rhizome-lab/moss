@@ -54,6 +54,8 @@ fn find_lockfile(project_root: &Path) -> Option<std::path::PathBuf> {
     None
 }
 
+/// Build dependency tree from parsed package-lock.json
+/// Exposed for testing
 fn build_tree(parsed: &serde_json::Value) -> Result<DependencyTree, PackageError> {
     let name = parsed
         .get("name")
@@ -76,8 +78,11 @@ fn build_tree(parsed: &serde_json::Value) -> Result<DependencyTree, PackageError
                 continue; // Skip root
             }
 
-            // Extract package name from path: "node_modules/foo" or "node_modules/foo/node_modules/bar"
-            let parts: Vec<&str> = path.split("/node_modules/").collect();
+            // Strip leading "node_modules/" prefix, then split on "/node_modules/"
+            // "node_modules/foo" -> "foo" (parent: root)
+            // "node_modules/foo/node_modules/bar" -> "bar" (parent: "foo")
+            let path_stripped = path.strip_prefix("node_modules/").unwrap_or(path);
+            let parts: Vec<&str> = path_stripped.split("/node_modules/").collect();
             let pkg_name = parts.last().unwrap_or(&"");
             let pkg_version = info.get("version").and_then(|v| v.as_str()).unwrap_or("");
 
@@ -154,5 +159,114 @@ fn build_tree(parsed: &serde_json::Value) -> Result<DependencyTree, PackageError
                 dependencies: Vec::new(),
             }],
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_tree_v2_format() {
+        // package-lock.json v2/v3 format with packages section
+        let json = r#"{
+            "name": "my-app",
+            "version": "1.0.0",
+            "lockfileVersion": 3,
+            "packages": {
+                "": {
+                    "name": "my-app",
+                    "version": "1.0.0"
+                },
+                "node_modules/react": {
+                    "version": "18.2.0",
+                    "resolved": "https://registry.npmjs.org/react/-/react-18.2.0.tgz"
+                },
+                "node_modules/react/node_modules/loose-envify": {
+                    "version": "1.4.0"
+                },
+                "node_modules/typescript": {
+                    "version": "5.0.0",
+                    "dev": true
+                }
+            }
+        }"#;
+
+        let parsed: serde_json::Value = serde_json::from_str(json).unwrap();
+        let tree = build_tree(&parsed).unwrap();
+
+        assert_eq!(tree.roots.len(), 1);
+        let root = &tree.roots[0];
+        assert_eq!(root.name, "my-app");
+        assert_eq!(root.version, "1.0.0");
+        assert_eq!(root.dependencies.len(), 2); // react and typescript
+
+        // Find react and check its transitive dep
+        let react = root
+            .dependencies
+            .iter()
+            .find(|d| d.name == "react")
+            .unwrap();
+        assert_eq!(react.version, "18.2.0");
+        assert_eq!(react.dependencies.len(), 1);
+        assert_eq!(react.dependencies[0].name, "loose-envify");
+        assert_eq!(react.dependencies[0].version, "1.4.0");
+    }
+
+    #[test]
+    fn test_build_tree_scoped_packages() {
+        let json = r#"{
+            "name": "app",
+            "version": "0.1.0",
+            "packages": {
+                "": {},
+                "node_modules/@types/node": {
+                    "version": "20.11.0"
+                },
+                "node_modules/@babel/core": {
+                    "version": "7.24.0"
+                },
+                "node_modules/@babel/core/node_modules/@babel/parser": {
+                    "version": "7.24.1"
+                }
+            }
+        }"#;
+
+        let parsed: serde_json::Value = serde_json::from_str(json).unwrap();
+        let tree = build_tree(&parsed).unwrap();
+
+        let root = &tree.roots[0];
+        assert_eq!(root.dependencies.len(), 2);
+
+        let types_node = root
+            .dependencies
+            .iter()
+            .find(|d| d.name == "@types/node")
+            .unwrap();
+        assert_eq!(types_node.version, "20.11.0");
+
+        let babel_core = root
+            .dependencies
+            .iter()
+            .find(|d| d.name == "@babel/core")
+            .unwrap();
+        assert_eq!(babel_core.version, "7.24.0");
+        assert_eq!(babel_core.dependencies.len(), 1);
+        assert_eq!(babel_core.dependencies[0].name, "@babel/parser");
+    }
+
+    #[test]
+    fn test_build_tree_empty_packages() {
+        let json = r#"{
+            "name": "empty-project",
+            "version": "0.0.1"
+        }"#;
+
+        let parsed: serde_json::Value = serde_json::from_str(json).unwrap();
+        let tree = build_tree(&parsed).unwrap();
+
+        assert_eq!(tree.roots[0].name, "empty-project");
+        assert_eq!(tree.roots[0].version, "0.0.1");
+        assert!(tree.roots[0].dependencies.is_empty());
     }
 }

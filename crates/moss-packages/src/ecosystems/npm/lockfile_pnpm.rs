@@ -277,4 +277,82 @@ mod tests {
         assert_eq!(name, "@types/node");
         assert_eq!(version, "20.0.0");
     }
+
+    #[test]
+    fn test_parse_snapshot_key_with_peer_suffix() {
+        // pnpm adds peer dep info in parentheses
+        let (name, version) =
+            parse_snapshot_key("vitepress@1.6.4(@algolia/client-search@5.0.0)").unwrap();
+        assert_eq!(name, "vitepress");
+        assert_eq!(version, "1.6.4");
+
+        let (name, version) = parse_snapshot_key("@vue/compiler-core@3.5.0(vue@3.5.0)").unwrap();
+        assert_eq!(name, "@vue/compiler-core");
+        assert_eq!(version, "3.5.0");
+    }
+
+    #[test]
+    fn test_build_deps_map() {
+        let yaml = r#"
+lockfileVersion: '9.0'
+
+snapshots:
+  react@18.2.0:
+    dependencies:
+      loose-envify: 1.4.0
+
+  loose-envify@1.4.0:
+    dependencies:
+      js-tokens: 4.0.0
+
+  js-tokens@4.0.0: {}
+
+  typescript@5.4.5: {}
+
+  "@types/node@20.11.0":
+    dependencies:
+      undici-types: 5.26.5
+
+  undici-types@5.26.5: {}
+"#;
+
+        let parsed: serde_yaml::Value = serde_yaml::from_str(yaml).unwrap();
+        let deps_map = build_deps_map(&parsed);
+
+        // Check react has loose-envify as dependency
+        assert!(deps_map.contains_key("react@18.2.0"));
+        let react_deps = deps_map.get("react@18.2.0").unwrap();
+        assert!(react_deps.contains(&"loose-envify@1.4.0".to_string()));
+
+        // Check loose-envify has js-tokens
+        let loose_deps = deps_map.get("loose-envify@1.4.0").unwrap();
+        assert!(loose_deps.contains(&"js-tokens@4.0.0".to_string()));
+
+        // Check packages with no deps
+        let ts_deps = deps_map.get("typescript@5.4.5").unwrap();
+        assert!(ts_deps.is_empty());
+
+        // Check scoped package
+        let types_node_deps = deps_map.get("@types/node@20.11.0").unwrap();
+        assert!(types_node_deps.contains(&"undici-types@5.26.5".to_string()));
+    }
+
+    #[test]
+    fn test_build_deps_map_with_optional() {
+        let yaml = r#"
+snapshots:
+  esbuild@0.21.0:
+    optionalDependencies:
+      "@esbuild/linux-x64": 0.21.0
+      "@esbuild/darwin-arm64": 0.21.0
+"#;
+
+        let parsed: serde_yaml::Value = serde_yaml::from_str(yaml).unwrap();
+        let deps_map = build_deps_map(&parsed);
+
+        let esbuild_deps = deps_map.get("esbuild@0.21.0").unwrap();
+        assert_eq!(esbuild_deps.len(), 2);
+        assert!(esbuild_deps.contains(&"@esbuild/linux-x64@0.21.0".to_string()));
+        assert!(esbuild_deps.contains(&"@esbuild/darwin-arm64@0.21.0".to_string()));
+    }
 }

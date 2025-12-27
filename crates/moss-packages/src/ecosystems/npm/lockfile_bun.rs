@@ -952,6 +952,8 @@ fn get_project_info_from_package_json(project_root: &Path) -> (String, String) {
 mod tests {
     use super::*;
 
+    // ========== Text format (bun.lock) tests ==========
+
     #[test]
     fn test_extract_version_simple() {
         assert_eq!(
@@ -969,37 +971,142 @@ mod tests {
     }
 
     #[test]
+    fn test_build_deps_map_text() {
+        // bun.lock uses JSONC format (JSON with comments and trailing commas)
+        let json = r#"{
+            "lockfileVersion": 1,
+            "workspaces": {
+                "": {
+                    "name": "my-app",
+                    "dependencies": {
+                        "react": "^18.0.0"
+                    }
+                }
+            },
+            "packages": {
+                "react": ["react@18.2.0", "", {
+                    "dependencies": {
+                        "loose-envify": "^1.1.0"
+                    }
+                }],
+                "loose-envify": ["loose-envify@1.4.0", "", {
+                    "dependencies": {
+                        "js-tokens": "^4.0.0"
+                    }
+                }],
+                "js-tokens": ["js-tokens@4.0.0", "", {}],
+                "@types/node": ["@types/node@20.11.0", "", {
+                    "dependencies": {
+                        "undici-types": "~5.26.0"
+                    }
+                }],
+                "undici-types": ["undici-types@5.26.5", "", {}]
+            }
+        }"#;
+
+        let parsed: serde_json::Value = serde_json::from_str(json).unwrap();
+        let deps_map = build_deps_map_text(&parsed);
+
+        // Check react
+        assert!(deps_map.contains_key("react"));
+        let (version, deps) = deps_map.get("react").unwrap();
+        assert_eq!(version, "18.2.0");
+        assert!(deps.contains(&"loose-envify".to_string()));
+
+        // Check transitive deps
+        let (version, deps) = deps_map.get("loose-envify").unwrap();
+        assert_eq!(version, "1.4.0");
+        assert!(deps.contains(&"js-tokens".to_string()));
+
+        // Check scoped package
+        let (version, deps) = deps_map.get("@types/node").unwrap();
+        assert_eq!(version, "20.11.0");
+        assert!(deps.contains(&"undici-types".to_string()));
+
+        // Check leaf package
+        let (version, deps) = deps_map.get("js-tokens").unwrap();
+        assert_eq!(version, "4.0.0");
+        assert!(deps.is_empty());
+    }
+
+    #[test]
+    fn test_build_deps_map_text_with_optional() {
+        let json = r#"{
+            "packages": {
+                "esbuild": ["esbuild@0.21.0", "", {
+                    "optionalDependencies": {
+                        "@esbuild/linux-x64": "0.21.0",
+                        "@esbuild/darwin-arm64": "0.21.0"
+                    }
+                }],
+                "@esbuild/linux-x64": ["@esbuild/linux-x64@0.21.0", "", {}],
+                "@esbuild/darwin-arm64": ["@esbuild/darwin-arm64@0.21.0", "", {}]
+            }
+        }"#;
+
+        let parsed: serde_json::Value = serde_json::from_str(json).unwrap();
+        let deps_map = build_deps_map_text(&parsed);
+
+        let (_, deps) = deps_map.get("esbuild").unwrap();
+        assert_eq!(deps.len(), 2);
+        assert!(deps.contains(&"@esbuild/linux-x64".to_string()));
+        assert!(deps.contains(&"@esbuild/darwin-arm64".to_string()));
+    }
+
+    // ========== Binary format (bun.lockb) tests ==========
+
+    #[test]
     fn test_is_valid_package_name() {
         assert!(BunLockb::is_valid_package_name("elysia"));
         assert!(BunLockb::is_valid_package_name("vue"));
         assert!(BunLockb::is_valid_package_name("@types/node"));
+        assert!(BunLockb::is_valid_package_name("@babel/core"));
+        assert!(BunLockb::is_valid_package_name("lodash.debounce"));
         assert!(!BunLockb::is_valid_package_name(""));
         assert!(!BunLockb::is_valid_package_name("has space"));
+        assert!(!BunLockb::is_valid_package_name("has\ttab"));
     }
 
     #[test]
-    fn test_parse_real_lockb() {
-        let path = std::path::Path::new("/home/me/git/tinkerbox/bun.lockb");
-        if !path.exists() {
-            eprintln!("Skipping test: bun.lockb not found at {:?}", path);
-            return;
-        }
+    fn test_read_string_inline() {
+        // Inline string: "react" with null terminator, no high bit set
+        let bytes: [u8; 8] = [b'r', b'e', b'a', b'c', b't', 0, 0, 0];
+        let result = BunLockb::read_string(&bytes, &[]);
+        assert_eq!(result, Some("react".to_string()));
 
-        let data = std::fs::read(path).expect("failed to read bun.lockb");
-        eprintln!("Read {} bytes from bun.lockb", data.len());
+        // Inline scoped package (short enough to fit)
+        let bytes: [u8; 8] = [b'@', b'a', b'/', b'b', 0, 0, 0, 0];
+        let result = BunLockb::read_string(&bytes, &[]);
+        assert_eq!(result, Some("@a/b".to_string()));
+    }
 
-        let parsed = BunLockb::parse(&data);
-        if let Some(lockb) = parsed {
-            eprintln!("Parsed {} packages", lockb.packages.len());
-            for pkg in lockb.packages.iter().take(20) {
-                eprintln!("  {} @ {}", pkg.name, pkg.version);
-            }
-            assert!(
-                !lockb.packages.is_empty(),
-                "should have found some packages"
-            );
-        } else {
-            panic!("Failed to parse bun.lockb");
-        }
+    #[test]
+    fn test_read_string_external() {
+        // External string: high bit set in byte[7]
+        // Pointer { off: 5, len: 11 } for "@types/node" at offset 5
+        let string_bytes = b"junk_@types/node_more";
+        //                   01234567890123456789
+        //                        ^--- offset 5, length 11
+
+        // Build external pointer: off=5, len=11, with high bit set
+        // Raw u64 = (len << 32) | off | (1 << 63)
+        let off: u64 = 5;
+        let len: u64 = 11;
+        let raw = off | (len << 32) | (1u64 << 63);
+        let bytes: [u8; 8] = raw.to_le_bytes();
+
+        let result = BunLockb::read_string(&bytes, string_bytes);
+        assert_eq!(result, Some("@types/node".to_string()));
+    }
+
+    #[test]
+    fn test_parse_invalid_header() {
+        // Too short
+        assert!(BunLockb::parse(&[0u8; 10]).is_none());
+
+        // Wrong magic
+        let mut bad = vec![0u8; 200];
+        bad[..10].copy_from_slice(b"wrong head");
+        assert!(BunLockb::parse(&bad).is_none());
     }
 }

@@ -251,3 +251,110 @@ fn build_tree(project_root: &Path) -> Result<DependencyTree, PackageError> {
 
     Ok(DependencyTree { roots: vec![root] })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_package_name_simple() {
+        assert_eq!(
+            extract_package_name("react@18.2.0"),
+            Some("react".to_string())
+        );
+        assert_eq!(
+            extract_package_name("lodash@^4.17.0"),
+            Some("lodash".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_package_name_scoped() {
+        assert_eq!(
+            extract_package_name("@types/node@20.0.0"),
+            Some("@types/node".to_string())
+        );
+        assert_eq!(
+            extract_package_name("@babel/core@^7.0.0"),
+            Some("@babel/core".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_yarn_lock_simple() {
+        let content = r#"
+# yarn lockfile v1
+
+react@^18.0.0:
+  version "18.2.0"
+  resolved "https://registry.yarnpkg.com/react/-/react-18.2.0.tgz"
+  integrity sha512-...
+  dependencies:
+    loose-envify "^1.1.0"
+
+loose-envify@^1.1.0:
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/loose-envify/-/loose-envify-1.4.0.tgz"
+"#;
+
+        let entries = parse_yarn_lock(content);
+
+        assert!(entries.contains_key("react"));
+        let react = entries.get("react").unwrap();
+        assert_eq!(react.version, "18.2.0");
+        assert_eq!(react.dependencies, vec!["loose-envify"]);
+
+        assert!(entries.contains_key("loose-envify"));
+        let loose = entries.get("loose-envify").unwrap();
+        assert_eq!(loose.version, "1.4.0");
+        assert!(loose.dependencies.is_empty());
+    }
+
+    #[test]
+    fn test_parse_yarn_lock_scoped() {
+        let content = r#"
+"@types/node@^20.0.0":
+  version "20.11.0"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-20.11.0.tgz"
+  dependencies:
+    undici-types "~5.26.4"
+
+"@babel/core@^7.24.0", "@babel/core@^7.0.0":
+  version "7.24.5"
+  resolved "https://registry.yarnpkg.com/@babel/core/-/core-7.24.5.tgz"
+"#;
+
+        let entries = parse_yarn_lock(content);
+
+        assert!(entries.contains_key("@types/node"));
+        let types_node = entries.get("@types/node").unwrap();
+        assert_eq!(types_node.version, "20.11.0");
+        assert_eq!(types_node.dependencies, vec!["undici-types"]);
+
+        // Multiple version ranges should all map to same entry
+        assert!(entries.contains_key("@babel/core"));
+        let babel = entries.get("@babel/core").unwrap();
+        assert_eq!(babel.version, "7.24.5");
+    }
+
+    #[test]
+    fn test_parse_yarn_lock_multiple_deps() {
+        let content = r#"
+typescript@^5.0.0:
+  version "5.4.5"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.4.5.tgz"
+  dependencies:
+    dep-a "^1.0.0"
+    dep-b "^2.0.0"
+    dep-c "^3.0.0"
+"#;
+
+        let entries = parse_yarn_lock(content);
+        let ts = entries.get("typescript").unwrap();
+        assert_eq!(ts.version, "5.4.5");
+        assert_eq!(ts.dependencies.len(), 3);
+        assert!(ts.dependencies.contains(&"dep-a".to_string()));
+        assert!(ts.dependencies.contains(&"dep-b".to_string()));
+        assert!(ts.dependencies.contains(&"dep-c".to_string()));
+    }
+}
