@@ -4,8 +4,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Expand docs nav in `docs/.vitepress/config.ts` - many docs not yet linked
-- Review docs content for vitepress compatibility (frontmatter, etc)
+- [x] Expand docs nav in `docs/.vitepress/config.ts` - all docs now linked
+- [x] Review docs content for vitepress compatibility - fixed Vue template escaping, dead links
 
 Test Status: 110 passing, 0 failing (moss-languages)
 
