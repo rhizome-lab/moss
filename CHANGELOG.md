@@ -49,6 +49,13 @@ The double-blank convention allows separating summary from extended docs inline.
 - Supports exact paths, glob patterns, and directories
 - Reports days stale and number of files changed
 
+### Example Validation
+
+`moss analyze --check-examples` validates example references in markdown:
+- Mark examples in source: `// [example: basic-usage] ... // [/example]`
+- Reference in docs: `{{example: tests/foo.rs#basic-usage}}`
+- Reports missing examples with file and line number
+
 ### Documentation Reference Checking
 
 `moss analyze --check-refs` scans markdown files for code references in backticks and validates against indexed symbols. Reports broken references with file:line and context.
