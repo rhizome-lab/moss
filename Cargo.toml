@@ -46,26 +46,8 @@ grep-regex = "0.1"
 grep-searcher = "0.1"
 
 # Parsing - arborium bundles ~70 tree-sitter grammars
-arborium = { version = "2.4", features = [
-    "lang-python",
-    "lang-rust",
-    "lang-javascript",
-    "lang-typescript",
-    "lang-markdown",
-    "lang-json",
-    "lang-yaml",
-    "lang-html",
-    "lang-css",
-    "lang-go",
-    "lang-c",
-    "lang-cpp",
-    "lang-java",
-    "lang-ruby",
-    "lang-bash",
-    "lang-toml",
-    "lang-scala",
-    "lang-vue",
-] }
+# Features controlled by moss-languages, not here
+arborium = { version = "2.4", default-features = false }
 
 # Minimize debug build size (full debug info adds ~2GB)
 [profile.dev]

@@ -10,11 +10,14 @@ name = "moss"
 path = "src/main.rs"
 
 [features]
-default = ["all-languages", "lua"]
+default = ["common", "lua"]
 
 # Meta-features (passthrough to moss-languages)
-all-languages = ["moss-languages/all-languages"]
 tier1 = ["moss-languages/tier1"]
+tier2 = ["moss-languages/tier2"]
+common = ["moss-languages/common"]
+niche = ["moss-languages/niche"]
+all-languages = ["moss-languages/all-languages"]
 
 # Optional LLM support for workflows
 llm = ["rig-core", "tokio-stream"]

@@ -10,24 +10,39 @@ rusqlite = { workspace = true }
 serde_json = { workspace = true }
 
 [features]
-default = ["all-languages"]
+default = ["common"]
 
-# Meta-features
-all-languages = [
-    "lang-python", "lang-rust", "lang-javascript", "lang-typescript", "lang-tsx",
-    "lang-go", "lang-java", "lang-kotlin", "lang-c-sharp", "lang-swift",
-    "lang-php", "lang-dockerfile", "lang-c", "lang-cpp", "lang-ruby",
-    "lang-scala", "lang-vue", "lang-markdown", "lang-json", "lang-yaml",
-    "lang-toml", "lang-html", "lang-css", "lang-bash",
-    "lang-lua", "lang-zig", "lang-elixir", "lang-erlang", "lang-dart",
-    "lang-fsharp", "lang-sql", "lang-graphql", "lang-hcl", "lang-scss",
-    "lang-svelte", "lang-xml", "lang-clojure", "lang-haskell", "lang-ocaml",
-    "lang-nix", "lang-perl", "lang-r", "lang-julia", "lang-elm", "lang-cmake",
-    "lang-vim", "lang-awk", "lang-fish", "lang-jq", "lang-powershell",
-    "lang-zsh", "lang-groovy", "lang-glsl", "lang-hlsl",
-    "lang-commonlisp", "lang-elisp", "lang-gleam", "lang-scheme",
-    "lang-ini", "lang-diff", "lang-dot", "lang-kdl",
-    "lang-ada", "lang-agda", "lang-d", "lang-matlab",
+# Tier 1: Core languages (~5MB) - universally useful, small grammars
+tier1 = [
+    "lang-python", "lang-rust", "lang-javascript", "lang-typescript",
+    "lang-go", "lang-java", "lang-c",
+    "lang-markdown", "lang-json", "lang-yaml", "lang-toml",
+    "lang-html", "lang-css", "lang-bash",
+]
+
+# Tier 2: Common but larger (~25MB) - popular, worth including
+tier2 = [
+    "lang-cpp", "lang-ruby", "lang-kotlin", "lang-c-sharp",
+    "lang-swift", "lang-php", "lang-scala", "lang-tsx", "lang-vue",
+    "lang-lua", "lang-zig", "lang-elixir", "lang-dart",
+    "lang-dockerfile", "lang-graphql", "lang-hcl", "lang-scss",
+]
+
+# Common = tier1 + tier2 (default, ~30MB)
+common = ["tier1", "tier2"]
+
+# Niche: Large or specialized grammars (opt-in only, ~60MB)
+# lean (18M), verilog (18M), sql (9M), d (8M), hlsl (6M), fsharp (6M),
+# objc (5M), tlaplus (5M), haskell (4M), swift already in tier2
+niche = [
+    "lang-sql", "lang-fsharp", "lang-haskell", "lang-ocaml",
+    "lang-perl", "lang-r", "lang-julia", "lang-elm",
+    "lang-erlang", "lang-svelte", "lang-xml", "lang-clojure",
+    "lang-nix", "lang-cmake", "lang-vim", "lang-awk", "lang-fish",
+    "lang-jq", "lang-powershell", "lang-zsh", "lang-groovy",
+    "lang-glsl", "lang-hlsl", "lang-commonlisp", "lang-elisp",
+    "lang-gleam", "lang-scheme", "lang-ini", "lang-diff", "lang-dot",
+    "lang-kdl", "lang-ada", "lang-agda", "lang-d", "lang-matlab",
     "lang-meson", "lang-nginx", "lang-prolog", "lang-batch",
     "lang-asm", "lang-objc", "lang-typst", "lang-asciidoc",
     "lang-vb", "lang-idris", "lang-rescript", "lang-lean",
@@ -38,11 +53,8 @@ all-languages = [
     "lang-verilog", "lang-vhdl", "lang-wit", "lang-x86asm", "lang-yuri",
 ]
 
-# Tier 1: Most common languages
-tier1 = [
-    "lang-python", "lang-rust", "lang-javascript", "lang-typescript",
-    "lang-go", "lang-java", "lang-cpp",
-]
+# All languages (tier1 + tier2 + niche, ~90MB)
+all-languages = ["common", "niche"]
 
 # Individual language features
 lang-python = ["arborium/lang-python"]
