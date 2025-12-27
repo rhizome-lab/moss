@@ -82,8 +82,8 @@ Docs reference by marker:
 - [x] Update skeleton extraction to use summary only
 
 ### Phase 2: External doc tracking
-- [ ] `<!-- covers: ... -->` parser
-- [ ] `moss analyze --docs` to detect stale docs
+- [x] `<!-- covers: ... -->` parser
+- [x] `moss analyze --stale-docs` to detect stale docs
 - [ ] Integration with `moss view` to show related docs
 
 ### Phase 3: Example extraction

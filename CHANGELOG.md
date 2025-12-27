@@ -42,6 +42,13 @@ Three-level docstring display for `moss view`:
 
 The double-blank convention allows separating summary from extended docs inline. Design doc: `docs/documentation.md`.
 
+### Stale Documentation Detection
+
+`moss analyze --stale-docs` finds docs where covered code has changed since the doc was modified:
+- Add `<!-- covers: src/foo.rs, src/bar/*.rs -->` to markdown docs
+- Supports exact paths, glob patterns, and directories
+- Reports days stale and number of files changed
+
 ### Documentation Reference Checking
 
 `moss analyze --check-refs` scans markdown files for code references in backticks and validates against indexed symbols. Reports broken references with file:line and context.
