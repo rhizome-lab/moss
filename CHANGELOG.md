@@ -4,6 +4,14 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Index-Free Operation
+
+All commands now work gracefully when indexing is disabled (`[index] enabled = false`):
+- Symbol search falls back to filesystem walking with skeleton extraction
+- Health analysis walks filesystem for file counts and line metrics
+- Path resolution uses glob patterns instead of index queries
+- Shadow Git for hunk-level edit tracking (`.moss/.git`)
+
 ### Package Command
 
 - `moss package why <pkg>` and `moss package tree` now show full transitive dependency trees for pnpm, yarn, and bun lockfiles
