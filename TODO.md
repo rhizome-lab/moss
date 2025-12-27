@@ -26,7 +26,8 @@ See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to 
 Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so files (~142MB total).
 - Grammars load from: `MOSS_GRAMMAR_PATH` env var, `~/.config/moss/grammars/`
 - See `crates/moss-languages/src/grammar_loader.rs` for loader implementation
-- Remaining: ship .so files with releases, `moss grammars install` command
+- [x] `moss grammars install` downloads from GitHub releases
+- [x] Release workflow builds and packages grammars per platform
 
 **Workflow Engine:**
 - Consider streaming output for `auto{}` driver
@@ -36,7 +37,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
-- Investigate moss binary size (~56MB) - profile with `cargo bloat`, check for LTO, strip symbols, unused deps
+- [x] Binary size optimization: LTO + strip reduced 25MB → 18MB (main contributors: moss 2.1MB, bundled C libs 2MB, moss_languages 1.6MB)
 
 **Daemon Design:**
 - Multi-codebase: single daemon indexing multiple roots simultaneously
@@ -62,7 +63,9 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Claude Code lacks navigation: clicking paths/links in output doesn't open them in editor (significant UX gap)
 
 **Distribution:**
-- Wrapper packages for ecosystems: npm, PyPI, Homebrew, etc. (single binary, wrapper scripts)
+- Wrapper packages for ecosystems: npm, PyPI, Homebrew, etc.
+  - Auto-generate and publish in sync with GitHub releases
+  - Single binary + thin wrapper scripts per ecosystem
 
 ## Deferred
 
