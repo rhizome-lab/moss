@@ -47,10 +47,10 @@ struct AppState {
 /// Start the HTTP server.
 pub async fn run_http_server(root: &std::path::Path, port: u16) -> i32 {
     // Initialize index
-    let index = match FileIndex::open(root) {
-        Ok(idx) => idx,
-        Err(e) => {
-            eprintln!("Failed to open index: {}", e);
+    let index = match FileIndex::open_if_enabled(root) {
+        Some(idx) => idx,
+        None => {
+            eprintln!("Indexing disabled or failed");
             return 1;
         }
     };

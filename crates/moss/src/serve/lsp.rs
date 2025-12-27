@@ -28,7 +28,7 @@ impl MossBackend {
 
     /// Initialize index for the workspace root.
     fn init_index(&self, root: PathBuf) {
-        if let Ok(idx) = FileIndex::open(&root) {
+        if let Some(idx) = FileIndex::open_if_enabled(&root) {
             *self.index.lock().unwrap() = Some(idx);
         }
         *self.root.lock().unwrap() = Some(root);

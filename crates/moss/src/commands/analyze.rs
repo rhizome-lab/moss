@@ -396,13 +396,10 @@ fn cmd_call_graph(
     };
 
     // Try index first
-    let idx = match index::FileIndex::open(root) {
-        Ok(i) => i,
-        Err(e) => {
-            eprintln!(
-                "Failed to open index: {}. Run: moss reindex --call-graph",
-                e
-            );
+    let idx = match index::FileIndex::open_if_enabled(root) {
+        Some(i) => i,
+        None => {
+            eprintln!("Indexing disabled or failed. Run: moss index rebuild --call-graph");
             return 1;
         }
     };
@@ -754,9 +751,9 @@ fn cmd_hotspots(root: &Path, json: bool) -> i32 {
     }
 
     // Get complexity from index
-    let idx = match index::FileIndex::open(root) {
-        Ok(i) => i,
-        Err(_) => {
+    let idx = match index::FileIndex::open_if_enabled(root) {
+        Some(i) => i,
+        None => {
             // No index, just use churn data
             let mut hotspots: Vec<FileHotspot> = file_stats
                 .into_iter()
@@ -921,13 +918,10 @@ fn cmd_check_refs(root: &Path, json: bool) -> i32 {
     use regex::Regex;
 
     // Open index to get known symbols
-    let idx = match index::FileIndex::open(root) {
-        Ok(i) => i,
-        Err(e) => {
-            eprintln!(
-                "Failed to open index: {}. Run: moss index rebuild --call-graph",
-                e
-            );
+    let idx = match index::FileIndex::open_if_enabled(root) {
+        Some(i) => i,
+        None => {
+            eprintln!("Indexing disabled or failed. Run: moss index rebuild --call-graph");
             return 1;
         }
     };

@@ -1,3 +1,4 @@
+use crate::config::MossConfig;
 use crate::paths::get_moss_dir;
 use ignore::WalkBuilder;
 use moss_languages::support_for_path;
@@ -120,6 +121,16 @@ impl FileIndex {
                 }
             }
         }
+    }
+
+    /// Open index only if indexing is enabled in config.
+    /// Returns None if `[index] enabled = false`.
+    pub fn open_if_enabled(root: &Path) -> Option<Self> {
+        let config = MossConfig::load(root);
+        if !config.index.enabled() {
+            return None;
+        }
+        Self::open(root).ok()
     }
 
     /// Internal: try to open database without recovery

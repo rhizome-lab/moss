@@ -142,9 +142,9 @@ fn has_language_support(path: &str) -> bool {
 
 /// Search for symbols in the index by name
 fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
-    let idx = match index::FileIndex::open(root) {
-        Ok(i) => i,
-        Err(_) => return vec![],
+    let idx = match index::FileIndex::open_if_enabled(root) {
+        Some(i) => i,
+        None => return vec![],
     };
 
     // Check if call graph is populated

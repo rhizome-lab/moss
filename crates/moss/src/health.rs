@@ -245,10 +245,10 @@ fn is_lockfile(path: &str) -> bool {
 }
 
 pub fn analyze_health(root: &Path) -> HealthReport {
-    // Open the index (creates/refreshes if needed)
-    let mut index = match FileIndex::open(root) {
-        Ok(idx) => idx,
-        Err(_) => {
+    // Open the index if enabled
+    let mut index = match FileIndex::open_if_enabled(root) {
+        Some(idx) => idx,
+        None => {
             return HealthReport {
                 total_files: 0,
                 files_by_language: HashMap::new(),
