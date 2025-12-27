@@ -5,7 +5,6 @@ use crate::{
     PackageQuery, TreeNode,
 };
 use std::path::Path;
-use std::process::Command;
 
 pub struct Maven;
 
@@ -273,17 +272,8 @@ fn fetch_maven_info(package: &str) -> Result<PackageInfo, PackageError> {
         group_id, artifact_id
     );
 
-    let output = Command::new("curl")
-        .args(["-sS", "-f", &url])
-        .output()
-        .map_err(|e| PackageError::ToolFailed(format!("curl failed: {}", e)))?;
-
-    if !output.status.success() {
-        return Err(PackageError::NotFound(package.to_string()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    parse_maven_response(&stdout, package)
+    let body = crate::http::get(&url)?;
+    parse_maven_response(&body, package)
 }
 
 fn search_maven_central(query: &str) -> Result<PackageInfo, PackageError> {
@@ -292,17 +282,8 @@ fn search_maven_central(query: &str) -> Result<PackageInfo, PackageError> {
         query
     );
 
-    let output = Command::new("curl")
-        .args(["-sS", "-f", &url])
-        .output()
-        .map_err(|e| PackageError::ToolFailed(format!("curl failed: {}", e)))?;
-
-    if !output.status.success() {
-        return Err(PackageError::NotFound(query.to_string()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    parse_maven_response(&stdout, query)
+    let body = crate::http::get(&url)?;
+    parse_maven_response(&body, query)
 }
 
 fn parse_maven_response(json: &str, package: &str) -> Result<PackageInfo, PackageError> {

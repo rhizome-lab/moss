@@ -128,18 +128,8 @@ impl Ecosystem for Deno {
 fn fetch_jsr_info(package: &str, version: Option<&str>) -> Result<PackageInfo, PackageError> {
     // JSR API: https://jsr.io/api/packages/@scope/name
     let url = format!("https://jsr.io/api/packages/{}", package);
-
-    let output = Command::new("curl")
-        .args(["-s", &url])
-        .output()
-        .map_err(|e| PackageError::ToolFailed(e.to_string()))?;
-
-    if !output.status.success() {
-        return Err(PackageError::NotFound(package.to_string()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let v: serde_json::Value = serde_json::from_str(&stdout)
+    let body = crate::http::get(&url)?;
+    let v: serde_json::Value = serde_json::from_str(&body)
         .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
 
     if v.get("error").is_some() {

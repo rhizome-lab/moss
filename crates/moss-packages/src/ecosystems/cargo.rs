@@ -26,7 +26,7 @@ impl Ecosystem for Cargo {
     }
 
     fn tools(&self) -> &'static [&'static str] {
-        &["curl"] // Uses crates.io API
+        &["cargo"] // Uses crates.io API directly, but check cargo exists
     }
 
     fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
@@ -357,22 +357,15 @@ fn fetch_crates_io_info(query: &PackageQuery) -> Result<PackageInfo, PackageErro
 
     // If version specified, fetch that version directly
     // Otherwise, get crate metadata first to find latest version
+    let headers = &[("User-Agent", "moss-packages")];
+
     let version = if let Some(v) = &query.version {
         v.clone()
     } else {
         // Get latest version
         let url = format!("https://crates.io/api/v1/crates/{}", package);
-        let output = Command::new("curl")
-            .args(["-sS", "-f", "-H", "User-Agent: moss-packages", &url])
-            .output()
-            .map_err(|e| PackageError::ToolFailed(format!("curl failed: {}", e)))?;
-
-        if !output.status.success() {
-            return Err(PackageError::NotFound(package.to_string()));
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let v: serde_json::Value = serde_json::from_str(&stdout)
+        let body = crate::http::get_with_headers(&url, headers)?;
+        let v: serde_json::Value = serde_json::from_str(&body)
             .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
 
         v.get("crate")
@@ -384,17 +377,8 @@ fn fetch_crates_io_info(query: &PackageQuery) -> Result<PackageInfo, PackageErro
 
     // Get version-specific info
     let version_url = format!("https://crates.io/api/v1/crates/{}/{}", package, version);
-    let output = Command::new("curl")
-        .args(["-sS", "-f", "-H", "User-Agent: moss-packages", &version_url])
-        .output()
-        .map_err(|e| PackageError::ToolFailed(format!("curl failed: {}", e)))?;
-
-    if !output.status.success() {
-        return Err(PackageError::NotFound(format!("{}@{}", package, version)));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let v: serde_json::Value = serde_json::from_str(&stdout)
+    let body = crate::http::get_with_headers(&version_url, headers)?;
+    let v: serde_json::Value = serde_json::from_str(&body)
         .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
 
     let ver = v
@@ -441,15 +425,9 @@ fn fetch_crates_io_info(query: &PackageQuery) -> Result<PackageInfo, PackageErro
 
     // Get crate-level info (description, homepage, repository)
     let crate_url = format!("https://crates.io/api/v1/crates/{}", package);
-    let crate_output = Command::new("curl")
-        .args(["-sS", "-f", "-H", "User-Agent: moss-packages", &crate_url])
-        .output()
-        .ok();
-
-    let (description, homepage, repository) = if let Some(out) = crate_output {
-        if out.status.success() {
-            let crate_stdout = String::from_utf8_lossy(&out.stdout);
-            if let Ok(cv) = serde_json::from_str::<serde_json::Value>(&crate_stdout) {
+    let (description, homepage, repository) =
+        if let Ok(body) = crate::http::get_with_headers(&crate_url, headers) {
+            if let Ok(cv) = serde_json::from_str::<serde_json::Value>(&body) {
                 let crate_info = cv.get("crate");
                 (
                     crate_info
@@ -472,10 +450,7 @@ fn fetch_crates_io_info(query: &PackageQuery) -> Result<PackageInfo, PackageErro
             }
         } else {
             (None, None, None)
-        }
-    } else {
-        (None, None, None)
-    };
+        };
 
     Ok(PackageInfo {
         name,

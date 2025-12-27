@@ -5,7 +5,6 @@ use crate::{
     PackageQuery, TreeNode,
 };
 use std::path::Path;
-use std::process::Command;
 
 pub struct Nuget;
 
@@ -153,17 +152,8 @@ fn fetch_nuget_info(package: &str) -> Result<PackageInfo, PackageError> {
         package.to_lowercase()
     );
 
-    let output = Command::new("curl")
-        .args(["-sS", "-f", &index_url])
-        .output()
-        .map_err(|e| PackageError::ToolFailed(format!("curl failed: {}", e)))?;
-
-    if !output.status.success() {
-        return Err(PackageError::NotFound(package.to_string()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let index: serde_json::Value = serde_json::from_str(&stdout)
+    let body = crate::http::get(&index_url)?;
+    let index: serde_json::Value = serde_json::from_str(&body)
         .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
 
     let version = index
@@ -181,26 +171,23 @@ fn fetch_nuget_info(package: &str) -> Result<PackageInfo, PackageError> {
         package.to_lowercase()
     );
 
-    let output = Command::new("curl")
-        .args(["-sS", "-f", &nuspec_url])
-        .output()
-        .map_err(|e| PackageError::ToolFailed(format!("curl failed: {}", e)))?;
+    // Return basic info if nuspec not available
+    let nuspec = match crate::http::get(&nuspec_url) {
+        Ok(body) => body,
+        Err(_) => {
+            return Ok(PackageInfo {
+                name: package.to_string(),
+                version: version.to_string(),
+                description: None,
+                license: None,
+                homepage: Some(format!("https://www.nuget.org/packages/{}", package)),
+                repository: None,
+                features: Vec::new(),
+                dependencies: Vec::new(),
+            });
+        }
+    };
 
-    if !output.status.success() {
-        // Return basic info if nuspec not available
-        return Ok(PackageInfo {
-            name: package.to_string(),
-            version: version.to_string(),
-            description: None,
-            license: None,
-            homepage: Some(format!("https://www.nuget.org/packages/{}", package)),
-            repository: None,
-            features: Vec::new(),
-            dependencies: Vec::new(),
-        });
-    }
-
-    let nuspec = String::from_utf8_lossy(&output.stdout);
     parse_nuspec(&nuspec, package, version)
 }
 

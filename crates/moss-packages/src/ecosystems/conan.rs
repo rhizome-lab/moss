@@ -5,7 +5,6 @@ use crate::{
     PackageQuery, TreeNode,
 };
 use std::path::Path;
-use std::process::Command;
 
 pub struct Conan;
 
@@ -181,19 +180,10 @@ fn fetch_conancenter_api(package: &str) -> Result<PackageInfo, PackageError> {
         package
     );
 
-    let output = Command::new("curl")
-        .args(["-sS", "-f", &url])
-        .output()
-        .map_err(|e| PackageError::ToolFailed(format!("curl failed: {}", e)))?;
-
-    if !output.status.success() {
-        return Err(PackageError::NotFound(package.to_string()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let body = crate::http::get(&url)?;
 
     // Parse YAML config - extract versions (format: "1.2.3":)
-    let version = stdout
+    let version = body
         .lines()
         .find(|line| {
             let t = line.trim().trim_start_matches('"');

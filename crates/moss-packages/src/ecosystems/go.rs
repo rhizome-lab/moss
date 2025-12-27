@@ -213,18 +213,8 @@ impl Ecosystem for Go {
 fn fetch_go_proxy_info(package: &str) -> Result<PackageInfo, PackageError> {
     // Get latest version from proxy
     let url = format!("https://proxy.golang.org/{}/@latest", package);
-
-    let output = Command::new("curl")
-        .args(["-sS", "-f", &url])
-        .output()
-        .map_err(|e| PackageError::ToolFailed(format!("curl failed: {}", e)))?;
-
-    if !output.status.success() {
-        return Err(PackageError::NotFound(package.to_string()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let v: serde_json::Value = serde_json::from_str(&stdout)
+    let body = crate::http::get(&url)?;
+    let v: serde_json::Value = serde_json::from_str(&body)
         .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
 
     let version = v

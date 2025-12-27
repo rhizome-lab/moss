@@ -417,21 +417,8 @@ fn fetch_pypi_info(query: &PackageQuery) -> Result<PackageInfo, PackageError> {
         None => format!("https://pypi.org/pypi/{}/json", query.name),
     };
 
-    let output = Command::new("curl")
-        .args(["-sS", "-f", &url])
-        .output()
-        .map_err(|e| PackageError::ToolFailed(format!("curl failed: {}", e)))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("404") || output.status.code() == Some(22) {
-            return Err(PackageError::NotFound(query.name.clone()));
-        }
-        return Err(PackageError::RegistryError(stderr.to_string()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    parse_pypi_json(&stdout, &query.name)
+    let body = crate::http::get(&url)?;
+    parse_pypi_json(&body, &query.name)
 }
 
 fn parse_pypi_json(json_str: &str, package: &str) -> Result<PackageInfo, PackageError> {

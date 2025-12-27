@@ -5,7 +5,6 @@ use crate::{
     PackageQuery, TreeNode,
 };
 use std::path::Path;
-use std::process::Command;
 
 pub struct Composer;
 
@@ -134,18 +133,8 @@ impl Ecosystem for Composer {
 
 fn fetch_packagist_info(package: &str) -> Result<PackageInfo, PackageError> {
     let url = format!("https://packagist.org/packages/{}.json", package);
-
-    let output = Command::new("curl")
-        .args(["-sS", "-f", &url])
-        .output()
-        .map_err(|e| PackageError::ToolFailed(format!("curl failed: {}", e)))?;
-
-    if !output.status.success() {
-        return Err(PackageError::NotFound(package.to_string()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let v: serde_json::Value = serde_json::from_str(&stdout)
+    let body = crate::http::get(&url)?;
+    let v: serde_json::Value = serde_json::from_str(&body)
         .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
 
     let pkg = v

@@ -20,6 +20,7 @@
 
 mod cache;
 pub mod ecosystems;
+mod http;
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
