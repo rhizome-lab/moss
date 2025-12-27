@@ -32,16 +32,16 @@ use serde::Deserialize;
 use std::path::Path;
 
 /// Index configuration.
-#[derive(Debug, Clone, Deserialize, Merge)]
+#[derive(Debug, Clone, Deserialize, Merge, Default)]
 #[serde(default)]
 pub struct IndexConfig {
-    /// Whether to create and use the file index.
-    pub enabled: bool,
+    /// Whether to create and use the file index. Default: true
+    pub enabled: Option<bool>,
 }
 
-impl Default for IndexConfig {
-    fn default() -> Self {
-        Self { enabled: true }
+impl IndexConfig {
+    pub fn enabled(&self) -> bool {
+        self.enabled.unwrap_or(true)
     }
 }
 
@@ -109,9 +109,9 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = MossConfig::default_enabled();
-        assert!(config.daemon.enabled);
-        assert!(config.daemon.auto_start);
-        assert!(config.index.enabled);
+        assert!(config.daemon.enabled());
+        assert!(config.daemon.auto_start());
+        assert!(config.index.enabled());
     }
 
     #[test]
@@ -136,9 +136,9 @@ enabled = true
         .unwrap();
 
         let config = MossConfig::load(dir.path());
-        assert!(!config.daemon.enabled);
-        assert!(!config.daemon.auto_start);
-        assert!(config.index.enabled);
+        assert!(!config.daemon.enabled());
+        assert!(!config.daemon.auto_start());
+        assert!(config.index.enabled());
     }
 
     #[test]
@@ -159,9 +159,9 @@ auto_start = false
         .unwrap();
 
         let config = MossConfig::load(dir.path());
-        // enabled uses serde default (true) since not specified
-        assert!(config.daemon.enabled);
-        assert!(!config.daemon.auto_start);
+        // enabled is None (not specified), accessor returns true
+        assert!(config.daemon.enabled());
+        assert!(!config.daemon.auto_start());
     }
 
     #[test]
@@ -218,6 +218,34 @@ show_all = true
         let config = MossConfig::load(dir.path());
         assert_eq!(config.todo.file, Some("TASKS.md".to_string()));
         assert_eq!(config.todo.primary_section, Some("Backlog".to_string()));
-        assert!(config.todo.show_all);
+        assert!(config.todo.show_all());
+    }
+
+    #[test]
+    fn test_merge_preserves_explicit_values() {
+        // Simulate: global sets enabled=false, project only sets auto_start=true
+        // The explicit enabled=false should be preserved, not overwritten by default
+        let global = MossConfig {
+            daemon: DaemonConfig {
+                enabled: Some(false), // explicitly disabled
+                auto_start: None,
+            },
+            ..Default::default()
+        };
+
+        let project = MossConfig {
+            daemon: DaemonConfig {
+                enabled: None,          // not specified
+                auto_start: Some(true), // explicitly enabled
+            },
+            ..Default::default()
+        };
+
+        let merged = global.merge(project);
+
+        // enabled should stay false (from global), not become true (default)
+        assert!(!merged.daemon.enabled());
+        // auto_start should be true (from project)
+        assert!(merged.daemon.auto_start());
     }
 }

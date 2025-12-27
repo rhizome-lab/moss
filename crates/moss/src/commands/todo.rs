@@ -24,8 +24,14 @@ pub struct TodoConfig {
     /// Primary section name to show by default.
     /// If not set, uses common patterns: "Next Up", "TODO", "Tasks".
     pub primary_section: Option<String>,
-    /// Default to showing all sections instead of just primary.
-    pub show_all: bool,
+    /// Default to showing all sections instead of just primary. Default: false
+    pub show_all: Option<bool>,
+}
+
+impl TodoConfig {
+    pub fn show_all(&self) -> bool {
+        self.show_all.unwrap_or(false)
+    }
 }
 
 #[derive(Subcommand)]
@@ -638,7 +644,7 @@ fn find_section_by_name<'a>(sections: &'a [Section], query: &str) -> Result<&'a 
 /// Display sections with proper headers and filtering
 fn display_sections(sections: &[Section], filter: &ListFilter, config: &TodoConfig, json: bool) {
     // Check if we should show all sections (from config or filter)
-    let show_all = filter.all || config.show_all;
+    let show_all = filter.all || config.show_all();
 
     // Determine which sections to show
     let sections_to_show: Vec<&Section> = if let Some(ref section_filter) = filter.section {

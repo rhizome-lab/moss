@@ -14,21 +14,22 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 use tokio::net::UnixListener;
 
 /// Daemon configuration.
-#[derive(Debug, Clone, Deserialize, Merge)]
+#[derive(Debug, Clone, Deserialize, Merge, Default)]
 #[serde(default)]
 pub struct DaemonConfig {
-    /// Whether to use the daemon for queries.
-    pub enabled: bool,
-    /// Whether to auto-start the daemon when running moss commands.
-    pub auto_start: bool,
+    /// Whether to use the daemon for queries. Default: true
+    pub enabled: Option<bool>,
+    /// Whether to auto-start the daemon when running moss commands. Default: true
+    pub auto_start: Option<bool>,
 }
 
-impl Default for DaemonConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            auto_start: true,
-        }
+impl DaemonConfig {
+    pub fn enabled(&self) -> bool {
+        self.enabled.unwrap_or(true)
+    }
+
+    pub fn auto_start(&self) -> bool {
+        self.auto_start.unwrap_or(true)
     }
 }
 
@@ -616,7 +617,7 @@ pub async fn run_daemon(root: &Path) -> Result<i32, Box<dyn std::error::Error>> 
 /// This is a no-op if daemon is disabled or already running.
 pub fn maybe_start_daemon(root: &Path) {
     let config = MossConfig::load(root);
-    if !config.daemon.enabled || !config.daemon.auto_start {
+    if !config.daemon.enabled() || !config.daemon.auto_start() {
         return;
     }
 
