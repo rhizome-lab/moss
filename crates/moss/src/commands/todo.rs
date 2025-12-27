@@ -8,9 +8,9 @@
 use std::fs;
 use std::path::Path;
 
-use clap::Subcommand;
+use clap::{Args, Subcommand};
 
-use clap::Args;
+use crate::config::{MossConfig, TodoConfig};
 
 #[derive(Subcommand)]
 pub enum TodoAction {
@@ -308,8 +308,20 @@ fn detect_format(items: &[Item]) -> ItemFormat {
 }
 
 /// Find the primary section (the one to use for add/done operations)
-fn find_primary_section(sections: &[Section]) -> Option<usize> {
-    // First, look for priority names
+fn find_primary_section(sections: &[Section], config_primary: Option<&str>) -> Option<usize> {
+    // First, check config-specified primary section
+    if let Some(primary) = config_primary {
+        let primary_lower = primary.to_lowercase();
+        for (i, section) in sections.iter().enumerate() {
+            if section.name.to_lowercase().contains(&primary_lower)
+                || section.path.to_lowercase().contains(&primary_lower)
+            {
+                return Some(i);
+            }
+        }
+    }
+
+    // Then, look for priority names
     for priority_name in PRIMARY_SECTION_NAMES {
         for (i, section) in sections.iter().enumerate() {
             if section.name.to_lowercase().contains(priority_name) {
@@ -337,7 +349,12 @@ fn format_item(text: &str, format: ItemFormat, number: Option<usize>) -> String 
 }
 
 /// Add an item to a section
-fn add_item(content: &str, section_name: Option<&str>, item_text: &str) -> Result<String, String> {
+fn add_item(
+    content: &str,
+    section_name: Option<&str>,
+    item_text: &str,
+    config_primary: Option<&str>,
+) -> Result<String, String> {
     let sections = parse_todo(content);
 
     let section_idx = if let Some(name) = section_name {
@@ -346,7 +363,7 @@ fn add_item(content: &str, section_name: Option<&str>, item_text: &str) -> Resul
             .position(|s| s.name.to_lowercase().contains(&name.to_lowercase()))
             .ok_or_else(|| format!("Section '{}' not found", name))?
     } else {
-        find_primary_section(&sections).ok_or("No sections found in TODO.md")?
+        find_primary_section(&sections, config_primary).ok_or("No sections found in TODO.md")?
     };
 
     let section = &sections[section_idx];
@@ -420,12 +437,13 @@ fn mark_item_done(
     content: &str,
     query: &str,
     section_name: Option<&str>,
+    config_primary: Option<&str>,
 ) -> Result<(String, String), String> {
     let sections = parse_todo(content);
     let section = if let Some(name) = section_name {
         find_section_by_name(&sections, name)?
     } else {
-        let idx = find_primary_section(&sections).ok_or("No sections found")?;
+        let idx = find_primary_section(&sections, config_primary).ok_or("No sections found")?;
         &sections[idx]
     };
 
@@ -491,12 +509,13 @@ fn remove_item(
     content: &str,
     query: &str,
     section_name: Option<&str>,
+    config_primary: Option<&str>,
 ) -> Result<(String, String), String> {
     let sections = parse_todo(content);
     let section = if let Some(name) = section_name {
         find_section_by_name(&sections, name)?
     } else {
-        let idx = find_primary_section(&sections).ok_or("No sections found")?;
+        let idx = find_primary_section(&sections, config_primary).ok_or("No sections found")?;
         &sections[idx]
     };
 
@@ -601,7 +620,10 @@ fn find_section_by_name<'a>(sections: &'a [Section], query: &str) -> Result<&'a 
 }
 
 /// Display sections with proper headers and filtering
-fn display_sections(sections: &[Section], filter: &ListFilter, json: bool) {
+fn display_sections(sections: &[Section], filter: &ListFilter, config: &TodoConfig, json: bool) {
+    // Check if we should show all sections (from config or filter)
+    let show_all = filter.all || config.show_all;
+
     // Determine which sections to show
     let sections_to_show: Vec<&Section> = if let Some(ref section_filter) = filter.section {
         let filter_lower = section_filter.to_lowercase();
@@ -617,12 +639,12 @@ fn display_sections(sections: &[Section], filter: &ListFilter, json: bool) {
                 }
             })
             .collect()
-    } else if filter.all || filter.done {
+    } else if show_all || filter.done {
         // Show all sections when filtering globally
         sections.iter().collect()
     } else {
         // Default: just primary section
-        if let Some(idx) = find_primary_section(sections) {
+        if let Some(idx) = find_primary_section(sections, config.primary_section.as_deref()) {
             vec![&sections[idx]]
         } else {
             vec![]
@@ -790,13 +812,20 @@ fn find_todo_file(root: &Path) -> Option<std::path::PathBuf> {
 
 /// Main command handler
 pub fn cmd_todo(action: Option<TodoAction>, file: Option<&Path>, json: bool, root: &Path) -> i32 {
+    // Load config
+    let config = MossConfig::load(root);
+    let todo_config = &config.todo;
+
     // Determine the todo file path
+    // Priority: --file flag > config.todo.file > auto-detect
     let todo_path = if let Some(f) = file {
         if f.is_absolute() {
             f.to_path_buf()
         } else {
             root.join(f)
         }
+    } else if let Some(ref config_file) = todo_config.file {
+        root.join(config_file)
     } else {
         match find_todo_file(root) {
             Some(p) => p,
@@ -824,9 +853,11 @@ pub fn cmd_todo(action: Option<TodoAction>, file: Option<&Path>, json: bool, roo
         }
     };
 
+    let primary = todo_config.primary_section.as_deref();
+
     match action {
         Some(TodoAction::Add { text, section }) => {
-            match add_item(&content, section.as_deref(), &text) {
+            match add_item(&content, section.as_deref(), &text, primary) {
                 Ok(new_content) => {
                     if let Err(e) = fs::write(&todo_path, &new_content) {
                         eprintln!("Error writing TODO.md: {}", e);
@@ -841,7 +872,7 @@ pub fn cmd_todo(action: Option<TodoAction>, file: Option<&Path>, json: bool, roo
                                 .map(|sec| sec.name.as_str())
                                 .unwrap_or(s.as_str())
                         } else {
-                            find_primary_section(&sections)
+                            find_primary_section(&sections, todo_config.primary_section.as_deref())
                                 .map(|i| sections[i].name.as_str())
                                 .unwrap_or("TODO")
                         };
@@ -857,7 +888,7 @@ pub fn cmd_todo(action: Option<TodoAction>, file: Option<&Path>, json: bool, roo
         }
 
         Some(TodoAction::Done { query, section }) => {
-            match mark_item_done(&content, &query, section.as_deref()) {
+            match mark_item_done(&content, &query, section.as_deref(), primary) {
                 Ok((new_content, completed_item)) => {
                     if let Err(e) = fs::write(&todo_path, &new_content) {
                         eprintln!("Error writing TODO.md: {}", e);
@@ -881,7 +912,7 @@ pub fn cmd_todo(action: Option<TodoAction>, file: Option<&Path>, json: bool, roo
         }
 
         Some(TodoAction::Rm { query, section }) => {
-            match remove_item(&content, &query, section.as_deref()) {
+            match remove_item(&content, &query, section.as_deref(), primary) {
                 Ok((new_content, removed_item)) => {
                     if let Err(e) = fs::write(&todo_path, &new_content) {
                         eprintln!("Error writing TODO.md: {}", e);
@@ -939,7 +970,7 @@ pub fn cmd_todo(action: Option<TodoAction>, file: Option<&Path>, json: bool, roo
 
         None => {
             let sections = parse_todo(&content);
-            display_sections(&sections, &ListFilter::default(), json);
+            display_sections(&sections, &ListFilter::default(), todo_config, json);
             0
         }
 
@@ -954,7 +985,7 @@ pub fn cmd_todo(action: Option<TodoAction>, file: Option<&Path>, json: bool, roo
             }
 
             let sections = parse_todo(&content);
-            display_sections(&sections, &filter, json);
+            display_sections(&sections, &filter, todo_config, json);
             0
         }
     }

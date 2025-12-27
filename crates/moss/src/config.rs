@@ -17,6 +17,11 @@
 //! tests = ["*_test.*", "my_custom_tests/**"]  # override built-in
 //! vendor = ["vendor/**", "third_party/**"]     # add new alias
 //! config = []                                   # disable built-in
+//!
+//! [todo]
+//! file = "TASKS.md"           # custom todo file (default: auto-detect)
+//! primary_section = "Backlog" # default section for add/done/rm
+//! show_all = true             # show all sections by default
 //! ```
 
 use serde::Deserialize;
@@ -50,6 +55,20 @@ pub struct FilterConfig {
     pub aliases: HashMap<String, Vec<String>>,
 }
 
+/// Todo command configuration.
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(default)]
+pub struct TodoConfig {
+    /// Path to todo file (relative to project root).
+    /// If not set, auto-detects from common filenames.
+    pub file: Option<String>,
+    /// Primary section name to show by default.
+    /// If not set, uses common patterns: "Next Up", "TODO", "Tasks".
+    pub primary_section: Option<String>,
+    /// Default to showing all sections instead of just primary.
+    pub show_all: bool,
+}
+
 /// Root configuration structure.
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
@@ -57,6 +76,7 @@ pub struct MossConfig {
     pub daemon: DaemonConfig,
     pub index: IndexConfig,
     pub filter: FilterConfig,
+    pub todo: TodoConfig,
 }
 
 impl MossConfig {
@@ -92,6 +112,7 @@ impl MossConfig {
             },
             index: IndexConfig { enabled: true },
             filter: FilterConfig::default(),
+            todo: TodoConfig::default(),
         }
     }
 
@@ -130,6 +151,11 @@ impl MossConfig {
             },
             filter: FilterConfig {
                 aliases: merged_aliases,
+            },
+            todo: TodoConfig {
+                file: other.todo.file.or(self.todo.file),
+                primary_section: other.todo.primary_section.or(self.todo.primary_section),
+                show_all: other.todo.show_all || self.todo.show_all,
             },
         }
     }
@@ -231,5 +257,30 @@ config = []
         );
         // Empty array disables alias
         assert_eq!(config.filter.aliases.get("config"), Some(&vec![]));
+    }
+
+    #[test]
+    fn test_todo_config() {
+        let dir = TempDir::new().unwrap();
+        let moss_dir = dir.path().join(".moss");
+        std::fs::create_dir_all(&moss_dir).unwrap();
+
+        let config_path = moss_dir.join("config.toml");
+        let mut file = std::fs::File::create(&config_path).unwrap();
+        writeln!(
+            file,
+            r#"
+[todo]
+file = "TASKS.md"
+primary_section = "Backlog"
+show_all = true
+"#
+        )
+        .unwrap();
+
+        let config = MossConfig::load(dir.path());
+        assert_eq!(config.todo.file, Some("TASKS.md".to_string()));
+        assert_eq!(config.todo.primary_section, Some("Backlog".to_string()));
+        assert!(config.todo.show_all);
     }
 }
