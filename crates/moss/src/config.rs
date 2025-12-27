@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 /// Daemon configuration.
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct DaemonConfig {
     /// Whether to use the daemon for queries.
@@ -38,12 +38,27 @@ pub struct DaemonConfig {
     pub auto_start: bool,
 }
 
+impl Default for DaemonConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            auto_start: true,
+        }
+    }
+}
+
 /// Index configuration.
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct IndexConfig {
     /// Whether to create and use the file index.
     pub enabled: bool,
+}
+
+impl Default for IndexConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }
 
 /// Filter configuration for --exclude and --only flags.
@@ -103,17 +118,9 @@ impl MossConfig {
         config
     }
 
-    /// Default config with everything enabled.
+    /// Default config with serde defaults (enabled fields default to true).
     fn default_enabled() -> Self {
-        Self {
-            daemon: DaemonConfig {
-                enabled: true,
-                auto_start: true,
-            },
-            index: IndexConfig { enabled: true },
-            filter: FilterConfig::default(),
-            todo: TodoConfig::default(),
-        }
+        Self::default()
     }
 
     /// Get the global config path.
@@ -132,10 +139,8 @@ impl MossConfig {
     }
 
     /// Merge another config into this one.
-    /// Values from `other` override values in `self` only if they differ from defaults.
+    /// `other` takes precedence (project config overrides global).
     fn merge(self, other: Self) -> Self {
-        // For now, simple override - other takes precedence
-        // A more sophisticated merge would check which fields were explicitly set
         let mut merged_aliases = self.filter.aliases;
         for (k, v) in other.filter.aliases {
             merged_aliases.insert(k, v);
@@ -155,7 +160,7 @@ impl MossConfig {
             todo: TodoConfig {
                 file: other.todo.file.or(self.todo.file),
                 primary_section: other.todo.primary_section.or(self.todo.primary_section),
-                show_all: other.todo.show_all || self.todo.show_all,
+                show_all: other.todo.show_all,
             },
         }
     }
@@ -220,10 +225,8 @@ auto_start = false
         .unwrap();
 
         let config = MossConfig::load(dir.path());
-        // daemon.enabled should use default (true) since not specified
-        // But serde default gives false, so we get false
-        // This is a known limitation - we'd need Option<bool> for proper merge
-        assert!(!config.daemon.enabled); // serde default
+        // enabled uses serde default (true) since not specified
+        assert!(config.daemon.enabled);
         assert!(!config.daemon.auto_start);
     }
 

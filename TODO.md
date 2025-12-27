@@ -6,8 +6,31 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 Test Status: 110 passing, 0 failing (moss-languages)
 
+**Configuration System:**
+- Fix merge bug: use `Option<T>` wrapper so partial configs don't clobber defaults
+- Derive macro: `#[derive(MossConfig)]` to auto-generate merge + defaults
 
 ## Remaining Work
+
+**Configuration System:**
+Current: `[daemon]`, `[index]`, `[filter.aliases]`, `[todo]` in `.moss/config.toml`
+
+Issues:
+- Merge broken for bools: partial config `[daemon] auto_start = false` causes `enabled` to become false too (serde default)
+- Adding new section requires 5 places: struct, MossConfig field, default_enabled(), merge(), test
+
+Commands that load config but don't use it (only filter.aliases): view, analyze, edit, grep
+
+Potential config candidates:
+- `[view]`: depth, skeleton vs full, syntax highlighting
+- `[analyze]`: checks to enable, thresholds
+- `[grep]`: context lines, case sensitivity
+- `[workflow]`: directory, auto-run
+- `[serve]`: port, host
+
+Future considerations:
+- Flat key-value style (`view.depth = 2`) without nested structs
+- Schema-driven: define in TOML, generate Rust
 
 **Workflow Engine:**
 - [x] Port LLM calling logic (streaming, tool use) as workflow component
