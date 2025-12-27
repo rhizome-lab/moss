@@ -761,19 +761,65 @@ fn clean_done_items(content: &str) -> String {
     result
 }
 
+/// Common todo file names to auto-detect (in priority order)
+const TODO_FILE_NAMES: &[&str] = &[
+    "TODO.md",
+    "TODO.txt",
+    "TODO",
+    "TASKS.md",
+    "TASKS.txt",
+    "TASKS",
+    "todo.md",
+    "todo.txt",
+    "todo",
+    "tasks.md",
+    "tasks.txt",
+    "tasks",
+];
+
+/// Find a todo file in the given directory
+fn find_todo_file(root: &Path) -> Option<std::path::PathBuf> {
+    for name in TODO_FILE_NAMES {
+        let path = root.join(name);
+        if path.exists() {
+            return Some(path);
+        }
+    }
+    None
+}
+
 /// Main command handler
-pub fn cmd_todo(action: Option<TodoAction>, json: bool, root: &Path) -> i32 {
-    let todo_path = root.join("TODO.md");
+pub fn cmd_todo(action: Option<TodoAction>, file: Option<&Path>, json: bool, root: &Path) -> i32 {
+    // Determine the todo file path
+    let todo_path = if let Some(f) = file {
+        if f.is_absolute() {
+            f.to_path_buf()
+        } else {
+            root.join(f)
+        }
+    } else {
+        match find_todo_file(root) {
+            Some(p) => p,
+            None => {
+                eprintln!(
+                    "No todo file found in {}. Looked for: {}",
+                    root.display(),
+                    TODO_FILE_NAMES.join(", ")
+                );
+                return 1;
+            }
+        }
+    };
 
     if !todo_path.exists() {
-        eprintln!("No TODO.md found in {}", root.display());
+        eprintln!("Todo file not found: {}", todo_path.display());
         return 1;
     }
 
     let content = match fs::read_to_string(&todo_path) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Error reading TODO.md: {}", e);
+            eprintln!("Error reading {}: {}", todo_path.display(), e);
             return 1;
         }
     };

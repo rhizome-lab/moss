@@ -378,6 +378,10 @@ enum Commands {
         #[command(subcommand)]
         action: Option<commands::todo::TodoAction>,
 
+        /// Todo file path (auto-detects if not specified)
+        #[arg(short, long, global = true)]
+        file: Option<PathBuf>,
+
         /// Root directory (defaults to current directory)
         #[arg(short, long, global = true)]
         root: Option<PathBuf>,
@@ -696,9 +700,9 @@ fn main() {
         Commands::Plans { name, limit } => {
             commands::plans::cmd_plans(name.as_deref(), limit, cli.json)
         }
-        Commands::Todo { action, root } => {
+        Commands::Todo { action, file, root } => {
             let root = root.as_deref().unwrap_or(Path::new("."));
-            commands::todo::cmd_todo(action, cli.json, root)
+            commands::todo::cmd_todo(action, file.as_deref(), cli.json, root)
         }
         Commands::Package {
             action,
