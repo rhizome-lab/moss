@@ -53,19 +53,8 @@ impl Ecosystem for Npm {
         &["bun", "pnpm", "yarn", "npm"]
     }
 
-    fn fetch_info(&self, query: &PackageQuery, tool: &str) -> Result<PackageInfo, PackageError> {
-        // Format: package or package@version
-        let pkg_spec = match &query.version {
-            Some(v) => format!("{}@{}", query.name, v),
-            None => query.name.clone(),
-        };
-        match tool {
-            "npm" => fetch_npm_info(&query.name, "npm", &["view", &pkg_spec, "--json"]),
-            "yarn" => fetch_npm_info(&query.name, "yarn", &["info", &pkg_spec, "--json"]),
-            "pnpm" => fetch_npm_info(&query.name, "pnpm", &["view", &pkg_spec, "--json"]),
-            "bun" => fetch_npm_info(&query.name, "bun", &["pm", "view", &pkg_spec]),
-            _ => Err(PackageError::ToolFailed(format!("unknown tool: {}", tool))),
-        }
+    fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
+        fetch_npm_registry(&query.name, query.version.as_deref())
     }
 
     fn installed_version(&self, package: &str, project_root: &Path) -> Option<String> {
@@ -244,43 +233,21 @@ impl Ecosystem for Npm {
     }
 }
 
-fn fetch_npm_info(package: &str, tool: &str, args: &[&str]) -> Result<PackageInfo, PackageError> {
-    let output = Command::new(tool)
-        .args(args)
-        .output()
-        .map_err(|e| PackageError::ToolFailed(e.to_string()))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("404") || stderr.contains("not found") {
-            return Err(PackageError::NotFound(package.to_string()));
-        }
-        return Err(PackageError::ToolFailed(stderr.to_string()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Yarn wraps output in a JSON object with "data" field
-    let json_str = if tool == "yarn" {
-        extract_yarn_data(&stdout)?
-    } else {
-        stdout.to_string()
+/// Fetch package info from npm registry API.
+/// Used by both npm and deno ecosystems.
+pub(crate) fn fetch_npm_registry(
+    package: &str,
+    version: Option<&str>,
+) -> Result<PackageInfo, PackageError> {
+    // registry.npmjs.org/{package} returns full metadata
+    // registry.npmjs.org/{package}/{version} returns version-specific
+    let url = match version {
+        Some(v) => format!("https://registry.npmjs.org/{}/{}", package, v),
+        None => format!("https://registry.npmjs.org/{}/latest", package),
     };
 
-    parse_npm_json(&json_str, package)
-}
-
-fn extract_yarn_data(output: &str) -> Result<String, PackageError> {
-    // Yarn outputs: {"type":"inspect","data":{...}}
-    let parsed: serde_json::Value = serde_json::from_str(output)
-        .map_err(|e| PackageError::ParseError(format!("invalid yarn JSON: {}", e)))?;
-
-    if let Some(data) = parsed.get("data") {
-        Ok(data.to_string())
-    } else {
-        // Fallback: maybe it's already the data
-        Ok(output.to_string())
-    }
+    let body = crate::http::get(&url)?;
+    parse_npm_json(&body, package)
 }
 
 fn parse_npm_json(json_str: &str, package: &str) -> Result<PackageInfo, PackageError> {

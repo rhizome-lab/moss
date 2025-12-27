@@ -5,7 +5,6 @@ use crate::{
     PackageQuery, TreeNode,
 };
 use std::path::Path;
-use std::process::Command;
 
 pub struct Deno;
 
@@ -30,11 +29,11 @@ impl Ecosystem for Deno {
     }
 
     fn fetch_info(&self, query: &PackageQuery, _tool: &str) -> Result<PackageInfo, PackageError> {
-        // Try JSR first, then npm
+        // Try JSR first, then npm registry
         if let Ok(info) = fetch_jsr_info(&query.name, query.version.as_deref()) {
             return Ok(info);
         }
-        fetch_npm_info(&query.name, query.version.as_deref())
+        super::npm::fetch_npm_registry(&query.name, query.version.as_deref())
     }
 
     fn installed_version(&self, package: &str, project_root: &Path) -> Option<String> {
@@ -162,58 +161,6 @@ fn fetch_jsr_info(package: &str, version: Option<&str>) -> Result<PackageInfo, P
         description,
         license: None,
         homepage: Some(format!("https://jsr.io/{}", package)),
-        repository: None,
-        features: Vec::new(),
-        dependencies: Vec::new(),
-    })
-}
-
-fn fetch_npm_info(package: &str, version: Option<&str>) -> Result<PackageInfo, PackageError> {
-    let pkg_spec = match version {
-        Some(v) => format!("{}@{}", package, v),
-        None => package.to_string(),
-    };
-
-    let output = Command::new("npm")
-        .args(["view", &pkg_spec, "--json"])
-        .output()
-        .map_err(|e| PackageError::ToolFailed(e.to_string()))?;
-
-    if !output.status.success() {
-        return Err(PackageError::NotFound(package.to_string()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let v: serde_json::Value = serde_json::from_str(&stdout)
-        .map_err(|e| PackageError::ParseError(format!("invalid JSON: {}", e)))?;
-
-    let name = v
-        .get("name")
-        .and_then(|n| n.as_str())
-        .unwrap_or(package)
-        .to_string();
-
-    let pkg_version = v
-        .get("version")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| PackageError::ParseError("missing version".to_string()))?
-        .to_string();
-
-    let description = v
-        .get("description")
-        .and_then(|d| d.as_str())
-        .map(String::from);
-
-    let license = v.get("license").and_then(|l| l.as_str()).map(String::from);
-
-    let homepage = v.get("homepage").and_then(|h| h.as_str()).map(String::from);
-
-    Ok(PackageInfo {
-        name,
-        version: pkg_version,
-        description,
-        license,
-        homepage,
         repository: None,
         features: Vec::new(),
         dependencies: Vec::new(),
