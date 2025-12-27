@@ -67,3 +67,7 @@ arborium = { version = "2.4", features = [
     "lang-vue",
 ] }
 
+# Minimize debug build size (full debug info adds ~2GB)
+[profile.dev]
+debug = 0
+
