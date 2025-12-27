@@ -1,6 +1,7 @@
 //! pnpm-lock.yaml parser
 
 use crate::{DependencyTree, PackageError, TreeNode};
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// Get installed version from pnpm-lock.yaml
@@ -86,6 +87,107 @@ fn parse_package_key(key: &str) -> Option<(String, String)> {
     }
 }
 
+/// Extract package name from a snapshot key like "mermaid@11.12.2" or
+/// "@braintree/sanitize-url@7.1.1" or "vitepress@1.6.4(@algolia/...)".
+fn parse_snapshot_key(key: &str) -> Option<(String, String)> {
+    // Strip peer dep suffix: "pkg@1.0.0(peer@2.0.0)" -> "pkg@1.0.0"
+    let key = key.split('(').next().unwrap_or(key);
+    parse_package_key(key)
+}
+
+/// Build a map of package@version -> list of dependency package@version strings
+fn build_deps_map(parsed: &serde_yaml::Value) -> HashMap<String, Vec<String>> {
+    let mut deps_map = HashMap::new();
+
+    if let Some(snapshots) = parsed.get("snapshots").and_then(|s| s.as_mapping()) {
+        for (key, value) in snapshots {
+            if let Some(key_str) = key.as_str() {
+                if let Some((name, version)) = parse_snapshot_key(key_str) {
+                    let pkg_key = format!("{}@{}", name, version);
+                    let mut deps = Vec::new();
+
+                    // Get dependencies
+                    if let Some(dep_map) = value.get("dependencies").and_then(|d| d.as_mapping()) {
+                        for (dep_name, dep_version) in dep_map {
+                            if let (Some(name), Some(ver)) =
+                                (dep_name.as_str(), dep_version.as_str())
+                            {
+                                // Version might have peer suffix
+                                let ver = ver.split('(').next().unwrap_or(ver);
+                                deps.push(format!("{}@{}", name, ver));
+                            }
+                        }
+                    }
+
+                    // Also include optionalDependencies
+                    if let Some(dep_map) = value
+                        .get("optionalDependencies")
+                        .and_then(|d| d.as_mapping())
+                    {
+                        for (dep_name, dep_version) in dep_map {
+                            if let (Some(name), Some(ver)) =
+                                (dep_name.as_str(), dep_version.as_str())
+                            {
+                                let ver = ver.split('(').next().unwrap_or(ver);
+                                deps.push(format!("{}@{}", name, ver));
+                            }
+                        }
+                    }
+
+                    deps_map.insert(pkg_key, deps);
+                }
+            }
+        }
+    }
+
+    deps_map
+}
+
+/// Recursively build a TreeNode, tracking visited packages to avoid cycles
+fn build_node(
+    name: &str,
+    version: &str,
+    deps_map: &HashMap<String, Vec<String>>,
+    visited: &mut HashSet<String>,
+    max_depth: usize,
+) -> TreeNode {
+    let pkg_key = format!("{}@{}", name, version);
+
+    // Avoid infinite recursion on cycles
+    if visited.contains(&pkg_key) || max_depth == 0 {
+        return TreeNode {
+            name: name.to_string(),
+            version: version.to_string(),
+            dependencies: Vec::new(),
+        };
+    }
+
+    visited.insert(pkg_key.clone());
+
+    let mut children = Vec::new();
+    if let Some(deps) = deps_map.get(&pkg_key) {
+        for dep_key in deps {
+            if let Some((dep_name, dep_version)) = parse_package_key(dep_key) {
+                children.push(build_node(
+                    &dep_name,
+                    &dep_version,
+                    deps_map,
+                    visited,
+                    max_depth - 1,
+                ));
+            }
+        }
+    }
+
+    visited.remove(&pkg_key);
+
+    TreeNode {
+        name: name.to_string(),
+        version: version.to_string(),
+        dependencies: children,
+    }
+}
+
 fn build_tree(
     parsed: &serde_yaml::Value,
     project_root: &Path,
@@ -111,7 +213,12 @@ fn build_tree(
         ("root".to_string(), "0.0.0".to_string())
     };
 
+    // Build the dependency map from snapshots
+    let deps_map = build_deps_map(parsed);
+
     let mut root_deps = Vec::new();
+    let mut visited = HashSet::new();
+    const MAX_DEPTH: usize = 50; // Prevent runaway recursion
 
     // Get direct dependencies from importers section
     if let Some(importers) = parsed.get("importers").and_then(|i| i.as_mapping()) {
@@ -123,17 +230,20 @@ fn build_tree(
             for dep_type in ["dependencies", "devDependencies"] {
                 if let Some(deps) = root_importer.get(dep_type).and_then(|d| d.as_mapping()) {
                     for (dep_name, dep_info) in deps {
-                        if let (Some(name), Some(version_info)) = (
+                        if let (Some(dep_name_str), Some(version_info)) = (
                             dep_name.as_str(),
                             dep_info.get("version").and_then(|v| v.as_str()),
                         ) {
                             // Version might have peer dep suffix
-                            let version = version_info.split('(').next().unwrap_or(version_info);
-                            root_deps.push(TreeNode {
-                                name: name.to_string(),
-                                version: version.to_string(),
-                                dependencies: Vec::new(), // pnpm flattens deps, skip nested for now
-                            });
+                            let dep_version =
+                                version_info.split('(').next().unwrap_or(version_info);
+                            root_deps.push(build_node(
+                                dep_name_str,
+                                dep_version,
+                                &deps_map,
+                                &mut visited,
+                                MAX_DEPTH,
+                            ));
                         }
                     }
                 }

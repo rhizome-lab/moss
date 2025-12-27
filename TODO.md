@@ -4,9 +4,10 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Finish vitepress setup: `corepack enable && pnpm install`, update pnpm version in package.json, test `pnpm docs:dev`
+- [x] Finish vitepress setup: downgraded to stable 1.6.4, fixed mermaid CJS interop
 - Expand docs nav in `docs/.vitepress/config.ts` - many docs not yet linked
 - Review docs content for vitepress compatibility (frontmatter, etc)
+- `moss package why` doesn't find transitive deps - tree parsing only gets top-level
 
 Test Status: 110 passing, 0 failing (moss-languages)
 
