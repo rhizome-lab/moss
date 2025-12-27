@@ -7,7 +7,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Finish vitepress setup: downgraded to stable 1.6.4, fixed mermaid CJS interop
 - Expand docs nav in `docs/.vitepress/config.ts` - many docs not yet linked
 - Review docs content for vitepress compatibility (frontmatter, etc)
-- `moss package why` doesn't find transitive deps - tree parsing only gets top-level
+- [x] `moss package why` transitive deps for pnpm - DONE
+- `moss package why` transitive deps for yarn.lock and bun.lock - still flat
 
 Test Status: 110 passing, 0 failing (moss-languages)
 
