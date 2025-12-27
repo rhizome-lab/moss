@@ -1,5 +1,11 @@
 //! bun.lock (text) and bun.lockb (binary) parser
 //!
+//! As of Bun 1.0+, text format (bun.lock) is the default. Binary format (bun.lockb)
+//! is supported for backwards compatibility with older projects.
+//!
+//! The parser prefers bun.lock when both exist. Binary format fallback reads
+//! logical dependencies from each package's dependencies/resolutions slices.
+//!
 //! Binary format ported from Bun (MIT License):
 //! Copyright (c) 2022 Oven-sh
 //! https://github.com/oven-sh/bun/blob/main/src/install/lockfile/
@@ -77,14 +83,14 @@ fn installed_version_binary(package: &str, project_root: &Path) -> Option<String
 
 /// Build dependency tree from bun.lock or bun.lockb
 pub fn dependency_tree(project_root: &Path) -> Option<Result<DependencyTree, PackageError>> {
-    // Try text format first
+    // Try text format first (preferred - has version info)
     if let Some(lockfile) = find_text_lockfile(project_root) {
         let content = std::fs::read_to_string(&lockfile).ok()?;
         let parsed: serde_json::Value = serde_json_lenient::from_str(&content).ok()?;
         return Some(build_tree_text(&parsed, project_root));
     }
 
-    // Try binary format
+    // Fall back to binary format (versions not yet parsed from Resolution field)
     if let Some(lockfile) = find_binary_lockfile(project_root) {
         if lockfile.exists() {
             return Some(build_tree_binary(project_root));
@@ -123,17 +129,49 @@ pub fn dependency_tree(project_root: &Path) -> Option<Result<DependencyTree, Pac
 /// Header magic for bun.lockb files
 const HEADER_MAGIC: &[u8] = b"#!/usr/bin/env bun\nbun-lockfile-format-v0\n";
 
+/// Parsed Tree entry from bun.lockb
+/// Trees represent physical node_modules layout (hoisted), not logical deps.
+/// We now use packages' dependencies/resolutions for logical tree building.
+/// Trees are kept for potential future use (physical layout visualization).
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+struct BunTree {
+    id: u32,
+    dependency_id: u32,
+    parent: u32,
+    deps_off: u32,
+    deps_len: u32,
+}
+
 /// Parsed bun.lockb file
 struct BunLockb<'a> {
     packages: Vec<BunPackage>,
     #[allow(dead_code)]
+    trees: Vec<BunTree>,
+    #[allow(dead_code)]
+    hoisted_deps: &'a [u8], // DependencyID[] (u32 each) - for physical layout
+    resolutions_buf: &'a [u8], // PackageID[] (u32 each) - resolved package indices
+    dependencies: &'a [u8],    // Dependency.External[] (name at offset 0, 8 bytes)
     string_bytes: &'a [u8],
+}
+
+/// Slice reference {off: u32, len: u32}
+#[derive(Debug, Clone, Copy, Default)]
+struct Slice {
+    off: u32,
+    len: u32,
 }
 
 #[derive(Debug, Clone)]
 struct BunPackage {
     name: String,
     version: String,
+    /// Slice into dependencies buffer (Dependency.External array)
+    dependencies: Slice,
+    /// Slice into resolutions buffer (PackageID array)
+    /// Not currently used - deps indices work for both. Kept for future version parsing.
+    #[allow(dead_code)]
+    resolutions: Slice,
 }
 
 impl<'a> BunLockb<'a> {
@@ -175,18 +213,64 @@ impl<'a> BunLockb<'a> {
             return None;
         }
 
-        // Buffers start at pkg_end
-        // Read through 6 buffers to find string_bytes (buffer index 5, 0-indexed)
+        // Buffers start at pkg_end (sorted by alignment):
+        // 0: trees, 1: hoisted_deps, 2: resolutions, 3: dependencies, 4: extern_strings, 5: string_bytes
+        let trees_buf = Self::find_buffer(data, pkg_end, 0)?;
+        let hoisted_deps = Self::find_buffer(data, pkg_end, 1)?;
+        let resolutions_buf = Self::find_buffer(data, pkg_end, 2)?;
+        let dependencies = Self::find_buffer(data, pkg_end, 3)?;
         let string_bytes = Self::find_buffer(data, pkg_end, 5)?;
 
-        // Package names start at pkg_begin (first field in MultiArrayList, sorted by alignment)
-        // Names are String[count], each 8 bytes
+        // Parse trees (20 bytes each: id, dep_id, parent, deps.off, deps.len)
+        let trees = Self::parse_trees(trees_buf);
+
+        // Package MultiArrayList field offsets (fields stored as arrays, sorted by alignment):
+        // - names:        offset 0,              each 8 bytes (String)
+        // - name_hashes:  offset pkg_count * 8,  each 8 bytes (u64)
+        // - resolution:   offset pkg_count * 16, each 72 bytes (Resolution)
+        // - dependencies: offset pkg_count * 88, each 8 bytes (DependencySlice)
+        // - resolutions:  offset pkg_count * 96, each 8 bytes (PackageIDSlice)
         let packages = Self::extract_packages(data, pkg_begin, packages_count, string_bytes);
 
         Some(Self {
             packages,
+            trees,
+            hoisted_deps,
+            resolutions_buf,
+            dependencies,
             string_bytes,
         })
+    }
+
+    /// Parse trees buffer into BunTree structs
+    fn parse_trees(trees_buf: &[u8]) -> Vec<BunTree> {
+        const TREE_SIZE: usize = 20;
+        let count = trees_buf.len() / TREE_SIZE;
+        let mut trees = Vec::with_capacity(count);
+
+        for i in 0..count {
+            let off = i * TREE_SIZE;
+            if off + TREE_SIZE > trees_buf.len() {
+                break;
+            }
+            trees.push(BunTree {
+                id: u32::from_le_bytes(trees_buf[off..off + 4].try_into().unwrap_or([0; 4])),
+                dependency_id: u32::from_le_bytes(
+                    trees_buf[off + 4..off + 8].try_into().unwrap_or([0; 4]),
+                ),
+                parent: u32::from_le_bytes(
+                    trees_buf[off + 8..off + 12].try_into().unwrap_or([0; 4]),
+                ),
+                deps_off: u32::from_le_bytes(
+                    trees_buf[off + 12..off + 16].try_into().unwrap_or([0; 4]),
+                ),
+                deps_len: u32::from_le_bytes(
+                    trees_buf[off + 16..off + 20].try_into().unwrap_or([0; 4]),
+                ),
+            });
+        }
+
+        trees
     }
 
     /// Find buffer by index (0-indexed). Buffers are sequential, each header at previous end_pos.
@@ -221,34 +305,99 @@ impl<'a> BunLockb<'a> {
         None
     }
 
-    /// Extract packages using proper String encoding
+    /// Extract packages using proper String encoding and slice references
+    ///
+    /// MultiArrayList layout (fields as arrays, sorted by alignment descending):
+    /// - names[count]:        8 bytes each (String)
+    /// - name_hashes[count]:  8 bytes each (u64)
+    /// - resolution[count]:   72 bytes each (Resolution)
+    /// - dependencies[count]: 8 bytes each (DependencySlice = {off: u32, len: u32})
+    /// - resolutions[count]:  8 bytes each (PackageIDSlice = {off: u32, len: u32})
+    /// - meta[count], bin[count], scripts[count]: remaining fields
     fn extract_packages(
         data: &[u8],
-        names_start: usize,
+        pkg_begin: usize,
         count: usize,
         string_bytes: &[u8],
     ) -> Vec<BunPackage> {
         let mut packages = Vec::with_capacity(count);
 
+        // Package.Serializer.save() writes fields in DECLARATION ORDER:
+        // name(8), name_hash(8), resolution(72), dependencies(8), resolutions(8), meta(?), bin(?), scripts(?)
+        //
+        // Field offsets (from pkg_begin):
+        // - names: 0
+        // - name_hashes: count * 8
+        // - resolution: count * 16
+        // - dependencies: count * 88 (after resolution's 72 bytes)
+        // - resolutions: count * 96 (after dependencies' 8 bytes)
+        // - meta, bin, scripts: after resolutions
+        let names_off = 0;
+        let deps_off = count * 88;
+        let res_off = count * 96;
+
         for i in 0..count {
-            let offset = names_start + i * 8;
-            if offset + 8 > data.len() {
+            // Read name
+            let name_offset = pkg_begin + names_off + i * 8;
+            if name_offset + 8 > data.len() {
                 break;
             }
 
-            let bytes: [u8; 8] = match data[offset..offset + 8].try_into() {
+            let name_bytes: [u8; 8] = match data[name_offset..name_offset + 8].try_into() {
                 Ok(b) => b,
                 Err(_) => break,
             };
 
-            if let Some(name) = Self::read_string(&bytes, string_bytes) {
-                if Self::is_valid_package_name(&name) {
-                    packages.push(BunPackage {
-                        name,
-                        version: "0.0.0".to_string(), // TODO: read from Resolution field
-                    });
+            let name = match Self::read_string(&name_bytes, string_bytes) {
+                Some(n) if Self::is_valid_package_name(&n) => n,
+                _ => continue,
+            };
+
+            // Read dependencies slice {off: u32, len: u32}
+            let dep_slice_off = pkg_begin + deps_off + i * 8;
+            let dependencies = if dep_slice_off + 8 <= data.len() {
+                Slice {
+                    off: u32::from_le_bytes(
+                        data[dep_slice_off..dep_slice_off + 4]
+                            .try_into()
+                            .unwrap_or([0; 4]),
+                    ),
+                    len: u32::from_le_bytes(
+                        data[dep_slice_off + 4..dep_slice_off + 8]
+                            .try_into()
+                            .unwrap_or([0; 4]),
+                    ),
                 }
-            }
+            } else {
+                Slice::default()
+            };
+
+            // Read resolutions slice (PackageID[]) - not used (deps indices work for both)
+            // Kept for potential future version parsing from Resolution field
+            let res_slice_off = pkg_begin + res_off + i * 8;
+            let resolutions = if res_slice_off + 8 <= data.len() {
+                Slice {
+                    off: u32::from_le_bytes(
+                        data[res_slice_off..res_slice_off + 4]
+                            .try_into()
+                            .unwrap_or([0; 4]),
+                    ),
+                    len: u32::from_le_bytes(
+                        data[res_slice_off + 4..res_slice_off + 8]
+                            .try_into()
+                            .unwrap_or([0; 4]),
+                    ),
+                }
+            } else {
+                Slice::default()
+            };
+
+            packages.push(BunPackage {
+                name,
+                version: "0.0.0".to_string(), // TODO: read from Resolution field
+                dependencies,
+                resolutions,
+            });
         }
 
         packages
@@ -305,22 +454,163 @@ impl<'a> BunLockb<'a> {
             .map(|p| p.version.clone())
     }
 
-    fn to_tree(&self, project_root: &Path) -> DependencyTree {
-        let (name, version) = get_project_info_from_package_json(project_root);
-        let root_deps: Vec<TreeNode> = self
-            .packages
-            .iter()
-            .map(|p| TreeNode {
-                name: p.name.clone(),
-                version: p.version.clone(),
-                dependencies: Vec::new(),
+    /// Get dependency name from dependencies buffer by index
+    /// Dependency.External layout: name (8 bytes), name_hash (8), behavior (1), version (9) = 26 bytes
+    fn get_dep_name(&self, dep_id: u32) -> Option<String> {
+        const DEP_SIZE: usize = 26;
+        let offset = dep_id as usize * DEP_SIZE;
+        if offset + 8 > self.dependencies.len() {
+            return None;
+        }
+        let name_bytes: [u8; 8] = self.dependencies[offset..offset + 8].try_into().ok()?;
+        Self::read_string(&name_bytes, self.string_bytes)
+    }
+
+    /// Get hoisted dependency IDs for a tree node (physical layout)
+    #[allow(dead_code)]
+    fn get_hoisted_deps(&self, tree: &BunTree) -> Vec<u32> {
+        let start = tree.deps_off as usize * 4; // u32 = 4 bytes
+        let end = start + tree.deps_len as usize * 4;
+        if end > self.hoisted_deps.len() {
+            return Vec::new();
+        }
+
+        (0..tree.deps_len as usize)
+            .filter_map(|i| {
+                let off = start + i * 4;
+                if off + 4 <= self.hoisted_deps.len() {
+                    Some(u32::from_le_bytes(
+                        self.hoisted_deps[off..off + 4].try_into().ok()?,
+                    ))
+                } else {
+                    None
+                }
             })
-            .collect();
+            .collect()
+    }
+
+    /// Build a map of package name -> (version, list of dep names) from logical dependencies
+    fn build_deps_map(&self) -> HashMap<String, (String, Vec<String>)> {
+        let mut deps_map = HashMap::new();
+
+        for pkg in self.packages.iter() {
+            let mut dep_names = Vec::new();
+
+            // For each dependency in this package's dependencies slice:
+            // - Read dep name from dependencies buffer
+            // - Read resolved PackageID from resolutions buffer (same indices as deps)
+            // - Look up package name by PackageID
+            //
+            // Note: dependencies and resolutions are parallel arrays with matching indices.
+            // We use dependencies.off for both since resolutions slice may not be stored
+            // in older lockfiles (the Package.resolutions field had garbage values).
+            for j in 0..pkg.dependencies.len as usize {
+                // Get dependency name from dependencies buffer
+                if let Some(dep_name) = self.get_dep_name(pkg.dependencies.off + j as u32) {
+                    // Get resolved PackageID from resolutions buffer
+                    // Use dependencies offset since deps and resolutions are parallel
+                    let res_idx = pkg.dependencies.off as usize + j;
+                    let res_offset = res_idx * 4; // PackageID is u32
+                    if res_offset + 4 <= self.resolutions_buf.len() {
+                        let resolved_pkg_id = u32::from_le_bytes(
+                            self.resolutions_buf[res_offset..res_offset + 4]
+                                .try_into()
+                                .unwrap_or([0; 4]),
+                        );
+
+                        // Get package name by ID
+                        if let Some(resolved_pkg) = self.packages.get(resolved_pkg_id as usize) {
+                            dep_names.push(resolved_pkg.name.clone());
+                        } else {
+                            // Fallback to dependency name if resolution not found
+                            dep_names.push(dep_name);
+                        }
+                    }
+                }
+            }
+
+            deps_map.insert(pkg.name.clone(), (pkg.version.clone(), dep_names));
+        }
+
+        deps_map
+    }
+
+    /// Recursively build a TreeNode using logical dependencies
+    fn build_node(
+        &self,
+        name: &str,
+        deps_map: &HashMap<String, (String, Vec<String>)>,
+        visited: &mut HashSet<String>,
+        max_depth: usize,
+    ) -> TreeNode {
+        let version = deps_map
+            .get(name)
+            .map(|(v, _)| v.clone())
+            .unwrap_or_else(|| "?".to_string());
+
+        if visited.contains(name) || max_depth == 0 {
+            return TreeNode {
+                name: name.to_string(),
+                version,
+                dependencies: Vec::new(),
+            };
+        }
+
+        visited.insert(name.to_string());
+
+        let children = if let Some((_, deps)) = deps_map.get(name) {
+            deps.iter()
+                .map(|dep| self.build_node(dep, deps_map, visited, max_depth - 1))
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        visited.remove(name);
+
+        TreeNode {
+            name: name.to_string(),
+            version,
+            dependencies: children,
+        }
+    }
+
+    fn to_tree(&self, project_root: &Path) -> DependencyTree {
+        let (proj_name, proj_version) = get_project_info_from_package_json(project_root);
+
+        // Build logical dependency map from packages
+        let deps_map = self.build_deps_map();
+
+        // Get direct dependencies from root package (package 0 is usually the root)
+        let mut visited = HashSet::new();
+        const MAX_DEPTH: usize = 50;
+
+        let root_deps = if let Some(root_pkg) = self.packages.first() {
+            if let Some((_, direct_deps)) = deps_map.get(&root_pkg.name) {
+                direct_deps
+                    .iter()
+                    .map(|dep| self.build_node(dep, &deps_map, &mut visited, MAX_DEPTH))
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        } else {
+            // Fallback: flat list from packages (shouldn't happen)
+            self.packages
+                .iter()
+                .skip(1) // Skip root
+                .map(|p| TreeNode {
+                    name: p.name.clone(),
+                    version: p.version.clone(),
+                    dependencies: Vec::new(),
+                })
+                .collect()
+        };
 
         DependencyTree {
             roots: vec![TreeNode {
-                name,
-                version,
+                name: proj_name,
+                version: proj_version,
                 dependencies: root_deps,
             }],
         }
@@ -521,10 +811,6 @@ fn build_tree_text(
     Ok(DependencyTree { roots: vec![root] })
 }
 
-// TODO: Parse tree structure from bun.lockb for transitive deps.
-// Binary format stores tree in: trees[i].dependencies → hoisted_deps[off..off+len] → dep_ids
-// Each dep_id maps to resolutions → package_id → packages[pkg_id] for name/version.
-// Text format (bun.lock) has full transitive support; prefer that format.
 fn build_tree_binary(project_root: &Path) -> Result<DependencyTree, PackageError> {
     let lockfile = find_binary_lockfile(project_root)
         .ok_or_else(|| PackageError::ParseError("bun.lockb not found".to_string()))?;
