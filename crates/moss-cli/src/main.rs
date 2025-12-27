@@ -224,6 +224,12 @@ enum Commands {
         check: bool,
     },
 
+    /// Manage tree-sitter grammars for parsing
+    Grammars {
+        #[command(subcommand)]
+        action: commands::grammars::GrammarAction,
+    },
+
     /// Analyze codebase (unified health, complexity, security, overview)
     Analyze {
         /// Target to analyze (path, file, or directory). Defaults to current directory.
@@ -620,6 +626,7 @@ fn main() {
             commands::daemon::cmd_daemon(action, root.as_deref(), cli.json)
         }
         Commands::Update { check } => commands::update::cmd_update(check, cli.json),
+        Commands::Grammars { action } => commands::grammars::cmd_grammars(action, cli.json),
         Commands::Analyze {
             target,
             root,

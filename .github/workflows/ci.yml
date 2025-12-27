@@ -72,8 +72,21 @@ jobs:
         with:
           workspaces: "crates -> target"
 
+      - name: Cache grammars
+        id: grammar-cache
+        uses: actions/cache@v4
+        with:
+          path: target/grammars
+          key: grammars-linux-${{ hashFiles('Cargo.lock') }}
+
+      - name: Build grammars
+        if: steps.grammar-cache.outputs.cache-hit != 'true'
+        run: cargo xtask build-grammars
+
       - name: Run tests
         run: cargo test --workspace
+        env:
+          MOSS_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
 
   benchmark:
     name: Benchmark

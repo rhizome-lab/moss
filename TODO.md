@@ -40,6 +40,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss-cli: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
+- Investigate moss binary size (~56MB) - profile with `cargo bloat`, check for LTO, strip symbols, unused deps
 
 **Daemon Design:**
 - Multi-codebase: single daemon indexing multiple roots simultaneously
