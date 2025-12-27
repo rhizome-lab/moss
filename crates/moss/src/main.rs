@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use moss::commands;
 use moss::serve;
@@ -373,6 +373,23 @@ enum Commands {
         limit: usize,
     },
 
+    /// Structured TODO.md editing (prevents content loss)
+    Todo {
+        /// Action: add, done, list (default: list)
+        action: Option<String>,
+
+        /// Item text (for add) or index (for done)
+        item: Option<String>,
+
+        /// Show full TODO.md content
+        #[arg(short, long)]
+        full: bool,
+
+        /// Root directory (defaults to current directory)
+        #[arg(short, long)]
+        root: Option<PathBuf>,
+    },
+
     /// Run TOML-defined workflows
     Workflow {
         #[command(subcommand)]
@@ -685,6 +702,23 @@ fn main() {
         }
         Commands::Plans { name, limit } => {
             commands::plans::cmd_plans(name.as_deref(), limit, cli.json)
+        }
+        Commands::Todo {
+            action,
+            item,
+            full,
+            root,
+        } => {
+            let root = root.as_deref().unwrap_or(Path::new("."));
+            let index = item.as_ref().and_then(|s| s.parse::<usize>().ok());
+            commands::todo::cmd_todo(
+                action.as_deref(),
+                item.as_deref(),
+                index,
+                full,
+                cli.json,
+                root,
+            )
         }
         Commands::Package {
             action,

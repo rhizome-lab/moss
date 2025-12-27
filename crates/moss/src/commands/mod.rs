@@ -11,6 +11,7 @@ pub mod lint;
 pub mod package;
 pub mod plans;
 pub mod sessions;
+pub mod todo;
 pub mod update;
 pub mod view;
 pub mod workflow;

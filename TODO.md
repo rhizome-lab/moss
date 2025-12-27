@@ -6,10 +6,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 Test Status: 110 passing, 0 failing (moss-languages)
 
-1. Enable mold linker: uncomment `.cargo/config.toml` after nix shell reload
-2. Verify CI workflows: push to trigger GitHub Actions, check grammar builds work
-3. First release dry-run: test `cargo xtask build-grammars` + release workflow locally
-4. Consider: `moss todo` command for structured TODO.md editing (prevents content loss)
+1. Verify CI workflows: push to trigger GitHub Actions, check grammar builds work
+2. First release dry-run: test `cargo xtask build-grammars` + release workflow locally
+3. Add `moss todo done` to move completed items to proper CHANGELOG section (currently appends to file end)
 
 ## Remaining Work
 
@@ -49,7 +48,6 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Minimal memory footprint (currently loads full index per root)
 
 **Tooling:**
-- Structured TODO.md editing: first-class `moss todo` command to add/complete/move items without losing content (Opus 4.5 drops TODO items when editing markdown)
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
 
 **Workspace/Context Management:**
