@@ -25,34 +25,34 @@ moss synthesize "Build a REST API with CRUD for users" --dry-run
 
 ## Architecture Overview
 
-```
-User Request
-    │
-    ▼
-┌─────────────┐
-│ Config      │ ─── Policy Engine (safety rules)
-│ Engine      │
-└─────────────┘
-    │
-    ▼
-┌─────────────┐
-│ Context     │ ─── View Providers (Skeleton, CFG, Dependencies)
-│ Host        │
-└─────────────┘
-    │
-    ▼
-┌─────────────┐
-│ Synthesis   │ ─── Strategies + Generators + Validators
-│ Framework   │
-└─────────────┘
-    │
-    ▼
-┌─────────────┐
-│ Shadow Git  │ ─── Atomic commits, rollback
-└─────────────┘
-    │
-    ▼
-  Output
+```mermaid
+flowchart TB
+    Request[User Request]
+    Request --> Config
+
+    subgraph Config[Config Engine]
+        ConfigNote[Policy Engine - safety rules]
+    end
+
+    Config --> Context
+
+    subgraph Context[Context Host]
+        ContextNote[View Providers - Skeleton, CFG, Dependencies]
+    end
+
+    Context --> Synthesis
+
+    subgraph Synthesis[Synthesis Framework]
+        SynthesisNote[Strategies + Generators + Validators]
+    end
+
+    Synthesis --> Shadow
+
+    subgraph Shadow[Shadow Git]
+        ShadowNote[Atomic commits, rollback]
+    end
+
+    Shadow --> Output[Output]
 ```
 
 ## Installation

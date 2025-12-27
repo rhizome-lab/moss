@@ -224,30 +224,34 @@ This gives LangGraph:
 
 ## Package Dependencies
 
-```
-                         Frontends (wire everything)
-                    ┌────────────────────────────────────┐
-                    │  moss-tui, moss-mcp, moss-langgraph │
-                    └─────┬──────────┬──────────┬────────┘
-                          │          │          │
-                          │          v          │
-                          │      moss-llm ──────┼──→ anthropic, openai, etc.
-                          │     (LLM impls)     │
-         ┌────────────────┘          │          └────────────────┐
-         v                           v                           v
-  moss-orchestration           moss-context            moss-intelligence
-  (protocols only)             (protocols only)              │
-                                                             v
-                                                        (Rust CLI)
+```mermaid
+flowchart TB
+    subgraph Frontends["Frontends (wire everything)"]
+        moss-tui & moss-mcp & moss-langgraph
+    end
+
+    Frontends --> moss-llm
+    Frontends --> moss-orchestration
+    Frontends --> moss-context
+    Frontends --> moss-intelligence
+
+    moss-llm --> providers[anthropic, openai, etc.]
+
+    moss-orchestration[moss-orchestration<br/>protocols only]
+    moss-context[moss-context<br/>protocols only]
+
+    moss-intelligence --> RustCLI[Rust CLI]
 ```
 
 **Core packages define protocols. moss-llm provides implementations. Frontends wire together.**
 
 LangGraph-specific:
-```
-moss-langgraph-shadow ──→ moss-orchestration (shadow git)
-moss-langgraph ──────────→ moss-intelligence (tools/nodes)
-                     └───→ langgraph (peer dep)
+
+```mermaid
+flowchart LR
+    moss-langgraph-shadow --> moss-orchestration[moss-orchestration<br/>shadow git]
+    moss-langgraph --> moss-intelligence[moss-intelligence<br/>tools/nodes]
+    moss-langgraph --> langgraph[langgraph<br/>peer dep]
 ```
 
 ## Frontend Packages

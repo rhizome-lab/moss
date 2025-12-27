@@ -9,6 +9,16 @@
     "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
-    "vitepress": "^1.5.0"
+    "vitepress": "2.0.0-alpha.15"
+  },
+  "dependencies": {
+    "dayjs": "^1.11.19",
+    "mermaid": "^11.12.2",
+    "vitepress-plugin-mermaid": "^2.0.17"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite": "8.0.0-beta.0"
+    }
   }
 }

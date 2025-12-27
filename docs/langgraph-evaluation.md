@@ -10,42 +10,44 @@ Moss is a **code intelligence tool**, not an agent framework. LangGraph handles 
 
 ## Layered Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                      Frontends                          │
-│   MCP │ TUI │ CLI │ HTTP │ IDE │ A2A │ ACP             │
-└────────────────────────┬────────────────────────────────┘
-                         │
-        ┌────────────────┴────────────────┐
-        ▼                                 ▼
-┌──────────────────┐            ┌───────────────────────┐
-│  Orchestration   │            │  Direct Tool Access   │
-│  (moss agent)    │            │  (MCP, external)      │
-│                  │            │                       │
-│  - Agent loops   │            │  Caller brings their  │
-│  - Sessions      │            │  own orchestration    │
-│  - Shadow Git    │            │  (LangGraph, Claude)  │
-└────────┬─────────┘            └───────────┬───────────┘
-         │                                  │
-         └──────────────┬───────────────────┘
-                        ▼
-         ┌──────────────────────────────────┐
-         │     Context Layer                │  ← THE DIFFERENTIATOR
-         │  - Working memory (not chat)     │
-         │  - Skeleton extraction           │
-         │  - Structural summaries          │
-         │  - Fisheye views                 │
-         │  - Call graphs, dependencies     │
-         └──────────────┬───────────────────┘
-                        ▼
-         ┌──────────────────────────────────┐
-         │     MossAPI (Core Tools)         │
-         │  view, edit, analyze             │
-         └──────────────┬───────────────────┘
-                        ▼
-         ┌──────────────────────────────────┐
-         │         Rust CLI                 │
-         └──────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Frontends
+        MCP & TUI & CLI & HTTP & IDE & A2A & ACP
+    end
+
+    Frontends --> Orchestration
+    Frontends --> DirectAccess
+
+    subgraph Orchestration["Orchestration (moss agent)"]
+        O1[Agent loops]
+        O2[Sessions]
+        O3[Shadow Git]
+    end
+
+    subgraph DirectAccess["Direct Tool Access (MCP, external)"]
+        D1[Caller brings their own orchestration]
+        D2[LangGraph, Claude]
+    end
+
+    Orchestration --> ContextLayer
+    DirectAccess --> ContextLayer
+
+    subgraph ContextLayer["Context Layer ← THE DIFFERENTIATOR"]
+        C1[Working memory - not chat]
+        C2[Skeleton extraction]
+        C3[Structural summaries]
+        C4[Fisheye views]
+        C5[Call graphs, dependencies]
+    end
+
+    ContextLayer --> MossAPI
+
+    subgraph MossAPI["MossAPI (Core Tools)"]
+        view & edit & analyze
+    end
+
+    MossAPI --> RustCLI[Rust CLI]
 ```
 
 ## What LangGraph Does Well
