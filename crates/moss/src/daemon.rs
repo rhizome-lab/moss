@@ -505,6 +505,11 @@ impl DaemonServer {
 /// Run the daemon server in the foreground
 #[tokio::main]
 pub async fn run_daemon(root: &Path) -> Result<i32, Box<dyn std::error::Error>> {
+    let config = MossConfig::load(root);
+    if !config.index.enabled() {
+        return Err("Cannot start daemon: indexing is disabled in config".into());
+    }
+
     let moss_dir = get_moss_dir(root);
     let socket_path = moss_dir.join("daemon.sock");
 
@@ -614,10 +619,10 @@ pub async fn run_daemon(root: &Path) -> Result<i32, Box<dyn std::error::Error>> 
 /// Loads config from global (~/.config/moss/config.toml) and project (.moss/config.toml),
 /// then starts daemon if auto_start is enabled.
 ///
-/// This is a no-op if daemon is disabled or already running.
+/// This is a no-op if daemon or indexing is disabled, or already running.
 pub fn maybe_start_daemon(root: &Path) {
     let config = MossConfig::load(root);
-    if !config.daemon.enabled() || !config.daemon.auto_start() {
+    if !config.daemon.enabled() || !config.daemon.auto_start() || !config.index.enabled() {
         return;
     }
 
