@@ -1,5 +1,6 @@
 //! Package registry queries.
 
+use crate::output::OutputFormat;
 use clap::Subcommand;
 use moss_packages::{
     all_ecosystems, detect_all_ecosystems, AuditResult, PackageError, PackageInfo,
@@ -33,7 +34,7 @@ pub fn cmd_package(
     action: PackageAction,
     ecosystem: Option<&str>,
     root: Option<&Path>,
-    json: bool,
+    format: &OutputFormat,
 ) -> i32 {
     let project_root = root.unwrap_or(Path::new("."));
 
@@ -41,7 +42,7 @@ pub fn cmd_package(
     if let Some(name) = ecosystem {
         // Explicit ecosystem specified
         match find_ecosystem_by_name(name) {
-            Some(eco) => run_for_ecosystem(eco, &action, project_root, json),
+            Some(eco) => run_for_ecosystem(eco, &action, project_root, format),
             None => {
                 eprintln!("error: unknown ecosystem '{}'", name);
                 eprintln!("available: {}", available_ecosystems().join(", "));
@@ -62,16 +63,16 @@ pub fn cmd_package(
         // For info/outdated, use first ecosystem only
         match &action {
             PackageAction::List | PackageAction::Tree => {
-                if json && ecosystems.len() > 1 {
+                if format.is_json() && ecosystems.len() > 1 {
                     // Collect all results into a JSON array
-                    run_all_ecosystems_json(&ecosystems, &action, project_root)
+                    run_all_ecosystems_json(&ecosystems, &action, project_root, format)
                 } else {
                     let mut exit_code = 0;
                     for (i, eco) in ecosystems.iter().enumerate() {
                         if i > 0 {
                             println!(); // Separator between ecosystems
                         }
-                        let result = run_for_ecosystem(*eco, &action, project_root, json);
+                        let result = run_for_ecosystem(*eco, &action, project_root, format);
                         if result != 0 {
                             exit_code = result;
                         }
@@ -85,7 +86,7 @@ pub fn cmd_package(
                     eprintln!("note: multiple ecosystems detected: {}", names.join(", "));
                     eprintln!("hint: use --ecosystem to specify which one");
                 }
-                run_for_ecosystem(ecosystems[0], &action, project_root, json)
+                run_for_ecosystem(ecosystems[0], &action, project_root, format)
             }
         }
     }
@@ -95,6 +96,7 @@ fn run_all_ecosystems_json(
     ecosystems: &[&dyn moss_packages::Ecosystem],
     action: &PackageAction,
     project_root: &Path,
+    format: &OutputFormat,
 ) -> i32 {
     let mut results = serde_json::Map::new();
 
@@ -144,7 +146,8 @@ fn run_all_ecosystems_json(
         }
     }
 
-    println!("{}", serde_json::Value::Object(results));
+    let value = serde_json::Value::Object(results);
+    print_json_value(&value, format);
     0
 }
 
@@ -152,15 +155,15 @@ fn run_for_ecosystem(
     eco: &dyn moss_packages::Ecosystem,
     action: &PackageAction,
     project_root: &Path,
-    json: bool,
+    format: &OutputFormat,
 ) -> i32 {
     match action {
-        PackageAction::Info { package } => cmd_info(eco, package, project_root, json),
-        PackageAction::List => cmd_list(eco, project_root, json),
-        PackageAction::Tree => cmd_tree(eco, project_root, json),
-        PackageAction::Why { package } => cmd_why(eco, package, project_root, json),
-        PackageAction::Outdated => cmd_outdated(eco, project_root, json),
-        PackageAction::Audit => cmd_audit(eco, project_root, json),
+        PackageAction::Info { package } => cmd_info(eco, package, project_root, format),
+        PackageAction::List => cmd_list(eco, project_root, format),
+        PackageAction::Tree => cmd_tree(eco, project_root, format),
+        PackageAction::Why { package } => cmd_why(eco, package, project_root, format),
+        PackageAction::Outdated => cmd_outdated(eco, project_root, format),
+        PackageAction::Audit => cmd_audit(eco, project_root, format),
     }
 }
 
@@ -168,15 +171,11 @@ fn cmd_info(
     eco: &dyn moss_packages::Ecosystem,
     package: &str,
     project_root: &Path,
-    json: bool,
+    format: &OutputFormat,
 ) -> i32 {
     match eco.query(package, project_root) {
         Ok(info) => {
-            if json {
-                print_json(&info);
-            } else {
-                print_human(&info, eco.name());
-            }
+            print_package_info(&info, eco.name(), format);
             0
         }
         Err(e) => {
@@ -201,21 +200,19 @@ fn cmd_info(
     }
 }
 
-fn cmd_list(eco: &dyn moss_packages::Ecosystem, project_root: &Path, json: bool) -> i32 {
+fn cmd_list(eco: &dyn moss_packages::Ecosystem, project_root: &Path, format: &OutputFormat) -> i32 {
     match eco.list_dependencies(project_root) {
         Ok(deps) => {
-            if json {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "ecosystem": eco.name(),
-                        "dependencies": deps.iter().map(|d| serde_json::json!({
-                            "name": d.name,
-                            "version_req": d.version_req,
-                            "optional": d.optional,
-                        })).collect::<Vec<_>>()
-                    })
-                );
+            if format.is_json() {
+                let value = serde_json::json!({
+                    "ecosystem": eco.name(),
+                    "dependencies": deps.iter().map(|d| serde_json::json!({
+                        "name": d.name,
+                        "version_req": d.version_req,
+                        "optional": d.optional,
+                    })).collect::<Vec<_>>()
+                });
+                print_json_value(&value, format);
             } else {
                 println!("{} dependencies ({})", deps.len(), eco.name());
                 println!();
@@ -234,17 +231,15 @@ fn cmd_list(eco: &dyn moss_packages::Ecosystem, project_root: &Path, json: bool)
     }
 }
 
-fn cmd_tree(eco: &dyn moss_packages::Ecosystem, project_root: &Path, json: bool) -> i32 {
+fn cmd_tree(eco: &dyn moss_packages::Ecosystem, project_root: &Path, format: &OutputFormat) -> i32 {
     match eco.dependency_tree(project_root) {
         Ok(tree) => {
-            if json {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "ecosystem": eco.name(),
-                        "tree": tree,
-                    })
-                );
+            if format.is_json() {
+                let value = serde_json::json!({
+                    "ecosystem": eco.name(),
+                    "tree": tree,
+                });
+                print_json_value(&value, format);
             } else {
                 print_tree(&tree);
             }
@@ -279,44 +274,40 @@ fn cmd_why(
     eco: &dyn moss_packages::Ecosystem,
     package: &str,
     project_root: &Path,
-    json: bool,
+    format: &OutputFormat,
 ) -> i32 {
     match eco.dependency_tree(project_root) {
         Ok(tree) => {
             let paths = find_dependency_paths(&tree, package);
 
             if paths.is_empty() {
-                if json {
-                    println!(
-                        "{}",
-                        serde_json::json!({
-                            "package": package,
-                            "found": false,
-                            "paths": []
-                        })
-                    );
+                if format.is_json() {
+                    let value = serde_json::json!({
+                        "package": package,
+                        "found": false,
+                        "paths": []
+                    });
+                    print_json_value(&value, format);
                 } else {
                     println!("Package '{}' not found in dependency tree", package);
                 }
                 return 1;
             }
 
-            if json {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "package": package,
-                        "found": true,
-                        "paths": paths.iter().map(|path| {
-                            path.iter().map(|(name, version)| {
-                                serde_json::json!({
-                                    "name": name,
-                                    "version": version
-                                })
-                            }).collect::<Vec<_>>()
+            if format.is_json() {
+                let value = serde_json::json!({
+                    "package": package,
+                    "found": true,
+                    "paths": paths.iter().map(|path| {
+                        path.iter().map(|(name, version)| {
+                            serde_json::json!({
+                                "name": name,
+                                "version": version
+                            })
                         }).collect::<Vec<_>>()
-                    })
-                );
+                    }).collect::<Vec<_>>()
+                });
+                print_json_value(&value, format);
             } else {
                 println!("'{}' is required by {} path(s):", package, paths.len());
                 println!();
@@ -378,7 +369,11 @@ fn find_paths_recursive(
     }
 }
 
-fn cmd_outdated(eco: &dyn moss_packages::Ecosystem, project_root: &Path, json: bool) -> i32 {
+fn cmd_outdated(
+    eco: &dyn moss_packages::Ecosystem,
+    project_root: &Path,
+    format: &OutputFormat,
+) -> i32 {
     // Get declared dependencies
     let deps = match eco.list_dependencies(project_root) {
         Ok(d) => d,
@@ -427,14 +422,12 @@ fn cmd_outdated(eco: &dyn moss_packages::Ecosystem, project_root: &Path, json: b
         }
     }
 
-    if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "outdated": outdated,
-                "errors": errors.iter().map(|(n, e)| serde_json::json!({"name": n, "error": e})).collect::<Vec<_>>()
-            })
-        );
+    if format.is_json() {
+        let value = serde_json::json!({
+            "outdated": outdated,
+            "errors": errors.iter().map(|(n, e)| serde_json::json!({"name": n, "error": e})).collect::<Vec<_>>()
+        });
+        print_json_value(&value, format);
     } else {
         if outdated.is_empty() && errors.is_empty() {
             println!("All packages are up to date");
@@ -460,11 +453,16 @@ fn cmd_outdated(eco: &dyn moss_packages::Ecosystem, project_root: &Path, json: b
     0
 }
 
-fn cmd_audit(eco: &dyn moss_packages::Ecosystem, project_root: &Path, json: bool) -> i32 {
+fn cmd_audit(
+    eco: &dyn moss_packages::Ecosystem,
+    project_root: &Path,
+    format: &OutputFormat,
+) -> i32 {
     match eco.audit(project_root) {
         Ok(result) => {
-            if json {
-                println!("{}", serde_json::to_string_pretty(&result).unwrap());
+            if format.is_json() {
+                let value = serde_json::to_value(&result).unwrap_or_default();
+                print_json_value(&value, format);
             } else {
                 print_audit_human(&result, eco.name());
             }
@@ -555,9 +553,32 @@ fn available_ecosystems() -> Vec<&'static str> {
     all_ecosystems().iter().map(|e| e.name()).collect()
 }
 
-fn print_json(info: &PackageInfo) {
-    if let Ok(json) = serde_json::to_string_pretty(info) {
-        println!("{}", json);
+/// Print a JSON value, applying jq filter if specified.
+fn print_json_value(value: &serde_json::Value, format: &OutputFormat) {
+    match format {
+        OutputFormat::Text => unreachable!("print_json_value called with Text format"),
+        OutputFormat::Json => println!("{}", value),
+        OutputFormat::Jq(filter) => match crate::output::apply_jq(value, filter) {
+            Ok(results) => {
+                for result in results {
+                    println!("{}", result);
+                }
+            }
+            Err(e) => {
+                eprintln!("jq error: {}", e);
+            }
+        },
+    }
+}
+
+/// Print package info in the specified format.
+fn print_package_info(info: &PackageInfo, ecosystem: &str, format: &OutputFormat) {
+    match format {
+        OutputFormat::Text => print_human(info, ecosystem),
+        OutputFormat::Json | OutputFormat::Jq(_) => {
+            let value = serde_json::to_value(info).unwrap_or_default();
+            print_json_value(&value, format);
+        }
     }
 }
 

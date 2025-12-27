@@ -453,7 +453,8 @@ fn main() {
             ecosystem,
             root,
         } => {
-            commands::package::cmd_package(action, ecosystem.as_deref(), root.as_deref(), cli.json)
+            let format = moss::output::OutputFormat::from_flags(cli.json, cli.jq.as_deref());
+            commands::package::cmd_package(action, ecosystem.as_deref(), root.as_deref(), &format)
         }
         Commands::Workflow { action, root } => {
             commands::workflow::cmd_workflow(action, root.as_deref(), cli.json)
