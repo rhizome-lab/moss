@@ -63,12 +63,17 @@ Our system prompt for sub-agents (`src/moss/agent_loop.py:LLMConfig.system_promp
 - If proposing a new dependency, ask: can stdlib/existing code do this?
 - HashMap > inventory crate. OnceLock > lazy_static. Functions > traits (until you need the trait).
 - "Going in circles" = signal to simplify, not add complexity.
-- Simple formats for simple data: line-based files > TOML/JSON when structure isn't needed.
 
 **Explicit over implicit.**
+- Convenience = zero-config. Hiding information = pretending everything is okay.
 - Location-based allowlists > hash-based (new occurrences shouldn't be silently ignored).
 - Log when skipping something (e.g., "entry commented out, skipping") - user should know why.
 - Respect user's file organization: insert near related content, don't blindly append.
+
+**Separate niche data from shared config.**
+- Don't bloat config.toml with feature-specific data (e.g., clone allowlist).
+- Many commands load config.toml - adding hundreds of lines for a niche feature pollutes every load.
+- Use separate files for large/specialized data: `.moss/clone-allow`, not `[clone.allow]` in config.
 
 **Conversational architecture is flawed.**
 The chatbot model (user → assistant → user, appending to a growing log) is wrong for agents. It leads to:
