@@ -5,11 +5,14 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
-use mlua::{FromLua, Lua, Result as LuaResult, Table, Thread, UserData, UserDataMethods, Value};
+use mlua::{
+    FromLua, Lua, LuaSerdeExt, Result as LuaResult, Table, Thread, UserData, UserDataMethods, Value,
+};
 
 #[cfg(feature = "llm")]
 use super::llm::{parse_agent_response, AgentAction, LlmClient, AGENT_SYSTEM_PROMPT};
 
+use super::memory::MemoryStore;
 use super::shadow::ShadowGit;
 
 /// What the runtime is waiting for from the frontend.
@@ -162,6 +165,7 @@ impl LuaRuntime {
             Self::register_helpers(&lua, &globals, &root)?;
             Self::register_drivers(&lua, &globals, &root)?;
             Self::register_shadow(&lua, &globals, &root)?;
+            Self::register_memory(&lua, &globals, &root)?;
         }
 
         Ok(Self { lua })
@@ -669,6 +673,159 @@ impl LuaRuntime {
         globals.set("shadow", shadow_table)?;
         Ok(())
     }
+
+    fn register_memory(lua: &Lua, globals: &Table, root: &Path) -> LuaResult<()> {
+        // Open memory store and keep in registry
+        let store = MemoryStore::open(root).map_err(mlua::Error::external)?;
+        lua.set_named_registry_value("_memory_store", LuaMemoryStore(std::sync::Arc::new(store)))?;
+
+        // store(content, opts?) -> id
+        // opts: { context = "...", weight = 1.0, metadata = {...} }
+        globals.set(
+            "store",
+            lua.create_function(|lua, (content, opts): (String, Option<Table>)| {
+                let ms: LuaMemoryStore = lua.named_registry_value("_memory_store")?;
+
+                let context: Option<String> = opts.as_ref().and_then(|t| t.get("context").ok());
+                let weight: Option<f64> = opts.as_ref().and_then(|t| t.get("weight").ok());
+
+                // Convert metadata table to JSON if present
+                let metadata: Option<String> = if let Some(ref t) = opts {
+                    if let Ok(meta) = t.get::<Value>("metadata") {
+                        Some(value_to_json(lua, &meta)?)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                let id =
+                    ms.0.store(&content, context.as_deref(), weight, metadata.as_deref())
+                        .map_err(mlua::Error::external)?;
+
+                Ok(id)
+            })?,
+        )?;
+
+        // recall(query, limit?) -> list of items
+        // Each item: { id, content, context, weight, created_at, accessed_at, metadata }
+        globals.set(
+            "recall",
+            lua.create_function(|lua, (query, limit): (Value, Option<usize>)| {
+                let ms: LuaMemoryStore = lua.named_registry_value("_memory_store")?;
+                let limit = limit.unwrap_or(10);
+
+                let items = match query {
+                    Value::String(s) => {
+                        let q = s.to_str()?;
+                        ms.0.recall(&q, limit).map_err(mlua::Error::external)?
+                    }
+                    Value::Table(t) => {
+                        // Query by metadata: recall({ slot = "system", author = { name = "X" } })
+                        // Nested tables are flattened to path segments, arrays matched exactly
+                        let filters = flatten_table_to_filters(lua, &t, "")?;
+                        let filter_refs: Vec<(&str, &str)> = filters
+                            .iter()
+                            .map(|(k, v)| (k.as_str(), v.as_str()))
+                            .collect();
+                        ms.0.recall_by_metadata(&filter_refs, limit)
+                            .map_err(mlua::Error::external)?
+                    }
+                    _ => {
+                        return Err(mlua::Error::external(
+                            "recall requires string query or table with key/value",
+                        ));
+                    }
+                };
+
+                let result = lua.create_table()?;
+                for (i, item) in items.iter().enumerate() {
+                    let t = lua.create_table()?;
+                    t.set("id", item.id)?;
+                    t.set("content", item.content.clone())?;
+                    t.set("context", item.context.clone())?;
+                    t.set("weight", item.weight)?;
+                    t.set("created_at", item.created_at)?;
+                    t.set("accessed_at", item.accessed_at)?;
+                    t.set("metadata", item.metadata.clone())?;
+                    result.set(i + 1, t)?;
+                }
+                Ok(result)
+            })?,
+        )?;
+
+        // forget(query) -> count of deleted items
+        globals.set(
+            "forget",
+            lua.create_function(|lua, query: String| {
+                let ms: LuaMemoryStore = lua.named_registry_value("_memory_store")?;
+                let count = ms.0.forget(&query).map_err(mlua::Error::external)?;
+                Ok(count)
+            })?,
+        )?;
+
+        Ok(())
+    }
+}
+
+/// Convert a Lua value to JSON string using mlua's serde support.
+fn value_to_json(lua: &Lua, v: &Value) -> LuaResult<String> {
+    let json: serde_json::Value = lua.from_value(v.clone())?;
+    Ok(json.to_string())
+}
+
+/// Flatten a Lua table into metadata filters.
+/// Nested tables become path segments, arrays become JSON strings.
+fn flatten_table_to_filters(
+    lua: &Lua,
+    t: &Table,
+    prefix: &str,
+) -> LuaResult<Vec<(String, String)>> {
+    let mut filters = Vec::new();
+
+    for pair in t.pairs::<String, Value>() {
+        let (key, value) = pair?;
+        let path = if prefix.is_empty() {
+            key.clone()
+        } else {
+            format!("{}.{}", prefix, key)
+        };
+
+        match &value {
+            Value::String(s) => {
+                filters.push((path, s.to_str()?.to_string()));
+            }
+            Value::Integer(i) => {
+                filters.push((path, i.to_string()));
+            }
+            Value::Number(n) => {
+                filters.push((path, n.to_string()));
+            }
+            Value::Boolean(b) => {
+                filters.push((path, b.to_string()));
+            }
+            Value::Table(nested) => {
+                // Check if array-like (has raw_len > 0)
+                if nested.raw_len() > 0 {
+                    // Array - serialize to JSON for exact match
+                    let json = value_to_json(lua, &value)?;
+                    filters.push((path, json));
+                } else {
+                    // Object - recurse
+                    filters.extend(flatten_table_to_filters(lua, nested, &path)?);
+                }
+            }
+            _ => {
+                return Err(mlua::Error::external(format!(
+                    "unsupported value type in metadata query: {}",
+                    value.type_name()
+                )));
+            }
+        }
+    }
+
+    Ok(filters)
 }
 
 /// Wrapper for ShadowGit to store in Lua registry.
@@ -690,6 +847,30 @@ impl FromLua for LuaShadowGit {
                 from: value.type_name(),
                 to: "LuaShadowGit".to_string(),
                 message: Some("expected ShadowGit userdata".to_string()),
+            }),
+        }
+    }
+}
+
+/// Wrapper for MemoryStore to store in Lua registry.
+struct LuaMemoryStore(std::sync::Arc<MemoryStore>);
+
+impl Clone for LuaMemoryStore {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl UserData for LuaMemoryStore {}
+
+impl FromLua for LuaMemoryStore {
+    fn from_lua(value: Value, _lua: &Lua) -> LuaResult<Self> {
+        match value {
+            Value::UserData(ud) => Ok(ud.borrow::<LuaMemoryStore>()?.clone()),
+            _ => Err(mlua::Error::FromLuaConversionError {
+                from: value.type_name(),
+                to: "LuaMemoryStore".to_string(),
+                message: Some("expected MemoryStore userdata".to_string()),
             }),
         }
     }
@@ -957,5 +1138,102 @@ mod tests {
             "#,
         );
         assert!(result.is_ok(), "shadow.list failed: {:?}", result);
+    }
+
+    #[test]
+    fn test_memory_lua_api() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let runtime = LuaRuntime::new(tmp.path()).unwrap();
+
+        // Store some items
+        let result = runtime.run_string(
+            r#"
+            local id1 = store("User prefers tabs", { context = "formatting", weight = 1.0 })
+            assert(id1 == 1, "first store should return id 1")
+
+            local id2 = store("auth.py broke tests", { context = "auth.py", weight = 0.8 })
+            assert(id2 == 2, "second store should return id 2")
+
+            local id3 = store("system prompt", { metadata = { slot = "system" } })
+            assert(id3 == 3, "third store should return id 3")
+            "#,
+        );
+        assert!(result.is_ok(), "store failed: {:?}", result);
+
+        // Recall by content
+        let result = runtime.run_string(
+            r#"
+            local items = recall("tabs")
+            assert(#items == 1, "should find 1 item matching 'tabs'")
+            assert(items[1].content:find("tabs"), "content should contain 'tabs'")
+            "#,
+        );
+        assert!(result.is_ok(), "recall by content failed: {:?}", result);
+
+        // Recall by context
+        let result = runtime.run_string(
+            r#"
+            local items = recall("auth.py")
+            assert(#items == 1, "should find 1 item with auth.py context")
+            "#,
+        );
+        assert!(result.is_ok(), "recall by context failed: {:?}", result);
+
+        // Recall by metadata
+        let result = runtime.run_string(
+            r#"
+            local items = recall({ slot = "system" })
+            assert(#items == 1, "should find 1 item with slot=system")
+            assert(items[1].content:find("system prompt"), "content should be system prompt")
+            "#,
+        );
+        assert!(result.is_ok(), "recall by metadata failed: {:?}", result);
+
+        // Forget
+        let result = runtime.run_string(
+            r#"
+            local count = forget("auth.py")
+            assert(count == 1, "should forget 1 item")
+
+            local items = recall("auth.py")
+            assert(#items == 0, "should find no items after forget")
+            "#,
+        );
+        assert!(result.is_ok(), "forget failed: {:?}", result);
+    }
+
+    #[test]
+    fn test_memory_nested_and_arrays() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let runtime = LuaRuntime::new(tmp.path()).unwrap();
+
+        // Store with nested metadata
+        let result = runtime.run_string(
+            r#"
+            store("nested item", { metadata = { author = { name = "Alice", org = "ACME" } } })
+            store("array item", { metadata = { tags = {"rust", "lua"} } })
+            "#,
+        );
+        assert!(result.is_ok(), "store failed: {:?}", result);
+
+        // Query with nested object (flattened to dot notation)
+        let result = runtime.run_string(
+            r#"
+            local items = recall({ author = { name = "Alice" } })
+            assert(#items == 1, "should find 1 item with author.name=Alice, got " .. #items)
+            assert(items[1].content == "nested item", "content mismatch")
+            "#,
+        );
+        assert!(result.is_ok(), "nested query failed: {:?}", result);
+
+        // Query with array (exact match)
+        let result = runtime.run_string(
+            r#"
+            local items = recall({ tags = {"rust", "lua"} })
+            assert(#items == 1, "should find 1 item with exact tags array")
+            assert(items[1].content == "array item", "content mismatch")
+            "#,
+        );
+        assert!(result.is_ok(), "array query failed: {:?}", result);
     }
 }

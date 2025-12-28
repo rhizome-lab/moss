@@ -12,8 +12,8 @@ use crate::symbols::{Import, Symbol, SymbolParser};
 /// Parsed data for a single file, ready for database insertion
 struct ParsedFileData {
     file_path: String,
-    /// (name, kind, start_line, end_line, parent, complexity)
-    symbols: Vec<(String, String, usize, usize, Option<String>, Option<usize>)>,
+    /// (name, kind, start_line, end_line, parent)
+    symbols: Vec<(String, String, usize, usize, Option<String>)>,
     /// (caller_symbol, callee_name, callee_qualifier, line)
     calls: Vec<(String, String, Option<String>, usize)>,
     /// imports (for Python files only)
@@ -21,7 +21,7 @@ struct ParsedFileData {
 }
 
 // Not yet public - just delete .moss/index.sqlite on schema changes
-const SCHEMA_VERSION: i64 = 5;
+const SCHEMA_VERSION: i64 = 1;
 
 /// Supported source file extensions for call graph indexing
 const SOURCE_EXTENSIONS: &[&str] = &[
@@ -183,8 +183,7 @@ impl FileIndex {
                 kind TEXT NOT NULL,
                 start_line INTEGER NOT NULL,
                 end_line INTEGER NOT NULL,
-                parent TEXT,
-                complexity INTEGER
+                parent TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
             CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file);
@@ -204,22 +203,6 @@ impl FileIndex {
             CREATE INDEX IF NOT EXISTS idx_imports_name ON imports(name);
             CREATE INDEX IF NOT EXISTS idx_imports_module ON imports(module);
 
-            -- Cross-language references (e.g., Python importing Rust PyO3 modules)
-            -- source_file: file containing the import/call
-            -- source_lang: language of source file (python, rust, etc.)
-            -- target_crate: target crate/module name
-            -- target_lang: language of target (rust, python, etc.)
-            -- ref_type: pyo3_import, cffi, ctypes, etc.
-            CREATE TABLE IF NOT EXISTS cross_refs (
-                source_file TEXT NOT NULL,
-                source_lang TEXT NOT NULL,
-                target_crate TEXT NOT NULL,
-                target_lang TEXT NOT NULL,
-                ref_type TEXT NOT NULL,
-                line INTEGER NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_cross_refs_source ON cross_refs(source_file);
-            CREATE INDEX IF NOT EXISTS idx_cross_refs_target ON cross_refs(target_crate);
             ",
         )?;
 
@@ -238,7 +221,6 @@ impl FileIndex {
             conn.execute("DELETE FROM calls", []).ok();
             conn.execute("DELETE FROM symbols", []).ok();
             conn.execute("DELETE FROM imports", []).ok();
-            conn.execute("DELETE FROM cross_refs", []).ok();
             conn.execute(
                 "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?1)",
                 params![SCHEMA_VERSION.to_string()],
@@ -606,8 +588,8 @@ impl FileIndex {
         // Insert symbols
         for sym in symbols {
             self.conn.execute(
-                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, complexity) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![path, sym.name, sym.kind.as_str(), sym.start_line, sym.end_line, sym.parent, sym.complexity],
+                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![path, sym.name, sym.kind.as_str(), sym.start_line, sym.end_line, sym.parent],
             )?;
         }
 
@@ -777,19 +759,6 @@ impl FileIndex {
             .query_map([], |row| row.get(0))?
             .collect::<Result<std::collections::HashSet<_>, _>>()?;
         Ok(names)
-    }
-
-    /// Get complexity stats for a file (avg, max)
-    pub fn file_complexity(&self, file: &str) -> rusqlite::Result<(f64, usize)> {
-        let mut stmt = self.conn.prepare(
-            "SELECT AVG(complexity), MAX(complexity) FROM symbols WHERE file = ?1 AND complexity > 0",
-        )?;
-        let result = stmt.query_row(params![file], |row| {
-            let avg: Option<f64> = row.get(0)?;
-            let max: Option<usize> = row.get(1)?;
-            Ok((avg.unwrap_or(0.0), max.unwrap_or(0)))
-        })?;
-        Ok(result)
     }
 
     /// Find symbols by name with fuzzy matching, optional kind filter, and limit
@@ -1067,7 +1036,6 @@ impl FileIndex {
                         sym.start_line,
                         sym.end_line,
                         sym.parent.clone(),
-                        sym.complexity,
                     ));
 
                     // Only index calls for functions/methods
@@ -1105,7 +1073,7 @@ impl FileIndex {
         // Pre-compile statements for batch insertion (much faster than tx.execute per row)
         {
             let mut sym_stmt = tx.prepare_cached(
-                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, complexity) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
+                "INSERT INTO symbols (file, name, kind, start_line, end_line, parent) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"
             )?;
             let mut call_stmt = tx.prepare_cached(
                 "INSERT INTO calls (caller_file, caller_symbol, callee_name, callee_qualifier, line) VALUES (?1, ?2, ?3, ?4, ?5)"
@@ -1115,15 +1083,14 @@ impl FileIndex {
             )?;
 
             for data in &parsed_data {
-                for (name, kind, start_line, end_line, parent, complexity) in &data.symbols {
+                for (name, kind, start_line, end_line, parent) in &data.symbols {
                     sym_stmt.execute(params![
                         data.file_path,
                         name,
                         kind,
                         start_line,
                         end_line,
-                        parent,
-                        complexity
+                        parent
                     ])?;
                     symbol_count += 1;
                 }
@@ -1209,8 +1176,8 @@ impl FileIndex {
 
             for sym in &symbols {
                 tx.execute(
-                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent, complexity) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                    params![file_path, sym.name, sym.kind.as_str(), sym.start_line, sym.end_line, sym.parent, sym.complexity],
+                    "INSERT INTO symbols (file, name, kind, start_line, end_line, parent) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![file_path, sym.name, sym.kind.as_str(), sym.start_line, sym.end_line, sym.parent],
                 )?;
                 symbol_count += 1;
 
@@ -1317,241 +1284,6 @@ impl FileIndex {
             .collect();
         Ok(files)
     }
-
-    // =========================================================================
-    // Cross-language reference tracking
-    // =========================================================================
-
-    /// Refresh cross-language references by detecting FFI patterns.
-    /// Uses trait-based FfiDetector from moss-languages for extensibility.
-    pub fn refresh_cross_refs(&mut self) -> rusqlite::Result<usize> {
-        use moss_languages::ffi::{FfiDetector, FfiModule as LangFfiModule};
-
-        let detector = FfiDetector::new();
-
-        // Collect all cross-refs before starting transaction
-        let mut cross_refs: Vec<CrossRefData> = Vec::new();
-
-        // 1. Find build files and detect FFI modules
-        let build_files: Vec<String> = {
-            let mut stmt = self
-                .conn
-                .prepare("SELECT path FROM files WHERE path LIKE '%Cargo.toml' OR path LIKE '%pyproject.toml'")?;
-            let rows = stmt.query_map([], |row| row.get(0))?;
-            rows.filter_map(|r| r.ok()).collect()
-        };
-
-        let mut ffi_modules: Vec<LangFfiModule> = Vec::new();
-        for build_path in build_files {
-            let full_path = self.root.join(&build_path);
-            if let Ok(content) = std::fs::read_to_string(&full_path) {
-                ffi_modules.extend(detector.detect_modules(&full_path, &content));
-            }
-        }
-
-        // 2. Match imports to FFI modules
-        for module in &ffi_modules {
-            let module_name = module.name.replace('-', "_");
-            let ref_type = format!("{}_import", module.binding_type);
-
-            // Find imports matching this module
-            let imports: Vec<(String, Option<String>, String, usize)> = {
-                let mut stmt = self.conn.prepare(
-                    "SELECT file, module, name, line FROM imports WHERE module = ?1 OR module LIKE ?2 OR name = ?1",
-                )?;
-                let pattern = format!("{}%", module_name);
-                let rows = stmt.query_map(params![module_name, pattern], |row| {
-                    Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
-                })?;
-                rows.filter_map(|r| r.ok()).collect()
-            };
-
-            for (file, import_module, import_name, line) in imports {
-                // Check file extension matches binding's consumer extensions
-                let ext = file.rsplit('.').next().unwrap_or("");
-                if !detector.is_consumer_extension(ext) {
-                    continue;
-                }
-
-                // Determine source language from extension
-                let source_lang = match ext {
-                    "py" => "python",
-                    "js" | "mjs" | "ts" | "tsx" => "javascript",
-                    _ => continue,
-                };
-
-                // Verify import matches using binding's logic
-                let import_mod = import_module.as_deref().unwrap_or("");
-                if detector
-                    .match_import(import_mod, &import_name, &ffi_modules)
-                    .is_some()
-                {
-                    cross_refs.push(CrossRefData {
-                        source_file: file,
-                        source_lang,
-                        target_module: module.name.clone(),
-                        target_lang: module.target_lang,
-                        ref_type: ref_type.clone(),
-                        line,
-                    });
-                }
-            }
-        }
-
-        // 3. Detect standalone FFI usage (ctypes/cffi without matching module)
-        let ffi_imports = self.detect_standalone_ffi_imports(&detector)?;
-        cross_refs.extend(ffi_imports);
-
-        // Insert all cross-refs in a transaction
-        let tx = self.conn.transaction()?;
-        tx.execute("DELETE FROM cross_refs", [])?;
-
-        for cr in &cross_refs {
-            tx.execute(
-                "INSERT INTO cross_refs (source_file, source_lang, target_crate, target_lang, ref_type, line)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![cr.source_file, cr.source_lang, cr.target_module, cr.target_lang, cr.ref_type, cr.line],
-            )?;
-        }
-
-        tx.commit()?;
-        Ok(cross_refs.len())
-    }
-
-    /// Detect standalone FFI imports (ctypes/cffi) that don't match a known module.
-    fn detect_standalone_ffi_imports(
-        &self,
-        detector: &moss_languages::ffi::FfiDetector,
-    ) -> rusqlite::Result<Vec<CrossRefData>> {
-        let mut results = Vec::new();
-
-        // Get all imports once
-        let imports: Vec<(String, Option<String>, String, usize)> = {
-            let mut stmt = self
-                .conn
-                .prepare("SELECT file, module, name, line FROM imports")?;
-            let rows = stmt.query_map([], |row| {
-                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
-            })?;
-            rows.filter_map(|r| r.ok()).collect()
-        };
-
-        // Check each binding for standalone detection
-        for binding in detector.bindings() {
-            // Only ctypes/cffi have standalone detection (no build file)
-            if binding.name() != "ctypes" && binding.name() != "cffi" {
-                continue;
-            }
-
-            for (file, import_module, import_name, line) in &imports {
-                let ext = file.rsplit('.').next().unwrap_or("");
-                if !binding.consumer_extensions().contains(&ext) {
-                    continue;
-                }
-
-                let import_mod = import_module.as_deref().unwrap_or("");
-                if binding.matches_import(import_mod, import_name, "") {
-                    results.push(CrossRefData {
-                        source_file: file.clone(),
-                        source_lang: binding.source_lang(),
-                        target_module: "native_lib".to_string(),
-                        target_lang: binding.target_lang(),
-                        ref_type: format!("{}_usage", binding.name()),
-                        line: *line,
-                    });
-                }
-            }
-        }
-
-        Ok(results)
-    }
-
-    /// Find cross-language references from a source file.
-    pub fn find_cross_refs(&self, file: &str) -> rusqlite::Result<Vec<CrossRef>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT source_file, source_lang, target_crate, target_lang, ref_type, line
-             FROM cross_refs WHERE source_file = ?1",
-        )?;
-        let refs = stmt
-            .query_map(params![file], |row| {
-                Ok(CrossRef {
-                    source_file: row.get(0)?,
-                    source_lang: row.get(1)?,
-                    target_crate: row.get(2)?,
-                    target_lang: row.get(3)?,
-                    ref_type: row.get(4)?,
-                    line: row.get(5)?,
-                })
-            })?
-            .filter_map(|r| r.ok())
-            .collect();
-        Ok(refs)
-    }
-
-    /// Find files that reference a given crate/module across languages.
-    pub fn find_cross_ref_sources(&self, target: &str) -> rusqlite::Result<Vec<CrossRef>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT source_file, source_lang, target_crate, target_lang, ref_type, line
-             FROM cross_refs WHERE target_crate = ?1",
-        )?;
-        let refs = stmt
-            .query_map(params![target], |row| {
-                Ok(CrossRef {
-                    source_file: row.get(0)?,
-                    source_lang: row.get(1)?,
-                    target_crate: row.get(2)?,
-                    target_lang: row.get(3)?,
-                    ref_type: row.get(4)?,
-                    line: row.get(5)?,
-                })
-            })?
-            .filter_map(|r| r.ok())
-            .collect();
-        Ok(refs)
-    }
-
-    /// Get all cross-language references in the index.
-    pub fn all_cross_refs(&self) -> rusqlite::Result<Vec<CrossRef>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT source_file, source_lang, target_crate, target_lang, ref_type, line
-             FROM cross_refs ORDER BY source_file, line",
-        )?;
-        let refs = stmt
-            .query_map([], |row| {
-                Ok(CrossRef {
-                    source_file: row.get(0)?,
-                    source_lang: row.get(1)?,
-                    target_crate: row.get(2)?,
-                    target_lang: row.get(3)?,
-                    ref_type: row.get(4)?,
-                    line: row.get(5)?,
-                })
-            })?
-            .filter_map(|r| r.ok())
-            .collect();
-        Ok(refs)
-    }
-}
-
-/// Internal cross-ref data for collection before insertion.
-struct CrossRefData {
-    source_file: String,
-    source_lang: &'static str,
-    target_module: String,
-    target_lang: &'static str,
-    ref_type: String,
-    line: usize,
-}
-
-/// Cross-language reference record.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct CrossRef {
-    pub source_file: String,
-    pub source_lang: String,
-    pub target_crate: String,
-    pub target_lang: String,
-    pub ref_type: String,
-    pub line: usize,
 }
 
 #[cfg(test)]

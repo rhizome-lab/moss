@@ -59,12 +59,6 @@ pub enum Request {
     Importers { module: String },
     #[serde(rename = "resolve_import")]
     ResolveImport { file: String, name: String },
-    #[serde(rename = "cross_refs")]
-    CrossRefs { file: String },
-    #[serde(rename = "cross_ref_sources")]
-    CrossRefSources { target: String },
-    #[serde(rename = "all_cross_refs")]
-    AllCrossRefs,
     #[serde(rename = "status")]
     Status,
     #[serde(rename = "shutdown")]
@@ -465,27 +459,6 @@ impl DaemonServer {
                     Err(e) => ServerResponse::err(&e.to_string()),
                 }
             }
-            Request::CrossRefs { file } => {
-                let idx = self.index.lock().unwrap();
-                match idx.find_cross_refs(&file) {
-                    Ok(refs) => ServerResponse::ok(serde_json::json!(refs)),
-                    Err(e) => ServerResponse::err(&e.to_string()),
-                }
-            }
-            Request::CrossRefSources { target } => {
-                let idx = self.index.lock().unwrap();
-                match idx.find_cross_ref_sources(&target) {
-                    Ok(refs) => ServerResponse::ok(serde_json::json!(refs)),
-                    Err(e) => ServerResponse::err(&e.to_string()),
-                }
-            }
-            Request::AllCrossRefs => {
-                let idx = self.index.lock().unwrap();
-                match idx.all_cross_refs() {
-                    Ok(refs) => ServerResponse::ok(serde_json::json!(refs)),
-                    Err(e) => ServerResponse::err(&e.to_string()),
-                }
-            }
             Request::Shutdown => {
                 ServerResponse::ok(serde_json::json!({"message": "shutting down"}))
             }
@@ -526,10 +499,9 @@ pub async fn run_daemon(root: &Path) -> Result<i32, Box<dyn std::error::Error>> 
         let mut idx = server.index.lock().unwrap();
         let file_count = idx.refresh()?;
         let stats = idx.incremental_call_graph_refresh()?;
-        let cross_ref_count = idx.refresh_cross_refs().unwrap_or(0);
         eprintln!(
-            "Indexed {} files, {} symbols, {} calls, {} cross-refs",
-            file_count, stats.symbols, stats.calls, cross_ref_count
+            "Indexed {} files, {} symbols, {} calls",
+            file_count, stats.symbols, stats.calls
         );
     }
 

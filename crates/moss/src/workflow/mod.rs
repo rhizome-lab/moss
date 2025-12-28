@@ -26,6 +26,7 @@ mod lua_runtime;
 #[cfg(feature = "llm")]
 pub(crate) mod llm;
 
+mod memory;
 mod shadow;
 
 #[cfg(feature = "lua")]

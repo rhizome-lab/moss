@@ -20,6 +20,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 
 **Workflow Engine:**
 - [x] Port LLM calling logic (streaming, tool use) as workflow component
+- [x] Memory system: `store()`, `recall()`, `forget()` Lua API with SQLite persistence
 
 **Token-Efficient Output:**
 Default output optimized for LLM context efficiency. Add `--pretty` for human-friendly display.
@@ -53,6 +54,8 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
+- Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
+- [x] Clone detection (`moss analyze --clones`): implemented with on-demand AST hashing, `--elide-identifiers` (default true), `--elide-literals` (default false). No index storage - computed at scan time.
 - [x] Binary size optimization: LTO + strip reduced 25MB → 18MB (main contributors: moss 2.1MB, bundled C libs 2MB, moss_languages 1.6MB)
 - [x] Avoid Command::new in crates/moss-packages/src/ecosystems/: replaced 14 curl calls with ureq HTTP client. bun.lockb properly ported from Bun source (inline + external strings). Remaining Command uses are legitimate CLI tools: npm/cargo/pip-audit/bundle-audit/govulncheck (security audits), nix/nix-env (local queries)
 
@@ -97,7 +100,6 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 
 - VS Code extension: test and publish to marketplace (after first CLI release)
 - Remaining docs: prior-art.md, hybrid-loops.md
-- Memory system: layered cross-session learning
 
 ## Python Features Not Yet Ported
 
@@ -115,11 +117,9 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Summarization with local models
 - Working memory with summarization
 
-**Memory System Design (from deleted docs):**
-Three-layer architecture for agent context:
-1. Automatic (always loaded): preferences, conventions
-2. Triggered (pattern-activated): episodic warnings, semantic rules
-3. On-demand (`memory.recall(query)`): explicit agent queries
+**Memory System:**
+See `docs/design/memory.md`. Core API: `store(content, opts)`, `recall(query)`, `forget(query)`.
+SQLite-backed persistence in `.moss/memory.db`. Slots are user-space (metadata), not special-cased.
 
 **Local NN Budget (from deleted docs):**
 | Model | Params | FP16 RAM |

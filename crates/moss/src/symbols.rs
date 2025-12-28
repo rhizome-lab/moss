@@ -1,4 +1,4 @@
-use crate::extract::{compute_complexity, ExtractOptions, Extractor};
+use crate::extract::{ExtractOptions, Extractor};
 use crate::parsers::Parsers;
 use moss_languages::{
     support_for_grammar, support_for_path, Language, Symbol as LangSymbol,
@@ -14,8 +14,6 @@ pub struct Symbol {
     pub start_line: usize,
     pub end_line: usize,
     pub parent: Option<String>,
-    /// Cyclomatic complexity (only for functions/methods)
-    pub complexity: Option<usize>,
 }
 
 /// An import statement (from X import Y as Z)
@@ -86,49 +84,24 @@ impl SymbolParser {
     }
 
     pub fn parse_file(&self, path: &Path, content: &str) -> Vec<Symbol> {
-        let support = match support_for_path(path) {
-            Some(s) => s,
-            None => return Vec::new(),
-        };
+        if support_for_path(path).is_none() {
+            return Vec::new();
+        }
 
         // Use shared extractor for symbol extraction
         let result = self.extractor.extract(path, content);
 
-        // Parse once for complexity computation
-        let tree = self
-            .parsers
-            .parse_with_grammar(support.grammar_name(), content);
-
-        // Flatten nested symbols and compute complexity
+        // Flatten nested symbols
         let mut symbols = Vec::new();
         for sym in &result.symbols {
-            self.flatten_symbol(sym, None, &mut symbols, content, support, tree.as_ref());
+            self.flatten_symbol(sym, None, &mut symbols);
         }
         symbols
     }
 
     /// Flatten a nested symbol into the flat list with parent references
-    fn flatten_symbol(
-        &self,
-        sym: &LangSymbol,
-        parent: Option<&str>,
-        symbols: &mut Vec<Symbol>,
-        content: &str,
-        support: &dyn Language,
-        tree: Option<&tree_sitter::Tree>,
-    ) {
+    fn flatten_symbol(&self, sym: &LangSymbol, parent: Option<&str>, symbols: &mut Vec<Symbol>) {
         let kind = convert_symbol_kind(sym.kind);
-        let is_function = matches!(kind, SymbolKind::Function | SymbolKind::Method);
-
-        // Compute complexity for functions if we have a parse tree
-        let complexity = if is_function {
-            tree.and_then(|t| {
-                self.find_function_node(t, sym.start_line)
-                    .map(|node| compute_complexity(&node, support))
-            })
-        } else {
-            None
-        };
 
         symbols.push(Symbol {
             name: sym.name.clone(),
@@ -136,65 +109,12 @@ impl SymbolParser {
             start_line: sym.start_line,
             end_line: sym.end_line,
             parent: parent.map(String::from),
-            complexity,
         });
 
         // Recurse into children with current symbol as parent
         for child in &sym.children {
-            self.flatten_symbol(child, Some(&sym.name), symbols, content, support, tree);
+            self.flatten_symbol(child, Some(&sym.name), symbols);
         }
-    }
-
-    /// Find a function node at a given line for complexity computation
-    fn find_function_node<'a>(
-        &self,
-        tree: &'a tree_sitter::Tree,
-        target_line: usize,
-    ) -> Option<tree_sitter::Node<'a>> {
-        let root = tree.root_node();
-        let mut cursor = root.walk();
-        self.find_node_at_line(&mut cursor, target_line)
-    }
-
-    fn find_node_at_line<'a>(
-        &self,
-        cursor: &mut tree_sitter::TreeCursor<'a>,
-        target_line: usize,
-    ) -> Option<tree_sitter::Node<'a>> {
-        loop {
-            let node = cursor.node();
-            let start = node.start_position().row + 1;
-
-            // If this node starts at our target line and is a function-like node, return it
-            if start == target_line {
-                let kind = node.kind();
-                // Common function node kinds across languages
-                if kind.contains("function")
-                    || kind.contains("method")
-                    || kind == "function_definition"
-                    || kind == "method_definition"
-                    || kind == "function_item"
-                    || kind == "function_declaration"
-                    || kind == "arrow_function"
-                    || kind == "generator_function"
-                {
-                    return Some(node);
-                }
-            }
-
-            // Descend if target might be in subtree
-            if cursor.goto_first_child() {
-                if let Some(found) = self.find_node_at_line(cursor, target_line) {
-                    return Some(found);
-                }
-                cursor.goto_parent();
-            }
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-        None
     }
 
     /// Parse imports from any supported language file using trait-based extraction.

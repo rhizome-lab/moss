@@ -104,6 +104,22 @@ pub struct AnalyzeArgs {
     #[arg(long)]
     pub check_examples: bool,
 
+    /// Detect code clones (duplicate functions/methods)
+    #[arg(long)]
+    pub clones: bool,
+
+    /// Elide identifier names when detecting clones (default: true)
+    #[arg(long, default_value = "true")]
+    pub elide_identifiers: bool,
+
+    /// Elide literal values when detecting clones (default: false)
+    #[arg(long)]
+    pub elide_literals: bool,
+
+    /// Show source code for detected clones
+    #[arg(long)]
+    pub show_source: bool,
+
     /// Exclude paths matching pattern or @alias
     #[arg(long, value_name = "PATTERN")]
     pub exclude: Vec<String>,
@@ -139,6 +155,10 @@ pub fn run(args: AnalyzeArgs, json: bool) -> i32 {
         args.check_refs,
         args.stale_docs,
         args.check_examples,
+        args.clones,
+        args.elide_identifiers,
+        args.elide_literals,
+        args.show_source,
         json,
         &args.exclude,
         &args.only,
@@ -165,6 +185,10 @@ pub fn cmd_analyze(
     check_refs: bool,
     stale_docs: bool,
     check_examples: bool,
+    clones: bool,
+    elide_identifiers: bool,
+    elide_literals: bool,
+    show_source: bool,
     json: bool,
     exclude: &[String],
     only: &[String],
@@ -243,6 +267,11 @@ pub fn cmd_analyze(
     // --check-examples validates example references
     if check_examples {
         return cmd_check_examples(&root, json);
+    }
+
+    // --clones detects duplicate code
+    if clones {
+        return cmd_clones(&root, elide_identifiers, elide_literals, show_source, json);
     }
 
     // If no specific flags, run all analyses
@@ -694,8 +723,6 @@ struct FileHotspot {
     commits: usize,
     lines_added: usize,
     lines_deleted: usize,
-    avg_complexity: f64,
-    max_complexity: usize,
     score: f64,
 }
 
@@ -769,8 +796,6 @@ fn cmd_hotspots(root: &Path, json: bool) -> i32 {
                         commits,
                         lines_added: added,
                         lines_deleted: deleted,
-                        avg_complexity: 0.0,
-                        max_complexity: 0,
                         score: (commits as f64) * (churn as f64).sqrt(),
                     }
                 })
@@ -783,7 +808,8 @@ fn cmd_hotspots(root: &Path, json: bool) -> i32 {
         }
     };
 
-    // Combine with complexity data
+    // Build hotspots from churn data (index is available but not used for complexity)
+    let _ = idx; // Index available for future on-demand complexity computation
     let mut hotspots: Vec<FileHotspot> = Vec::new();
 
     for (path, (commits, added, deleted)) in file_stats {
@@ -792,21 +818,15 @@ fn cmd_hotspots(root: &Path, json: bool) -> i32 {
             continue;
         }
 
-        // Get complexity from index
-        let (avg_complexity, max_complexity) = idx.file_complexity(&path).unwrap_or_default();
-
         let churn = added + deleted;
-        // Score: commits * sqrt(churn) * (1 + avg_complexity/10)
-        let complexity_factor = 1.0 + avg_complexity / 10.0;
-        let score = (commits as f64) * (churn as f64).sqrt() * complexity_factor;
+        // Score: commits * sqrt(churn)
+        let score = (commits as f64) * (churn as f64).sqrt();
 
         hotspots.push(FileHotspot {
             path,
             commits,
             lines_added: added,
             lines_deleted: deleted,
-            avg_complexity,
-            max_complexity,
             score,
         });
     }
@@ -867,21 +887,19 @@ fn print_hotspots(hotspots: &[FileHotspot], json: bool) -> i32 {
                     "lines_added": h.lines_added,
                     "lines_deleted": h.lines_deleted,
                     "churn": h.lines_added + h.lines_deleted,
-                    "avg_complexity": (h.avg_complexity * 10.0).round() / 10.0,
-                    "max_complexity": h.max_complexity,
                     "score": (h.score * 10.0).round() / 10.0,
                 })
             })
             .collect();
         println!("{}", serde_json::to_string_pretty(&output).unwrap());
     } else {
-        println!("Git Hotspots (high churn + complexity)");
+        println!("Git Hotspots (high churn)");
         println!();
         println!(
-            "{:<50} {:>8} {:>8} {:>8} {:>8}",
-            "File", "Commits", "Churn", "AvgCx", "Score"
+            "{:<50} {:>8} {:>8} {:>8}",
+            "File", "Commits", "Churn", "Score"
         );
-        println!("{}", "-".repeat(90));
+        println!("{}", "-".repeat(80));
 
         for h in hotspots {
             let churn = h.lines_added + h.lines_deleted;
@@ -891,14 +909,14 @@ fn print_hotspots(hotspots: &[FileHotspot], json: bool) -> i32 {
                 h.path.clone()
             };
             println!(
-                "{:<50} {:>8} {:>8} {:>8.1} {:>8.0}",
-                display_path, h.commits, churn, h.avg_complexity, h.score
+                "{:<50} {:>8} {:>8} {:>8.0}",
+                display_path, h.commits, churn, h.score
             );
         }
 
         println!();
-        println!("Score = commits × √churn × (1 + avgComplexity/10)");
-        println!("High scores indicate bug-prone files that change often and are complex.");
+        println!("Score = commits × √churn");
+        println!("High scores indicate bug-prone files that change often.");
     }
 
     0
@@ -1481,4 +1499,367 @@ fn cmd_check_examples(root: &Path, json: bool) -> i32 {
     } else {
         1
     }
+}
+
+// ============================================================================
+// Clone Detection
+// ============================================================================
+
+use crate::extract::Extractor;
+use crate::parsers::Parsers;
+use moss_languages::support_for_path;
+use std::hash::{Hash, Hasher};
+
+/// A detected code clone group
+#[derive(Debug)]
+struct CloneGroup {
+    hash: u64,
+    locations: Vec<CloneLocation>,
+    line_count: usize,
+}
+
+/// Location of a clone instance
+#[derive(Debug)]
+struct CloneLocation {
+    file: String,
+    symbol: String,
+    start_line: usize,
+    end_line: usize,
+}
+
+/// Detect code clones across the codebase
+fn cmd_clones(
+    root: &Path,
+    elide_identifiers: bool,
+    elide_literals: bool,
+    show_source: bool,
+    json: bool,
+) -> i32 {
+    let extractor = Extractor::new();
+    let parsers = Parsers::new();
+
+    // Collect function hashes: hash -> [(file, symbol, start, end)]
+    let mut hash_groups: std::collections::HashMap<u64, Vec<CloneLocation>> =
+        std::collections::HashMap::new();
+    let mut files_scanned = 0;
+    let mut functions_hashed = 0;
+
+    // Walk source files, respecting .gitignore
+    let walker = ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+
+    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
+        let path = e.path();
+        path.is_file() && is_source_file(path)
+    }) {
+        let path = entry.path();
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let support = match support_for_path(path) {
+            Some(s) => s,
+            None => continue,
+        };
+
+        // Parse the file
+        let tree = match parsers.parse_with_grammar(support.grammar_name(), &content) {
+            Some(t) => t,
+            None => continue,
+        };
+
+        files_scanned += 1;
+
+        // Extract symbols to find functions/methods
+        let result = extractor.extract(path, &content);
+
+        // Find and hash each function/method
+        for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
+            let kind = sym.kind.as_str();
+            if kind != "function" && kind != "method" {
+                continue;
+            }
+
+            // Find the function node
+            if let Some(node) = find_function_node(&tree, sym.start_line) {
+                // Skip trivial functions (< 3 lines)
+                let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
+                if line_count < 3 {
+                    continue;
+                }
+
+                let hash = compute_clone_hash(
+                    &node,
+                    content.as_bytes(),
+                    elide_identifiers,
+                    elide_literals,
+                );
+                functions_hashed += 1;
+
+                let rel_path = path
+                    .strip_prefix(root)
+                    .unwrap_or(path)
+                    .display()
+                    .to_string();
+
+                hash_groups.entry(hash).or_default().push(CloneLocation {
+                    file: rel_path,
+                    symbol: sym.name.clone(),
+                    start_line: sym.start_line,
+                    end_line: sym.end_line,
+                });
+            }
+        }
+    }
+
+    // Filter to groups with 2+ instances (actual clones)
+    let mut clone_groups: Vec<CloneGroup> = hash_groups
+        .into_iter()
+        .filter(|(_, locs)| locs.len() >= 2)
+        .map(|(hash, locations)| {
+            let line_count = locations
+                .first()
+                .map(|l| l.end_line - l.start_line + 1)
+                .unwrap_or(0);
+            CloneGroup {
+                hash,
+                locations,
+                line_count,
+            }
+        })
+        .collect();
+
+    // Sort by line count (larger clones first), then by number of instances
+    clone_groups.sort_by(|a, b| {
+        b.line_count
+            .cmp(&a.line_count)
+            .then_with(|| b.locations.len().cmp(&a.locations.len()))
+    });
+
+    let total_clones: usize = clone_groups.iter().map(|g| g.locations.len()).sum();
+    let clone_lines: usize = clone_groups
+        .iter()
+        .map(|g| g.line_count * g.locations.len())
+        .sum();
+
+    if json {
+        let output = serde_json::json!({
+            "files_scanned": files_scanned,
+            "functions_hashed": functions_hashed,
+            "clone_groups": clone_groups.len(),
+            "total_clones": total_clones,
+            "clone_lines": clone_lines,
+            "elide_identifiers": elide_identifiers,
+            "elide_literals": elide_literals,
+            "groups": clone_groups.iter().map(|g| {
+                serde_json::json!({
+                    "hash": format!("{:016x}", g.hash),
+                    "line_count": g.line_count,
+                    "instances": g.locations.len(),
+                    "locations": g.locations.iter().map(|l| {
+                        serde_json::json!({
+                            "file": l.file,
+                            "symbol": l.symbol,
+                            "start_line": l.start_line,
+                            "end_line": l.end_line,
+                        })
+                    }).collect::<Vec<_>>(),
+                })
+            }).collect::<Vec<_>>(),
+        });
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    } else {
+        println!("Clone Detection");
+        println!();
+        println!("Files scanned: {}", files_scanned);
+        println!("Functions hashed: {}", functions_hashed);
+        println!("Clone groups: {}", clone_groups.len());
+        println!("Total clones: {}", total_clones);
+        println!("Duplicated lines: ~{}", clone_lines);
+        println!();
+
+        if clone_groups.is_empty() {
+            println!("No code clones detected.");
+        } else {
+            println!("Clone Groups (sorted by size):");
+            println!();
+
+            for (i, group) in clone_groups.iter().take(20).enumerate() {
+                println!(
+                    "{}. {} lines, {} instances:",
+                    i + 1,
+                    group.line_count,
+                    group.locations.len()
+                );
+
+                for loc in &group.locations {
+                    println!(
+                        "   {}:{}-{} ({})",
+                        loc.file, loc.start_line, loc.end_line, loc.symbol
+                    );
+
+                    // Show source code if requested
+                    if show_source {
+                        let file_path = root.join(&loc.file);
+                        if let Ok(content) = std::fs::read_to_string(&file_path) {
+                            let lines: Vec<&str> = content.lines().collect();
+                            let start = loc.start_line.saturating_sub(1);
+                            let end = loc.end_line.min(lines.len());
+                            for (j, line) in lines[start..end].iter().enumerate() {
+                                println!("        {:4} │ {}", start + j + 1, line);
+                            }
+                            println!();
+                        }
+                    }
+                }
+                println!();
+            }
+
+            if clone_groups.len() > 20 {
+                println!("... and {} more groups", clone_groups.len() - 20);
+            }
+        }
+    }
+
+    0
+}
+
+/// Flatten nested symbols into a flat list
+fn flatten_symbols(sym: &moss_languages::Symbol) -> Vec<&moss_languages::Symbol> {
+    let mut result = vec![sym];
+    for child in &sym.children {
+        result.extend(flatten_symbols(child));
+    }
+    result
+}
+
+/// Find a function node at a given line
+fn find_function_node(
+    tree: &tree_sitter::Tree,
+    target_line: usize,
+) -> Option<tree_sitter::Node<'_>> {
+    let root = tree.root_node();
+    let mut cursor = root.walk();
+    find_node_at_line_recursive(&mut cursor, target_line)
+}
+
+fn find_node_at_line_recursive<'a>(
+    cursor: &mut tree_sitter::TreeCursor<'a>,
+    target_line: usize,
+) -> Option<tree_sitter::Node<'a>> {
+    loop {
+        let node = cursor.node();
+        let start = node.start_position().row + 1;
+
+        if start == target_line {
+            let kind = node.kind();
+            if kind.contains("function")
+                || kind.contains("method")
+                || kind == "function_definition"
+                || kind == "method_definition"
+                || kind == "function_item"
+                || kind == "function_declaration"
+                || kind == "arrow_function"
+                || kind == "generator_function"
+            {
+                return Some(node);
+            }
+        }
+
+        if cursor.goto_first_child() {
+            if let Some(found) = find_node_at_line_recursive(cursor, target_line) {
+                return Some(found);
+            }
+            cursor.goto_parent();
+        }
+
+        if !cursor.goto_next_sibling() {
+            break;
+        }
+    }
+    None
+}
+
+/// Compute a normalized AST hash for clone detection.
+fn compute_clone_hash(
+    node: &tree_sitter::Node,
+    content: &[u8],
+    elide_identifiers: bool,
+    elide_literals: bool,
+) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    let mut hasher = DefaultHasher::new();
+    hash_node_recursive(
+        node,
+        content,
+        &mut hasher,
+        elide_identifiers,
+        elide_literals,
+    );
+    hasher.finish()
+}
+
+/// Recursively hash a node and its children.
+fn hash_node_recursive(
+    node: &tree_sitter::Node,
+    content: &[u8],
+    hasher: &mut impl Hasher,
+    elide_identifiers: bool,
+    elide_literals: bool,
+) {
+    let kind = node.kind();
+
+    // Hash the node kind (structure)
+    kind.hash(hasher);
+
+    // For leaf nodes, decide whether to hash content
+    if node.child_count() == 0 {
+        let should_hash = if is_identifier_kind(kind) {
+            !elide_identifiers
+        } else if is_literal_kind(kind) {
+            !elide_literals
+        } else {
+            // Operators, keywords - their kind is sufficient
+            false
+        };
+
+        if should_hash {
+            let text = &content[node.start_byte()..node.end_byte()];
+            text.hash(hasher);
+        }
+    }
+
+    // Recurse into children
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        hash_node_recursive(&child, content, hasher, elide_identifiers, elide_literals);
+    }
+}
+
+/// Check if a node kind represents an identifier.
+fn is_identifier_kind(kind: &str) -> bool {
+    kind == "identifier"
+        || kind == "field_identifier"
+        || kind == "type_identifier"
+        || kind == "property_identifier"
+        || kind.ends_with("_identifier")
+}
+
+/// Check if a node kind represents a literal value.
+fn is_literal_kind(kind: &str) -> bool {
+    kind.contains("string")
+        || kind.contains("integer")
+        || kind.contains("float")
+        || kind.contains("number")
+        || kind.contains("boolean")
+        || kind == "true"
+        || kind == "false"
+        || kind == "nil"
+        || kind == "null"
+        || kind == "none"
 }
