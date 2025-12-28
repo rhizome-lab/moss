@@ -62,8 +62,8 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - [x] Avoid Command::new in crates/moss-packages/src/ecosystems/: replaced 14 curl calls with ureq HTTP client. bun.lockb properly ported from Bun source (inline + external strings). Remaining Command uses are legitimate CLI tools: npm/cargo/pip-audit/bundle-audit/govulncheck (security audits), nix/nix-env (local queries)
 
 **Daemon Design:**
-- Multi-codebase: single daemon indexing multiple roots simultaneously
-- Minimal memory footprint (currently loads full index per root)
+- [x] Multi-codebase: single global daemon at `~/.config/moss/daemon.sock`, manages multiple roots via `daemon add/remove/list`
+- [x] Minimal memory footprint: SQLite file-based (~2MB per connection), no LRU eviction needed
 
 **Tooling:**
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
