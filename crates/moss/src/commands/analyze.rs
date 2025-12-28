@@ -184,6 +184,14 @@ pub struct AnalyzeArgs {
     #[arg(long, default_value = "1")]
     pub min_lines: usize,
 
+    /// Allow a clone group by location (add to .moss/clone-allow). Format: path:symbol
+    #[arg(long, value_name = "LOCATION")]
+    pub allow_group: Option<String>,
+
+    /// Reason for allowing the clone group (required for new groups)
+    #[arg(long, value_name = "REASON", requires = "allow_group")]
+    pub reason: Option<String>,
+
     /// Exclude paths matching pattern or @alias
     #[arg(long, value_name = "PATTERN")]
     pub exclude: Vec<String>,
@@ -200,6 +208,18 @@ pub fn run(args: AnalyzeArgs, json: bool) -> i32 {
         .clone()
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = MossConfig::load(&effective_root);
+
+    // Handle --allow-group mode
+    if let Some(ref location) = args.allow_group {
+        return cmd_allow_clone_group(
+            &effective_root,
+            location,
+            args.reason.as_deref(),
+            args.elide_identifiers,
+            args.elide_literals,
+            args.min_lines,
+        );
+    }
 
     // Determine which passes to run:
     // --all: run everything
@@ -1702,6 +1722,215 @@ fn load_clone_allowlist(root: &Path) -> std::collections::HashSet<String> {
     allowed
 }
 
+/// Detect all clone groups in the codebase (before filtering by allowlist)
+fn detect_clone_groups(
+    root: &Path,
+    elide_identifiers: bool,
+    elide_literals: bool,
+    min_lines: usize,
+) -> Vec<CloneGroup> {
+    let extractor = Extractor::new();
+    let parsers = Parsers::new();
+
+    let mut hash_groups: std::collections::HashMap<u64, Vec<CloneLocation>> =
+        std::collections::HashMap::new();
+
+    let walker = ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+
+    for entry in walker.filter_map(|e| e.ok()).filter(|e| {
+        let path = e.path();
+        path.is_file() && is_source_file(path)
+    }) {
+        let path = entry.path();
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let support = match support_for_path(path) {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let tree = match parsers.parse_with_grammar(support.grammar_name(), &content) {
+            Some(t) => t,
+            None => continue,
+        };
+
+        let result = extractor.extract(path, &content);
+
+        for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
+            let kind = sym.kind.as_str();
+            if kind != "function" && kind != "method" {
+                continue;
+            }
+
+            if let Some(node) = find_function_node(&tree, sym.start_line) {
+                let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
+                if line_count < min_lines {
+                    continue;
+                }
+
+                let hash = compute_clone_hash(
+                    &node,
+                    content.as_bytes(),
+                    elide_identifiers,
+                    elide_literals,
+                );
+
+                let rel_path = path
+                    .strip_prefix(root)
+                    .unwrap_or(path)
+                    .display()
+                    .to_string();
+
+                hash_groups.entry(hash).or_default().push(CloneLocation {
+                    file: rel_path,
+                    symbol: sym.name.clone(),
+                    start_line: sym.start_line,
+                    end_line: sym.end_line,
+                });
+            }
+        }
+    }
+
+    // Filter to groups with 2+ instances (actual clones)
+    let mut clone_groups: Vec<CloneGroup> = hash_groups
+        .into_iter()
+        .filter(|(_, locs)| locs.len() >= 2)
+        .map(|(hash, locations)| {
+            let line_count = locations
+                .first()
+                .map(|l| l.end_line - l.start_line + 1)
+                .unwrap_or(0);
+            CloneGroup {
+                hash,
+                locations,
+                line_count,
+            }
+        })
+        .collect();
+
+    // Sort by line count (larger clones first), then by number of instances
+    clone_groups.sort_by(|a, b| {
+        b.line_count
+            .cmp(&a.line_count)
+            .then_with(|| b.locations.len().cmp(&a.locations.len()))
+    });
+
+    clone_groups
+}
+
+/// Allow a specific clone group by adding it to .moss/clone-allow
+fn cmd_allow_clone_group(
+    root: &Path,
+    location: &str,
+    reason: Option<&str>,
+    elide_identifiers: bool,
+    elide_literals: bool,
+    min_lines: usize,
+) -> i32 {
+    // Detect all clone groups
+    let all_groups = detect_clone_groups(root, elide_identifiers, elide_literals, min_lines);
+
+    // Find the group containing this location
+    let target_group = all_groups.iter().find(|g| {
+        g.locations.iter().any(|loc| {
+            let entry = format!("{}:{}", loc.file, loc.symbol);
+            entry == location
+        })
+    });
+
+    let group = match target_group {
+        Some(g) => g,
+        None => {
+            eprintln!("No clone group found containing: {}", location);
+            eprintln!("Run `moss analyze --clones` to see available groups.");
+            return 1;
+        }
+    };
+
+    // Load existing allowlist to check for overlap
+    let allowlist_path = root.join(".moss/clone-allow");
+    let existing_content = std::fs::read_to_string(&allowlist_path).unwrap_or_default();
+    let existing_lines: Vec<&str> = existing_content.lines().collect();
+
+    // Check if any entries from this group already exist
+    let mut has_existing = false;
+    let mut insert_after: Option<usize> = None;
+
+    for loc in &group.locations {
+        let entry = format!("{}:{}", loc.file, loc.symbol);
+        for (i, line) in existing_lines.iter().enumerate() {
+            if line.trim() == entry {
+                has_existing = true;
+                insert_after = Some(insert_after.map_or(i, |prev| prev.max(i)));
+            }
+        }
+    }
+
+    // Require reason for new groups
+    if !has_existing && reason.is_none() {
+        eprintln!("Reason required for new clone groups. Use --reason \"...\"");
+        return 1;
+    }
+
+    // Build entries to add
+    let mut to_add: Vec<String> = Vec::new();
+    for loc in &group.locations {
+        let entry = format!("{}:{}", loc.file, loc.symbol);
+        if !existing_lines.iter().any(|l| l.trim() == entry) {
+            to_add.push(entry);
+        }
+    }
+
+    if to_add.is_empty() {
+        println!("All entries from this group are already allowed.");
+        return 0;
+    }
+
+    // Build new content with smart insertion
+    let mut new_lines: Vec<String> = existing_lines.iter().map(|s| s.to_string()).collect();
+
+    if let Some(idx) = insert_after {
+        // Insert near existing entries from this group
+        let insert_pos = idx + 1;
+        for (i, entry) in to_add.iter().enumerate() {
+            new_lines.insert(insert_pos + i, entry.clone());
+        }
+    } else {
+        // Append at end with reason as comment
+        if !new_lines.is_empty() && !new_lines.last().map_or(true, |l| l.is_empty()) {
+            new_lines.push(String::new());
+        }
+        if let Some(r) = reason {
+            new_lines.push(format!("# {}", r));
+        }
+        for entry in &to_add {
+            new_lines.push(entry.clone());
+        }
+    }
+
+    // Write back
+    let new_content = new_lines.join("\n") + "\n";
+    if let Err(e) = std::fs::write(&allowlist_path, new_content) {
+        eprintln!("Failed to write .moss/clone-allow: {}", e);
+        return 1;
+    }
+
+    println!("Added {} entries to .moss/clone-allow:", to_add.len());
+    for entry in &to_add {
+        println!("  {}", entry);
+    }
+
+    0
+}
+
 /// Detect code clones - returns (exit_code, clone_group_count)
 fn cmd_clones_with_count(
     root: &Path,
@@ -2046,4 +2275,127 @@ fn is_literal_kind(kind: &str) -> bool {
         || kind == "nil"
         || kind == "null"
         || kind == "none"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_load_clone_allowlist_empty() {
+        let tmp = tempdir().unwrap();
+        let allowlist = load_clone_allowlist(tmp.path());
+        assert!(allowlist.is_empty());
+    }
+
+    #[test]
+    fn test_load_clone_allowlist_with_entries() {
+        let tmp = tempdir().unwrap();
+        let moss_dir = tmp.path().join(".moss");
+        fs::create_dir_all(&moss_dir).unwrap();
+        fs::write(
+            moss_dir.join("clone-allow"),
+            "# Comment\nsrc/foo.rs:bar\nsrc/baz.rs:qux\n",
+        )
+        .unwrap();
+
+        let allowlist = load_clone_allowlist(tmp.path());
+        assert_eq!(allowlist.len(), 2);
+        assert!(allowlist.contains("src/foo.rs:bar"));
+        assert!(allowlist.contains("src/baz.rs:qux"));
+    }
+
+    #[test]
+    fn test_load_clone_allowlist_ignores_comments() {
+        let tmp = tempdir().unwrap();
+        let moss_dir = tmp.path().join(".moss");
+        fs::create_dir_all(&moss_dir).unwrap();
+        fs::write(
+            moss_dir.join("clone-allow"),
+            "# This is a comment\n# Another comment\nsrc/foo.rs:bar\n",
+        )
+        .unwrap();
+
+        let allowlist = load_clone_allowlist(tmp.path());
+        assert_eq!(allowlist.len(), 1);
+        assert!(allowlist.contains("src/foo.rs:bar"));
+    }
+
+    /// Helper to check if a clone group is fully allowed
+    fn is_group_allowed(
+        locations: &[CloneLocation],
+        allowlist: &std::collections::HashSet<String>,
+    ) -> bool {
+        locations
+            .iter()
+            .all(|loc| allowlist.contains(&format!("{}:{}", loc.file, loc.symbol)))
+    }
+
+    #[test]
+    fn test_is_group_allowed_all_in_allowlist() {
+        let mut allowlist = std::collections::HashSet::new();
+        allowlist.insert("src/a.rs:foo".to_string());
+        allowlist.insert("src/b.rs:bar".to_string());
+
+        let locations = vec![
+            CloneLocation {
+                file: "src/a.rs".to_string(),
+                symbol: "foo".to_string(),
+                start_line: 1,
+                end_line: 5,
+            },
+            CloneLocation {
+                file: "src/b.rs".to_string(),
+                symbol: "bar".to_string(),
+                start_line: 10,
+                end_line: 15,
+            },
+        ];
+
+        assert!(is_group_allowed(&locations, &allowlist));
+    }
+
+    #[test]
+    fn test_is_group_allowed_partial_not_allowed() {
+        let mut allowlist = std::collections::HashSet::new();
+        allowlist.insert("src/a.rs:foo".to_string());
+
+        let locations = vec![
+            CloneLocation {
+                file: "src/a.rs".to_string(),
+                symbol: "foo".to_string(),
+                start_line: 1,
+                end_line: 5,
+            },
+            CloneLocation {
+                file: "src/b.rs".to_string(),
+                symbol: "bar".to_string(),
+                start_line: 10,
+                end_line: 15,
+            },
+        ];
+
+        assert!(!is_group_allowed(&locations, &allowlist));
+    }
+
+    #[test]
+    fn test_calculate_grade_perfect() {
+        // (score, weight) pairs - all 100%
+        let scores = [(100.0, 1.0), (100.0, 0.5), (100.0, 2.0), (100.0, 0.3)];
+        let (letter, percentage) = calculate_grade(&scores);
+        assert_eq!(letter, "A");
+        assert!((percentage - 100.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_calculate_grade_weights() {
+        // Security weight is 2.0, so a security issue hurts more than complexity
+        // 50% health (weight 1.0), 100% complexity (weight 0.5), 0% security (weight 2.0), 100% clones
+        let scores = [(50.0, 1.0), (100.0, 0.5), (0.0, 2.0), (100.0, 0.3)];
+        let (_, percentage) = calculate_grade(&scores);
+        // Expected: (50*1 + 100*0.5 + 0*2 + 100*0.3) / (1+0.5+2+0.3) = 130/3.8 ≈ 34.2%
+        assert!(percentage < 50.0); // Security weight should drag it down
+    }
 }

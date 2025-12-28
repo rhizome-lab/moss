@@ -14,10 +14,6 @@ crates/moss/src/deps.rs:new
 crates/moss/src/edit.rs:new
 crates/moss/src/skeleton.rs:new
 
-# Python stdlib lookup (similar but distinct)
-crates/moss-languages/src/python.rs:get_python_version
-crates/moss-languages/src/python.rs:find_python_stdlib
-
 # FFI bindings and tool registry (parallel registration patterns)
 crates/moss-languages/src/ffi.rs:bindings
 crates/moss-languages/src/ffi.rs:add_binding
@@ -30,6 +26,7 @@ crates/moss/src/commands/grep.rs:ignore_case
 crates/moss/src/commands/view.rs:line_numbers
 crates/moss/src/commands/view.rs:show_docs
 crates/moss/src/commands/analyze.rs:compact
+crates/moss/src/commands/analyze.rs:clones
 crates/moss/src/config.rs:enabled
 crates/moss/src/daemon.rs:enabled
 crates/moss/src/daemon.rs:auto_start
@@ -46,4 +43,7 @@ crates/moss-tools/src/tools.rs:warning_count
 crates/moss/src/commands/analyze.rs:health
 crates/moss/src/commands/analyze.rs:complexity
 crates/moss/src/commands/analyze.rs:security
-crates/moss/src/commands/analyze.rs:clones
+
+# Python stdlib lookup (similar but distinct)
+crates/moss-languages/src/python.rs:get_python_version
+crates/moss-languages/src/python.rs:find_python_stdlib
