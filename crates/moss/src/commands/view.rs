@@ -755,6 +755,10 @@ fn cmd_view_file(
         return 0;
     }
 
+    // Get grammar for syntax highlighting
+    let grammar =
+        moss_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+
     // Skeleton view
     let extractor = if include_private {
         skeleton::SkeletonExtractor::with_all()
@@ -780,7 +784,7 @@ fn cmd_view_file(
 
     if json {
         // Use ViewNode for consistent structured output
-        let view_node = skeleton_result.to_view_node();
+        let view_node = skeleton_result.to_view_node(grammar.as_deref());
         println!("{}", serde_json::to_string(&view_node).unwrap());
     } else {
         println!("# {}", file_path);
@@ -825,7 +829,7 @@ fn cmd_view_file(
         // Show symbols if depth >= 1 and not in deps-only mode (or context mode which shows both)
         if depth >= 1 && (!show_deps || context) {
             // Use ViewNode for consistent formatting
-            let view_node = skeleton_result.to_view_node();
+            let view_node = skeleton_result.to_view_node(grammar.as_deref());
             let format_options = FormatOptions {
                 docstrings: if context {
                     DocstringDisplay::None // Skip docstrings in context mode for brevity
@@ -885,7 +889,9 @@ fn cmd_view_file(
                             import_skeleton
                         };
 
-                        let view_node = import_skeleton.to_view_node();
+                        let import_grammar = moss_languages::support_for_path(&resolved_path)
+                            .map(|s| s.grammar_name().to_string());
+                        let view_node = import_skeleton.to_view_node(import_grammar.as_deref());
                         let format_options = FormatOptions {
                             docstrings: DocstringDisplay::None,
                             line_numbers: true,
@@ -917,7 +923,11 @@ fn cmd_view_file(
                                         reexp_skeleton
                                     };
 
-                                    let view_node = reexp_skeleton.to_view_node();
+                                    let reexp_grammar =
+                                        moss_languages::support_for_path(&reexp_path)
+                                            .map(|s| s.grammar_name().to_string());
+                                    let view_node =
+                                        reexp_skeleton.to_view_node(reexp_grammar.as_deref());
                                     let format_options = FormatOptions {
                                         docstrings: DocstringDisplay::None,
                                         line_numbers: true,
@@ -1069,6 +1079,10 @@ fn cmd_view_symbol(
         let extractor = skeleton::SkeletonExtractor::new();
         let skeleton_result = extractor.extract(&full_path, &content);
 
+        // Get grammar for syntax highlighting
+        let grammar =
+            moss_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+
         if let Some(sym) = find_symbol(&skeleton_result.symbols, symbol_name) {
             let full_symbol_path = format!("{}/{}", file_path, symbol_path.join("/"));
 
@@ -1102,7 +1116,7 @@ fn cmd_view_symbol(
             }
 
             // Default: show skeleton (signature + docstring + children)
-            let view_node = sym.to_view_node(&full_symbol_path);
+            let view_node = sym.to_view_node(&full_symbol_path, grammar.as_deref());
             if json {
                 // Use ViewNode for consistent structured output
                 println!("{}", serde_json::to_string(&view_node).unwrap());

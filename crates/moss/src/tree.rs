@@ -2,9 +2,11 @@
 //!
 //! Git-aware tree display using the `ignore` crate for gitignore support.
 
+use crate::parsers::Parsers;
 use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use ignore::WalkBuilder;
 use moss_languages::support_for_path;
+use nu_ansi_term::Color::{Cyan, Red};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
@@ -33,6 +35,9 @@ pub struct ViewNode {
     /// Line range in file (start, end)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub line_range: Option<(usize, usize)>,
+    /// Grammar name for syntax highlighting (e.g., "rust", "python")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grammar: Option<String>,
 }
 
 /// Type of node in the view tree.
@@ -57,12 +62,19 @@ impl ViewNode {
             signature: None,
             docstring: None,
             line_range: None,
+            grammar: None,
         }
     }
 
     /// Add multiple children.
     pub fn with_children(mut self, children: Vec<ViewNode>) -> Self {
         self.children = children;
+        self
+    }
+
+    /// Set grammar for syntax highlighting.
+    pub fn with_grammar(mut self, grammar: impl Into<String>) -> Self {
+        self.grammar = Some(grammar.into());
         self
     }
 }
@@ -187,9 +199,11 @@ fn format_node_line(node: &ViewNode, options: &FormatOptions) -> String {
     let base = match &node.kind {
         ViewNodeKind::Symbol(_) => {
             if let Some(sig) = &node.signature {
-                // Minimal: elide keywords; Pretty: keep them (highlighting TODO: use AST)
+                // Minimal: elide keywords; Pretty: highlight with AST
                 let sig_display = if options.minimal {
                     elide_keywords(sig)
+                } else if let Some(grammar) = &node.grammar {
+                    highlight_signature_ast(sig, grammar)
                 } else {
                     sig.clone()
                 };
@@ -247,6 +261,129 @@ fn elide_keywords(sig: &str) -> String {
     s
 }
 
+/// A span of text with highlight information.
+struct HighlightSpan {
+    start: usize,
+    end: usize,
+    kind: HighlightKind,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum HighlightKind {
+    Keyword,
+    Type,
+    Default,
+}
+
+/// Highlight a signature using AST-based parsing.
+fn highlight_signature_ast(sig: &str, grammar: &str) -> String {
+    let parsers = Parsers::new();
+    let tree = match parsers.parse_with_grammar(grammar, sig) {
+        Some(t) => t,
+        None => return sig.to_string(), // Fallback to unhighlighted
+    };
+
+    let mut spans: Vec<HighlightSpan> = Vec::new();
+    collect_highlight_spans(tree.root_node(), sig.as_bytes(), &mut spans);
+
+    // Sort spans by start position
+    spans.sort_by_key(|s| s.start);
+
+    // Remove overlapping spans - keep the first one encountered
+    let mut filtered: Vec<HighlightSpan> = Vec::new();
+    for span in spans {
+        let overlaps = filtered
+            .iter()
+            .any(|existing| span.start < existing.end && span.end > existing.start);
+        if !overlaps {
+            filtered.push(span);
+        }
+    }
+
+    // Build highlighted string
+    let mut result = String::new();
+    let mut pos = 0;
+
+    for span in filtered {
+        // Skip if we've passed this span already
+        if span.start < pos {
+            continue;
+        }
+
+        // Add unhighlighted text before this span
+        if span.start > pos {
+            result.push_str(&sig[pos..span.start]);
+        }
+
+        // Add highlighted span (Monokai-inspired colors)
+        let text = &sig[span.start..span.end];
+        let styled = match span.kind {
+            HighlightKind::Keyword => Red.paint(text).to_string(), // Red/pink for keywords
+            HighlightKind::Type => Cyan.paint(text).to_string(),   // Cyan for types
+            HighlightKind::Default => text.to_string(),
+        };
+        result.push_str(&styled);
+        pos = span.end;
+    }
+
+    // Add remaining text
+    if pos < sig.len() {
+        result.push_str(&sig[pos..]);
+    }
+
+    result
+}
+
+/// Collect highlight spans from AST nodes.
+fn collect_highlight_spans(
+    node: tree_sitter::Node,
+    _source: &[u8],
+    spans: &mut Vec<HighlightSpan>,
+) {
+    let kind = node.kind();
+
+    // Check for keywords and types based on node kind
+    let highlight = classify_node_kind(kind);
+
+    // Only highlight leaf nodes (no children) to avoid duplication
+    // This means keywords and simple type identifiers get highlighted,
+    // but complex types like `Vec<String>` highlight `Vec` and `String` separately
+    if highlight != HighlightKind::Default && node.child_count() == 0 {
+        spans.push(HighlightSpan {
+            start: node.start_byte(),
+            end: node.end_byte(),
+            kind: highlight,
+        });
+    }
+
+    // Recurse into children
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_highlight_spans(child, _source, spans);
+    }
+}
+
+/// Classify a node kind into a highlight category.
+fn classify_node_kind(kind: &str) -> HighlightKind {
+    match kind {
+        // Types (check first - more specific)
+        "type_identifier"
+        | "primitive_type"
+        | "generic_type"
+        | "scoped_type_identifier"
+        | "builtin_type" => HighlightKind::Type,
+
+        // Keywords
+        "fn" | "function" | "def" | "async" | "await" | "pub" | "struct" | "enum" | "trait"
+        | "impl" | "type" | "const" | "static" | "let" | "mut" | "ref" | "class" | "interface"
+        | "extends" | "implements" | "import" | "from" | "export" | "return" | "if" | "else"
+        | "for" | "while" | "loop" | "match" | "where" | "self" | "Self" | "super" | "crate"
+        | "mod" | "use" | "as" | "in" | "unsafe" | "extern" | "dyn" => HighlightKind::Keyword,
+
+        _ => HighlightKind::Default,
+    }
+}
+
 /// Check if a docstring is useless (just repeats the name).
 fn is_useless_docstring(name: &str, doc_line: &str) -> bool {
     let doc_lower = doc_line.to_lowercase();
@@ -302,9 +439,6 @@ fn format_children(
         // Recurse into children
         if !child.children.is_empty() {
             format_children(&child.children, &child_prefix, lines, options, depth + 1);
-        } else if matches!(&child.kind, ViewNodeKind::Symbol(_)) {
-            // Symbols without children get "..." placeholder
-            lines.push(format!("{}    ...", child_prefix));
         }
     }
 }
@@ -517,13 +651,15 @@ fn tree_node_to_view_node(
         signature: None,
         docstring: None,
         line_range: None,
+        grammar: None,
     }
 }
 
 /// Extract symbols from a file and convert to ViewNodes.
 fn extract_file_symbols(file_path: &Path, view_path: &str) -> Option<Vec<ViewNode>> {
     // Check if file has language support
-    let _support = support_for_path(file_path)?;
+    let support = support_for_path(file_path)?;
+    let grammar = support.grammar_name().to_string();
 
     // Read file content
     let content = std::fs::read_to_string(file_path).ok()?;
@@ -540,20 +676,20 @@ fn extract_file_symbols(file_path: &Path, view_path: &str) -> Option<Vec<ViewNod
     let children: Vec<ViewNode> = result
         .symbols
         .iter()
-        .map(|sym| skeleton_to_view_node(sym, view_path))
+        .map(|sym| skeleton_to_view_node(sym, view_path, &grammar))
         .collect();
 
     Some(children)
 }
 
 /// Convert a SkeletonSymbol to a ViewNode.
-fn skeleton_to_view_node(sym: &SkeletonSymbol, parent_path: &str) -> ViewNode {
+fn skeleton_to_view_node(sym: &SkeletonSymbol, parent_path: &str, grammar: &str) -> ViewNode {
     let path = format!("{}/{}", parent_path, sym.name);
 
     let children: Vec<ViewNode> = sym
         .children
         .iter()
-        .map(|child| skeleton_to_view_node(child, &path))
+        .map(|child| skeleton_to_view_node(child, &path, grammar))
         .collect();
 
     ViewNode {
@@ -564,6 +700,7 @@ fn skeleton_to_view_node(sym: &SkeletonSymbol, parent_path: &str) -> ViewNode {
         signature: Some(sym.signature.clone()),
         docstring: sym.docstring.clone(),
         line_range: Some((sym.start_line, sym.end_line)),
+        grammar: Some(grammar.to_string()),
     }
 }
 

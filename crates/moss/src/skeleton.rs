@@ -22,7 +22,7 @@ pub struct SkeletonSymbol {
 
 impl SkeletonSymbol {
     /// Convert to a ViewNode for unified viewing.
-    pub fn to_view_node(&self, parent_path: &str) -> ViewNode {
+    pub fn to_view_node(&self, parent_path: &str, grammar: Option<&str>) -> ViewNode {
         let path = if parent_path.is_empty() {
             self.name.clone()
         } else {
@@ -32,7 +32,7 @@ impl SkeletonSymbol {
         let children: Vec<ViewNode> = self
             .children
             .iter()
-            .map(|c| c.to_view_node(&path))
+            .map(|c| c.to_view_node(&path, grammar))
             .collect();
 
         ViewNode {
@@ -43,6 +43,7 @@ impl SkeletonSymbol {
             signature: Some(self.signature.clone()),
             docstring: self.docstring.clone(),
             line_range: Some((self.start_line, self.end_line)),
+            grammar: grammar.map(String::from),
         }
     }
 }
@@ -55,7 +56,7 @@ pub struct SkeletonResult {
 
 impl SkeletonResult {
     /// Convert to a ViewNode with file as root and symbols as children.
-    pub fn to_view_node(&self) -> ViewNode {
+    pub fn to_view_node(&self, grammar: Option<&str>) -> ViewNode {
         let file_name = Path::new(&self.file_path)
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -64,7 +65,7 @@ impl SkeletonResult {
         let children: Vec<ViewNode> = self
             .symbols
             .iter()
-            .map(|s| s.to_view_node(&file_name))
+            .map(|s| s.to_view_node(&file_name, grammar))
             .collect();
 
         ViewNode::file(&file_name, &self.file_path).with_children(children)
@@ -261,7 +262,7 @@ def greet(name: str) -> str:
     return f"Hello, {name}"
 "#;
         let result = extractor.extract(&PathBuf::from("test.py"), content);
-        let view_node = result.to_view_node();
+        let view_node = result.to_view_node(Some("python"));
 
         assert_eq!(view_node.name, "test.py");
         assert!(view_node.children.len() >= 1);
