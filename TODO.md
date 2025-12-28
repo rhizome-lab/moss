@@ -7,9 +7,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 Test Status: 110 passing, 0 failing (moss-languages)
 
 **Analyze enhancements:**
-- `--all` / `--full` flag to run all passes including clones
-- Weighted scoring: different passes contribute to final grade (security weight > clones weight)
-- Output: letter grade (A/B/C/D/F) or percentage based on weighted pass results
+- [x] `--all` flag to run all passes including clones
+- [x] Weighted scoring via `[analyze.weights]` config
+- [x] Letter grade output (A-F) with percentage
 
 ## Remaining Work
 
