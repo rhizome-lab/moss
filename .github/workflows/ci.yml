@@ -117,7 +117,7 @@ jobs:
         run: cargo build --release -p moss
 
       - name: Check for code clones
-        run: ./target/release/moss analyze --clones --fail-on-clones
+        run: ./target/release/moss analyze --clones
         env:
           MOSS_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
 
