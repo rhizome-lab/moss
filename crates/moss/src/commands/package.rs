@@ -1,6 +1,5 @@
 //! Package registry queries.
 
-use crate::config::MossConfig;
 use crate::output::OutputFormat;
 use clap::Subcommand;
 use moss_packages::{
@@ -36,21 +35,16 @@ pub fn cmd_package(
     action: PackageAction,
     ecosystem: Option<&str>,
     root: Option<&Path>,
-    format: &OutputFormat,
-    pretty: bool,
+    format: OutputFormat,
 ) -> i32 {
     let project_root = root.unwrap_or(Path::new("."));
-
-    // Load config for pretty mode
-    let config = MossConfig::load(project_root);
-    let use_pretty = pretty || config.pretty.enabled();
-    let use_colors = use_pretty && config.pretty.use_colors();
+    let use_colors = format.use_colors();
 
     // Get ecosystem either by name or by detection
     if let Some(name) = ecosystem {
         // Explicit ecosystem specified
         match find_ecosystem_by_name(name) {
-            Some(eco) => run_for_ecosystem(eco, &action, project_root, format, use_colors),
+            Some(eco) => run_for_ecosystem(eco, &action, project_root, &format, use_colors),
             None => {
                 eprintln!("error: unknown ecosystem '{}'", name);
                 eprintln!("available: {}", available_ecosystems().join(", "));
@@ -73,7 +67,7 @@ pub fn cmd_package(
             PackageAction::List | PackageAction::Tree => {
                 if format.is_json() && ecosystems.len() > 1 {
                     // Collect all results into a JSON array
-                    run_all_ecosystems_json(&ecosystems, &action, project_root, format)
+                    run_all_ecosystems_json(&ecosystems, &action, project_root, &format)
                 } else {
                     let mut exit_code = 0;
                     for (i, eco) in ecosystems.iter().enumerate() {
@@ -81,7 +75,7 @@ pub fn cmd_package(
                             println!(); // Separator between ecosystems
                         }
                         let result =
-                            run_for_ecosystem(*eco, &action, project_root, format, use_colors);
+                            run_for_ecosystem(*eco, &action, project_root, &format, use_colors);
                         if result != 0 {
                             exit_code = result;
                         }
@@ -95,7 +89,7 @@ pub fn cmd_package(
                     eprintln!("note: multiple ecosystems detected: {}", names.join(", "));
                     eprintln!("hint: use --ecosystem to specify which one");
                 }
-                run_for_ecosystem(ecosystems[0], &action, project_root, format, use_colors)
+                run_for_ecosystem(ecosystems[0], &action, project_root, &format, use_colors)
             }
         }
     }
@@ -601,7 +595,9 @@ fn available_ecosystems() -> Vec<&'static str> {
 /// Print a JSON value, applying jq filter if specified.
 fn print_json_value(value: &serde_json::Value, format: &OutputFormat) {
     match format {
-        OutputFormat::Text => unreachable!("print_json_value called with Text format"),
+        OutputFormat::Compact | OutputFormat::Pretty { .. } => {
+            unreachable!("print_json_value called with non-JSON format")
+        }
         OutputFormat::Json => println!("{}", value),
         OutputFormat::Jq(filter) => match crate::output::apply_jq(value, filter) {
             Ok(results) => {
@@ -619,7 +615,7 @@ fn print_json_value(value: &serde_json::Value, format: &OutputFormat) {
 /// Print package info in the specified format.
 fn print_package_info(info: &PackageInfo, ecosystem: &str, format: &OutputFormat) {
     match format {
-        OutputFormat::Text => print_human(info, ecosystem),
+        OutputFormat::Compact | OutputFormat::Pretty { .. } => print_human(info, ecosystem),
         OutputFormat::Json | OutputFormat::Jq(_) => {
             let value = serde_json::to_value(info).unwrap_or_default();
             print_json_value(&value, format);

@@ -58,25 +58,19 @@ pub struct GrepArgs {
 }
 
 /// Run grep command with args.
-pub fn run(args: GrepArgs, json: bool, jq: Option<&str>, pretty: bool) -> i32 {
+pub fn run(args: GrepArgs, format: crate::output::OutputFormat) -> i32 {
     let effective_root = args
         .root
         .clone()
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = MossConfig::load(&effective_root);
 
-    // --pretty flag forces pretty mode, otherwise use config (auto TTY detection)
-    let use_pretty = pretty || config.pretty.enabled();
-    let use_colors = use_pretty && config.pretty.use_colors();
-
     cmd_grep(
         &args.pattern,
         args.root.as_deref(),
         args.limit.unwrap_or_else(|| config.grep.limit()),
         args.ignore_case || config.grep.ignore_case(),
-        json,
-        jq,
-        use_colors,
+        &format,
         &args.exclude,
         &args.only,
     )
@@ -88,9 +82,7 @@ pub fn cmd_grep(
     root: Option<&Path>,
     limit: usize,
     ignore_case: bool,
-    json: bool,
-    jq: Option<&str>,
-    use_colors: bool,
+    format: &OutputFormat,
     exclude: &[String],
     only: &[String],
 ) -> i32 {
@@ -122,18 +114,11 @@ pub fn cmd_grep(
 
     match grep::grep(pattern, &root, filter.as_ref(), limit, ignore_case) {
         Ok(result) => {
-            let format = OutputFormat::from_flags(json, jq);
             if result.matches.is_empty() && !format.is_json() {
                 eprintln!("No matches found for: {}", pattern);
                 return 1;
             }
-            if format.is_json() {
-                result.print(&format);
-            } else if use_colors {
-                println!("{}", result.format_pretty());
-            } else {
-                println!("{}", result.format_text());
-            }
+            result.print(format);
             0
         }
         Err(e) => {

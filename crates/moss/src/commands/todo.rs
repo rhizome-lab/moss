@@ -764,32 +764,34 @@ fn display_sections(
                     item.text.clone()
                 };
 
-                if item.done {
-                    // Done: green background with checkmark
-                    let marker = if use_colors {
-                        Style::new()
+                if use_colors {
+                    // Pretty mode: use background colors
+                    if item.done {
+                        // Done: green background with checkmark
+                        let marker = Style::new()
                             .on(nu_ansi_term::Color::Green)
                             .fg(nu_ansi_term::Color::Black)
                             .paint(" ✓ ")
-                            .to_string()
-                    } else {
-                        "[x]".to_string()
-                    };
-                    println!("{} {}", marker, text_display);
-                } else if has_original_marker {
-                    // Pending with checkbox: green background empty
-                    let marker = if use_colors {
-                        Style::new()
+                            .to_string();
+                        println!("{} {}", marker, text_display);
+                    } else if has_original_marker {
+                        // Pending with checkbox: green background empty
+                        let marker = Style::new()
                             .on(nu_ansi_term::Color::Green)
                             .paint("   ")
-                            .to_string()
+                            .to_string();
+                        println!("{} {}", marker, text_display);
                     } else {
-                        "[ ]".to_string()
-                    };
-                    println!("{} {}", marker, text_display);
+                        // Unmarked: blank space for alignment
+                        println!("    {}", text_display);
+                    }
                 } else {
-                    // Unmarked: blank space for alignment
-                    println!("    {}", text_display);
+                    // Compact mode: markdown-like format
+                    if item.done {
+                        println!("- [x] {}", text_display);
+                    } else {
+                        println!("- {}", text_display);
+                    }
                 }
             }
 
@@ -924,16 +926,13 @@ fn find_todo_file(root: &Path) -> Option<std::path::PathBuf> {
 pub fn cmd_todo(
     action: Option<TodoAction>,
     file: Option<&Path>,
-    json: bool,
-    pretty: bool,
+    format: crate::output::OutputFormat,
     root: &Path,
 ) -> i32 {
     // Load config
     let config = MossConfig::load(root);
-
-    // --pretty flag forces pretty mode, otherwise use config (auto TTY detection)
-    let use_pretty = pretty || config.pretty.enabled();
-    let use_colors = use_pretty && config.pretty.use_colors();
+    let use_colors = format.use_colors();
+    let json = format.is_json();
     let todo_config = &config.todo;
 
     // Determine the todo file path

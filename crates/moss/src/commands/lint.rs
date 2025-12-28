@@ -1,6 +1,5 @@
 //! Lint command - run linters, formatters, and type checkers.
 
-use crate::config::MossConfig;
 use crate::output::{OutputFormat, OutputFormatter};
 use moss_tools::{registry_with_custom, SarifReport, ToolCategory, ToolRegistry};
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
@@ -58,15 +57,11 @@ pub fn cmd_lint_run(
     tools: Option<&str>,
     category: Option<&str>,
     sarif: bool,
-    json: bool,
-    pretty: bool,
+    format: crate::output::OutputFormat,
 ) -> i32 {
     let root = root.unwrap_or_else(|| Path::new("."));
-
-    // Load config for pretty mode
-    let config = MossConfig::load(root);
-    let use_pretty = pretty || config.pretty.enabled();
-    let use_colors = use_pretty && config.pretty.use_colors();
+    let use_colors = format.use_colors();
+    let json = format.is_json();
     // Load built-in tools + custom tools from .moss/tools.toml
     let registry = registry_with_custom(root);
 
@@ -265,7 +260,7 @@ pub fn cmd_lint_run(
 }
 
 /// List available linting tools.
-pub fn cmd_lint_list(root: Option<&Path>, json: bool, jq: Option<&str>) -> i32 {
+pub fn cmd_lint_list(root: Option<&Path>, format: &OutputFormat) -> i32 {
     let root = root.unwrap_or_else(|| Path::new("."));
     let registry = registry_with_custom(root);
 
@@ -290,8 +285,7 @@ pub fn cmd_lint_list(root: Option<&Path>, json: bool, jq: Option<&str>) -> i32 {
         .collect();
 
     let result = LintListResult { tools };
-    let format = OutputFormat::from_flags(json, jq);
-    result.print(&format);
+    result.print(format);
 
     0
 }

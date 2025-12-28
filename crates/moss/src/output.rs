@@ -74,38 +74,14 @@ impl PrettyConfig {
     }
 }
 
-/// Output display mode (affects text formatting style).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum OutputMode {
-    /// LLM-optimized: minimal decoration, dense but scannable.
-    #[default]
-    Minimal,
-    /// Human-friendly: colors, aligned columns, box-drawing.
-    Pretty,
-}
-
-impl OutputMode {
-    /// Create from CLI flag.
-    pub fn from_flag(pretty: bool) -> Self {
-        if pretty {
-            OutputMode::Pretty
-        } else {
-            OutputMode::Minimal
-        }
-    }
-
-    /// Is this pretty mode?
-    pub fn is_pretty(&self) -> bool {
-        matches!(self, OutputMode::Pretty)
-    }
-}
-
-/// Output format mode.
+/// Output format and display mode.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum OutputFormat {
-    /// Human-readable text output (default).
+    /// Compact text output (LLM-optimized, no colors).
     #[default]
-    Text,
+    Compact,
+    /// Pretty text output (human-friendly, with colors if available).
+    Pretty { colors: bool },
     /// JSON output.
     Json,
     /// JSON filtered through jq expression.
@@ -113,18 +89,51 @@ pub enum OutputFormat {
 }
 
 impl OutputFormat {
-    /// Create from common CLI flags.
-    pub fn from_flags(json: bool, jq: Option<&str>) -> Self {
-        match (json, jq) {
-            (_, Some(filter)) => OutputFormat::Jq(filter.to_string()),
-            (true, None) => OutputFormat::Json,
-            (false, None) => OutputFormat::Text,
+    /// Create from CLI flags and config (fully resolved).
+    pub fn from_cli(
+        json: bool,
+        jq: Option<&str>,
+        pretty: bool,
+        compact: bool,
+        config: &PrettyConfig,
+    ) -> Self {
+        // JSON modes take precedence
+        if let Some(filter) = jq {
+            return OutputFormat::Jq(filter.to_string());
+        }
+        if json {
+            return OutputFormat::Json;
+        }
+
+        // Determine text mode
+        let is_pretty = if compact {
+            false
+        } else {
+            pretty || config.enabled()
+        };
+
+        if is_pretty {
+            OutputFormat::Pretty {
+                colors: config.use_colors(),
+            }
+        } else {
+            OutputFormat::Compact
         }
     }
 
     /// Is this a JSON-based format?
     pub fn is_json(&self) -> bool {
         matches!(self, OutputFormat::Json | OutputFormat::Jq(_))
+    }
+
+    /// Is this pretty mode?
+    pub fn is_pretty(&self) -> bool {
+        matches!(self, OutputFormat::Pretty { .. })
+    }
+
+    /// Are colors enabled?
+    pub fn use_colors(&self) -> bool {
+        matches!(self, OutputFormat::Pretty { colors: true })
     }
 }
 
@@ -145,7 +154,8 @@ pub trait OutputFormatter: Serialize {
     /// Print to stdout in the specified format.
     fn print(&self, format: &OutputFormat) {
         match format {
-            OutputFormat::Text => println!("{}", self.format_text()),
+            OutputFormat::Compact => println!("{}", self.format_text()),
+            OutputFormat::Pretty { .. } => println!("{}", self.format_pretty()),
             OutputFormat::Json => {
                 println!("{}", serde_json::to_string(self).unwrap_or_default())
             }
@@ -221,15 +231,24 @@ mod tests {
     }
 
     #[test]
-    fn test_output_format_from_flags() {
-        assert_eq!(OutputFormat::from_flags(false, None), OutputFormat::Text);
-        assert_eq!(OutputFormat::from_flags(true, None), OutputFormat::Json);
+    fn test_output_format_from_cli() {
+        let config = PrettyConfig::default();
+        // compact=true overrides auto
         assert_eq!(
-            OutputFormat::from_flags(false, Some(".name")),
-            OutputFormat::Jq(".name".to_string())
+            OutputFormat::from_cli(false, None, false, true, &config),
+            OutputFormat::Compact
         );
         assert_eq!(
-            OutputFormat::from_flags(true, Some(".name")),
+            OutputFormat::from_cli(true, None, false, false, &config),
+            OutputFormat::Json
+        );
+        assert_eq!(
+            OutputFormat::from_cli(false, Some(".name"), false, false, &config),
+            OutputFormat::Jq(".name".to_string())
+        );
+        // jq takes precedence over json
+        assert_eq!(
+            OutputFormat::from_cli(true, Some(".name"), false, false, &config),
             OutputFormat::Jq(".name".to_string())
         );
     }

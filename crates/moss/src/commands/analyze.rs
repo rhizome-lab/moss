@@ -206,15 +206,12 @@ pub struct AnalyzeArgs {
 }
 
 /// Run analyze command with args.
-pub fn run(args: AnalyzeArgs, json: bool, pretty: bool) -> i32 {
+pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
     let effective_root = args
         .root
         .clone()
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = MossConfig::load(&effective_root);
-
-    // --pretty flag forces pretty mode, otherwise use config (auto TTY detection)
-    let use_pretty = pretty || config.pretty.enabled();
 
     // Handle --allow-group mode
     if let Some(ref location) = args.allow_group {
@@ -283,8 +280,8 @@ pub fn run(args: AnalyzeArgs, json: bool, pretty: bool) -> i32 {
         args.show_source,
         args.min_lines,
         &weights,
-        json,
-        use_pretty,
+        format.is_json(),
+        format.is_pretty(),
         &args.exclude,
         &args.only,
     )

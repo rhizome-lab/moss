@@ -105,17 +105,12 @@ pub struct ViewArgs {
 }
 
 /// Run view command with args.
-pub fn run(args: ViewArgs, json: bool, pretty: bool) -> i32 {
+pub fn run(args: ViewArgs, format: crate::output::OutputFormat) -> i32 {
     let effective_root = args
         .root
         .clone()
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = MossConfig::load(&effective_root);
-
-    // --pretty flag forces pretty mode, otherwise use config (auto TTY detection)
-    let use_pretty = pretty || config.pretty.enabled();
-    // Colors only when pretty mode is enabled and config allows
-    let use_colors = use_pretty && config.pretty.use_colors();
 
     cmd_view(
         args.target.as_deref(),
@@ -132,9 +127,9 @@ pub fn run(args: ViewArgs, json: bool, pretty: bool) -> i32 {
         args.full,
         args.docs || config.view.show_docs(),
         args.context,
-        json,
-        use_pretty,
-        use_colors,
+        format.is_json(),
+        format.is_pretty(),
+        format.use_colors(),
         &args.exclude,
         &args.only,
     )

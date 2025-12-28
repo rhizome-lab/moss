@@ -23,8 +23,12 @@ struct Cli {
     jq: Option<String>,
 
     /// Human-friendly output with colors and formatting
-    #[arg(long, global = true)]
+    #[arg(long, global = true, conflicts_with = "compact")]
     pretty: bool,
+
+    /// Compact output without colors (overrides TTY detection)
+    #[arg(long, global = true, conflicts_with = "pretty")]
+    compact: bool,
 }
 
 #[derive(Subcommand)]
@@ -368,8 +372,18 @@ fn main() {
     reset_sigpipe();
     let cli = Cli::parse();
 
+    // Resolve output format at top level - pretty config is TTY-based, not root-specific
+    let config = moss::config::MossConfig::load(Path::new("."));
+    let format = moss::output::OutputFormat::from_cli(
+        cli.json,
+        cli.jq.as_deref(),
+        cli.pretty,
+        cli.compact,
+        &config.pretty,
+    );
+
     let exit_code = match cli.command {
-        Commands::View(args) => commands::view::run(args, cli.json, cli.pretty),
+        Commands::View(args) => commands::view::run(args, format),
         Commands::Edit {
             target,
             root,
@@ -423,11 +437,11 @@ fn main() {
         }
         Commands::Update { check } => commands::update::cmd_update(check, cli.json),
         Commands::Grammars { action } => commands::grammars::cmd_grammars(action, cli.json),
-        Commands::Analyze(args) => commands::analyze::run(args, cli.json, cli.pretty),
+        Commands::Analyze(args) => commands::analyze::run(args, format),
         Commands::Filter { action, root } => {
             commands::filter::cmd_filter(action, root.as_deref(), cli.json)
         }
-        Commands::Grep(args) => commands::grep::run(args, cli.json, cli.jq.as_deref(), cli.pretty),
+        Commands::Grep(args) => commands::grep::run(args, format),
         Commands::Sessions {
             session,
             project,
@@ -454,22 +468,13 @@ fn main() {
         }
         Commands::Todo { action, file, root } => {
             let root = root.as_deref().unwrap_or(Path::new("."));
-            commands::todo::cmd_todo(action, file.as_deref(), cli.json, cli.pretty, root)
+            commands::todo::cmd_todo(action, file.as_deref(), format, root)
         }
         Commands::Package {
             action,
             ecosystem,
             root,
-        } => {
-            let format = moss::output::OutputFormat::from_flags(cli.json, cli.jq.as_deref());
-            commands::package::cmd_package(
-                action,
-                ecosystem.as_deref(),
-                root.as_deref(),
-                &format,
-                cli.pretty,
-            )
-        }
+        } => commands::package::cmd_package(action, ecosystem.as_deref(), root.as_deref(), format),
         Commands::Workflow { action, root } => {
             commands::workflow::cmd_workflow(action, root.as_deref(), cli.json)
         }
@@ -508,14 +513,11 @@ fn main() {
                             tools.as_deref(),
                             category.as_deref(),
                             sarif,
-                            cli.json,
-                            cli.pretty,
+                            format,
                         )
                     }
                 }
-                LintAction::List => {
-                    commands::lint::cmd_lint_list(root.as_deref(), cli.json, cli.jq.as_deref())
-                }
+                LintAction::List => commands::lint::cmd_lint_list(root.as_deref(), &format),
             }
         }
         Commands::Serve { protocol, root } => match protocol {

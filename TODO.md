@@ -50,6 +50,11 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Consider streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)
 
+**Performance:**
+- Debug view command performance: `./target/release/moss view output.rs/OutputFormat` is slower than expected
+  - Profile with `hyperfine`, `perf`, or `--timings`
+  - Likely candidates: tree-sitter parsing, symbol resolution, redundant file reads
+
 **Code Quality:**
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
