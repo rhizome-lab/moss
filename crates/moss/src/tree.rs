@@ -6,7 +6,7 @@ use crate::parsers::Parsers;
 use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use ignore::WalkBuilder;
 use moss_languages::support_for_path;
-use nu_ansi_term::Color::{LightCyan, LightGreen, Red, White as LightGray, Yellow};
+use nu_ansi_term::Color::{LightCyan, LightGreen, LightMagenta, Red, White as LightGray, Yellow};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
@@ -276,6 +276,7 @@ enum HighlightKind {
     Type,
     Comment,
     String,
+    Attribute,
     FunctionName,
     Default,
 }
@@ -332,6 +333,7 @@ pub fn highlight_source(sig: &str, grammar: &str, use_colors: bool) -> String {
             HighlightKind::Type => LightCyan.paint(text).to_string(), // Light cyan for types
             HighlightKind::Comment => LightGray.paint(text).to_string(), // Grey for comments
             HighlightKind::String => LightGreen.paint(text).to_string(), // Light green for strings
+            HighlightKind::Attribute => LightMagenta.paint(text).to_string(), // Magenta for attributes
             HighlightKind::FunctionName => Yellow.paint(text).to_string(), // Yellow for functions
             HighlightKind::Default => text.to_string(),
         };
@@ -352,8 +354,11 @@ fn collect_highlight_spans(node: tree_sitter::Node, spans: &mut Vec<HighlightSpa
     let kind = node.kind();
     let highlight = classify_node_kind(kind);
 
-    // Comments and strings: highlight entire node (don't recurse into children)
-    if highlight == HighlightKind::Comment || highlight == HighlightKind::String {
+    // Comments, strings, attributes: highlight entire node (don't recurse into children)
+    if matches!(
+        highlight,
+        HighlightKind::Comment | HighlightKind::String | HighlightKind::Attribute
+    ) {
         spans.push(HighlightSpan {
             start: node.start_byte(),
             end: node.end_byte(),
@@ -392,6 +397,9 @@ fn classify_node_kind(kind: &str) -> HighlightKind {
         | "line_inner_doc_comment"
         | "block_outer_doc_comment"
         | "block_inner_doc_comment" => HighlightKind::Comment,
+
+        // Attributes / proc macros (#[derive(...)], @decorator, etc.)
+        "attribute_item" | "inner_attribute_item" | "decorator" => HighlightKind::Attribute,
 
         // Strings (including template/interpolated strings)
         "string_literal"
