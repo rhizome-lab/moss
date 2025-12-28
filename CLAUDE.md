@@ -39,7 +39,7 @@ moss analyze [--complexity] [path]          # find complex functions
 moss grep <pattern> [--only "*.rs"]         # search with context
 ```
 
-Fall back to Read only for exact line content needed by Edit. If moss isn't useful, fix moss.
+Fall back to Read only for exact line content needed by Edit. If moss isn't useful, add to TODO.md and fix it.
 
 ## Negative Constraints
 
@@ -155,7 +155,3 @@ Session handoffs: Add "Next Up" section to TODO.md with 3-5 tasks. Goal is to co
 
 Commit consistently. Each commit = one logical change.
 Move completed TODOs to CHANGELOG.md.
-
-### Code Quality
-
-`cargo clippy`, `cargo fmt --check`, `cargo test` before committing.
