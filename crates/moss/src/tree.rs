@@ -6,7 +6,7 @@ use crate::parsers::Parsers;
 use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use ignore::WalkBuilder;
 use moss_languages::support_for_path;
-use nu_ansi_term::Color::{LightCyan, Red};
+use nu_ansi_term::Color::{LightCyan, LightGreen, Red, White as LightGray, Yellow};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
@@ -205,7 +205,7 @@ fn format_node_line(node: &ViewNode, options: &FormatOptions) -> String {
                 let sig_display = if options.minimal {
                     elide_keywords(sig)
                 } else if let Some(grammar) = &node.grammar {
-                    highlight_signature_ast(sig, grammar, options.use_colors)
+                    highlight_source(sig, grammar, options.use_colors)
                 } else {
                     sig.clone()
                 };
@@ -274,11 +274,14 @@ struct HighlightSpan {
 enum HighlightKind {
     Keyword,
     Type,
+    Comment,
+    String,
+    FunctionName,
     Default,
 }
 
-/// Highlight a signature using AST-based parsing.
-fn highlight_signature_ast(sig: &str, grammar: &str, use_colors: bool) -> String {
+/// Highlight source code using AST-based syntax highlighting.
+pub fn highlight_source(sig: &str, grammar: &str, use_colors: bool) -> String {
     // If colors disabled, just return the signature as-is
     if !use_colors {
         return sig.to_string();
@@ -291,7 +294,7 @@ fn highlight_signature_ast(sig: &str, grammar: &str, use_colors: bool) -> String
     };
 
     let mut spans: Vec<HighlightSpan> = Vec::new();
-    collect_highlight_spans(tree.root_node(), sig.as_bytes(), &mut spans);
+    collect_highlight_spans(tree.root_node(), &mut spans);
 
     // Sort spans by start position
     spans.sort_by_key(|s| s.start);
@@ -327,6 +330,9 @@ fn highlight_signature_ast(sig: &str, grammar: &str, use_colors: bool) -> String
         let styled = match span.kind {
             HighlightKind::Keyword => Red.paint(text).to_string(), // Red/pink for keywords
             HighlightKind::Type => LightCyan.paint(text).to_string(), // Light cyan for types
+            HighlightKind::Comment => LightGray.paint(text).to_string(), // Grey for comments
+            HighlightKind::String => LightGreen.paint(text).to_string(), // Light green for strings
+            HighlightKind::FunctionName => Yellow.paint(text).to_string(), // Yellow for functions
             HighlightKind::Default => text.to_string(),
         };
         result.push_str(&styled);
@@ -342,15 +348,19 @@ fn highlight_signature_ast(sig: &str, grammar: &str, use_colors: bool) -> String
 }
 
 /// Collect highlight spans from AST nodes.
-fn collect_highlight_spans(
-    node: tree_sitter::Node,
-    _source: &[u8],
-    spans: &mut Vec<HighlightSpan>,
-) {
+fn collect_highlight_spans(node: tree_sitter::Node, spans: &mut Vec<HighlightSpan>) {
     let kind = node.kind();
-
-    // Check for keywords and types based on node kind
     let highlight = classify_node_kind(kind);
+
+    // Comments and strings: highlight entire node (don't recurse into children)
+    if highlight == HighlightKind::Comment || highlight == HighlightKind::String {
+        spans.push(HighlightSpan {
+            start: node.start_byte(),
+            end: node.end_byte(),
+            kind: highlight,
+        });
+        return; // Don't recurse - these are single units
+    }
 
     // Only highlight leaf nodes (no children) to avoid duplication
     // This means keywords and simple type identifiers get highlighted,
@@ -366,13 +376,33 @@ fn collect_highlight_spans(
     // Recurse into children
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_highlight_spans(child, _source, spans);
+        collect_highlight_spans(child, spans);
     }
 }
 
 /// Classify a node kind into a highlight category.
 fn classify_node_kind(kind: &str) -> HighlightKind {
     match kind {
+        // Comments (including doc comments)
+        "comment"
+        | "line_comment"
+        | "block_comment"
+        | "doc_comment"
+        | "line_outer_doc_comment"
+        | "line_inner_doc_comment"
+        | "block_outer_doc_comment"
+        | "block_inner_doc_comment" => HighlightKind::Comment,
+
+        // Strings (including template/interpolated strings)
+        "string_literal"
+        | "raw_string_literal"
+        | "string_content"
+        | "string_fragment"
+        | "interpreted_string_literal"
+        | "char_literal"
+        | "template_string"
+        | "template_literal" => HighlightKind::String,
+
         // Types (check first - more specific)
         "type_identifier"
         | "primitive_type"

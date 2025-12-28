@@ -1075,6 +1075,10 @@ fn cmd_view_symbol(
     let mut parser = symbols::SymbolParser::new();
     let symbol_name = symbol_path.last().unwrap();
 
+    // Get grammar for syntax highlighting
+    let grammar =
+        moss_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+
     // Try to find and extract the symbol
     if let Some(source) = parser.extract_symbol_source(&full_path, &content, symbol_name) {
         let full_symbol_path = format!("{}/{}", file_path, symbol_path.join("/"));
@@ -1094,17 +1098,19 @@ fn cmd_view_symbol(
             if depth >= 0 {
                 println!("# {}", full_symbol_path);
             }
-            println!("{}", source);
+            // Apply syntax highlighting in pretty mode
+            let highlighted = if let Some(ref g) = grammar {
+                tree::highlight_source(&source, g, use_colors)
+            } else {
+                source
+            };
+            println!("{}", highlighted);
         }
         0
     } else {
         // Try skeleton extraction for more context
         let extractor = skeleton::SkeletonExtractor::new();
         let skeleton_result = extractor.extract(&full_path, &content);
-
-        // Get grammar for syntax highlighting
-        let grammar =
-            moss_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
 
         if let Some(sym) = find_symbol(&skeleton_result.symbols, symbol_name) {
             let full_symbol_path = format!("{}/{}", file_path, symbol_path.join("/"));
@@ -1133,7 +1139,13 @@ fn cmd_view_symbol(
                     if depth >= 0 {
                         println!("# {}", full_symbol_path);
                     }
-                    println!("{}", source);
+                    // Apply syntax highlighting in pretty mode
+                    let highlighted = if let Some(ref g) = grammar {
+                        tree::highlight_source(&source, g, use_colors)
+                    } else {
+                        source
+                    };
+                    println!("{}", highlighted);
                 }
                 return 0;
             }

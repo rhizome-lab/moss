@@ -113,9 +113,20 @@ impl OutputFormat {
         };
 
         if is_pretty {
-            OutputFormat::Pretty {
-                colors: config.use_colors(),
-            }
+            // Determine colors: respect "never", otherwise --pretty forces colors
+            let use_colors = if std::env::var("NO_COLOR").is_ok() {
+                false
+            } else {
+                match config.colors.unwrap_or_default() {
+                    ColorMode::Never => false,
+                    ColorMode::Always => true,
+                    ColorMode::Auto => {
+                        // Explicit --pretty overrides TTY check
+                        pretty || std::io::stdout().is_terminal()
+                    }
+                }
+            };
+            OutputFormat::Pretty { colors: use_colors }
         } else {
             OutputFormat::Compact
         }
