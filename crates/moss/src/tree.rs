@@ -378,6 +378,100 @@ fn collect_highlight_spans(node: tree_sitter::Node, spans: &mut Vec<HighlightSpa
         });
     }
 
+    // Check for function/method names and calls
+    if node.child_count() == 0 {
+        if let Some(parent) = node.parent() {
+            let parent_kind = parent.kind();
+
+            // Function/method definitions
+            if kind == "identifier"
+                && matches!(
+                    parent_kind,
+                    "function_item"
+                        | "function_signature_item"
+                        | "function_definition"
+                        | "method_definition"
+                        | "function_declaration"
+                )
+            {
+                spans.push(HighlightSpan {
+                    start: node.start_byte(),
+                    end: node.end_byte(),
+                    kind: HighlightKind::FunctionName,
+                });
+            }
+
+            // Function/macro calls: foo() - Rust: call_expression/macro_invocation, JS: call_expression, Python: call
+            if kind == "identifier"
+                && matches!(parent_kind, "call_expression" | "call" | "macro_invocation")
+            {
+                spans.push(HighlightSpan {
+                    start: node.start_byte(),
+                    end: node.end_byte(),
+                    kind: HighlightKind::FunctionName,
+                });
+            }
+
+            // Scoped function calls: serde_json::to_value()
+            // identifier → scoped_identifier → call_expression
+            // Only highlight the last identifier (the function name, not module path)
+            if kind == "identifier" && parent_kind == "scoped_identifier" {
+                if let Some(grandparent) = parent.parent() {
+                    if matches!(grandparent.kind(), "call_expression" | "call") {
+                        // Check this is the last identifier (no :: after it)
+                        let is_last = node.next_sibling().map_or(true, |s| s.kind() != "::");
+                        if is_last {
+                            spans.push(HighlightSpan {
+                                start: node.start_byte(),
+                                end: node.end_byte(),
+                                kind: HighlightKind::FunctionName,
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Method calls: bar.baz()
+            // - Rust: field_identifier → field_expression → call_expression
+            // - JS/TS: property_identifier → member_expression → call_expression
+            // - Python: identifier → attribute → call
+            let is_method_id = matches!(kind, "field_identifier" | "property_identifier")
+                || (kind == "identifier" && parent_kind == "attribute");
+            let is_method_parent = matches!(
+                parent_kind,
+                "field_expression" | "member_expression" | "attribute"
+            );
+            if is_method_id && is_method_parent {
+                if let Some(grandparent) = parent.parent() {
+                    if matches!(grandparent.kind(), "call_expression" | "call") {
+                        spans.push(HighlightSpan {
+                            start: node.start_byte(),
+                            end: node.end_byte(),
+                            kind: HighlightKind::FunctionName,
+                        });
+                    }
+                }
+            }
+
+            // Inside macro token_tree: heuristic for function/method calls
+            // Pattern: identifier followed by token_tree starting with (
+            // Or: identifier preceded by . (method call)
+            if kind == "identifier" && parent_kind == "token_tree" {
+                if let Some(next) = node.next_sibling() {
+                    // Check if next sibling is () or token_tree starting with (
+                    let next_kind = next.kind();
+                    if next_kind == "token_tree" || next_kind == "(" {
+                        spans.push(HighlightSpan {
+                            start: node.start_byte(),
+                            end: node.end_byte(),
+                            kind: HighlightKind::FunctionName,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
     // Recurse into children
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
