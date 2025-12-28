@@ -307,17 +307,5 @@ fn is_executable(path: &Path) -> bool {
     path.is_file()
 }
 
-/// Detect ecosystem from project files in the given directory.
-pub fn detect_ecosystem(project_root: &Path) -> Option<&'static dyn Ecosystem> {
-    ecosystems::detect(project_root)
-}
-
-/// Detect all ecosystems from project files in the given directory.
-pub fn detect_all_ecosystems(project_root: &Path) -> Vec<&'static dyn Ecosystem> {
-    ecosystems::detect_all(project_root)
-}
-
-/// Get all registered ecosystems.
-pub fn all_ecosystems() -> &'static [&'static dyn Ecosystem] {
-    ecosystems::all()
-}
+// Re-export ecosystem detection functions
+pub use ecosystems::{all_ecosystems, detect_all_ecosystems, detect_ecosystem};

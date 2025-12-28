@@ -120,6 +120,10 @@ pub struct AnalyzeArgs {
     #[arg(long)]
     pub show_source: bool,
 
+    /// Minimum lines for a function to be considered for clone detection
+    #[arg(long, default_value = "1")]
+    pub min_lines: usize,
+
     /// Exclude paths matching pattern or @alias
     #[arg(long, value_name = "PATTERN")]
     pub exclude: Vec<String>,
@@ -159,6 +163,7 @@ pub fn run(args: AnalyzeArgs, json: bool) -> i32 {
         args.elide_identifiers,
         args.elide_literals,
         args.show_source,
+        args.min_lines,
         json,
         &args.exclude,
         &args.only,
@@ -189,6 +194,7 @@ pub fn cmd_analyze(
     elide_identifiers: bool,
     elide_literals: bool,
     show_source: bool,
+    min_lines: usize,
     json: bool,
     exclude: &[String],
     only: &[String],
@@ -271,7 +277,14 @@ pub fn cmd_analyze(
 
     // --clones detects duplicate code
     if clones {
-        return cmd_clones(&root, elide_identifiers, elide_literals, show_source, json);
+        return cmd_clones(
+            &root,
+            elide_identifiers,
+            elide_literals,
+            show_source,
+            min_lines,
+            json,
+        );
     }
 
     // If no specific flags, run all analyses
@@ -1527,16 +1540,34 @@ struct CloneLocation {
     end_line: usize,
 }
 
+/// Load allowed clone locations from .moss/clone-allow file
+fn load_clone_allowlist(root: &Path) -> std::collections::HashSet<String> {
+    let path = root.join(".moss/clone-allow");
+    let mut allowed = std::collections::HashSet::new();
+    if let Ok(content) = std::fs::read_to_string(&path) {
+        for line in content.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            allowed.insert(line.to_string());
+        }
+    }
+    allowed
+}
+
 /// Detect code clones across the codebase
 fn cmd_clones(
     root: &Path,
     elide_identifiers: bool,
     elide_literals: bool,
     show_source: bool,
+    min_lines: usize,
     json: bool,
 ) -> i32 {
     let extractor = Extractor::new();
     let parsers = Parsers::new();
+    let allowlist = load_clone_allowlist(root);
 
     // Collect function hashes: hash -> [(file, symbol, start, end)]
     let mut hash_groups: std::collections::HashMap<u64, Vec<CloneLocation>> =
@@ -1587,9 +1618,8 @@ fn cmd_clones(
 
             // Find the function node
             if let Some(node) = find_function_node(&tree, sym.start_line) {
-                // Skip trivial functions (< 3 lines)
                 let line_count = sym.end_line.saturating_sub(sym.start_line) + 1;
-                if line_count < 3 {
+                if line_count < min_lines {
                     continue;
                 }
 
@@ -1618,9 +1648,15 @@ fn cmd_clones(
     }
 
     // Filter to groups with 2+ instances (actual clones)
+    // Skip groups where ALL locations are in the allowlist
     let mut clone_groups: Vec<CloneGroup> = hash_groups
         .into_iter()
         .filter(|(_, locs)| locs.len() >= 2)
+        .filter(|(_, locs)| {
+            // Keep if any location is NOT allowed
+            locs.iter()
+                .any(|loc| !allowlist.contains(&format!("{}:{}", loc.file, loc.symbol)))
+        })
         .map(|(hash, locations)| {
             let line_count = locations
                 .first()

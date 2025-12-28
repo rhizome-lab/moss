@@ -7,6 +7,7 @@ pub mod filter;
 pub mod grammars;
 pub mod grep;
 pub mod index;
+pub mod init;
 pub mod lint;
 pub mod package;
 pub mod plans;

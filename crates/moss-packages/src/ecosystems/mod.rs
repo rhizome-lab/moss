@@ -35,12 +35,12 @@ static ECOSYSTEMS: &[&dyn Ecosystem] = &[
 ];
 
 /// Detect ecosystem from project files.
-pub fn detect(project_root: &Path) -> Option<&'static dyn Ecosystem> {
-    detect_all(project_root).into_iter().next()
+pub fn detect_ecosystem(project_root: &Path) -> Option<&'static dyn Ecosystem> {
+    detect_all_ecosystems(project_root).into_iter().next()
 }
 
 /// Detect all ecosystems from project files.
-pub fn detect_all(project_root: &Path) -> Vec<&'static dyn Ecosystem> {
+pub fn detect_all_ecosystems(project_root: &Path) -> Vec<&'static dyn Ecosystem> {
     let mut found = Vec::new();
     for ecosystem in ECOSYSTEMS {
         for manifest in ecosystem.manifest_files() {
@@ -72,6 +72,6 @@ pub fn detect_all(project_root: &Path) -> Vec<&'static dyn Ecosystem> {
 }
 
 /// Get all registered ecosystems.
-pub fn all() -> &'static [&'static dyn Ecosystem] {
+pub fn all_ecosystems() -> &'static [&'static dyn Ecosystem] {
     ECOSYSTEMS
 }

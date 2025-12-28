@@ -72,18 +72,19 @@ impl ToolResult {
         }
     }
 
-    pub fn error_count(&self) -> usize {
+    pub fn count_by_severity(&self, severity: crate::DiagnosticSeverity) -> usize {
         self.diagnostics
             .iter()
-            .filter(|d| d.severity == crate::DiagnosticSeverity::Error)
+            .filter(|d| d.severity == severity)
             .count()
     }
 
+    pub fn error_count(&self) -> usize {
+        self.count_by_severity(crate::DiagnosticSeverity::Error)
+    }
+
     pub fn warning_count(&self) -> usize {
-        self.diagnostics
-            .iter()
-            .filter(|d| d.severity == crate::DiagnosticSeverity::Warning)
-            .count()
+        self.count_by_severity(crate::DiagnosticSeverity::Warning)
     }
 }
 

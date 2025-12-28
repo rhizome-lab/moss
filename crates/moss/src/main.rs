@@ -120,6 +120,9 @@ enum Commands {
         root: Option<PathBuf>,
     },
 
+    /// Initialize moss in current directory
+    Init(commands::init::InitArgs),
+
     /// Manage the moss daemon
     Daemon {
         #[command(subcommand)]
@@ -410,6 +413,7 @@ fn main() {
         Commands::Index { action, root } => {
             commands::index::cmd_index(action, root.as_deref(), cli.json)
         }
+        Commands::Init(args) => commands::init::run(args),
         Commands::Daemon { action, root } => {
             commands::daemon::cmd_daemon(action, root.as_deref(), cli.json)
         }
