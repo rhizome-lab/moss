@@ -91,6 +91,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - LLM code consistency: see `docs/llm-code-consistency.md` for research notes
 - Analyze long chains of uninterrupted tool calls (friction indicator)
 - Claude Code lacks navigation: clicking paths/links in output doesn't open them in editor (significant UX gap)
+- Rich links in LLM output: either LLM outputs structured links (file:line, TODO items, symbols) or cheap model postprocesses response to extract them. Would enable clickable references in terminal/IDE.
 
 **Distribution:**
 - Wrapper packages for ecosystems: npm, PyPI, Homebrew, etc.
