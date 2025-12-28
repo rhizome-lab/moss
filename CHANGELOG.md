@@ -4,6 +4,24 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Init Command
+
+`moss init` for idempotent project setup:
+- Creates `.moss/` directory and default `config.toml`
+- Updates `.gitignore` with moss entries (`.moss`, `!.moss/config.toml`, `!.moss/clone-allow`)
+- Logs when commented-out entries are skipped
+- `--index` flag to index codebase after init
+
+### Clone Detection
+
+`moss analyze --clones` for finding structural code duplicates:
+- On-demand AST hashing (no index storage)
+- `--elide-identifiers` (default true): ignore variable/function names
+- `--elide-literals` (default false): ignore literal values
+- `--show-source`: display duplicate code inline
+- `--min-lines N`: filter trivial functions
+- Allowlist via `.moss/clone-allow` (format: `path:symbol`)
+
 ### Index-Free Operation
 
 All commands now work gracefully when indexing is disabled (`[index] enabled = false`):
