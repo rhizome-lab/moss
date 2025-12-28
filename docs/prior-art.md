@@ -265,6 +265,72 @@ Moss's approach is proactive (include only what's needed, structured views by de
 - Goose has mature desktop app; moss is library-first
 - Both: multi-model, local execution, MCP integration, verification loops
 
+### Sourcegraph
+- **Site**: https://sourcegraph.com
+- **Repo**: https://github.com/sourcegraph/sourcegraph (Apache 2.0)
+- **What it is**: Code intelligence platform - search, navigation, and understanding across massive codebases
+
+**Historical Significance:**
+Sourcegraph pioneered many concepts that coding agents now build on:
+- Universal code search across all repos, branches, languages
+- Semantic code navigation ("go to definition", "find references" at scale)
+- Code graph understanding (not just text search)
+- Batch changes for multi-repo refactoring
+
+**Key Architecture Insights:**
+
+**Repository Layer:**
+- **gitserver**: Sharded service storing all connected repositories
+- **worker**: Keeps repos synchronized with code hosts, respects rate limits
+- Persistent cache (code host is source of truth, eventually consistent)
+
+**Code Intelligence (Two Approaches):**
+1. **Search-based** (default): Regex patterns, no setup, may have false positives
+2. **Precise** (SCIP/LSIF): Language-specific indexes uploaded to Sourcegraph, accurate cross-repo navigation
+
+**Search Infrastructure:**
+- **zoekt**: Trigram indexes for fast full-codebase search on default branches
+- **searcher**: Fallback for non-indexed code/branches
+- **Syntect**: Syntax highlighting across all code views
+
+**Code Graph:**
+Not a dependency graph, but semantic understanding through:
+- Repository syncing from code hosts
+- Permission syncing for authorization
+- Settings cascade (user → org → global)
+- Navigation connecting definitions, references, docs
+
+**Products (2025):**
+- **Code Search**: Core search and navigation product
+- **Cody**: AI coding assistant (Enterprise focus after July 2025)
+- **Amp**: Agentic coding tool (see `docs/research/ampcode.md`)
+
+**Recent Evolution:**
+- Cody Free/Pro discontinued July 2025, focusing on Enterprise
+- MCP Server available for Enterprise plans
+- Code Review Agent, Migration Agent, Testing Agent in EAP
+- Agent API for building custom agents on Sourcegraph infrastructure
+
+**Moss Observations:**
+- **Foundational influence**: Sourcegraph's code graph concept directly influenced moss's index design
+- **SCIP/LSIF**: Moss uses tree-sitter instead (simpler, no build pipeline integration needed)
+- **zoekt trigrams**: Similar to moss's SQLite FTS for path search
+- **Precise vs search-based**: Moss is "search-based" level (AST parsing, not full type resolution)
+- **Scale difference**: Sourcegraph handles millions of repos; moss focuses on single-codebase depth
+- **Key learning**: Universal code intelligence is infrastructure, not a feature - agents need it
+
+**What Sourcegraph Does Better:**
+- Cross-repository navigation and search
+- Enterprise scale (permissions, deployment options)
+- Language-agnostic precise navigation via SCIP
+- Mature batch changes for large refactors
+
+**What Moss Does Differently:**
+- Single-codebase focus with deeper structural views (skeleton, CFG)
+- No build pipeline integration needed
+- Library-first API design
+- LLM-optimized output (token efficiency)
+
 ## Competitive Analysis Summary
 
 ### What Competitors Do Better Than Moss Currently:
@@ -275,6 +341,7 @@ Moss's approach is proactive (include only what's needed, structured views by de
 4. **Claude Code**: Native Anthropic integration, checkpoint/rollback
 5. **Cursor**: IDE integration, massive adoption, codebase indexing
 6. **Goose**: MCP-native architecture, mature desktop app, extension security (malware scanning)
+7. **Sourcegraph**: Cross-repo search at scale, precise navigation via SCIP, batch changes
 
 ### Moss's Unique Differentiators:
 
