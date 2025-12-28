@@ -153,9 +153,20 @@ pub fn grep(
 
 impl OutputFormatter for GrepResult {
     fn format_text(&self) -> String {
-        let mut out = String::new();
+        use std::collections::BTreeMap;
+
+        // Group matches by file
+        let mut by_file: BTreeMap<&str, Vec<&GrepMatch>> = BTreeMap::new();
         for m in &self.matches {
-            writeln!(out, "{}:{}:{}", m.file, m.line, m.content).unwrap();
+            by_file.entry(&m.file).or_default().push(m);
+        }
+
+        let mut out = String::new();
+        for (file, matches) in by_file {
+            writeln!(out, "{}:", file).unwrap();
+            for m in matches {
+                writeln!(out, "  {}:{}", m.line, m.content).unwrap();
+            }
         }
         write!(
             out,
@@ -167,27 +178,31 @@ impl OutputFormatter for GrepResult {
     }
 
     fn format_pretty(&self) -> String {
-        let mut out = String::new();
+        use std::collections::BTreeMap;
+
+        // Group matches by file
+        let mut by_file: BTreeMap<&str, Vec<&GrepMatch>> = BTreeMap::new();
         for m in &self.matches {
-            // Highlight the match within the content
-            let content = if m.start < m.end && m.end <= m.content.len() {
-                format!(
-                    "{}{}{}",
-                    &m.content[..m.start],
-                    Red.bold().paint(&m.content[m.start..m.end]),
-                    &m.content[m.end..]
-                )
-            } else {
-                m.content.clone()
-            };
-            writeln!(
-                out,
-                "{}:{}:{}",
-                Cyan.paint(&m.file),
-                Yellow.paint(m.line.to_string()),
-                content
-            )
-            .unwrap();
+            by_file.entry(&m.file).or_default().push(m);
+        }
+
+        let mut out = String::new();
+        for (file, matches) in by_file {
+            writeln!(out, "{}:", Cyan.paint(file)).unwrap();
+            for m in matches {
+                // Highlight the match within the content
+                let content = if m.start < m.end && m.end <= m.content.len() {
+                    format!(
+                        "{}{}{}",
+                        &m.content[..m.start],
+                        Red.bold().paint(&m.content[m.start..m.end]),
+                        &m.content[m.end..]
+                    )
+                } else {
+                    m.content.clone()
+                };
+                writeln!(out, "  {}:{}", Yellow.paint(m.line.to_string()), content).unwrap();
+            }
         }
         write!(
             out,
