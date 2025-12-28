@@ -59,6 +59,7 @@ Do not:
 - **Use trait default implementations** - defaults let you "implement" a trait without implementing it. That's a silent bug. Every method should be explicitly implemented; compiler enforces completeness, not convention.
 - **String-match on source content for AST properties** - use tree-sitter node structure, not `text.contains("async")` or `text.starts_with("enum")`. Check node kinds, child nodes, field names. String matching is fragile and misses the point of having a parsed AST.
 - **Replace content when editing lists** - when adding to TODO.md or similar, extend existing content, don't replace sections. Read carefully, add items, preserve what's there.
+- **Dismiss tooling needs for "rare" operations** - error-prone manual operations need safety rails regardless of frequency. Build the tool.
 
 ## Design Principles
 
@@ -79,6 +80,7 @@ Do not:
 - Location-based allowlists > hash-based (new occurrences shouldn't be silently ignored).
 - Log when skipping something (e.g., "entry commented out, skipping") - user should know why.
 - Respect user's file organization: insert near related content, don't blindly append.
+- Show what's at stake before refusing: when blocking a destructive operation, display what would be affected.
 
 **Separate niche data from shared config.**
 - Don't bloat config.toml with feature-specific data (e.g., clone allowlist).
