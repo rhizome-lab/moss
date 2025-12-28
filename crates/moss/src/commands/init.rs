@@ -39,6 +39,12 @@ fn cmd_init(root: &Path, do_index: bool) -> i32 {
 [daemon]
 # enabled = true
 # auto_start = true
+
+[analyze]
+# health = true
+# complexity = true
+# security = true
+# clones = false
 "#;
         if let Err(e) = fs::write(&config_path, default_config) {
             eprintln!("Failed to create config.toml: {}", e);
