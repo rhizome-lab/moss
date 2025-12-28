@@ -50,9 +50,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - JSON Schema for complex action parameters (currently string-only)
 
 **Performance:**
-- Debug view command performance: `./target/release/moss view output.rs/OutputFormat` is slower than expected
-  - Profile with `hyperfine`, `perf`, or `--timings`
-  - Likely candidates: tree-sitter parsing, symbol resolution, redundant file reads
+- [x] View command performance: fixed by lazy symbol search + auto-build index (470ms → 14ms for file view, 47ms for symbol search)
 
 **Code Quality:**
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
