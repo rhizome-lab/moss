@@ -6,11 +6,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 Test Status: 110 passing, 0 failing (moss-languages)
 
-**Analyze enhancements:**
-- [x] `--all` flag to run all passes including clones
-- [x] Weighted scoring via `[analyze.weights]` config
-- [x] Letter grade output (A-F) with percentage
-
 ## Remaining Work
 
 **Configuration System:**

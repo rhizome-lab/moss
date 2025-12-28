@@ -21,6 +21,15 @@ First release. See `docs/` for design docs and `README.md` for usage.
 - `--show-source`: display duplicate code inline
 - `--min-lines N`: filter trivial functions
 - Allowlist via `.moss/clone-allow` (format: `path:symbol`)
+- CI integration: fails if unallowed clones found
+
+### Analyze Command
+
+Configurable analysis passes with weighted grading:
+- `--all` flag runs all passes including clones
+- `[analyze]` config section: `health`, `complexity`, `security`, `clones`
+- `[analyze.weights]` for custom grade weights (security=2.0 default, clones=0.3)
+- Letter grade output: "Overall Grade: B (82%)"
 
 ### Index-Free Operation
 
