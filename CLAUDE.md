@@ -35,21 +35,17 @@ Do not:
 - Announce actions with "I will now..." - just do them
 - Use markdown formatting in LLM prompts (no bold, headers, code blocks unless required)
 - Write preamble or summary in generated content
-- Use `os.path` - use `pathlib`
-- Catch generic `Exception` - catch specific errors
+- Catch generic errors - catch specific error types
 - Leave work uncommitted
 - Create special cases - design to avoid them; if stuck, ask user rather than special-casing
 - Deprecate things - no users, just remove; deprecation is for backwards compatibility we don't need
 - **Create "legacy" APIs** - one API, one way. If the signature changes, update all callers. No `foo_legacy()` or `foo_v2()`.
-- **Add to the monolith** - implementation goes in sub-packages (`moss-intelligence`, `moss-orchestration`, etc.), never in `src/moss/`. The `moss` package is a meta-package for external convenience only. Internal code imports from sub-packages, not `moss`.
+- **Add to the monolith** - implementation goes in sub-crates (`moss-languages`, `moss-packages`, etc.), not all in `crates/moss/`. Split by domain.
 - **Do half measures** - when adding a trait/abstraction, migrate ALL callers immediately. No "we can consolidate later" or asking whether to do partial vs full migration. Just do the full migration.
 - **Ask permission on design when philosophy is clear** - if "Generalize Don't Multiply" or other tenets point to an obvious answer, don't present options. Just do the right thing.
 - **Return tuples from functions** - use structs with named fields. Tuples obscure meaning and cause ordering bugs. Only use tuples when names would be pure ceremony (e.g., `(x, y)` coordinates).
 - **Use trait default implementations** - defaults let you "implement" a trait without implementing it. That's a silent bug. Every method should be explicitly implemented; compiler enforces completeness, not convention.
 - **String-match on source content for AST properties** - use tree-sitter node structure, not `text.contains("async")` or `text.starts_with("enum")`. Check node kinds, child nodes, field names. String matching is fragile and misses the point of having a parsed AST.
-
-Our system prompt for sub-agents (`src/moss/agent_loop.py:LLMConfig.system_prompt`):
-"Be terse. No preamble, no summary, no markdown formatting. Plain text only. For analysis: short bullet points, max 5 items, no code."
 
 ## Design Principles
 
@@ -91,22 +87,16 @@ Moss's alternative: dynamic context that can be reshaped throughout execution, n
 
 ## Development Environment
 
-Run `uv sync --extra all --extra dev` first. Many features require optional dependencies.
-
 ```bash
-uv sync --extra all --extra dev  # Install dependencies
+cargo build                    # Build debug binary
+cargo test                     # Run tests
+cargo clippy                   # Lint
+cargo fmt                      # Format
 ```
 
-**Debug builds:** `[profile.dev] debug = 0` in Cargo.toml - tree-sitter grammars bloat debug builds to ~2GB otherwise. This is moss-specific; don't copy to other projects without considering the tradeoff.
+**Debug builds:** `[profile.dev] debug = 0` in Cargo.toml - tree-sitter grammars bloat debug builds to ~2GB otherwise.
 
 ## Recipes
-
-Scaffold MCP Tool:
-1. Add API class in `src/moss/moss_api.py`
-2. Add accessor property to `MossAPI` class
-3. Update `src/moss/gen/introspect.py`: add import and entry to `sub_apis`
-4. Run `moss gen --target=mcp`
-5. Reload MCP server
 
 Context Reset (before `/exit`):
 1. Commit current work
@@ -116,22 +106,32 @@ Context Reset (before `/exit`):
 
 ## Dogfooding
 
-**Use moss CLI for code intelligence** via `uv run moss`. Returns structure (symbols, skeletons) instead of raw text, saving ~90% tokens.
+**Use moss for codebase exploration.** Structure > text. One `moss view` beats spawning an Explore agent or running 10 greps.
 
-Three primitives:
-- `uv run moss view <path>` - show tree, file skeleton, or symbol source
-- `uv run moss edit <path> "task"` - structural editing
-- `uv run moss analyze [path]` - health, complexity, security
+```bash
+# Exploration flow
+moss view                                # Directory overview
+moss view crates/moss/src/               # Subdirectory files
+moss view daemon.rs                      # File skeleton (all symbols + signatures)
+moss view daemon.rs --types-only         # Just structs/enums/traits
+moss view daemon.rs/DaemonServer         # Full source of one symbol
+moss analyze --complexity daemon.rs      # Find complex functions
+moss grep "impl.*Client" --only "*.rs"   # Structural search
+```
 
-Quick reference:
-- `view dwim.py` - fuzzy path resolution works
-- `view dwim.py/resolve_core_primitive` - view specific symbol
-- `analyze --complexity` - identify problem areas
+**When to use moss vs other tools:**
+| Task | Use | Not |
+|------|-----|-----|
+| Understand file structure | `moss view <file>` | Read (too verbose) |
+| Find all symbols in module | `moss view <dir>` | Glob + Read (slow) |
+| Get one function's source | `moss view file/symbol` | Read + scroll |
+| Find complex code | `moss analyze --complexity` | Manual review |
+| Search patterns | `moss grep` | Grep (no context) |
+| Exact line for editing | Read | moss view (need line numbers) |
 
-Fall back to generic tools (Read/Grep) only for:
-- Exact line content needed for editing
+**Fall back to Read/Grep only for:** exact line content needed for Edit tool.
 
-**Verify codebases with moss, not agents/greps.** One `moss view` call beats spawning an agent or running 50 greps. If moss output isn't useful enough for verification, that's a bug in moss - improve the tool (see tree view improvements in TODO.md).
+**If moss output isn't useful, that's a bug in moss.** Improve the tool, don't work around it.
 
 ## Conventions
 
@@ -186,5 +186,5 @@ Move completed TODOs to CHANGELOG.md.
 
 ### Code Quality
 
-Linting: `ruff check` and `ruff format`
-Tests: Run before committing. Add tests with new functionality.
+Linting: `cargo clippy` and `cargo fmt --check`
+Tests: `cargo test` before committing. Add tests with new functionality.
