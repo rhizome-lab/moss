@@ -29,6 +29,18 @@ ALWAYS NOTE THINGS DOWN. When you discover something important, write it immedia
 - "Fair point" / "Good point" / "You're right" → edit TODO.md/CLAUDE.md BEFORE responding
 - "Should have" / "I forgot to" → you're admitting failure, edit docs to prevent recurrence
 
+## Dogfooding
+
+**Use moss, not builtin tools.** Avoid Read/Grep/Glob at all costs - they waste tokens.
+
+```
+moss view [path[/symbol]] [--types-only]   # structure, skeleton, or symbol source
+moss analyze [--complexity] [path]          # find complex functions
+moss grep <pattern> [--only "*.rs"]         # search with context
+```
+
+Fall back to Read only for exact line content needed by Edit. If moss isn't useful, fix moss.
+
 ## Negative Constraints
 
 Do not:
@@ -85,17 +97,6 @@ Moss's alternative: dynamic context that can be reshaped throughout execution, n
 - Ask: "Am I solving the right problem?" (go-imports: naming issue vs architecture issue)
 - Check docs/philosophy.md before questioning design decisions - the feature may be intentional.
 
-## Development Environment
-
-```bash
-cargo build                    # Build debug binary
-cargo test                     # Run tests
-cargo clippy                   # Lint
-cargo fmt                      # Format
-```
-
-**Debug builds:** `[profile.dev] debug = 0` in Cargo.toml - tree-sitter grammars bloat debug builds to ~2GB otherwise.
-
 ## Recipes
 
 Context Reset (before `/exit`):
@@ -103,35 +104,6 @@ Context Reset (before `/exit`):
 2. Move completed tasks to CHANGELOG.md
 3. Update TODO.md "Next Up" section
 4. Note any open questions
-
-## Dogfooding
-
-**Use moss for codebase exploration.** Structure > text. One `moss view` beats spawning an Explore agent or running 10 greps.
-
-```bash
-# Exploration flow
-moss view                                # Directory overview
-moss view crates/moss/src/               # Subdirectory files
-moss view daemon.rs                      # File skeleton (all symbols + signatures)
-moss view daemon.rs --types-only         # Just structs/enums/traits
-moss view daemon.rs/DaemonServer         # Full source of one symbol
-moss analyze --complexity daemon.rs      # Find complex functions
-moss grep "impl.*Client" --only "*.rs"   # Structural search
-```
-
-**When to use moss vs other tools:**
-| Task | Use | Not |
-|------|-----|-----|
-| Understand file structure | `moss view <file>` | Read (too verbose) |
-| Find all symbols in module | `moss view <dir>` | Glob + Read (slow) |
-| Get one function's source | `moss view file/symbol` | Read + scroll |
-| Find complex code | `moss analyze --complexity` | Manual review |
-| Search patterns | `moss grep` | Grep (no context) |
-| Exact line for editing | Read | moss view (need line numbers) |
-
-**Fall back to Read/Grep only for:** exact line content needed for Edit tool.
-
-**If moss output isn't useful, that's a bug in moss.** Improve the tool, don't work around it.
 
 ## Conventions
 
@@ -186,5 +158,4 @@ Move completed TODOs to CHANGELOG.md.
 
 ### Code Quality
 
-Linting: `cargo clippy` and `cargo fmt --check`
-Tests: `cargo test` before committing. Add tests with new functionality.
+`cargo clippy`, `cargo fmt --check`, `cargo test` before committing.
