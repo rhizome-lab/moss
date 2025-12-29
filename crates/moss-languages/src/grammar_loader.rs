@@ -27,6 +27,8 @@ pub struct GrammarLoader {
     cache: RwLock<HashMap<String, Arc<LoadedGrammar>>>,
     /// Cached highlight queries.
     highlight_cache: RwLock<HashMap<String, Arc<String>>>,
+    /// Cached injection queries.
+    injection_cache: RwLock<HashMap<String, Arc<String>>>,
 }
 
 impl GrammarLoader {
@@ -56,6 +58,7 @@ impl GrammarLoader {
             search_paths: paths,
             cache: RwLock::new(HashMap::new()),
             highlight_cache: RwLock::new(HashMap::new()),
+            injection_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -65,6 +68,7 @@ impl GrammarLoader {
             search_paths: paths,
             cache: RwLock::new(HashMap::new()),
             highlight_cache: RwLock::new(HashMap::new()),
+            injection_cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -95,12 +99,30 @@ impl GrammarLoader {
             return Some(Arc::clone(query));
         }
 
-        self.load_highlights(name)
+        self.load_query(name, "highlights", &self.highlight_cache)
     }
 
-    /// Load highlight query from external .scm file.
-    fn load_highlights(&self, name: &str) -> Option<Arc<String>> {
-        let scm_name = format!("{name}.highlights.scm");
+    /// Get the injection query for a grammar.
+    ///
+    /// Returns None if no injection query found for the grammar.
+    /// Query files are {name}.injections.scm in the grammar search paths.
+    pub fn get_injections(&self, name: &str) -> Option<Arc<String>> {
+        // Check cache first
+        if let Some(query) = self.injection_cache.read().ok()?.get(name) {
+            return Some(Arc::clone(query));
+        }
+
+        self.load_query(name, "injections", &self.injection_cache)
+    }
+
+    /// Load a query file (.scm) from external file.
+    fn load_query(
+        &self,
+        name: &str,
+        query_type: &str,
+        cache: &RwLock<HashMap<String, Arc<String>>>,
+    ) -> Option<Arc<String>> {
+        let scm_name = format!("{name}.{query_type}.scm");
 
         for search_path in &self.search_paths {
             let scm_path = search_path.join(&scm_name);
@@ -109,8 +131,8 @@ impl GrammarLoader {
                     let query = Arc::new(content);
 
                     // Cache it
-                    if let Ok(mut cache) = self.highlight_cache.write() {
-                        cache.insert(name.to_string(), Arc::clone(&query));
+                    if let Ok(mut c) = cache.write() {
+                        c.insert(name.to_string(), Arc::clone(&query));
                     }
 
                     return Some(query);

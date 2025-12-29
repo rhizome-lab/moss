@@ -288,42 +288,235 @@ pub enum HighlightKind {
 ///
 /// Uses tree-sitter Query API with .scm highlight files when available,
 /// falling back to manual node classification otherwise.
-pub fn highlight_source(sig: &str, grammar: &str, use_colors: bool) -> String {
-    // If colors disabled, just return the signature as-is
+/// Also processes injections for embedded languages (e.g., code blocks in markdown).
+pub fn highlight_source(source: &str, grammar: &str, use_colors: bool) -> String {
+    highlight_source_impl(source, grammar, use_colors, 0)
+}
+
+/// Internal implementation with recursion depth tracking.
+fn highlight_source_impl(source: &str, grammar: &str, use_colors: bool, depth: usize) -> String {
+    // If colors disabled, just return the source as-is
     if !use_colors {
-        return sig.to_string();
+        return source.to_string();
+    }
+
+    // Limit recursion depth to prevent infinite loops
+    if depth > 3 {
+        return source.to_string();
     }
 
     let loader = GrammarLoader::new();
     let language = match loader.get(grammar) {
         Some(lang) => lang,
-        None => return sig.to_string(),
+        None => return source.to_string(),
     };
 
     let mut parser = tree_sitter::Parser::new();
     if parser.set_language(&language).is_err() {
-        return sig.to_string();
+        return source.to_string();
     }
 
-    let tree = match parser.parse(sig, None) {
+    let tree = match parser.parse(source, None) {
         Some(t) => t,
-        None => return sig.to_string(),
+        None => return source.to_string(),
     };
 
-    // Try query-based highlighting first (uses .scm files from arborium)
-    let spans = if let Some(query_str) = loader.get_highlights(grammar) {
+    // Collect base highlight spans
+    let mut spans = if let Some(query_str) = loader.get_highlights(grammar) {
         if let Ok(query) = Query::new(&language, &query_str) {
-            collect_query_spans(&query, tree.root_node(), sig)
+            collect_query_spans(&query, tree.root_node(), source)
         } else {
-            // Query parse failed, fall back to manual
             collect_manual_spans(tree.root_node())
         }
     } else {
-        // No .scm file, use manual classification
         collect_manual_spans(tree.root_node())
     };
 
-    render_highlighted(sig, spans)
+    // Process injections (embedded languages like code blocks in markdown)
+    if let Some(injection_query_str) = loader.get_injections(grammar) {
+        if let Ok(injection_query) = Query::new(&language, &injection_query_str) {
+            let injection_spans =
+                collect_injection_spans(&injection_query, tree.root_node(), source, depth, &loader);
+            // Injection spans take precedence - remove base spans that overlap
+            spans = merge_injection_spans(spans, injection_spans);
+        }
+    }
+
+    render_highlighted(source, spans)
+}
+
+/// Collect highlight spans from injected languages.
+fn collect_injection_spans(
+    query: &Query,
+    root: tree_sitter::Node,
+    source: &str,
+    depth: usize,
+    loader: &GrammarLoader,
+) -> Vec<HighlightSpan> {
+    let mut cursor = QueryCursor::new();
+    let mut spans = Vec::new();
+
+    // Find capture indices for injection.language and injection.content
+    let lang_idx = query
+        .capture_names()
+        .iter()
+        .position(|n| *n == "injection.language");
+    let content_idx = query
+        .capture_names()
+        .iter()
+        .position(|n| *n == "injection.content");
+
+    if content_idx.is_none() {
+        return spans;
+    }
+    let content_idx = content_idx.unwrap() as u32;
+
+    let mut matches = cursor.matches(query, root, source.as_bytes());
+    while let Some(match_) = matches.next() {
+        let mut lang_name: Option<String> = None;
+        let mut content_node: Option<tree_sitter::Node> = None;
+
+        for capture in match_.captures {
+            if Some(capture.index as usize) == lang_idx {
+                // Extract language name from the captured node
+                let text = &source[capture.node.byte_range()];
+                lang_name = Some(normalize_language_name(text));
+            } else if capture.index == content_idx {
+                content_node = Some(capture.node);
+            }
+        }
+
+        // Check for #set! injection.language directive in properties
+        if lang_name.is_none() {
+            for prop in query.property_settings(match_.pattern_index) {
+                if &*prop.key == "injection.language" {
+                    if let Some(val) = &prop.value {
+                        lang_name = Some(val.to_string());
+                    }
+                }
+            }
+        }
+
+        if let (Some(lang), Some(node)) = (lang_name, content_node) {
+            // Check if we can load this language
+            if loader.get(&lang).is_some() {
+                let content = &source[node.byte_range()];
+                let offset = node.start_byte();
+
+                // Recursively highlight the injected content
+                let inner_spans = collect_inner_spans(content, &lang, depth + 1, offset);
+                spans.extend(inner_spans);
+            }
+        }
+    }
+
+    spans
+}
+
+/// Collect spans for injected content, adjusting offsets.
+fn collect_inner_spans(
+    content: &str,
+    grammar: &str,
+    depth: usize,
+    offset: usize,
+) -> Vec<HighlightSpan> {
+    let loader = GrammarLoader::new();
+    let language = match loader.get(grammar) {
+        Some(lang) => lang,
+        None => return Vec::new(),
+    };
+
+    let mut parser = tree_sitter::Parser::new();
+    if parser.set_language(&language).is_err() {
+        return Vec::new();
+    }
+
+    let tree = match parser.parse(content, None) {
+        Some(t) => t,
+        None => return Vec::new(),
+    };
+
+    let mut spans = if let Some(query_str) = loader.get_highlights(grammar) {
+        if let Ok(query) = Query::new(&language, &query_str) {
+            collect_query_spans(&query, tree.root_node(), content)
+        } else {
+            collect_manual_spans(tree.root_node())
+        }
+    } else {
+        collect_manual_spans(tree.root_node())
+    };
+
+    // Adjust offsets to be relative to original source
+    for span in &mut spans {
+        span.start += offset;
+        span.end += offset;
+    }
+
+    // Recursively process injections in the injected content
+    if depth < 3 {
+        if let Some(injection_query_str) = loader.get_injections(grammar) {
+            if let Ok(injection_query) = Query::new(&language, &injection_query_str) {
+                let nested_spans = collect_injection_spans(
+                    &injection_query,
+                    tree.root_node(),
+                    content,
+                    depth,
+                    &loader,
+                );
+                // Adjust nested span offsets
+                let adjusted: Vec<_> = nested_spans
+                    .into_iter()
+                    .map(|mut s| {
+                        s.start += offset;
+                        s.end += offset;
+                        s
+                    })
+                    .collect();
+                spans = merge_injection_spans(spans, adjusted);
+            }
+        }
+    }
+
+    spans
+}
+
+/// Merge injection spans with base spans.
+/// Injection spans take precedence - remove overlapping base spans.
+fn merge_injection_spans(
+    mut base: Vec<HighlightSpan>,
+    injections: Vec<HighlightSpan>,
+) -> Vec<HighlightSpan> {
+    if injections.is_empty() {
+        return base;
+    }
+
+    // Remove base spans that overlap with injection spans
+    base.retain(|b| {
+        !injections
+            .iter()
+            .any(|i| b.start < i.end && b.end > i.start)
+    });
+
+    base.extend(injections);
+    base
+}
+
+/// Normalize language name for grammar lookup.
+fn normalize_language_name(name: &str) -> String {
+    match name.to_lowercase().as_str() {
+        "js" | "javascript" => "javascript".to_string(),
+        "ts" | "typescript" => "typescript".to_string(),
+        "py" | "python" | "python3" => "python".to_string(),
+        "rb" | "ruby" => "ruby".to_string(),
+        "rs" | "rust" => "rust".to_string(),
+        "sh" | "bash" | "shell" | "zsh" => "bash".to_string(),
+        "yml" => "yaml".to_string(),
+        "md" => "markdown".to_string(),
+        "cpp" | "c++" => "cpp".to_string(),
+        "cs" | "csharp" => "c-sharp".to_string(),
+        "dockerfile" => "dockerfile".to_string(),
+        _ => name.to_lowercase(),
+    }
 }
 
 /// Collect highlight spans using tree-sitter Query API.
