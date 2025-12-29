@@ -1,7 +1,7 @@
 use crate::parsers::Parsers;
+use crate::skeleton::SkeletonExtractor;
 use moss_languages::{support_for_path, Language};
 use std::path::Path;
-use tree_sitter;
 
 /// Result of finding a symbol in a file
 #[derive(Debug)]
@@ -41,77 +41,48 @@ impl Editor {
         }
     }
 
-    /// Find a symbol by name in a file
+    /// Find a symbol by name in a file (uses skeleton extractor)
     pub fn find_symbol(&self, path: &Path, content: &str, name: &str) -> Option<SymbolLocation> {
-        let support = support_for_path(path)?;
-        let grammar = support.grammar_name();
-        let tree = self.parsers.parse_with_grammar(grammar, content)?;
-        let root = tree.root_node();
-        self.find_symbol_with_trait(root, content, name, grammar, support)
-    }
+        let extractor = SkeletonExtractor::new();
+        let result = extractor.extract(path, content);
 
-    fn find_symbol_with_trait(
-        &self,
-        node: tree_sitter::Node,
-        content: &str,
-        name: &str,
-        grammar: &str,
-        support: &dyn Language,
-    ) -> Option<SymbolLocation> {
-        let kind = node.kind();
+        fn line_to_byte(content: &str, line: usize) -> usize {
+            content
+                .lines()
+                .take(line.saturating_sub(1))
+                .map(|l| l.len() + 1)
+                .sum()
+        }
 
-        // Check if this is a function or container with matching name
-        let symbol_kind = if support.function_kinds().contains(&kind) {
-            Some("function")
-        } else if support.container_kinds().contains(&kind) {
-            Some("class")
-        } else if support.type_kinds().contains(&kind) && !support.container_kinds().contains(&kind)
-        {
-            Some("type")
-        } else {
-            None
-        };
-
-        if let Some(sym_kind) = symbol_kind {
-            if let Some(name_node) = node
-                .child_by_field_name("name")
-                .or_else(|| node.child_by_field_name("type"))
-            // For impl blocks
-            {
-                let symbol_name = &content[name_node.byte_range()];
-                if symbol_name == name {
-                    let start_byte = node.start_byte();
-                    let line_start = content[..start_byte]
-                        .rfind('\n')
-                        .map(|i| i + 1)
-                        .unwrap_or(0);
-                    let indent = content[line_start..start_byte]
-                        .chars()
-                        .take_while(|c| c.is_whitespace())
-                        .collect();
+        fn search_symbols(
+            symbols: &[crate::skeleton::SkeletonSymbol],
+            name: &str,
+            content: &str,
+        ) -> Option<SymbolLocation> {
+            for sym in symbols {
+                if sym.name == name {
+                    let start_byte = line_to_byte(content, sym.start_line);
+                    let end_byte = line_to_byte(content, sym.end_line + 1);
 
                     return Some(SymbolLocation {
-                        name: symbol_name.to_string(),
-                        kind: sym_kind.to_string(),
-                        start_byte: node.start_byte(),
-                        end_byte: node.end_byte(),
-                        start_line: node.start_position().row + 1,
-                        end_line: node.end_position().row + 1,
-                        indent,
+                        name: sym.name.clone(),
+                        kind: sym.kind.to_string(),
+                        start_byte,
+                        end_byte,
+                        start_line: sym.start_line,
+                        end_line: sym.end_line,
+                        indent: String::new(),
                     });
                 }
+                // Search children
+                if let Some(loc) = search_symbols(&sym.children, name, content) {
+                    return Some(loc);
+                }
             }
+            None
         }
 
-        // Recurse into children
-        let mut cursor = node.walk();
-        for child in node.children(&mut cursor) {
-            if let Some(loc) = self.find_symbol_with_trait(child, content, name, grammar, support) {
-                return Some(loc);
-            }
-        }
-
-        None
+        search_symbols(&result.symbols, name, content)
     }
 
     /// Delete a symbol from the content
@@ -293,18 +264,71 @@ impl Editor {
         result
     }
 
-    /// Find the body of a container symbol (class, impl block) for prepend/append
+    /// Find the body of a container symbol (class, impl block, markdown section) for prepend/append
     pub fn find_container_body(
         &self,
         path: &Path,
         content: &str,
         name: &str,
     ) -> Option<ContainerBody> {
+        // Try skeleton-based lookup first (handles markdown sections)
+        if let Some(body) = self.find_container_body_via_skeleton(path, content, name) {
+            return Some(body);
+        }
+
+        // Fall back to AST-based lookup for languages with explicit body nodes
         let support = support_for_path(path)?;
         let grammar = support.grammar_name();
         let tree = self.parsers.parse_with_grammar(grammar, content)?;
         let root = tree.root_node();
         self.find_container_body_with_trait(root, content, name, grammar, support)
+    }
+
+    /// Find container body using skeleton (for markdown sections)
+    fn find_container_body_via_skeleton(
+        &self,
+        path: &Path,
+        content: &str,
+        name: &str,
+    ) -> Option<ContainerBody> {
+        let extractor = SkeletonExtractor::new();
+        let result = extractor.extract(path, content);
+
+        fn line_to_byte(content: &str, line: usize) -> usize {
+            content
+                .lines()
+                .take(line.saturating_sub(1))
+                .map(|l| l.len() + 1)
+                .sum()
+        }
+
+        fn search_symbols(
+            symbols: &[crate::skeleton::SkeletonSymbol],
+            name: &str,
+            content: &str,
+        ) -> Option<ContainerBody> {
+            for sym in symbols {
+                if sym.name == name && sym.kind == "heading" {
+                    // For markdown: body starts after heading line, ends at section end
+                    let content_start = line_to_byte(content, sym.start_line + 1);
+                    let content_end = line_to_byte(content, sym.end_line + 1);
+
+                    return Some(ContainerBody {
+                        content_start,
+                        content_end,
+                        inner_indent: String::new(),
+                        is_empty: content_start >= content_end,
+                    });
+                }
+                // Search children
+                if let Some(body) = search_symbols(&sym.children, name, content) {
+                    return Some(body);
+                }
+            }
+            None
+        }
+
+        search_symbols(&result.symbols, name, content)
     }
 
     fn find_container_body_with_trait(
