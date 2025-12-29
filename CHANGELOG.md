@@ -40,7 +40,7 @@ Grammar build tooling:
 `moss analyze` improvements:
 - `--duplicate-types`: detect structurally similar types via field name overlap
 - `--min-overlap N`: configurable threshold (default 70%)
-- `--allow-type "Type1~Type2"`: add pair to `.moss/duplicate-types-allow`
+- `--allow-type Type1 Type2`: add pair to `.moss/duplicate-types-allow`
 - Supports single file or directory scanning
 - JSON output with `--json`
 

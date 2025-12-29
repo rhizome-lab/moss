@@ -180,9 +180,9 @@ pub struct AnalyzeArgs {
     #[arg(long, default_value = "70")]
     pub min_overlap: usize,
 
-    /// Allow a duplicate type pair (add to .moss/duplicate-types-allow). Format: Type1~Type2
-    #[arg(long, value_name = "PAIR")]
-    pub allow_type: Option<String>,
+    /// Allow a duplicate type pair (add to .moss/duplicate-types-allow)
+    #[arg(long, num_args = 2, value_names = ["TYPE1", "TYPE2"])]
+    pub allow_type: Option<Vec<String>>,
 
     /// Elide identifier names when detecting clones (default: true)
     #[arg(long, default_value = "true")]
@@ -268,8 +268,15 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
     let weights = config.analyze.weights();
 
     // Handle --allow-type mode
-    if let Some(ref pair) = args.allow_type {
-        return cmd_allow_duplicate_type(&effective_root, pair, args.reason.as_deref());
+    if let Some(ref types) = args.allow_type {
+        if types.len() == 2 {
+            return cmd_allow_duplicate_type(
+                &effective_root,
+                &types[0],
+                &types[1],
+                args.reason.as_deref(),
+            );
+        }
     }
 
     // Handle --duplicate-types as standalone pass
@@ -2212,7 +2219,7 @@ fn cmd_duplicate_types(
         .lines()
         .filter(|l| !l.trim().is_empty() && !l.trim().starts_with('#'))
         .filter_map(|l| {
-            let parts: Vec<&str> = l.trim().split('~').collect();
+            let parts: Vec<&str> = l.trim().split_whitespace().collect();
             if parts.len() == 2 {
                 // Store in sorted order for consistent matching
                 let (a, b) = if parts[0] < parts[1] {
@@ -2457,21 +2464,14 @@ fn cmd_duplicate_types(
 }
 
 /// Allow a duplicate type pair by adding to .moss/duplicate-types-allow
-fn cmd_allow_duplicate_type(root: &Path, pair: &str, reason: Option<&str>) -> i32 {
-    // Parse pair format: Type1~Type2
-    let parts: Vec<&str> = pair.split('~').collect();
-    if parts.len() != 2 {
-        eprintln!("Invalid pair format. Use: Type1~Type2");
-        return 1;
-    }
-
+fn cmd_allow_duplicate_type(root: &Path, type1: &str, type2: &str, reason: Option<&str>) -> i32 {
     // Normalize to sorted order
-    let (type1, type2) = if parts[0] < parts[1] {
-        (parts[0], parts[1])
+    let (type1, type2) = if type1 < type2 {
+        (type1, type2)
     } else {
-        (parts[1], parts[0])
+        (type2, type1)
     };
-    let entry = format!("{}~{}", type1, type2);
+    let entry = format!("{} {}", type1, type2);
 
     // Load existing allowlist
     let allowlist_path = root.join(".moss/duplicate-types-allow");
@@ -2480,10 +2480,17 @@ fn cmd_allow_duplicate_type(root: &Path, pair: &str, reason: Option<&str>) -> i3
 
     // Check if already exists
     for line in &existing_lines {
-        let trimmed = line.trim();
-        if trimmed == entry || trimmed == format!("{}~{}", type2, type1) {
-            println!("Pair already allowed: {}", entry);
-            return 0;
+        let parts: Vec<&str> = line.trim().split_whitespace().collect();
+        if parts.len() == 2 {
+            let (a, b) = if parts[0] < parts[1] {
+                (parts[0], parts[1])
+            } else {
+                (parts[1], parts[0])
+            };
+            if a == type1 && b == type2 {
+                println!("Pair already allowed: {}", entry);
+                return 0;
+            }
         }
     }
 
