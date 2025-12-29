@@ -10,6 +10,8 @@ Reduced duplicate type definitions across crates:
 - `symbols.rs`: Symbol → FlatSymbol, Import → FlatImport, deleted SymbolKind (uses moss_languages::SymbolKind)
 - `deps.rs`: Uses moss_languages::Import/Export directly, removed conversion functions
 - `skeleton.rs`: SkeletonSymbol now type alias to moss_languages::Symbol (SymbolExt trait for to_view_node)
+- `analyze/mod.rs`: Generic `FileReport<T>` consolidates ComplexityReport/LengthReport
+- `skeleton.rs`: SkeletonResult is now type alias for ExtractResult
 
 ### Syntax Highlighting
 
@@ -38,6 +40,8 @@ Grammar build tooling:
 ### Analyze Command
 
 `moss analyze` improvements:
+- `--duplicate-functions`: detect duplicate functions (renamed from `--clones`)
+- `--allow-function`: add function pair to `.moss/duplicate-functions-allow` (renamed from `--allow-group`)
 - `--duplicate-types`: detect structurally similar types via field name overlap
 - `--min-overlap N`: configurable threshold (default 70%)
 - `--allow-type Type1 Type2`: add pair to `.moss/duplicate-types-allow`
