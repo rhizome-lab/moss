@@ -1189,7 +1189,20 @@ fn cmd_view_symbol(
             }
             0
         } else {
-            eprintln!("Symbol not found: {}", symbol_name);
+            // "Did You Mean?" bridge: if symbol not found but text exists, suggest grep
+            let text_matches: Vec<_> = content.match_indices(symbol_name).collect();
+            if text_matches.is_empty() {
+                eprintln!("Symbol not found: {}", symbol_name);
+            } else {
+                eprintln!(
+                    "Symbol '{}' not found in AST. However, the string '{}' appears {} time{}.",
+                    symbol_name,
+                    symbol_name,
+                    text_matches.len(),
+                    if text_matches.len() == 1 { "" } else { "s" }
+                );
+                eprintln!("Did you mean: moss grep '{}' {}", symbol_name, file_path);
+            }
             1
         }
     }

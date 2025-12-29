@@ -8,7 +8,11 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ## Remaining Work
 - Rethink 'unified tree' - codebases are graphs (namespaces, inheritance, calls), not trees
 - Shadow worktree isolation: git worktree or overlayfs for parallel validation
-- view: add 'Did You Mean?' bridge - if symbol not found but text exists, suggest grep
+  - Store diffs in memory, use worktree as "materialized view"
+  - Apply patch to worktree → run validator → if pass, apply to user dir
+  - Zero user interruption (user can edit while agent tests in background)
+- [x] view: add 'Did You Mean?' bridge - if symbol not found but text exists, suggest grep
+- "Hoisted Context": Body + Used Imports (not just skeleton) for agent context
 
 ### Configuration System
 Sections: `[daemon]`, `[index]`, `[filter.aliases]`, `[todo]`, `[view]`, `[analyze]`, `[grep]`
