@@ -47,16 +47,8 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 
 ### Code Quality
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
-- Highlighting test coverage: 13/98 languages tested. Remaining batches:
-  - Batch 1 (web): css, html, scss, svelte, vue, tsx
-  - Batch 2 (functional): haskell, ocaml, fsharp, elixir, erlang, clojure, scheme
-  - Batch 3 (systems): zig, d, ada, verilog, vhdl, asm, x86asm
-  - Batch 4 (jvm+apple): scala, kotlin, groovy, swift, objc
-  - Batch 5 (scripting): perl, php, awk, fish, zsh, powershell
-  - Batch 6 (data/query): sql, graphql, sparql, jq
-  - Batch 7 (config): ini, hcl, nix, dockerfile, nginx, cmake, meson
-  - Batch 8 (scientific): julia, r, matlab, prolog
-  - Batch 9 (misc): dart, vim, elisp, xml, gleam, elm, nim, ron
+- [x] Highlighting test coverage: 144 tests across 59 languages (see `highlight_tests.rs`)
+  - Note: Many grammars use anonymous nodes, limiting highlighting but grammar loading is verified
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
