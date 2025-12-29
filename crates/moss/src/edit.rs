@@ -1,6 +1,6 @@
 use crate::parsers::Parsers;
 use crate::skeleton::SkeletonExtractor;
-use moss_languages::{support_for_path, Language};
+use moss_languages::{support_for_path, Language, SymbolKind};
 use std::path::Path;
 
 /// Result of finding a symbol in a file
@@ -66,7 +66,7 @@ impl Editor {
 
                     return Some(SymbolLocation {
                         name: sym.name.clone(),
-                        kind: sym.kind.to_string(),
+                        kind: sym.kind.as_str().to_string(),
                         start_byte,
                         end_byte,
                         start_line: sym.start_line,
@@ -308,7 +308,7 @@ impl Editor {
             content: &str,
         ) -> Option<ContainerBody> {
             for sym in symbols {
-                if sym.name == name && sym.kind == "heading" {
+                if sym.name == name && sym.kind == SymbolKind::Heading {
                     // For markdown: body starts after heading line, ends at section end
                     let content_start = line_to_byte(content, sym.start_line + 1);
                     let content_end = line_to_byte(content, sym.end_line + 1);

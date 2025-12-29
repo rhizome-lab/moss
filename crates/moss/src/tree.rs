@@ -1067,7 +1067,7 @@ fn skeleton_to_view_node(sym: &SkeletonSymbol, parent_path: &str, grammar: &str)
 
     ViewNode {
         name: sym.name.clone(),
-        kind: ViewNodeKind::Symbol(sym.kind.to_string()),
+        kind: ViewNodeKind::Symbol(sym.kind.as_str().to_string()),
         path,
         children,
         signature: Some(sym.signature.clone()),

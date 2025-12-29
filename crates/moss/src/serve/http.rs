@@ -226,7 +226,7 @@ async fn get_file(
         .iter()
         .map(|s| SymbolInfo {
             name: s.name.clone(),
-            kind: s.kind.to_string(),
+            kind: s.kind.as_str().to_string(),
             line: s.start_line,
         })
         .collect();

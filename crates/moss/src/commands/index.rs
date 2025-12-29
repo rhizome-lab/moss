@@ -383,7 +383,7 @@ fn count_and_insert_symbols(
         let _ = pkg_index.insert_symbol(
             pkg_id,
             &sym.name,
-            sym.kind,
+            sym.kind.as_str(),
             &sym.signature,
             sym.start_line as u32,
         );

@@ -5,24 +5,21 @@
 
 use crate::extract::{ExtractOptions, Extractor};
 use crate::tree::{ViewNode, ViewNodeKind};
-use moss_languages::{Symbol as LangSymbol, SymbolKind as LangSymbolKind};
+use moss_languages::{Symbol, SymbolKind};
 use std::path::Path;
 
-/// A code symbol with its signature
-#[derive(Debug, Clone)]
-pub struct SkeletonSymbol {
-    pub name: String,
-    pub kind: &'static str, // "class", "function", "method"
-    pub signature: String,
-    pub docstring: Option<String>,
-    pub start_line: usize,
-    pub end_line: usize,
-    pub children: Vec<SkeletonSymbol>,
+/// Re-export Symbol as SkeletonSymbol for backwards compatibility.
+/// This is the canonical Symbol type from moss_languages.
+pub type SkeletonSymbol = Symbol;
+
+/// Extension trait for converting Symbol to ViewNode
+pub trait SymbolExt {
+    fn to_view_node(&self, parent_path: &str, grammar: Option<&str>) -> ViewNode;
 }
 
-impl SkeletonSymbol {
+impl SymbolExt for Symbol {
     /// Convert to a ViewNode for unified viewing.
-    pub fn to_view_node(&self, parent_path: &str, grammar: Option<&str>) -> ViewNode {
+    fn to_view_node(&self, parent_path: &str, grammar: Option<&str>) -> ViewNode {
         let path = if parent_path.is_empty() {
             self.name.clone()
         } else {
@@ -37,7 +34,7 @@ impl SkeletonSymbol {
 
         ViewNode {
             name: self.name.clone(),
-            kind: ViewNodeKind::Symbol(self.kind.to_string()),
+            kind: ViewNodeKind::Symbol(self.kind.as_str().to_string()),
             path,
             children,
             signature: Some(self.signature.clone()),
@@ -74,14 +71,20 @@ impl SkeletonResult {
     /// Filter to only type definitions (class, struct, enum, trait, interface)
     /// Returns a new SkeletonResult with only type-like symbols, and strips methods from classes
     pub fn filter_types(&self) -> SkeletonResult {
-        fn is_type_kind(kind: &str) -> bool {
+        fn is_type_kind(kind: SymbolKind) -> bool {
             matches!(
                 kind,
-                "class" | "struct" | "enum" | "trait" | "interface" | "type" | "impl" | "module"
+                SymbolKind::Class
+                    | SymbolKind::Struct
+                    | SymbolKind::Enum
+                    | SymbolKind::Trait
+                    | SymbolKind::Interface
+                    | SymbolKind::Type
+                    | SymbolKind::Module
             )
         }
 
-        fn filter_symbol(sym: &SkeletonSymbol) -> Option<SkeletonSymbol> {
+        fn filter_symbol(sym: &Symbol) -> Option<Symbol> {
             if is_type_kind(sym.kind) {
                 // For types, keep only nested types (not methods)
                 let type_children: Vec<_> = sym
@@ -89,13 +92,14 @@ impl SkeletonResult {
                     .iter()
                     .filter_map(|c| filter_symbol(c))
                     .collect();
-                Some(SkeletonSymbol {
+                Some(Symbol {
                     name: sym.name.clone(),
                     kind: sym.kind,
                     signature: sym.signature.clone(),
                     docstring: sym.docstring.clone(),
                     start_line: sym.start_line,
                     end_line: sym.end_line,
+                    visibility: sym.visibility,
                     children: type_children,
                 })
             } else {
@@ -113,34 +117,6 @@ impl SkeletonResult {
             symbols: filtered_symbols,
             file_path: self.file_path.clone(),
         }
-    }
-}
-
-/// Convert a moss_languages::Symbol to SkeletonSymbol
-fn convert_symbol(sym: &LangSymbol) -> SkeletonSymbol {
-    let kind = match sym.kind {
-        LangSymbolKind::Function => "function",
-        LangSymbolKind::Method => "method",
-        LangSymbolKind::Class => "class",
-        LangSymbolKind::Struct => "struct",
-        LangSymbolKind::Enum => "enum",
-        LangSymbolKind::Trait => "trait",
-        LangSymbolKind::Interface => "interface",
-        LangSymbolKind::Module => "module",
-        LangSymbolKind::Type => "type",
-        LangSymbolKind::Constant => "constant",
-        LangSymbolKind::Variable => "variable",
-        LangSymbolKind::Heading => "heading",
-    };
-
-    SkeletonSymbol {
-        name: sym.name.clone(),
-        kind,
-        signature: sym.signature.clone(),
-        docstring: sym.docstring.clone(),
-        start_line: sym.start_line,
-        end_line: sym.end_line,
-        children: sym.children.iter().map(convert_symbol).collect(),
     }
 }
 
@@ -168,7 +144,7 @@ impl SkeletonExtractor {
     pub fn extract(&self, path: &Path, content: &str) -> SkeletonResult {
         let result = self.extractor.extract(path, content);
         SkeletonResult {
-            symbols: result.symbols.iter().map(convert_symbol).collect(),
+            symbols: result.symbols,
             file_path: result.file_path,
         }
     }
@@ -185,7 +161,7 @@ impl SkeletonExtractor {
             }
         }
         Some(SkeletonResult {
-            symbols: result.symbols.iter().map(convert_symbol).collect(),
+            symbols: result.symbols,
             file_path: result.file_path,
         })
     }
@@ -216,13 +192,13 @@ class Bar:
 
         let foo = &result.symbols[0];
         assert_eq!(foo.name, "foo");
-        assert_eq!(foo.kind, "function");
+        assert_eq!(foo.kind, SymbolKind::Function);
         assert!(foo.signature.contains("def foo(x: int) -> str"));
         assert_eq!(foo.docstring.as_deref(), Some("Convert int to string."));
 
         let bar = &result.symbols[1];
         assert_eq!(bar.name, "Bar");
-        assert_eq!(bar.kind, "class");
+        assert_eq!(bar.kind, SymbolKind::Class);
         assert_eq!(bar.children.len(), 1);
         assert_eq!(bar.children[0].name, "method");
     }
@@ -247,7 +223,7 @@ impl Foo {
 
         // Should have struct with method from impl
         let foo = result.symbols.iter().find(|s| s.name == "Foo").unwrap();
-        assert_eq!(foo.kind, "struct");
+        assert_eq!(foo.kind, SymbolKind::Struct);
         assert!(foo.signature.contains("pub struct Foo"));
         assert_eq!(foo.children.len(), 1);
         assert_eq!(foo.children[0].name, "new");
@@ -303,7 +279,7 @@ More content.
 
         let title = &result.symbols[0];
         assert_eq!(title.name, "Title");
-        assert_eq!(title.kind, "heading");
+        assert_eq!(title.kind, SymbolKind::Heading);
 
         // Check that code block comment wasn't extracted as heading
         let all_names: Vec<&str> = result
@@ -339,11 +315,11 @@ class Greeter {
 
         let greet_fn = &result.symbols[0];
         assert_eq!(greet_fn.name, "greet");
-        assert_eq!(greet_fn.kind, "function");
+        assert_eq!(greet_fn.kind, SymbolKind::Function);
 
         let greeter = &result.symbols[1];
         assert_eq!(greeter.name, "Greeter");
-        assert_eq!(greeter.kind, "class");
+        assert_eq!(greeter.kind, SymbolKind::Class);
 
         // Class should have 2 methods: constructor and greet
         assert_eq!(
@@ -379,7 +355,7 @@ class AnotherClass:
         // Filtered should only have classes
         let filtered = result.filter_types();
         assert_eq!(filtered.symbols.len(), 2);
-        assert!(filtered.symbols.iter().all(|s| s.kind == "class"));
+        assert!(filtered.symbols.iter().all(|s| s.kind == SymbolKind::Class));
         assert_eq!(filtered.symbols[0].name, "MyClass");
         assert_eq!(filtered.symbols[1].name, "AnotherClass");
     }
@@ -414,11 +390,11 @@ fn another_function() {}
         // Filtered should have struct, enum, trait, impl
         let filtered = result.filter_types();
         let kinds: Vec<_> = filtered.symbols.iter().map(|s| s.kind).collect();
-        assert!(kinds.contains(&"struct"), "Should have struct");
-        assert!(kinds.contains(&"enum"), "Should have enum");
-        assert!(kinds.contains(&"trait"), "Should have trait");
+        assert!(kinds.contains(&SymbolKind::Struct), "Should have struct");
+        assert!(kinds.contains(&SymbolKind::Enum), "Should have enum");
+        assert!(kinds.contains(&SymbolKind::Trait), "Should have trait");
         // Functions should be filtered out
-        assert!(!kinds.contains(&"function"));
+        assert!(!kinds.contains(&SymbolKind::Function));
     }
 
     #[test]
@@ -572,9 +548,12 @@ trait Greeter {
         assert!(names.contains(&"Person"), "Should have Person class");
         assert!(names.contains(&"Greeter"), "Should have Greeter trait");
 
-        assert!(kinds.contains(&"module"), "Should have module (object)");
-        assert!(kinds.contains(&"class"), "Should have class");
-        assert!(kinds.contains(&"trait"), "Should have trait");
+        assert!(
+            kinds.contains(&SymbolKind::Module),
+            "Should have module (object)"
+        );
+        assert!(kinds.contains(&SymbolKind::Class), "Should have class");
+        assert!(kinds.contains(&SymbolKind::Trait), "Should have trait");
     }
 
     #[test]
@@ -669,15 +648,15 @@ class Bar:
 
         let foo = &result.symbols[0];
         assert_eq!(foo.name, "foo");
-        assert_eq!(foo.kind, "function");
+        assert_eq!(foo.kind, SymbolKind::Function);
         assert!(foo.signature.contains("def foo"));
         assert_eq!(foo.docstring.as_deref(), Some("Convert int to string."));
 
         let bar = &result.symbols[1];
         assert_eq!(bar.name, "Bar");
-        assert_eq!(bar.kind, "class");
+        assert_eq!(bar.kind, SymbolKind::Class);
         assert_eq!(bar.children.len(), 1, "Class should have 1 method");
         assert_eq!(bar.children[0].name, "method");
-        assert_eq!(bar.children[0].kind, "method");
+        assert_eq!(bar.children[0].kind, SymbolKind::Method);
     }
 }

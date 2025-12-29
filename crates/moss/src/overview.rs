@@ -16,6 +16,7 @@ use crate::analyze::complexity::ComplexityAnalyzer;
 use crate::deps::DepsExtractor;
 use crate::path_resolve;
 use crate::skeleton::SkeletonExtractor;
+use moss_languages::SymbolKind;
 
 /// Overview report aggregating multiple checks
 #[derive(Debug)]
@@ -302,14 +303,14 @@ pub fn analyze_overview(root: &Path) -> OverviewReport {
             ) {
                 for sym in symbols {
                     match sym.kind {
-                        "class" => *classes += 1,
-                        "method" => {
+                        SymbolKind::Class => *classes += 1,
+                        SymbolKind::Method => {
                             *methods += 1;
                             if sym.docstring.is_some() {
                                 *functions_with_docs += 1;
                             }
                         }
-                        "function" => {
+                        SymbolKind::Function => {
                             if sym.docstring.is_some() {
                                 *functions_with_docs += 1;
                             }

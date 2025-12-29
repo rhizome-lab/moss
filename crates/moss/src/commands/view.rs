@@ -4,6 +4,7 @@ use crate::commands::filter::detect_project_languages;
 use crate::config::MossConfig;
 use crate::filter::Filter;
 use crate::merge::Merge;
+use crate::skeleton::SymbolExt;
 use crate::tree::{DocstringDisplay, FormatOptions, ViewNode, ViewNodeKind};
 use crate::{daemon, deps, index, path_resolve, skeleton, symbols, tree};
 use clap::Args;
@@ -247,7 +248,7 @@ fn collect_matching_symbols(
             matches.push((
                 index::SymbolMatch {
                     name: sym.name.clone(),
-                    kind: sym.kind.to_string(),
+                    kind: sym.kind.as_str().to_string(),
                     file: file.to_string(),
                     start_line: sym.start_line,
                     end_line: sym.end_line,
@@ -1190,7 +1191,10 @@ fn cmd_view_symbol(
                 // Use ViewNode for consistent text formatting
                 println!(
                     "# {} ({}, L{}-{})",
-                    full_symbol_path, sym.kind, sym.start_line, sym.end_line
+                    full_symbol_path,
+                    sym.kind.as_str(),
+                    sym.start_line,
+                    sym.end_line
                 );
                 let format_options = FormatOptions {
                     docstrings: if show_docs {

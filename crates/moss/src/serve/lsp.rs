@@ -146,7 +146,7 @@ impl LanguageServer for MossBackend {
                 } else {
                     Some(sym.signature.clone())
                 },
-                kind: MossBackend::to_lsp_symbol_kind(&sym.kind.to_string()),
+                kind: MossBackend::to_lsp_symbol_kind(sym.kind.as_str()),
                 tags: None,
                 deprecated: None,
                 range,
@@ -260,7 +260,7 @@ impl LanguageServer for MossBackend {
 
         match symbol {
             Some(sym) => {
-                let mut content = format!("**{}** `{}`", sym.kind, sym.name);
+                let mut content = format!("**{}** `{}`", sym.kind.as_str(), sym.name);
                 if !sym.signature.is_empty() {
                     content.push_str(&format!("\n\n```\n{}\n```", sym.signature));
                 }

@@ -8,7 +8,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - [x] Data formats (TOML, JSON) syntax highlighting - works with `--pretty`
 - `cargo xtask build-grammars` doesn't copy .scm files for already-built grammars (need --force or separate copy step)
 - [x] `moss view` for JSON files now shows key structure with line ranges
-- Consolidate SkeletonSymbol: could use moss_languages::Symbol directly (just ignoring visibility field)
+- [x] Consolidate SkeletonSymbol: now type alias to moss_languages::Symbol (SymbolExt trait for to_view_node)
 
 ## Remaining Work
 - Rethink 'unified tree' - codebases are graphs (namespaces, inheritance, calls), not trees
