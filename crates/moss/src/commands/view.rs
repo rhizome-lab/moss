@@ -376,6 +376,11 @@ pub fn cmd_view(
         );
     }
 
+    // Handle line ranges: file.rs:30-55
+    if let Some((file_path, start, end)) = parse_line_range(target) {
+        return cmd_view_line_range(&file_path, start, end, &root, line_numbers, json, pretty);
+    }
+
     // Use unified path resolution - get ALL matches
     let matches = path_resolve::resolve_unified_all(target, &root);
 
@@ -1283,6 +1288,113 @@ fn cmd_view_symbol(
             1
         }
     }
+}
+
+/// Parse a line range target like "file.rs:30-55" into (file_path, start, end).
+fn parse_line_range(target: &str) -> Option<(String, usize, usize)> {
+    // Find the last colon (to handle paths like C:\foo on Windows)
+    let colon_pos = target.rfind(':')?;
+    let (path, range) = target.split_at(colon_pos);
+    let range = &range[1..]; // Skip the colon
+
+    // Parse the range as start-end
+    let (start_str, end_str) = range.split_once('-')?;
+    let start: usize = start_str.parse().ok()?;
+    let end: usize = end_str.parse().ok()?;
+
+    if start == 0 || end == 0 || start > end {
+        return None;
+    }
+
+    Some((path.to_string(), start, end))
+}
+
+/// View a range of lines from a file.
+fn cmd_view_line_range(
+    file_path: &str,
+    start: usize,
+    end: usize,
+    root: &Path,
+    line_numbers: bool,
+    json: bool,
+    pretty: bool,
+) -> i32 {
+    // Resolve the file path
+    let full_path = root.join(file_path);
+    if !full_path.exists() {
+        eprintln!("File not found: {}", file_path);
+        return 1;
+    }
+
+    let content = match std::fs::read_to_string(&full_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Failed to read file: {}", e);
+            return 1;
+        }
+    };
+
+    let lines: Vec<&str> = content.lines().collect();
+    let total_lines = lines.len();
+
+    // Clamp range to file bounds
+    let actual_start = start.min(total_lines);
+    let actual_end = end.min(total_lines);
+
+    if actual_start > total_lines {
+        eprintln!("Line {} is past end of file ({} lines)", start, total_lines);
+        return 1;
+    }
+
+    if json {
+        let range_lines: Vec<serde_json::Value> = (actual_start..=actual_end)
+            .filter_map(|i| {
+                lines.get(i - 1).map(|line| {
+                    serde_json::json!({
+                        "line": i,
+                        "content": line
+                    })
+                })
+            })
+            .collect();
+        println!(
+            "{}",
+            serde_json::json!({
+                "file": file_path,
+                "start": actual_start,
+                "end": actual_end,
+                "lines": range_lines
+            })
+        );
+        return 0;
+    }
+
+    // Header
+    println!("# {}:{}-{}", file_path, actual_start, actual_end);
+    println!();
+
+    // Output lines
+    let width = actual_end.to_string().len();
+    for i in actual_start..=actual_end {
+        if let Some(line) = lines.get(i - 1) {
+            if line_numbers {
+                if pretty {
+                    println!(
+                        "{:>width$} │ {}",
+                        nu_ansi_term::Color::DarkGray.paint(i.to_string()),
+                        line,
+                        width = width
+                    );
+                } else {
+                    println!("{:>width$} │ {}", i, line, width = width);
+                }
+            } else {
+                println!("{}", line);
+            }
+        }
+    }
+
+    0
 }
 
 /// Extract all identifiers used in source code.
