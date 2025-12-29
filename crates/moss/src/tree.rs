@@ -290,18 +290,8 @@ pub enum HighlightKind {
 /// falling back to manual node classification otherwise.
 /// Also processes injections for embedded languages (e.g., code blocks in markdown).
 pub fn highlight_source(source: &str, grammar: &str, use_colors: bool) -> String {
-    highlight_source_impl(source, grammar, use_colors, 0)
-}
-
-/// Internal implementation with recursion depth tracking.
-fn highlight_source_impl(source: &str, grammar: &str, use_colors: bool, depth: usize) -> String {
     // If colors disabled, just return the source as-is
     if !use_colors {
-        return source.to_string();
-    }
-
-    // Limit recursion depth to prevent infinite loops
-    if depth > 3 {
         return source.to_string();
     }
 
@@ -336,7 +326,7 @@ fn highlight_source_impl(source: &str, grammar: &str, use_colors: bool, depth: u
     if let Some(injection_query_str) = loader.get_injections(grammar) {
         if let Ok(injection_query) = Query::new(&language, &injection_query_str) {
             let injection_spans =
-                collect_injection_spans(&injection_query, tree.root_node(), source, depth, &loader);
+                collect_injection_spans(&injection_query, tree.root_node(), source, &loader);
             // Injection spans take precedence - remove base spans that overlap
             spans = merge_injection_spans(spans, injection_spans);
         }
@@ -350,7 +340,6 @@ fn collect_injection_spans(
     query: &Query,
     root: tree_sitter::Node,
     source: &str,
-    depth: usize,
     loader: &GrammarLoader,
 ) -> Vec<HighlightSpan> {
     let mut cursor = QueryCursor::new();
@@ -404,7 +393,7 @@ fn collect_injection_spans(
                 let offset = node.start_byte();
 
                 // Recursively highlight the injected content
-                let inner_spans = collect_inner_spans(content, &lang, depth + 1, offset);
+                let inner_spans = collect_inner_spans(content, &lang, offset);
                 spans.extend(inner_spans);
             }
         }
@@ -414,12 +403,7 @@ fn collect_injection_spans(
 }
 
 /// Collect spans for injected content, adjusting offsets.
-fn collect_inner_spans(
-    content: &str,
-    grammar: &str,
-    depth: usize,
-    offset: usize,
-) -> Vec<HighlightSpan> {
+fn collect_inner_spans(content: &str, grammar: &str, offset: usize) -> Vec<HighlightSpan> {
     let loader = GrammarLoader::new();
     let language = match loader.get(grammar) {
         Some(lang) => lang,
@@ -453,27 +437,20 @@ fn collect_inner_spans(
     }
 
     // Recursively process injections in the injected content
-    if depth < 3 {
-        if let Some(injection_query_str) = loader.get_injections(grammar) {
-            if let Ok(injection_query) = Query::new(&language, &injection_query_str) {
-                let nested_spans = collect_injection_spans(
-                    &injection_query,
-                    tree.root_node(),
-                    content,
-                    depth,
-                    &loader,
-                );
-                // Adjust nested span offsets
-                let adjusted: Vec<_> = nested_spans
-                    .into_iter()
-                    .map(|mut s| {
-                        s.start += offset;
-                        s.end += offset;
-                        s
-                    })
-                    .collect();
-                spans = merge_injection_spans(spans, adjusted);
-            }
+    if let Some(injection_query_str) = loader.get_injections(grammar) {
+        if let Ok(injection_query) = Query::new(&language, &injection_query_str) {
+            let nested_spans =
+                collect_injection_spans(&injection_query, tree.root_node(), content, &loader);
+            // Adjust nested span offsets
+            let adjusted: Vec<_> = nested_spans
+                .into_iter()
+                .map(|mut s| {
+                    s.start += offset;
+                    s.end += offset;
+                    s
+                })
+                .collect();
+            spans = merge_injection_spans(spans, adjusted);
         }
     }
 
