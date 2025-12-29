@@ -215,6 +215,14 @@ pub struct AnalyzeArgs {
     /// Include only paths matching pattern or @alias
     #[arg(long, value_name = "PATTERN")]
     pub only: Vec<String>,
+
+    /// Trace value provenance for a symbol
+    #[arg(long, value_name = "SYMBOL")]
+    pub trace: Option<String>,
+
+    /// Maximum trace depth (default: 10)
+    #[arg(long, default_value = "10")]
+    pub max_depth: usize,
 }
 
 /// Run analyze command with args.
@@ -294,6 +302,18 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             &effective_root,
             args.min_overlap,
             format.is_json(),
+        );
+    }
+
+    // Handle --trace mode
+    if let Some(ref symbol) = args.trace {
+        return cmd_trace(
+            symbol,
+            args.target.as_deref(),
+            &effective_root,
+            args.max_depth,
+            format.is_json(),
+            format.is_pretty(),
         );
     }
 
@@ -2679,6 +2699,314 @@ fn is_literal_kind(kind: &str) -> bool {
         || kind == "nil"
         || kind == "null"
         || kind == "none"
+}
+
+/// Parse a file to find a symbol (fallback when index unavailable/empty).
+fn fallback_parse_symbol(
+    symbol: &str,
+    target: Option<&str>,
+    root: &Path,
+) -> Vec<crate::index::SymbolMatch> {
+    let Some(path) = target else {
+        return Vec::new();
+    };
+
+    let full_path = root.join(path);
+    if !full_path.exists() {
+        return Vec::new();
+    }
+
+    let content = match std::fs::read_to_string(&full_path) {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+
+    let parser = crate::symbols::SymbolParser::new();
+    let symbols = parser.parse_file(&full_path, &content);
+    symbols
+        .into_iter()
+        .filter(|s| {
+            s.name == symbol
+                || s.parent.as_ref().map(|p| format!("{}/{}", p, s.name))
+                    == Some(symbol.to_string())
+        })
+        .map(|s| crate::index::SymbolMatch {
+            file: path.to_string(),
+            name: s.name,
+            kind: s.kind.as_str().to_string(),
+            parent: s.parent,
+            start_line: s.start_line,
+            end_line: s.end_line,
+        })
+        .collect()
+}
+
+/// Trace value provenance for a symbol.
+fn cmd_trace(
+    symbol: &str,
+    target: Option<&str>,
+    root: &Path,
+    max_depth: usize,
+    json: bool,
+    pretty: bool,
+) -> i32 {
+    use crate::index;
+    use crate::parsers;
+
+    // Find the symbol - try index first, fall back to file parsing
+    let symbol_matches = if let Some(mut idx) = index::FileIndex::open_if_enabled(root) {
+        let _ = idx.incremental_refresh();
+        match idx.find_symbols(symbol, None, false, 10) {
+            Ok(matches) if !matches.is_empty() => matches,
+            _ => fallback_parse_symbol(symbol, target, root),
+        }
+    } else {
+        fallback_parse_symbol(symbol, target, root)
+    };
+
+    if symbol_matches.is_empty() {
+        eprintln!("Symbol not found: {}", symbol);
+        return 1;
+    }
+
+    let sym = &symbol_matches[0];
+    let full_path = root.join(&sym.file);
+    let content = match std::fs::read_to_string(&full_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Failed to read file: {}", e);
+            return 1;
+        }
+    };
+
+    // Parse the file
+    let lang = match moss_languages::support_for_path(&full_path) {
+        Some(l) => l,
+        None => {
+            eprintln!("No language support for file");
+            return 1;
+        }
+    };
+    let parsers = parsers::Parsers::new();
+    let tree = match parsers.parse_with_grammar(lang.grammar_name(), &content) {
+        Some(t) => t,
+        None => {
+            eprintln!("Failed to parse file");
+            return 1;
+        }
+    };
+
+    let source_bytes = content.as_bytes();
+
+    let start_line = sym.start_line;
+    let end_line = sym.end_line;
+
+    // Trace assignments within the function
+    let trace_results = trace_assignments(
+        &tree.root_node(),
+        source_bytes,
+        start_line,
+        end_line,
+        max_depth,
+    );
+
+    if json {
+        let trace_json: Vec<serde_json::Value> = trace_results
+            .iter()
+            .map(|t| {
+                serde_json::json!({
+                    "variable": t.variable,
+                    "line": t.line,
+                    "source": t.source,
+                    "flows_from": t.flows_from
+                })
+            })
+            .collect();
+        println!(
+            "{}",
+            serde_json::json!({
+                "symbol": symbol,
+                "file": sym.file,
+                "start_line": start_line,
+                "end_line": end_line,
+                "trace": trace_json
+            })
+        );
+        return 0;
+    }
+
+    // Pretty output
+    println!("# Trace: {} ({}:{})", symbol, sym.file, start_line);
+    println!();
+
+    if trace_results.is_empty() {
+        println!("No assignments found in this symbol.");
+    } else {
+        for t in &trace_results {
+            let flows = if t.flows_from.is_empty() {
+                String::new()
+            } else {
+                format!(" ← {}", t.flows_from.join(", "))
+            };
+            if pretty {
+                println!(
+                    "  L{}: {} = {}{}",
+                    nu_ansi_term::Color::Yellow.paint(t.line.to_string()),
+                    nu_ansi_term::Color::Cyan.paint(&t.variable),
+                    t.source,
+                    nu_ansi_term::Color::DarkGray.paint(&flows)
+                );
+            } else {
+                println!("  L{}: {} = {}{}", t.line, t.variable, t.source, flows);
+            }
+        }
+    }
+
+    0
+}
+
+/// A traced assignment.
+#[derive(Debug)]
+struct TraceEntry {
+    variable: String,
+    line: usize,
+    source: String,
+    flows_from: Vec<String>,
+}
+
+/// Trace assignments within a function.
+fn trace_assignments(
+    root: &tree_sitter::Node,
+    source: &[u8],
+    start_line: usize,
+    end_line: usize,
+    _max_depth: usize,
+) -> Vec<TraceEntry> {
+    let mut entries = Vec::new();
+    let mut cursor = root.walk();
+
+    // Walk the AST looking for assignments
+    trace_node(&mut cursor, source, start_line, end_line, &mut entries);
+
+    entries
+}
+
+/// Recursively trace assignments in a node.
+fn trace_node(
+    cursor: &mut tree_sitter::TreeCursor,
+    source: &[u8],
+    start_line: usize,
+    end_line: usize,
+    entries: &mut Vec<TraceEntry>,
+) {
+    loop {
+        let node = cursor.node();
+        let line = node.start_position().row + 1;
+
+        // Only process nodes within our range
+        if line >= start_line && line <= end_line {
+            let kind = node.kind();
+
+            // Look for assignment-like nodes
+            if kind == "assignment_expression"
+                || kind == "assignment"
+                || kind == "let_declaration"
+                || kind == "variable_declarator"
+                || kind == "short_var_declaration"
+            {
+                if let Some(entry) = extract_assignment(&node, source, line) {
+                    entries.push(entry);
+                }
+            }
+        }
+
+        if cursor.goto_first_child() {
+            trace_node(cursor, source, start_line, end_line, entries);
+            cursor.goto_parent();
+        }
+
+        if !cursor.goto_next_sibling() {
+            break;
+        }
+    }
+}
+
+/// Extract assignment information from a node.
+fn extract_assignment(node: &tree_sitter::Node, source: &[u8], line: usize) -> Option<TraceEntry> {
+    // Try to find left and right sides
+    let lhs = node
+        .child_by_field_name("left")
+        .or_else(|| node.child_by_field_name("name"))
+        .or_else(|| node.child_by_field_name("pattern"));
+    let rhs = node
+        .child_by_field_name("right")
+        .or_else(|| node.child_by_field_name("value"))
+        .or_else(|| node.child_by_field_name("init"));
+
+    let variable = lhs
+        .and_then(|n| n.utf8_text(source).ok())
+        .map(|s| s.to_string())?;
+    let source_text = rhs
+        .and_then(|n| n.utf8_text(source).ok())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_else(|| "?".to_string());
+
+    // Extract identifiers from RHS that the value flows from
+    let flows_from = if let Some(rhs_node) = rhs {
+        extract_identifiers_from_node(&rhs_node, source)
+    } else {
+        Vec::new()
+    };
+
+    Some(TraceEntry {
+        variable,
+        line,
+        source: source_text,
+        flows_from,
+    })
+}
+
+/// Extract identifier names from a node.
+fn extract_identifiers_from_node(node: &tree_sitter::Node, source: &[u8]) -> Vec<String> {
+    let mut identifiers = Vec::new();
+    let mut cursor = node.walk();
+
+    fn collect(cursor: &mut tree_sitter::TreeCursor, source: &[u8], ids: &mut Vec<String>) {
+        loop {
+            let node = cursor.node();
+            let kind = node.kind();
+
+            if kind == "identifier" || kind == "field_identifier" || kind.ends_with("_identifier") {
+                if let Ok(text) = node.utf8_text(source) {
+                    // Skip keywords and common non-identifier patterns
+                    if ![
+                        "let", "mut", "const", "var", "true", "false", "nil", "null", "self",
+                        "this",
+                    ]
+                    .contains(&text)
+                    {
+                        ids.push(text.to_string());
+                    }
+                }
+            }
+
+            if cursor.goto_first_child() {
+                collect(cursor, source, ids);
+                cursor.goto_parent();
+            }
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+    }
+
+    collect(&mut cursor, source, &mut identifiers);
+
+    // Deduplicate
+    identifiers.sort();
+    identifiers.dedup();
+    identifiers
 }
 
 #[cfg(test)]

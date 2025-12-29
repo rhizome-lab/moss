@@ -59,6 +59,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
   - Filter names within multi-imports (e.g., `use foo::{A, B, C}` → `use foo::{A}` if only A is used)
   - Parent context: show class/impl/module containing target, with siblings collapsed
     - e.g., viewing `Foo::bar()` shows `impl Foo { fn bar() { ... } /* 3 other methods */ }`
+  - Optionally pull in referenced types as context (show type definitions used by the symbol)
 
 ### Code Quality
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
@@ -147,6 +148,15 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - Verification Loops: domain-specific validation (compiler, linter, tests) before accepting output
 - Synthesis: decompose complex tasks into solvable subproblems (`moss synthesize`)
 - Plugin Architecture: extensible view providers, synthesis strategies, code generators
+
+### Agent / MCP
+- `moss @agent` (crates/moss/src/commands/scripts/agent.lua): MCP support as second-class citizen
+  - Our own tools take priority, MCP as fallback/extension mechanism
+  - Need to design how MCP servers are discovered/configured
+
+### CI/Infrastructure
+- Fix pnpm/action-setup: "Error: No pnpm version is specified." - needs explicit version in GitHub Actions
+- Fix mold linker: `clang: error: invalid linker name in argument '-fuse-ld=mold'` - make local-only
 
 ## Deferred
 
