@@ -309,8 +309,41 @@ fn reset_sigpipe() {
 #[cfg(not(unix))]
 fn reset_sigpipe() {}
 
+/// Run a script from .moss/scripts/ directory.
+/// Returns Some(exit_code) if this was a script invocation, None otherwise.
+fn try_run_script() -> Option<i32> {
+    let args: Vec<String> = std::env::args().collect();
+
+    // Need at least program name and @script-name
+    if args.len() < 2 {
+        return None;
+    }
+
+    let first_arg = &args[1];
+    if !first_arg.starts_with('@') {
+        return None;
+    }
+
+    let script_name = &first_arg[1..]; // Strip @
+    if script_name.is_empty() {
+        eprintln!("Error: script name required after @");
+        return Some(1);
+    }
+
+    // Script args are everything after @script-name
+    let script_args: Vec<&str> = args[2..].iter().map(|s| s.as_str()).collect();
+
+    Some(commands::script::run_script(script_name, &script_args))
+}
+
 fn main() {
     reset_sigpipe();
+
+    // Check for @script-name invocation before clap parsing
+    if let Some(exit_code) = try_run_script() {
+        std::process::exit(exit_code);
+    }
+
     let cli = Cli::parse();
 
     // Resolve output format at top level - pretty config is TTY-based, not root-specific
