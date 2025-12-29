@@ -175,8 +175,8 @@ enum Commands {
         root: Option<PathBuf>,
     },
 
-    /// Run TOML-defined workflows
-    Workflow {
+    /// Run Lua scripts and TOML workflows
+    Script {
         #[command(subcommand)]
         action: commands::workflow::WorkflowAction,
 
@@ -419,7 +419,7 @@ fn main() {
             ecosystem,
             root,
         } => commands::package::cmd_package(action, ecosystem.as_deref(), root.as_deref(), format),
-        Commands::Workflow { action, root } => {
+        Commands::Script { action, root } => {
             commands::workflow::cmd_workflow(action, root.as_deref(), cli.json)
         }
         Commands::Lint { action, root } => {

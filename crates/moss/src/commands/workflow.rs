@@ -1,4 +1,4 @@
-//! Workflow command - Lua-based workflows.
+//! Script command - Lua scripts and TOML workflows.
 
 use std::path::Path;
 
@@ -9,13 +9,13 @@ use crate::workflow::LuaRuntime;
 
 #[derive(Subcommand)]
 pub enum WorkflowAction {
-    /// List available workflows
+    /// List available scripts
     List,
 
-    /// Run a workflow
+    /// Run a script
     Run {
-        /// Workflow name or path to .lua file
-        workflow: String,
+        /// Script name or path to .lua file
+        script: String,
 
         /// Task description (available as `task` variable in Lua)
         #[arg(short, long)]
@@ -25,47 +25,47 @@ pub enum WorkflowAction {
 
 pub fn cmd_workflow(action: WorkflowAction, root: Option<&Path>, json: bool) -> i32 {
     match action {
-        WorkflowAction::List => cmd_workflow_list(root, json),
-        WorkflowAction::Run { workflow, task } => {
-            cmd_workflow_run(&workflow, task.as_deref(), root, json)
+        WorkflowAction::List => cmd_script_list(root, json),
+        WorkflowAction::Run { script, task } => {
+            cmd_script_run(&script, task.as_deref(), root, json)
         }
     }
 }
 
-fn cmd_workflow_list(root: Option<&Path>, json: bool) -> i32 {
+fn cmd_script_list(root: Option<&Path>, json: bool) -> i32 {
     let root = root.unwrap_or_else(|| Path::new("."));
-    let workflows_dir = root.join(".moss").join("workflows");
+    let scripts_dir = root.join(".moss").join("scripts");
 
-    if !workflows_dir.exists() {
+    if !scripts_dir.exists() {
         if json {
             println!("[]");
         } else {
-            println!("No workflows directory at .moss/workflows/");
+            println!("No scripts directory at .moss/scripts/");
         }
         return 0;
     }
 
-    let mut workflows = Vec::new();
+    let mut scripts = Vec::new();
 
-    if let Ok(entries) = std::fs::read_dir(&workflows_dir) {
+    if let Ok(entries) = std::fs::read_dir(&scripts_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().map(|e| e == "lua").unwrap_or(false) {
                 if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                    workflows.push(name.to_string());
+                    scripts.push(name.to_string());
                 }
             }
         }
     }
 
-    workflows.sort();
+    scripts.sort();
 
     if json {
-        println!("{}", serde_json::to_string(&workflows).unwrap());
-    } else if workflows.is_empty() {
-        println!("No workflows found in .moss/workflows/");
+        println!("{}", serde_json::to_string(&scripts).unwrap());
+    } else if scripts.is_empty() {
+        println!("No scripts found in .moss/scripts/");
     } else {
-        for name in workflows {
+        for name in scripts {
             println!("{}", name);
         }
     }
@@ -74,19 +74,19 @@ fn cmd_workflow_list(root: Option<&Path>, json: bool) -> i32 {
 }
 
 #[cfg(feature = "lua")]
-fn cmd_workflow_run(workflow: &str, task: Option<&str>, root: Option<&Path>, json: bool) -> i32 {
+fn cmd_script_run(script: &str, task: Option<&str>, root: Option<&Path>, json: bool) -> i32 {
     let root = root.unwrap_or_else(|| Path::new("."));
 
-    let workflow_path = if workflow.ends_with(".lua") {
-        root.join(workflow)
+    let script_path = if script.ends_with(".lua") {
+        root.join(script)
     } else {
         root.join(".moss")
-            .join("workflows")
-            .join(format!("{}.lua", workflow))
+            .join("scripts")
+            .join(format!("{}.lua", script))
     };
 
-    if !workflow_path.exists() {
-        eprintln!("Workflow not found: {}", workflow_path.display());
+    if !script_path.exists() {
+        eprintln!("Script not found: {}", script_path.display());
         return 1;
     }
 
@@ -110,7 +110,7 @@ fn cmd_workflow_run(workflow: &str, task: Option<&str>, root: Option<&Path>, jso
         }
     }
 
-    match runtime.run_file(&workflow_path) {
+    match runtime.run_file(&script_path) {
         Ok(()) => {
             if json {
                 println!("{}", serde_json::json!({"success": true}));
@@ -121,7 +121,7 @@ fn cmd_workflow_run(workflow: &str, task: Option<&str>, root: Option<&Path>, jso
             if json {
                 println!("{}", serde_json::json!({"error": e.to_string()}));
             } else {
-                eprintln!("Lua error: {}", e);
+                eprintln!("Script error: {}", e);
             }
             1
         }
@@ -129,13 +129,8 @@ fn cmd_workflow_run(workflow: &str, task: Option<&str>, root: Option<&Path>, jso
 }
 
 #[cfg(not(feature = "lua"))]
-fn cmd_workflow_run(
-    _workflow: &str,
-    _task: Option<&str>,
-    _root: Option<&Path>,
-    _json: bool,
-) -> i32 {
-    eprintln!("Lua workflows require the 'lua' feature");
+fn cmd_script_run(_script: &str, _task: Option<&str>, _root: Option<&Path>, _json: bool) -> i32 {
+    eprintln!("Scripts require the 'lua' feature");
     eprintln!("Rebuild with: cargo build --features lua");
     1
 }
