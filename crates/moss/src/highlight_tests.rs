@@ -627,3 +627,119 @@ fn test_highlight_markdown_code() {
     // Just verify we got some spans (grammar loaded successfully)
     assert!(!spans.is_empty() || code.len() > 0); // Always passes, grammar check
 }
+
+// ==================== CSS ====================
+
+#[test]
+fn test_highlight_css_selectors() {
+    let code = ".class { color: red; }";
+    let spans = get_spans(code, "css");
+    // CSS uses property_name for properties
+    assert!(has_span(&spans, "color", HighlightKind::Keyword));
+}
+
+#[test]
+fn test_highlight_css_values() {
+    let code = ".class { font-size: 16px; opacity: 0.5; }";
+    let spans = get_spans(code, "css");
+    // integer_value for numbers
+    assert!(has_span(&spans, "16px", HighlightKind::Number));
+    assert!(has_span(&spans, "0.5", HighlightKind::Number));
+}
+
+#[test]
+fn test_highlight_css_strings() {
+    let code = ".class { content: \"hello\"; }";
+    let spans = get_spans(code, "css");
+    assert!(has_span(&spans, "\"hello\"", HighlightKind::String));
+}
+
+#[test]
+fn test_highlight_css_comments() {
+    let code = "/* comment */ .class { }";
+    let spans = get_spans(code, "css");
+    assert!(has_span(&spans, "/* comment */", HighlightKind::Comment));
+}
+
+// ==================== HTML ====================
+
+#[test]
+fn test_highlight_html_tags() {
+    let code = "<div class=\"foo\">Hello</div>";
+    let spans = get_spans(code, "html");
+    // tag_name should be highlighted
+    assert!(has_span(&spans, "div", HighlightKind::Keyword));
+}
+
+#[test]
+fn test_highlight_html_attributes() {
+    let code = "<input type=\"text\" disabled />";
+    let spans = get_spans(code, "html");
+    assert!(has_span(&spans, "type", HighlightKind::Keyword));
+    assert!(has_span(&spans, "\"text\"", HighlightKind::String));
+}
+
+#[test]
+fn test_highlight_html_comments() {
+    let code = "<!-- comment --><div></div>";
+    let spans = get_spans(code, "html");
+    assert!(has_span(&spans, "<!-- comment -->", HighlightKind::Comment));
+}
+
+// ==================== SCSS ====================
+
+#[test]
+fn test_highlight_scss_variables() {
+    let code = "$color: red; .class { color: $color; }";
+    let spans = get_spans(code, "scss");
+    // Variables should be highlighted
+    assert!(has_span(&spans, "$color", HighlightKind::Keyword));
+}
+
+#[test]
+fn test_highlight_scss_nesting() {
+    let code = ".parent { .child { color: blue; } }";
+    let spans = get_spans(code, "scss");
+    assert!(has_span(&spans, "color", HighlightKind::Keyword));
+}
+
+// ==================== TSX ====================
+
+#[test]
+fn test_highlight_tsx_jsx_elements() {
+    let code = "const App = () => <div>Hello</div>;";
+    let spans = get_spans(code, "tsx");
+    assert!(has_span(&spans, "const", HighlightKind::Keyword));
+}
+
+#[test]
+fn test_highlight_tsx_types() {
+    let code = "const App: React.FC<Props> = () => null;";
+    let spans = get_spans(code, "tsx");
+    assert!(has_span(&spans, "const", HighlightKind::Keyword));
+    assert!(has_span(&spans, "FC", HighlightKind::Type));
+    assert!(has_span(&spans, "Props", HighlightKind::Type));
+    assert!(has_span(&spans, "null", HighlightKind::Constant));
+}
+
+// ==================== Vue ====================
+
+#[test]
+fn test_highlight_vue_template() {
+    let code = "<template><div>Hi</div></template>";
+    let spans = get_spans(code, "vue");
+    // Vue template tags
+    assert!(has_span(&spans, "template", HighlightKind::Keyword));
+    assert!(has_span(&spans, "div", HighlightKind::Keyword));
+}
+
+// ==================== Svelte ====================
+
+#[test]
+fn test_highlight_svelte_template() {
+    let code = "<script>let x = 1;</script><div>Hi</div>";
+    let spans = get_spans(code, "svelte");
+    // Svelte tags - script content is raw_text, not parsed
+    assert!(has_span(&spans, "script", HighlightKind::Keyword));
+    assert!(has_span(&spans, "div", HighlightKind::Keyword));
+}

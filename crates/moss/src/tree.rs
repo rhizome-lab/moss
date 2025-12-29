@@ -358,10 +358,14 @@ pub fn collect_highlight_spans(node: tree_sitter::Node, spans: &mut Vec<Highligh
     let kind = node.kind();
     let highlight = classify_node_kind(kind);
 
-    // Comments, strings, attributes: highlight entire node (don't recurse into children)
+    // Comments, strings, attributes, numbers: highlight entire node (don't recurse into children)
+    // Numbers are included because CSS integer_value/float_value have child nodes (unit)
     if matches!(
         highlight,
-        HighlightKind::Comment | HighlightKind::String | HighlightKind::Attribute
+        HighlightKind::Comment
+            | HighlightKind::String
+            | HighlightKind::Attribute
+            | HighlightKind::Number
     ) {
         spans.push(HighlightSpan {
             start: node.start_byte(),
@@ -532,7 +536,10 @@ fn classify_node_kind(kind: &str) -> HighlightKind {
         // YAML strings
         | "string_scalar"
         | "double_quote_scalar"
-        | "single_quote_scalar" => HighlightKind::String,
+        | "single_quote_scalar"
+        // HTML/CSS strings
+        | "quoted_attribute_value"
+        | "string_value" => HighlightKind::String,
 
         // Numbers
         "number"
@@ -547,7 +554,10 @@ fn classify_node_kind(kind: &str) -> HighlightKind {
         | "number_literal"
         // YAML numbers
         | "integer_scalar"
-        | "float_scalar" => HighlightKind::Number,
+        | "float_scalar"
+        // CSS numbers
+        | "integer_value"
+        | "float_value" => HighlightKind::Number,
 
         // Constants (booleans, nil/null, special values)
         "true"
@@ -590,7 +600,9 @@ fn classify_node_kind(kind: &str) -> HighlightKind {
         | "package" | "func" | "defer" | "go" | "chan" | "select" | "fallthrough"
         | "range" | "map"
         // Bash keywords (then/elif already covered above)
-        | "fi" | "esac" | "done" => HighlightKind::Keyword,
+        | "fi" | "esac" | "done"
+        // CSS/HTML/SCSS
+        | "property_name" | "tag_name" | "attribute_name" | "variable" => HighlightKind::Keyword,
 
         _ => HighlightKind::Default,
     }
