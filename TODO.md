@@ -72,11 +72,8 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Todo improvements:
   - `moss todo add --section <name>`: add to specific section
   - `moss todo add --parent <text>`: add as subitem under matching item
-  - `moss todo section add <name> [--after <section>]`: create new section
-  - `moss todo section list`: list available sections
-  - `moss todo section rm <name>`: show items and refuse if non-empty, `--force` to override
-  - `moss todo section rename <old> <new>`: rename section
   - `moss todo archive [--format=changelog]`: format done items, remove them
+  - Section operations now use `moss edit`: `moss edit TODO.md/Section delete`, `moss view TODO.md`
 
 ### Workspace/Context Management
 - Persistent workspace concept (like Notion): files, tool results, context stored permanently
