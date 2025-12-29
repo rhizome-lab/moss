@@ -3,6 +3,7 @@ use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
 use nucleo_matcher::{Config, Matcher};
 use std::path::Path;
 
+use crate::config::MossConfig;
 use crate::index::FileIndex;
 
 #[derive(Debug, Clone)]
@@ -10,6 +11,37 @@ pub struct PathMatch {
     pub path: String,
     pub kind: String,
     pub score: u32,
+}
+
+/// Result of expanding a sigil like `@todo` or `@config`.
+#[derive(Debug, Clone)]
+pub struct SigilExpansion {
+    /// Expanded file paths (may be multiple, e.g., ["TODO.md", "TASKS.md"])
+    pub paths: Vec<String>,
+    /// Remaining path after the sigil (e.g., "Section/Item" from "@todo/Section/Item")
+    pub suffix: String,
+}
+
+/// Expand a sigil query like `@todo` or `@config/section`.
+/// Returns None if the query doesn't start with @ or the sigil is unknown.
+pub fn expand_sigil(query: &str, root: &Path) -> Option<SigilExpansion> {
+    if !query.starts_with('@') {
+        return None;
+    }
+
+    let rest = &query[1..]; // Strip @
+    let (sigil_name, suffix) = match rest.find('/') {
+        Some(idx) => (&rest[..idx], &rest[idx + 1..]),
+        None => (rest, ""),
+    };
+
+    let config = MossConfig::load(root);
+    let targets = config.sigil.get(sigil_name)?;
+
+    Some(SigilExpansion {
+        paths: targets,
+        suffix: suffix.to_string(),
+    })
 }
 
 /// Result of resolving a unified path like `src/main.py/Foo/bar`
@@ -53,6 +85,25 @@ fn normalize_separators(query: &str) -> String {
 /// 2. When we hit a file, everything after is symbol path
 /// 3. If exact path doesn't exist, try fuzzy matching for the file portion
 pub fn resolve_unified(query: &str, root: &Path) -> Option<UnifiedPath> {
+    // Handle sigil expansion (@todo, @config, etc.)
+    if query.starts_with('@') {
+        if let Some(expansion) = expand_sigil(query, root) {
+            // Try each target path until one exists
+            for target in &expansion.paths {
+                let full_query = if expansion.suffix.is_empty() {
+                    target.clone()
+                } else {
+                    format!("{}/{}", target, expansion.suffix)
+                };
+                if let Some(result) = resolve_unified(&full_query, root) {
+                    return Some(result);
+                }
+            }
+            return None;
+        }
+        // Unknown sigil - fall through to normal resolution (will likely fail)
+    }
+
     let normalized = normalize_separators(query);
 
     // Handle absolute paths (start with /) - use filesystem root instead of project root
@@ -155,6 +206,23 @@ pub fn resolve_unified(query: &str, root: &Path) -> Option<UnifiedPath> {
 /// Returns empty vec if no matches, single-element vec if unambiguous,
 /// or multiple elements if query matches multiple files.
 pub fn resolve_unified_all(query: &str, root: &Path) -> Vec<UnifiedPath> {
+    // Handle sigil expansion (@todo, @config, etc.)
+    if query.starts_with('@') {
+        if let Some(expansion) = expand_sigil(query, root) {
+            let mut results = Vec::new();
+            for target in &expansion.paths {
+                let full_query = if expansion.suffix.is_empty() {
+                    target.clone()
+                } else {
+                    format!("{}/{}", target, expansion.suffix)
+                };
+                results.extend(resolve_unified_all(&full_query, root));
+            }
+            return results;
+        }
+        // Unknown sigil - fall through
+    }
+
     let normalized = normalize_separators(query);
 
     // Absolute paths: single result or none

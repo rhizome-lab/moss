@@ -104,6 +104,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
   - Examples: .editorconfig, prettierrc, prettierignore, oxlintrc.json[c], oxfmtrc.json[c], eslint.config.js, pom.xml
   - Open: do build scripts belong here? (conan, bazel, package.json, cmake) - maybe separate `moss-build`
   - Open: linter vs formatter vs typechecker config - same trait or specialized?
+  - Open: reconsider moss config format choice (TOML vs YAML, JSON, KDL) - rationalize decision
 
 ### Workspace/Context Management
 - Persistent workspace concept (like Notion): files, tool results, context stored permanently

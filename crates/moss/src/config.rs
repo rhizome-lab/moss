@@ -18,6 +18,10 @@
 //! vendor = ["vendor/**", "third_party/**"]     # add new alias
 //! config = []                                   # disable built-in
 //!
+//! [sigil]
+//! todo = ["TODO.md", "TASKS.md"]   # @todo expands to these files
+//! config = [".moss/config.toml"]   # @config (default)
+//!
 //! [todo]
 //! file = "TASKS.md"           # custom todo file (default: auto-detect)
 //! primary_section = "Backlog" # default section for add/done/rm
@@ -51,6 +55,7 @@ use crate::filter::FilterConfig;
 use crate::merge::Merge;
 use crate::output::PrettyConfig;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::Path;
 
 /// Index configuration.
@@ -59,6 +64,45 @@ use std::path::Path;
 pub struct IndexConfig {
     /// Whether to create and use the file index. Default: true
     pub enabled: Option<bool>,
+}
+
+/// Sigil configuration for @ target prefix expansion.
+///
+/// Example:
+/// ```toml
+/// [sigil]
+/// todo = ["TODO.md", "TASKS.md"]
+/// config = [".moss/config.toml"]
+/// ```
+#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[serde(default)]
+pub struct SigilConfig {
+    /// Map sigil names to file paths. Values are lists (may expand to multiple files).
+    #[serde(flatten)]
+    pub targets: HashMap<String, Vec<String>>,
+}
+
+impl SigilConfig {
+    /// Get default sigil mappings.
+    fn defaults() -> HashMap<String, Vec<String>> {
+        let mut defaults = HashMap::new();
+        defaults.insert("config".to_string(), vec![".moss/config.toml".to_string()]);
+        defaults
+    }
+
+    /// Get targets for a sigil, falling back to defaults.
+    /// Returns None if sigil is unknown or disabled (empty array).
+    pub fn get(&self, name: &str) -> Option<Vec<String>> {
+        if let Some(targets) = self.targets.get(name) {
+            if targets.is_empty() {
+                // Empty array disables the sigil
+                return None;
+            }
+            return Some(targets.clone());
+        }
+        // Fall back to defaults
+        Self::defaults().get(name).cloned()
+    }
 }
 
 impl IndexConfig {
@@ -74,6 +118,7 @@ pub struct MossConfig {
     pub daemon: DaemonConfig,
     pub index: IndexConfig,
     pub filter: FilterConfig,
+    pub sigil: SigilConfig,
     pub todo: TodoConfig,
     pub view: ViewConfig,
     pub analyze: AnalyzeConfig,
