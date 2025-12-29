@@ -13,9 +13,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
   - Store diffs in memory, use worktree as "materialized view"
   - Apply patch to worktree → run validator → if pass, apply to user dir
   - Zero user interruption (user can edit while agent tests in background)
-- "Smart Header" context for LLM (Gemini's term for "Hoisted Context"):
+- "Smart Header" as default view output (not a flag):
   - Problem: bare skeletons strip semantic intent (imports, comments, deprecation notices)
-  - Solution: synthesize context header per snippet:
+  - Default output should synthesize context:
     - File path
     - Filtered imports (only what the target uses)
     - Parent context (class/impl with siblings hidden)
