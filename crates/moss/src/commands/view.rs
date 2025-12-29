@@ -1100,11 +1100,20 @@ fn cmd_view_symbol(
     let grammar =
         moss_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
 
+    // Extract file imports for Smart Header
+    let deps_extractor = deps::DepsExtractor::new();
+    let deps_result = deps_extractor.extract(&full_path, &content);
+
     // Try to find and extract the symbol
     if let Some(source) = parser.extract_symbol_source(&full_path, &content, symbol_name) {
         let full_symbol_path = format!("{}/{}", file_path, symbol_path.join("/"));
 
         if json {
+            let imports: Vec<String> = deps_result
+                .imports
+                .iter()
+                .map(|i| i.format_summary())
+                .collect();
             println!(
                 "{}",
                 serde_json::json!({
@@ -1112,6 +1121,7 @@ fn cmd_view_symbol(
                     "path": full_symbol_path,
                     "file": file_path,
                     "symbol": symbol_name,
+                    "imports": imports,
                     "source": source
                 })
             );
@@ -1127,6 +1137,24 @@ fn cmd_view_symbol(
                     println!("# {}", full_symbol_path);
                 }
             }
+
+            // Smart Header: show imports (actual lines from source)
+            if !deps_result.imports.is_empty() {
+                let lines: Vec<&str> = content.lines().collect();
+                let mut seen_lines = std::collections::HashSet::new();
+                println!();
+                for import in &deps_result.imports {
+                    if import.line > 0 && import.line <= lines.len() {
+                        let line_content = lines[import.line - 1].trim();
+                        // Deduplicate
+                        if seen_lines.insert(line_content.to_string()) {
+                            println!("{}", line_content);
+                        }
+                    }
+                }
+                println!();
+            }
+
             // Apply syntax highlighting in pretty mode
             let highlighted = if let Some(ref g) = grammar {
                 tree::highlight_source(&source, g, use_colors)

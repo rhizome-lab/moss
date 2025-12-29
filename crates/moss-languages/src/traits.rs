@@ -91,6 +91,21 @@ pub struct Import {
     pub line: usize,
 }
 
+impl Import {
+    /// Format as a readable summary (module + names)
+    pub fn format_summary(&self) -> String {
+        if self.is_wildcard {
+            format!("{}::*", self.module)
+        } else if self.names.is_empty() {
+            self.module.clone()
+        } else if self.names.len() == 1 {
+            format!("{}::{}", self.module, self.names[0])
+        } else {
+            format!("{}::{{{}}}", self.module, self.names.join(", "))
+        }
+    }
+}
+
 /// An export declaration
 #[derive(Debug, Clone)]
 pub struct Export {
