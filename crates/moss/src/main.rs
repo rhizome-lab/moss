@@ -161,24 +161,10 @@ enum Commands {
         limit: usize,
     },
 
-    /// Structured TODO.md editing (prevents content loss)
-    Todo {
-        #[command(subcommand)]
-        action: Option<commands::todo::TodoAction>,
-
-        /// Todo file path (auto-detects if not specified)
-        #[arg(short, long, global = true)]
-        file: Option<PathBuf>,
-
-        /// Root directory (defaults to current directory)
-        #[arg(short, long, global = true)]
-        root: Option<PathBuf>,
-    },
-
-    /// Run Lua scripts and TOML workflows
+    /// Run Lua scripts
     Script {
         #[command(subcommand)]
-        action: commands::workflow::WorkflowAction,
+        action: commands::script::ScriptAction,
 
         /// Root directory (defaults to current directory)
         #[arg(short, long, global = true)]
@@ -410,17 +396,13 @@ fn main() {
         Commands::Plans { name, limit } => {
             commands::plans::cmd_plans(name.as_deref(), limit, cli.json)
         }
-        Commands::Todo { action, file, root } => {
-            let root = root.as_deref().unwrap_or(Path::new("."));
-            commands::todo::cmd_todo(action, file.as_deref(), format, root)
-        }
         Commands::Package {
             action,
             ecosystem,
             root,
         } => commands::package::cmd_package(action, ecosystem.as_deref(), root.as_deref(), format),
         Commands::Script { action, root } => {
-            commands::workflow::cmd_workflow(action, root.as_deref(), cli.json)
+            commands::script::cmd_script(action, root.as_deref(), cli.json)
         }
         Commands::Lint { action, root } => {
             let action = action.unwrap_or(LintAction::Run {

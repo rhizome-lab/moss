@@ -425,6 +425,16 @@ impl LuaRuntime {
             })?,
         )?;
 
+        // write_file(path: string, content: string) -> boolean
+        let root_clone = root_path.clone();
+        globals.set(
+            "write_file",
+            lua.create_function(move |_, (path, content): (String, String)| {
+                std::fs::write(root_clone.join(&path), content).map_err(mlua::Error::external)?;
+                Ok(true)
+            })?,
+        )?;
+
         // print(...)
         globals.set(
             "print",

@@ -1,9 +1,11 @@
-//! Script command - run Lua scripts via @ prefix.
+//! Script command - run Lua scripts via @ prefix or `moss script` subcommand.
 //!
 //! Scripts live in `.moss/scripts/` and are invoked with `moss @script-name args...`
 //! Builtin scripts (todo, config) are embedded and used as fallback.
 
 use std::path::Path;
+
+use clap::Subcommand;
 
 #[cfg(feature = "lua")]
 use crate::workflow::LuaRuntime;
@@ -27,6 +29,227 @@ pub mod builtins {
     pub fn list() -> &'static [&'static str] {
         &["config", "todo"]
     }
+}
+
+#[derive(Subcommand)]
+pub enum ScriptAction {
+    /// List available scripts
+    List,
+
+    /// Show script source (resolved path and highlighted code)
+    Show {
+        /// Script name
+        script: String,
+    },
+
+    /// Run a script
+    Run {
+        /// Script name or path to .lua file
+        script: String,
+
+        /// Task description (available as `task` variable in Lua)
+        #[arg(short, long)]
+        task: Option<String>,
+    },
+}
+
+pub fn cmd_script(action: ScriptAction, root: Option<&Path>, json: bool) -> i32 {
+    match action {
+        ScriptAction::List => cmd_script_list(root, json),
+        ScriptAction::Show { script } => cmd_script_show(&script, root, json),
+        ScriptAction::Run { script, task } => cmd_script_run(&script, task.as_deref(), root, json),
+    }
+}
+
+fn cmd_script_list(root: Option<&Path>, json: bool) -> i32 {
+    let root = root.unwrap_or_else(|| Path::new("."));
+    let scripts = list_scripts(root);
+
+    if json {
+        println!("{}", serde_json::to_string(&scripts).unwrap());
+    } else if scripts.is_empty() {
+        println!("No scripts found");
+    } else {
+        for name in scripts {
+            println!("{}", name);
+        }
+    }
+
+    0
+}
+
+fn cmd_script_show(script: &str, root: Option<&Path>, json: bool) -> i32 {
+    let root = root.unwrap_or_else(|| Path::new("."));
+
+    // Check user script first
+    let user_path = root
+        .join(".moss")
+        .join("scripts")
+        .join(format!("{}.lua", script));
+
+    if user_path.exists() {
+        // User script
+        if json {
+            let content = std::fs::read_to_string(&user_path).unwrap_or_default();
+            println!(
+                "{}",
+                serde_json::json!({
+                    "name": script,
+                    "source": "user",
+                    "path": user_path.display().to_string(),
+                    "content": content
+                })
+            );
+        } else {
+            println!("# {} (user script)", script);
+            println!("# Path: {}", user_path.display());
+            println!();
+            // Read and print with basic highlighting
+            if let Ok(content) = std::fs::read_to_string(&user_path) {
+                print_lua_highlighted(&content);
+            }
+        }
+        return 0;
+    }
+
+    // Check builtin
+    if let Some(content) = builtins::get(script) {
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "name": script,
+                    "source": "builtin",
+                    "path": format!("(embedded) crates/moss/src/commands/scripts/{}.lua", script),
+                    "content": content
+                })
+            );
+        } else {
+            println!("# {} (builtin)", script);
+            println!(
+                "# Path: crates/moss/src/commands/scripts/{}.lua (embedded)",
+                script
+            );
+            println!();
+            print_lua_highlighted(content);
+        }
+        return 0;
+    }
+
+    eprintln!("Script not found: {}", script);
+    1
+}
+
+/// Print Lua code with basic syntax highlighting (comments in dim)
+fn print_lua_highlighted(code: &str) {
+    for line in code.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("--") {
+            // Comment - print dim
+            println!("\x1b[2m{}\x1b[0m", line);
+        } else if trimmed.starts_with("local ") || trimmed.starts_with("function ") {
+            // Keywords - print bold
+            println!("\x1b[1m{}\x1b[0m", line);
+        } else {
+            println!("{}", line);
+        }
+    }
+}
+
+#[cfg(feature = "lua")]
+fn cmd_script_run(script: &str, task: Option<&str>, root: Option<&Path>, json: bool) -> i32 {
+    let root = root.unwrap_or_else(|| Path::new("."));
+
+    // Check for explicit .lua path first
+    let script_path = if script.ends_with(".lua") {
+        Some(root.join(script))
+    } else {
+        let path = root
+            .join(".moss")
+            .join("scripts")
+            .join(format!("{}.lua", script));
+        if path.exists() {
+            Some(path)
+        } else {
+            None
+        }
+    };
+
+    // Get builtin if no user script
+    let builtin_code = if script_path.is_none() {
+        builtins::get(script)
+    } else {
+        None
+    };
+
+    if script_path.is_none() && builtin_code.is_none() {
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({"error": format!("Script not found: {}", script)})
+            );
+        } else {
+            eprintln!("Script not found: {}", script);
+            eprintln!("Create it at: .moss/scripts/{}.lua", script);
+        }
+        return 1;
+    }
+
+    let runtime = match LuaRuntime::new(root) {
+        Ok(r) => r,
+        Err(e) => {
+            if json {
+                println!("{}", serde_json::json!({"error": e.to_string()}));
+            } else {
+                eprintln!("Failed to create Lua runtime: {}", e);
+            }
+            return 1;
+        }
+    };
+
+    // Set task variable if provided
+    if let Some(t) = task {
+        if let Err(e) = runtime.run_string(&format!("task = {:?}", t)) {
+            eprintln!("Failed to set task: {}", e);
+            return 1;
+        }
+    }
+
+    // Set args = {} for consistency with @ invocation
+    if let Err(e) = runtime.run_string("args = {}") {
+        eprintln!("Failed to set args: {}", e);
+        return 1;
+    }
+
+    let result = if let Some(path) = script_path {
+        runtime.run_file(&path)
+    } else {
+        runtime.run_string(builtin_code.unwrap())
+    };
+
+    match result {
+        Ok(()) => {
+            if json {
+                println!("{}", serde_json::json!({"success": true}));
+            }
+            0
+        }
+        Err(e) => {
+            if json {
+                println!("{}", serde_json::json!({"error": e.to_string()}));
+            } else {
+                eprintln!("Script error: {}", e);
+            }
+            1
+        }
+    }
+}
+
+#[cfg(not(feature = "lua"))]
+fn cmd_script_run(_script: &str, _task: Option<&str>, _root: Option<&Path>, _json: bool) -> i32 {
+    eprintln!("Scripts require the 'lua' feature");
+    eprintln!("Rebuild with: cargo build --features lua");
+    1
 }
 
 /// Run a script from .moss/scripts/ or builtins.
