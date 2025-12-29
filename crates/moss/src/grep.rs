@@ -124,12 +124,18 @@ pub fn grep(
                         end = m.end();
                     }
 
+                    let trimmed = line.trim();
+                    // Adjust match positions for trimmed content
+                    let leading_ws = line.len() - line.trim_start().len();
+                    let adj_start = start.saturating_sub(leading_ws);
+                    let adj_end = end.saturating_sub(leading_ws).min(trimmed.len());
+
                     file_matches.push(GrepMatch {
                         file: rel_path.clone(),
                         line: line_num as usize,
-                        content: line.trim_end().to_string(),
-                        start,
-                        end,
+                        content: trimmed.to_string(),
+                        start: adj_start,
+                        end: adj_end,
                         symbol: None,
                         symbol_start: None,
                         symbol_end: None,
