@@ -45,6 +45,12 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 - Consider streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)
 
+### View Command
+- `moss view file.rs:42-60` fails - line ranges not supported as targets
+  - Use case: view specific section without knowing symbol name
+  - Tension: structural (symbols) vs text-based (lines) addressing
+  - Could be useful after grep shows `(symbol L30-55)` context
+
 ### Code Quality
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
