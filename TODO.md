@@ -66,14 +66,44 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - [x] Multi-codebase: single global daemon at `~/.config/moss/daemon.sock`, manages multiple roots via `daemon add/remove/list`
 - [x] Minimal memory footprint: SQLite file-based (~2MB per connection), no LRU eviction needed
 
+### `@` Sigil
+- As target prefix, expands to well-known paths:
+  - `@todo` → detected TODO file(s), maybe `["TODO.md", "TASKS.md"]`
+  - `@config` → `.moss/config.toml`
+  - Works with any command: `moss view @todo`, `moss edit @config`
+  - Need to figure out: what happens when some items don't match?
+  - `moss init` can detect and configure this (prints "detected TODO file at TASKS.md")
+- As command prefix, runs scripts:
+  - `moss @script-name args` → runs `.moss/scripts/script-name.lua`
+  - First scripts: `@todo` (todo viewer/editor), `@config` (config viewer/editor)
+- Partial fix for file/section detection (explicit opt-in to heuristics)
+
+### `moss todo` Future
+- Currently: Rust implementation with file/section detection, format preservation
+- Goal: port `todo.rs` to `@todo` script (Lua + `moss edit` primitives)
+- `add`, `rm`, `done` stay for now (convenience), but room for improvement:
+  - These are conceptually `moss edit` ops on markdown
+  - `@todo` target prefix is the path toward unification
+- `list` with filters, `clean`, `normalize` → port to Lua script (todo-specific semantics)
+- Validates that view/edit primitives are sufficient for structural edits
+
+### Script System
+- Rename `moss workflow` → `moss script`
+  - TOML workflow format: structured definition (steps, actions)
+  - Builtin `workflow` runner script interprets TOML files
+  - Users can also write pure Lua scripts directly
+
+### Edit Improvements
+- `--at primary`: explicit opt-in to primary section detection (discoverable via error message)
+- `--item` flag: format-aware insertion (detects checkbox/bullet/numbered, wraps content)
+- Fuzzy glob in paths: `moss edit "TODO.md/**/feature*" delete` for item matching
+
 ### Tooling
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
-- Interactive config editor: `moss config` TUI for editing `.moss/config.toml`
-- Todo improvements:
-  - `moss todo add --section <name>`: add to specific section
-  - `moss todo add --parent <text>`: add as subitem under matching item
-  - `moss todo archive [--format=changelog]`: format done items, remove them
-  - Section operations now use `moss edit`: `moss edit TODO.md/Section delete`, `moss view TODO.md`
+- Structured config crate (`moss-config`): trait-based view/edit for known config formats (TOML, JSON, YAML, INI). Unified interface across formats. (xkcd 927 risk acknowledged)
+  - Examples: .editorconfig, prettierrc, prettierignore, oxlintrc.json[c], oxfmtrc.json[c], eslint.config.js, pom.xml
+  - Open: do build scripts belong here? (conan, bazel, package.json, cmake) - maybe separate `moss-build`
+  - Open: linter vs formatter vs typechecker config - same trait or specialized?
 
 ### Workspace/Context Management
 - Persistent workspace concept (like Notion): files, tool results, context stored permanently
