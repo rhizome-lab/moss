@@ -37,7 +37,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to verify.
 
 ### Grammar Loading (external .so files)
-Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so files (~142MB total).
+Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so files with highlight queries.
 - Grammars load from: `MOSS_GRAMMAR_PATH` env var, `~/.config/moss/grammars/`
 - See `crates/moss-languages/src/grammar_loader.rs` for loader implementation
 
@@ -47,13 +47,13 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 
 ### Code Quality
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
-- [x] Highlighting test coverage: 144 tests across 59 languages (see `highlight_tests.rs`)
-- Query-based highlighting using tree-sitter .scm files:
+- [x] Highlighting test coverage: 145 tests across 59 languages (see `highlight_tests.rs`)
+- [x] Query-based highlighting using tree-sitter .scm files:
   - [x] xtask copies `queries/highlights.scm` alongside grammar .so files
   - [x] GrammarLoader.get_highlights(name) loads and caches .scm files
-  - [ ] Use tree-sitter Query API in `highlight_source()` instead of `classify_node_kind()`
-  - [ ] Map query capture names (@keyword, @string, etc.) to HighlightKind
-  - [ ] Remove manual node kind classification (superseded by .scm queries)
+  - [x] Use tree-sitter Query API in `highlight_source()` instead of `classify_node_kind()`
+  - [x] Map query capture names (@keyword, @string, etc.) to HighlightKind
+  - Manual node kind classification kept as fallback (when no .scm file available)
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.

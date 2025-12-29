@@ -2,14 +2,15 @@
 //!
 //! Git-aware tree display using the `ignore` crate for gitignore support.
 
-use crate::parsers::Parsers;
 use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use ignore::WalkBuilder;
-use moss_languages::support_for_path;
+use moss_languages::{support_for_path, GrammarLoader};
 use nu_ansi_term::Color::{LightCyan, LightGreen, LightMagenta, Red, White as LightGray, Yellow};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
+use streaming_iterator::StreamingIterator;
+use tree_sitter::{Query, QueryCursor};
 
 /// Unified node for viewing directories, files, and symbols.
 ///
@@ -284,21 +285,157 @@ pub enum HighlightKind {
 }
 
 /// Highlight source code using AST-based syntax highlighting.
+///
+/// Uses tree-sitter Query API with .scm highlight files when available,
+/// falling back to manual node classification otherwise.
 pub fn highlight_source(sig: &str, grammar: &str, use_colors: bool) -> String {
     // If colors disabled, just return the signature as-is
     if !use_colors {
         return sig.to_string();
     }
 
-    let parsers = Parsers::new();
-    let tree = match parsers.parse_with_grammar(grammar, sig) {
-        Some(t) => t,
-        None => return sig.to_string(), // Fallback to unhighlighted
+    let loader = GrammarLoader::new();
+    let language = match loader.get(grammar) {
+        Some(lang) => lang,
+        None => return sig.to_string(),
     };
 
-    let mut spans: Vec<HighlightSpan> = Vec::new();
-    collect_highlight_spans(tree.root_node(), &mut spans);
+    let mut parser = tree_sitter::Parser::new();
+    if parser.set_language(&language).is_err() {
+        return sig.to_string();
+    }
 
+    let tree = match parser.parse(sig, None) {
+        Some(t) => t,
+        None => return sig.to_string(),
+    };
+
+    // Try query-based highlighting first (uses .scm files from arborium)
+    let spans = if let Some(query_str) = loader.get_highlights(grammar) {
+        if let Ok(query) = Query::new(&language, &query_str) {
+            collect_query_spans(&query, tree.root_node(), sig)
+        } else {
+            // Query parse failed, fall back to manual
+            collect_manual_spans(tree.root_node())
+        }
+    } else {
+        // No .scm file, use manual classification
+        collect_manual_spans(tree.root_node())
+    };
+
+    render_highlighted(sig, spans)
+}
+
+/// Collect highlight spans using tree-sitter Query API.
+fn collect_query_spans(query: &Query, root: tree_sitter::Node, source: &str) -> Vec<HighlightSpan> {
+    let mut cursor = QueryCursor::new();
+    let mut spans = Vec::new();
+
+    let mut matches = cursor.matches(query, root, source.as_bytes());
+    while let Some(match_) = matches.next() {
+        for capture in match_.captures {
+            let capture_name = &query.capture_names()[capture.index as usize];
+            if let Some(kind) = capture_name_to_highlight_kind(capture_name) {
+                spans.push(HighlightSpan {
+                    start: capture.node.start_byte(),
+                    end: capture.node.end_byte(),
+                    kind,
+                });
+            }
+        }
+    }
+
+    spans
+}
+
+/// Map tree-sitter query capture names to HighlightKind.
+///
+/// Standard capture names from tree-sitter highlight queries:
+/// <https://tree-sitter.github.io/tree-sitter/syntax-highlighting#theme>
+fn capture_name_to_highlight_kind(name: &str) -> Option<HighlightKind> {
+    // Check full name first for specific mappings (document formats, etc.)
+    match name {
+        // Document formats: headings, titles
+        "text.title" | "markup.heading" | "title" => return Some(HighlightKind::Keyword),
+
+        // Document formats: code blocks, literals, raw text
+        "text.literal" | "markup.raw" | "markup.raw.inline" | "markup.raw.block" => {
+            return Some(HighlightKind::String)
+        }
+
+        // Document formats: links, URIs
+        "text.uri" | "markup.link" | "markup.link.url" | "text.reference" => {
+            return Some(HighlightKind::Attribute)
+        }
+
+        // Document formats: bold, italic (treat as keywords for emphasis)
+        "text.strong" | "text.emphasis" | "markup.bold" | "markup.italic" => {
+            return Some(HighlightKind::Keyword)
+        }
+
+        // Explicitly skip these (no highlighting)
+        "none" | "text" | "markup" => return None,
+
+        _ => {}
+    }
+
+    // Match on base name (before any dot) for code-oriented captures
+    let base = name.split('.').next().unwrap_or(name);
+
+    match base {
+        // Keywords
+        "keyword" => Some(HighlightKind::Keyword),
+
+        // Types
+        "type" => Some(HighlightKind::Type),
+
+        // Comments
+        "comment" => Some(HighlightKind::Comment),
+
+        // Strings
+        "string" | "character" => Some(HighlightKind::String),
+
+        // Numbers
+        "number" | "float" => Some(HighlightKind::Number),
+
+        // Constants (boolean, nil, etc.)
+        "constant" | "boolean" => Some(HighlightKind::Constant),
+
+        // Attributes/annotations
+        "attribute" => Some(HighlightKind::Attribute),
+
+        // Functions
+        "function" | "method" => Some(HighlightKind::FunctionName),
+
+        // Also treat constructors and some operators as keywords
+        "constructor" | "operator" => Some(HighlightKind::Keyword),
+
+        // Punctuation - subtle highlighting (grey like comments)
+        "punctuation" => Some(HighlightKind::Comment),
+
+        // Tags (HTML/XML elements) - highlight as keywords
+        "tag" => Some(HighlightKind::Keyword),
+
+        // Properties/fields - show as default (not highlighted)
+        "property" | "field" | "variable" | "parameter" | "label" | "namespace" | "module"
+        | "include" | "conditional" | "repeat" | "exception" | "define" | "preproc"
+        | "storageclass" | "structure" | "text" | "title" | "uri" | "underline" | "todo"
+        | "note" | "warning" | "danger" | "embedded" | "error" | "conceal" | "spell" | "diff"
+        | "debug" | "symbol" | "identifier" | "markup" => None,
+
+        _ => None,
+    }
+}
+
+/// Collect highlight spans using manual node classification (fallback).
+fn collect_manual_spans(root: tree_sitter::Node) -> Vec<HighlightSpan> {
+    let mut spans = Vec::new();
+    collect_highlight_spans(root, &mut spans);
+    spans
+}
+
+/// Render source with highlight spans applied.
+fn render_highlighted(source: &str, mut spans: Vec<HighlightSpan>) -> String {
     // Sort spans by start position
     spans.sort_by_key(|s| s.start);
 
@@ -325,11 +462,11 @@ pub fn highlight_source(sig: &str, grammar: &str, use_colors: bool) -> String {
 
         // Add unhighlighted text before this span
         if span.start > pos {
-            result.push_str(&sig[pos..span.start]);
+            result.push_str(&source[pos..span.start]);
         }
 
         // Add highlighted span (Monokai-inspired colors)
-        let text = &sig[span.start..span.end];
+        let text = &source[span.start..span.end];
         let styled = match span.kind {
             HighlightKind::Keyword => Red.paint(text).to_string(), // Red for keywords
             HighlightKind::Type => LightCyan.paint(text).to_string(), // Light cyan for types
@@ -346,8 +483,8 @@ pub fn highlight_source(sig: &str, grammar: &str, use_colors: bool) -> String {
     }
 
     // Add remaining text
-    if pos < sig.len() {
-        result.push_str(&sig[pos..]);
+    if pos < source.len() {
+        result.push_str(&source[pos..]);
     }
 
     result

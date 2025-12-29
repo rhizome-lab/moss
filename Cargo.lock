@@ -1716,6 +1716,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "streaming-iterator",
  "tar",
  "tempfile",
  "tokio",

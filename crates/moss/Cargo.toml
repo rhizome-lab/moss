@@ -34,6 +34,7 @@ ignore.workspace = true
 nucleo-matcher.workspace = true
 rusqlite.workspace = true
 tree-sitter = "0.24"
+streaming-iterator = "0.1"
 dirs = "5"
 moss-derive = { path = "../moss-derive" }
 moss-languages = { path = "../moss-languages" }
