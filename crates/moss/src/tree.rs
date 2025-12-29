@@ -6,9 +6,7 @@ use crate::parsers::Parsers;
 use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use ignore::WalkBuilder;
 use moss_languages::support_for_path;
-use nu_ansi_term::Color::{
-    LightCyan, LightGreen, LightMagenta, LightRed, White as LightGray, Yellow,
-};
+use nu_ansi_term::Color::{LightCyan, LightGreen, LightMagenta, Red, White as LightGray, Yellow};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
@@ -333,8 +331,8 @@ pub fn highlight_source(sig: &str, grammar: &str, use_colors: bool) -> String {
         // Add highlighted span (Monokai-inspired colors)
         let text = &sig[span.start..span.end];
         let styled = match span.kind {
-            HighlightKind::Keyword => LightRed.paint(text).to_string(), // Light red for keywords
-            HighlightKind::Type => LightCyan.paint(text).to_string(),   // Light cyan for types
+            HighlightKind::Keyword => Red.paint(text).to_string(), // Red for keywords
+            HighlightKind::Type => LightCyan.paint(text).to_string(), // Light cyan for types
             HighlightKind::Comment => LightGray.paint(text).to_string(), // Grey for comments
             HighlightKind::String => LightGreen.paint(text).to_string(), // Light green for strings
             HighlightKind::Number => LightMagenta.paint(text).to_string(), // Magenta for numbers
