@@ -17,6 +17,16 @@ pub fn run(args: InitArgs) -> i32 {
     cmd_init(&root, args.index)
 }
 
+/// Common TODO file names to detect
+const TODO_CANDIDATES: &[&str] = &[
+    "TODO.md",
+    "TASKS.md",
+    "TODO.txt",
+    "TASKS.txt",
+    "TODO",
+    "TASKS",
+];
+
 fn cmd_init(root: &Path, do_index: bool) -> i32 {
     let mut changes = Vec::new();
 
@@ -30,10 +40,25 @@ fn cmd_init(root: &Path, do_index: bool) -> i32 {
         changes.push("Created .moss/".to_string());
     }
 
-    // 2. Create default config.toml if needed
+    // 2. Detect TODO files for sigil config
+    let todo_files = detect_todo_files(root);
+
+    // 3. Create or update config.toml
     let config_path = moss_dir.join("config.toml");
     if !config_path.exists() {
-        let default_config = r#"# Moss configuration
+        let sigil_section = if todo_files.is_empty() {
+            String::new()
+        } else {
+            let files_str = todo_files
+                .iter()
+                .map(|f| format!("\"{}\"", f))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("\n[sigil]\ntodo = [{}]\n", files_str)
+        };
+
+        let default_config = format!(
+            r#"# Moss configuration
 # See: https://github.com/pterror/moss
 
 [daemon]
@@ -51,12 +76,17 @@ fn cmd_init(root: &Path, do_index: bool) -> i32 {
 # complexity = 0.5
 # security = 2.0
 # clones = 0.3
-"#;
+{}"#,
+            sigil_section
+        );
         if let Err(e) = fs::write(&config_path, default_config) {
             eprintln!("Failed to create config.toml: {}", e);
             return 1;
         }
         changes.push("Created .moss/config.toml".to_string());
+        for f in &todo_files {
+            changes.push(format!("Detected TODO file: {}", f));
+        }
     }
 
     // 3. Update .gitignore if needed
@@ -94,6 +124,15 @@ fn cmd_init(root: &Path, do_index: bool) -> i32 {
     }
 
     0
+}
+
+/// Detect TODO files in the project root.
+fn detect_todo_files(root: &Path) -> Vec<String> {
+    TODO_CANDIDATES
+        .iter()
+        .filter(|name| root.join(name).exists())
+        .map(|s| s.to_string())
+        .collect()
 }
 
 /// Entries we want in .gitignore
@@ -268,5 +307,30 @@ mod tests {
             .position(|l| *l == "!.moss/config.toml")
             .unwrap();
         assert_eq!(config_idx, moss_idx + 1);
+    }
+
+    #[test]
+    fn test_init_detects_todo_files() {
+        let tmp = tempdir().unwrap();
+        fs::write(tmp.path().join("TODO.md"), "# TODO\n").unwrap();
+        fs::write(tmp.path().join("TASKS.md"), "# Tasks\n").unwrap();
+
+        cmd_init(tmp.path(), false);
+
+        let config = fs::read_to_string(tmp.path().join(".moss/config.toml")).unwrap();
+        assert!(config.contains("[sigil]"));
+        assert!(config.contains("TODO.md"));
+        assert!(config.contains("TASKS.md"));
+    }
+
+    #[test]
+    fn test_init_no_todo_files() {
+        let tmp = tempdir().unwrap();
+
+        cmd_init(tmp.path(), false);
+
+        let config = fs::read_to_string(tmp.path().join(".moss/config.toml")).unwrap();
+        // Should not have sigil section if no TODO files found
+        assert!(!config.contains("[sigil]"));
     }
 }
