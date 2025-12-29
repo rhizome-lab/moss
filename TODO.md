@@ -3,8 +3,8 @@
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
-- `analyze --trace`: start with intra-function, expand to cross-function
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus
+- Smart Header: filter names within multi-imports, parent context with collapsed siblings
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -155,8 +155,7 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
   - Need to design how MCP servers are discovered/configured
 
 ### CI/Infrastructure
-- Fix pnpm/action-setup: "Error: No pnpm version is specified." - needs explicit version in GitHub Actions
-- Fix mold linker: `clang: error: invalid linker name in argument '-fuse-ld=mold'` - make local-only
+(No current issues)
 
 ## Deferred
 

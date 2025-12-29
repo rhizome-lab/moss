@@ -42,6 +42,7 @@ Grammar build tooling:
 ### Analyze Command
 
 `moss analyze` improvements:
+- `--trace <symbol>`: trace value provenance (what identifiers flow into assignments)
 - `--duplicate-functions`: detect duplicate functions (renamed from `--clones`)
 - `--allow-function`: add function pair to `.moss/duplicate-functions-allow` (renamed from `--allow-group`)
 - `--duplicate-types`: detect structurally similar types via field name overlap
