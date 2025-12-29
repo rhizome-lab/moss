@@ -3,11 +3,7 @@
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
-- `moss grep` context flags: add `-C`, `-A`, `-B` for context lines (like ripgrep)
-- [x] Consolidate duplicate types (detected by `moss analyze --duplicate-types`):
-  - [x] ComplexityReport/LengthReport → generic FileReport<T>
-  - [x] ExtractResult/SkeletonResult → SkeletonResult is now type alias
-  - [x] FunctionComplexity/FunctionLength → allowed (different metrics, over-engineering to unify)
+- `moss grep` containing symbol: show symbol name + line range in output (e.g., `src/foo.rs:42 (process_request L30-55): ...`)
 
 ## Remaining Work
 - Rethink 'unified tree' - codebases are graphs (namespaces, inheritance, calls), not trees
