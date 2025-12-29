@@ -21,12 +21,15 @@ fn print_help() {
     eprintln!("Usage: cargo xtask <command>");
     eprintln!();
     eprintln!("Commands:");
-    eprintln!("  build-grammars [--out <dir>]  Compile tree-sitter grammars to shared libraries");
-    eprintln!("  help                          Show this message");
+    eprintln!("  build-grammars [--out <dir>] [--force]");
+    eprintln!("      Compile tree-sitter grammars to shared libraries");
+    eprintln!("      --out <dir>  Output directory (default: target/grammars)");
+    eprintln!("      --force      Recompile even if grammar already exists");
+    eprintln!("  help             Show this message");
 }
 
 fn build_grammars(args: &[String]) {
-    let out_dir = parse_out_dir(args);
+    let (out_dir, force) = parse_build_args(args);
     fs::create_dir_all(&out_dir).expect("Failed to create output directory");
 
     let registry_src = find_cargo_registry_src();
@@ -40,19 +43,33 @@ fn build_grammars(args: &[String]) {
     }
 
     println!(
-        "Found {} grammars, compiling to {}",
+        "Found {} grammars, output: {}",
         grammars.len(),
         out_dir.display()
     );
 
-    let mut success = 0;
+    let mut compiled = 0;
+    let mut skipped = 0;
     let mut failed = 0;
+    let mut queries_copied = 0;
 
     for (lang, crate_dir) in &grammars {
+        // Always copy query files (highlights.scm, injections.scm)
+        queries_copied += copy_query_files(lang, crate_dir, &out_dir);
+
+        // Check if grammar already exists
+        let lib_ext = lib_extension();
+        let out_file = out_dir.join(format!("{lang}.{lib_ext}"));
+
+        if out_file.exists() && !force {
+            skipped += 1;
+            continue;
+        }
+
         match compile_grammar(lang, crate_dir, &out_dir) {
             Ok(size) => {
                 println!("  {lang}: {}", human_size(size));
-                success += 1;
+                compiled += 1;
             }
             Err(e) => {
                 eprintln!("  {lang}: FAILED - {e}");
@@ -61,18 +78,62 @@ fn build_grammars(args: &[String]) {
         }
     }
 
-    println!("\nCompiled {success} grammars ({failed} failed)");
+    println!("\nCompiled {compiled} grammars, skipped {skipped} (already built), {failed} failed");
+    if queries_copied > 0 {
+        println!("Copied {queries_copied} query files");
+    }
 }
 
-fn parse_out_dir(args: &[String]) -> PathBuf {
+fn parse_build_args(args: &[String]) -> (PathBuf, bool) {
+    let mut out_dir = PathBuf::from("target/grammars");
+    let mut force = false;
     let mut i = 0;
     while i < args.len() {
-        if args[i] == "--out" && i + 1 < args.len() {
-            return PathBuf::from(&args[i + 1]);
+        match args[i].as_str() {
+            "--out" if i + 1 < args.len() => {
+                out_dir = PathBuf::from(&args[i + 1]);
+                i += 1;
+            }
+            "--force" => force = true,
+            _ => {}
         }
         i += 1;
     }
-    PathBuf::from("target/grammars")
+    (out_dir, force)
+}
+
+fn lib_extension() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "dylib"
+    } else if cfg!(target_os = "windows") {
+        "dll"
+    } else {
+        "so"
+    }
+}
+
+/// Copy query files (highlights.scm, injections.scm) if they don't exist.
+/// Returns the number of files copied.
+fn copy_query_files(lang: &str, crate_dir: &Path, out_dir: &Path) -> usize {
+    let mut copied = 0;
+
+    let query_files = [
+        ("highlights.scm", format!("{lang}.highlights.scm")),
+        ("injections.scm", format!("{lang}.injections.scm")),
+    ];
+
+    for (src_name, dest_name) in &query_files {
+        let src = crate_dir.join("queries").join(src_name);
+        let dest = out_dir.join(dest_name);
+
+        if src.exists() && !dest.exists() {
+            if fs::copy(&src, &dest).is_ok() {
+                copied += 1;
+            }
+        }
+    }
+
+    copied
 }
 
 fn find_cargo_registry_src() -> PathBuf {
@@ -133,15 +194,7 @@ fn compile_grammar(lang: &str, crate_dir: &Path, out_dir: &Path) -> Result<u64, 
     let parser_c = crate_dir.join("grammar/src/parser.c");
     let scanner_c = crate_dir.join("grammar/scanner.c");
 
-    let lib_ext = if cfg!(target_os = "macos") {
-        "dylib"
-    } else if cfg!(target_os = "windows") {
-        "dll"
-    } else {
-        "so"
-    };
-
-    let out_file = out_dir.join(format!("{lang}.{lib_ext}"));
+    let out_file = out_dir.join(format!("{lang}.{}", lib_extension()));
 
     let mut cmd = Command::new("cc");
     cmd.arg("-shared")
@@ -175,13 +228,6 @@ fn compile_grammar(lang: &str, crate_dir: &Path, out_dir: &Path) -> Result<u64, 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!("Compilation failed: {stderr}"));
-    }
-
-    // Copy highlight queries if available
-    let highlights_scm = crate_dir.join("queries/highlights.scm");
-    if highlights_scm.exists() {
-        let dest = out_dir.join(format!("{lang}.highlights.scm"));
-        let _ = fs::copy(&highlights_scm, &dest);
     }
 
     let size = fs::metadata(&out_file).map(|m| m.len()).unwrap_or(0);
