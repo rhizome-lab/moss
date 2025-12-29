@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use moss::commands;
 use moss::commands::analyze::AnalyzeArgs;
+use moss::commands::edit::EditAction;
 use moss::commands::grep::GrepArgs;
 use moss::commands::view::ViewArgs;
 use moss::serve;
@@ -41,80 +42,24 @@ enum Commands {
         /// Target to edit (path like src/main.py/Foo/bar)
         target: String,
 
+        /// Edit action to perform
+        #[command(subcommand)]
+        action: EditAction,
+
         /// Root directory (defaults to current directory)
-        #[arg(short, long)]
+        #[arg(short, long, global = true)]
         root: Option<PathBuf>,
 
-        /// Delete the target node
-        #[arg(long)]
-        delete: bool,
-
-        /// Replace the target node with new content
-        #[arg(long)]
-        replace: Option<String>,
-
-        /// Insert content before the target node (sibling)
-        #[arg(long)]
-        before: Option<String>,
-
-        /// Insert content after the target node (sibling)
-        #[arg(long)]
-        after: Option<String>,
-
-        /// Insert content at the beginning of the target container
-        #[arg(long)]
-        prepend: Option<String>,
-
-        /// Insert content at the end of the target container
-        #[arg(long)]
-        append: Option<String>,
-
-        /// Move the target node before another node
-        #[arg(long)]
-        move_before: Option<String>,
-
-        /// Move the target node after another node
-        #[arg(long)]
-        move_after: Option<String>,
-
-        /// Copy the target node before another node
-        #[arg(long)]
-        copy_before: Option<String>,
-
-        /// Copy the target node after another node
-        #[arg(long)]
-        copy_after: Option<String>,
-
-        /// Move the target node to the beginning of a container
-        #[arg(long)]
-        move_prepend: Option<String>,
-
-        /// Move the target node to the end of a container
-        #[arg(long)]
-        move_append: Option<String>,
-
-        /// Copy the target node to the beginning of a container
-        #[arg(long)]
-        copy_prepend: Option<String>,
-
-        /// Copy the target node to the end of a container
-        #[arg(long)]
-        copy_append: Option<String>,
-
-        /// Swap the target node with another node
-        #[arg(long)]
-        swap: Option<String>,
-
         /// Dry run - show what would be changed without applying
-        #[arg(long)]
+        #[arg(long, global = true)]
         dry_run: bool,
 
         /// Exclude files matching patterns or aliases (e.g., @tests, *.test.js)
-        #[arg(long, value_delimiter = ',')]
+        #[arg(long, value_delimiter = ',', global = true)]
         exclude: Vec<String>,
 
         /// Only include files matching patterns or aliases
-        #[arg(long, value_delimiter = ',')]
+        #[arg(long, value_delimiter = ',', global = true)]
         only: Vec<String>,
     },
 
@@ -382,43 +327,15 @@ fn main() {
         Commands::View(args) => commands::view::run(args, format),
         Commands::Edit {
             target,
+            action,
             root,
-            delete,
-            replace,
-            before,
-            after,
-            prepend,
-            append,
-            move_before,
-            move_after,
-            copy_before,
-            copy_after,
-            move_prepend,
-            move_append,
-            copy_prepend,
-            copy_append,
-            swap,
             dry_run,
             exclude,
             only,
         } => commands::edit::cmd_edit(
             &target,
+            action,
             root.as_deref(),
-            delete,
-            replace.as_deref(),
-            before.as_deref(),
-            after.as_deref(),
-            prepend.as_deref(),
-            append.as_deref(),
-            move_before.as_deref(),
-            move_after.as_deref(),
-            copy_before.as_deref(),
-            copy_after.as_deref(),
-            move_prepend.as_deref(),
-            move_append.as_deref(),
-            copy_prepend.as_deref(),
-            copy_append.as_deref(),
-            swap.as_deref(),
             dry_run,
             cli.json,
             &exclude,

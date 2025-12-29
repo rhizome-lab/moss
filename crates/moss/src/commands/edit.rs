@@ -6,26 +6,103 @@ use crate::filter::Filter;
 use crate::{daemon, edit, path_resolve};
 use std::path::Path;
 
+/// Position for insert/move/copy operations
+#[derive(Clone, Copy, clap::ValueEnum)]
+pub enum Position {
+    /// Before the destination (sibling)
+    Before,
+    /// After the destination (sibling)
+    After,
+    /// At start of container
+    Prepend,
+    /// At end of container
+    Append,
+}
+
+/// Internal representation of operations (for output)
+#[derive(Clone, Copy)]
+pub enum Operation {
+    Delete,
+    Replace,
+    Swap,
+    Insert(Position),
+    Move(Position),
+    Copy(Position),
+}
+
+impl std::fmt::Display for Operation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Operation::Delete => write!(f, "delete"),
+            Operation::Replace => write!(f, "replace"),
+            Operation::Swap => write!(f, "swap"),
+            Operation::Insert(Position::Before) => write!(f, "insert_before"),
+            Operation::Insert(Position::After) => write!(f, "insert_after"),
+            Operation::Insert(Position::Prepend) => write!(f, "prepend"),
+            Operation::Insert(Position::Append) => write!(f, "append"),
+            Operation::Move(Position::Before) => write!(f, "move_before"),
+            Operation::Move(Position::After) => write!(f, "move_after"),
+            Operation::Move(Position::Prepend) => write!(f, "move_prepend"),
+            Operation::Move(Position::Append) => write!(f, "move_append"),
+            Operation::Copy(Position::Before) => write!(f, "copy_before"),
+            Operation::Copy(Position::After) => write!(f, "copy_after"),
+            Operation::Copy(Position::Prepend) => write!(f, "copy_prepend"),
+            Operation::Copy(Position::Append) => write!(f, "copy_append"),
+        }
+    }
+}
+
+/// Edit action to perform (CLI)
+#[derive(clap::Subcommand)]
+pub enum EditAction {
+    /// Delete the target symbol
+    Delete,
+
+    /// Replace target with new content
+    Replace {
+        /// New content to replace with
+        content: String,
+    },
+
+    /// Swap target with another symbol
+    Swap {
+        /// Symbol to swap with
+        other: String,
+    },
+
+    /// Insert content relative to target
+    Insert {
+        /// Content to insert
+        content: String,
+        /// Where to insert: before, after, prepend, append
+        #[arg(long)]
+        at: Position,
+    },
+
+    /// Move target to a new location
+    Move {
+        /// Destination symbol or container
+        destination: String,
+        /// Where to place: before, after, prepend, append
+        #[arg(long)]
+        at: Position,
+    },
+
+    /// Copy target to a new location
+    Copy {
+        /// Destination symbol or container
+        destination: String,
+        /// Where to place: before, after, prepend, append
+        #[arg(long)]
+        at: Position,
+    },
+}
+
 /// Perform structural edits on a file
-#[allow(clippy::too_many_arguments)]
 pub fn cmd_edit(
     target: &str,
+    action: EditAction,
     root: Option<&Path>,
-    delete: bool,
-    replace: Option<&str>,
-    before: Option<&str>,
-    after: Option<&str>,
-    prepend: Option<&str>,
-    append: Option<&str>,
-    move_before: Option<&str>,
-    move_after: Option<&str>,
-    copy_before: Option<&str>,
-    copy_after: Option<&str>,
-    move_prepend: Option<&str>,
-    move_append: Option<&str>,
-    copy_prepend: Option<&str>,
-    copy_append: Option<&str>,
-    swap: Option<&str>,
     dry_run: bool,
     json: bool,
     exclude: &[String],
@@ -37,35 +114,6 @@ pub fn cmd_edit(
 
     // Ensure daemon is running if configured (will pick up edits)
     daemon::maybe_start_daemon(&root);
-
-    // Count operations to ensure exactly one is specified
-    let ops = [
-        delete,
-        replace.is_some(),
-        before.is_some(),
-        after.is_some(),
-        prepend.is_some(),
-        append.is_some(),
-        move_before.is_some(),
-        move_after.is_some(),
-        copy_before.is_some(),
-        copy_after.is_some(),
-        move_prepend.is_some(),
-        move_append.is_some(),
-        copy_prepend.is_some(),
-        copy_append.is_some(),
-        swap.is_some(),
-    ];
-    let op_count = ops.iter().filter(|&&x| x).count();
-
-    if op_count == 0 {
-        eprintln!("Error: No operation specified. Use --delete, --replace, --before, --after, --prepend, --append, --move-*, --copy-*, or --swap");
-        return 1;
-    }
-    if op_count > 1 {
-        eprintln!("Error: Only one operation can be specified at a time");
-        return 1;
-    }
 
     // Resolve the target path
     let unified = match path_resolve::resolve_unified(target, &root) {
@@ -123,61 +171,15 @@ pub fn cmd_edit(
 
     // Handle file-level operations (prepend/append without a symbol)
     if unified.symbol_path.is_empty() {
-        // File-level operations
-        let new_content = if let Some(content_to_prepend) = prepend {
-            editor.prepend_to_file(&content, content_to_prepend)
-        } else if let Some(content_to_append) = append {
-            editor.append_to_file(&content, content_to_append)
-        } else {
-            eprintln!("Error: --delete, --replace, --before, --after require a symbol target");
-            eprintln!("Hint: Use a path like 'src/foo.py/MyClass' to target a symbol");
-            return 1;
-        };
-
-        if dry_run {
-            if json {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "dry_run": true,
-                        "file": unified.file_path,
-                        "operation": if prepend.is_some() { "prepend" } else { "append" },
-                        "new_content": new_content
-                    })
-                );
-            } else {
-                println!("--- Dry run: {} ---", unified.file_path);
-                println!("{}", new_content);
-            }
-            return 0;
-        }
-
-        if let Err(e) = std::fs::write(&file_path, &new_content) {
-            eprintln!("Error writing file: {}", e);
-            return 1;
-        }
-
-        if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "success": true,
-                    "file": unified.file_path,
-                    "operation": if prepend.is_some() { "prepend" } else { "append" }
-                })
-            );
-        } else {
-            println!(
-                "{}: {}",
-                if prepend.is_some() {
-                    "Prepended to"
-                } else {
-                    "Appended to"
-                },
-                unified.file_path
-            );
-        }
-        return 0;
+        return handle_file_level(
+            &action,
+            &editor,
+            &content,
+            &file_path,
+            &unified.file_path,
+            dry_run,
+            json,
+        );
     }
 
     // Symbol-level operations
@@ -190,253 +192,257 @@ pub fn cmd_edit(
         }
     };
 
-    let (operation, new_content) = if delete {
-        ("delete", editor.delete_symbol(&content, &loc))
-    } else if let Some(new_code) = replace {
-        ("replace", editor.replace_symbol(&content, &loc, new_code))
-    } else if let Some(code) = before {
-        ("insert_before", editor.insert_before(&content, &loc, code))
-    } else if let Some(code) = after {
-        ("insert_after", editor.insert_after(&content, &loc, code))
-    } else if let Some(code) = prepend {
-        // Prepend inside a container (class/impl)
-        let body = match editor.find_container_body(&file_path, &content, symbol_name) {
-            Some(b) => b,
-            None => {
-                eprintln!("Error: '{}' is not a container (class/impl)", symbol_name);
-                eprintln!("Hint: --prepend works on classes and impl blocks");
-                return 1;
-            }
-        };
-        (
-            "prepend",
-            editor.prepend_to_container(&content, &body, code),
-        )
-    } else if let Some(code) = append {
-        // Append inside a container (class/impl)
-        let body = match editor.find_container_body(&file_path, &content, symbol_name) {
-            Some(b) => b,
-            None => {
-                eprintln!("Error: '{}' is not a container (class/impl)", symbol_name);
-                eprintln!("Hint: --append works on classes and impl blocks");
-                return 1;
-            }
-        };
-        ("append", editor.append_to_container(&content, &body, code))
-    } else if let Some(dest) = move_before {
-        // Move operation: delete from source, insert before destination
-        // First verify destination exists
-        let _dest_loc = match editor.find_symbol(&file_path, &content, dest) {
-            Some(l) => l,
-            None => {
-                eprintln!("Destination symbol not found: {}", dest);
-                return 1;
-            }
-        };
-        let source_content = &content[loc.start_byte..loc.end_byte];
-        let without_source = editor.delete_symbol(&content, &loc);
-        // Re-find destination after deletion (location may have shifted)
-        let dest_loc_adjusted = match editor.find_symbol(&file_path, &without_source, dest) {
-            Some(l) => l,
-            None => {
-                eprintln!("Destination symbol not found after deletion: {}", dest);
-                return 1;
-            }
-        };
-        (
-            "move_before",
-            editor.insert_before(&without_source, &dest_loc_adjusted, source_content),
-        )
-    } else if let Some(dest) = move_after {
-        // First verify destination exists
-        let _dest_loc = match editor.find_symbol(&file_path, &content, dest) {
-            Some(l) => l,
-            None => {
-                eprintln!("Destination symbol not found: {}", dest);
-                return 1;
-            }
-        };
-        let source_content = &content[loc.start_byte..loc.end_byte];
-        let without_source = editor.delete_symbol(&content, &loc);
-        // Re-find destination after deletion (location may have shifted)
-        let dest_loc_adjusted = match editor.find_symbol(&file_path, &without_source, dest) {
-            Some(l) => l,
-            None => {
-                eprintln!("Destination symbol not found after deletion: {}", dest);
-                return 1;
-            }
-        };
-        (
-            "move_after",
-            editor.insert_after(&without_source, &dest_loc_adjusted, source_content),
-        )
-    } else if let Some(dest) = copy_before {
-        // Copy operation: insert copy before destination (keep original)
-        let dest_loc = match editor.find_symbol(&file_path, &content, dest) {
-            Some(l) => l,
-            None => {
-                eprintln!("Destination symbol not found: {}", dest);
-                return 1;
-            }
-        };
-        let source_content = &content[loc.start_byte..loc.end_byte];
-        (
-            "copy_before",
-            editor.insert_before(&content, &dest_loc, source_content),
-        )
-    } else if let Some(dest) = copy_after {
-        // Copy operation: insert copy after destination (keep original)
-        let dest_loc = match editor.find_symbol(&file_path, &content, dest) {
-            Some(l) => l,
-            None => {
-                eprintln!("Destination symbol not found: {}", dest);
-                return 1;
-            }
-        };
-        let source_content = &content[loc.start_byte..loc.end_byte];
-        (
-            "copy_after",
-            editor.insert_after(&content, &dest_loc, source_content),
-        )
-    } else if let Some(container) = move_prepend {
-        // Move to beginning of container
-        // First verify container exists
-        let _body = match editor.find_container_body(&file_path, &content, container) {
-            Some(b) => b,
-            None => {
-                eprintln!("Container not found: {}", container);
-                return 1;
-            }
-        };
-        let source_content = content[loc.start_byte..loc.end_byte].to_string();
-        let without_source = editor.delete_symbol(&content, &loc);
-        // Re-find container body after deletion (location may have shifted)
-        let body = match editor.find_container_body(&file_path, &without_source, container) {
-            Some(b) => b,
-            None => {
-                eprintln!("Container not found after deletion: {}", container);
-                return 1;
-            }
-        };
-        (
-            "move_prepend",
-            editor.prepend_to_container(&without_source, &body, &source_content),
-        )
-    } else if let Some(container) = move_append {
-        // Move to end of container
-        // First verify container exists
-        let _body = match editor.find_container_body(&file_path, &content, container) {
-            Some(b) => b,
-            None => {
-                eprintln!("Container not found: {}", container);
-                return 1;
-            }
-        };
-        let source_content = content[loc.start_byte..loc.end_byte].to_string();
-        let without_source = editor.delete_symbol(&content, &loc);
-        // Re-find container body after deletion (location may have shifted)
-        let body = match editor.find_container_body(&file_path, &without_source, container) {
-            Some(b) => b,
-            None => {
-                eprintln!("Container not found after deletion: {}", container);
-                return 1;
-            }
-        };
-        (
-            "move_append",
-            editor.append_to_container(&without_source, &body, &source_content),
-        )
-    } else if let Some(container) = copy_prepend {
-        // Copy to beginning of container
-        let body = match editor.find_container_body(&file_path, &content, container) {
-            Some(b) => b,
-            None => {
-                eprintln!("Container not found: {}", container);
-                return 1;
-            }
-        };
-        let source_content = &content[loc.start_byte..loc.end_byte];
-        (
-            "copy_prepend",
-            editor.prepend_to_container(&content, &body, source_content),
-        )
-    } else if let Some(container) = copy_append {
-        // Copy to end of container
-        let body = match editor.find_container_body(&file_path, &content, container) {
-            Some(b) => b,
-            None => {
-                eprintln!("Container not found: {}", container);
-                return 1;
-            }
-        };
-        let source_content = &content[loc.start_byte..loc.end_byte];
-        (
-            "copy_append",
-            editor.append_to_container(&content, &body, source_content),
-        )
-    } else if let Some(other) = swap {
-        let other_loc = match editor.find_symbol(&file_path, &content, other) {
-            Some(l) => l,
-            None => {
-                eprintln!("Other symbol not found: {}", other);
-                return 1;
-            }
-        };
-        // Swap: get both contents, then replace in order (handle offsets)
-        let (first_loc, second_loc) = if loc.start_byte < other_loc.start_byte {
-            (&loc, &other_loc)
-        } else {
-            (&other_loc, &loc)
-        };
-        let first_content = content[first_loc.start_byte..first_loc.end_byte].to_string();
-        let second_content = content[second_loc.start_byte..second_loc.end_byte].to_string();
+    let (operation, new_content) = match action {
+        EditAction::Delete => (Operation::Delete, editor.delete_symbol(&content, &loc)),
 
-        // Build new content by replacing second first (to preserve offsets), then first
-        let mut new = content.clone();
-        new.replace_range(second_loc.start_byte..second_loc.end_byte, &first_content);
-        new.replace_range(first_loc.start_byte..first_loc.end_byte, &second_content);
-        ("swap", new)
-    } else {
-        eprintln!("Error: No valid operation");
-        return 1;
+        EditAction::Replace {
+            content: ref new_code,
+        } => (
+            Operation::Replace,
+            editor.replace_symbol(&content, &loc, new_code),
+        ),
+
+        EditAction::Swap { ref other } => {
+            let other_loc = match editor.find_symbol(&file_path, &content, other) {
+                Some(l) => l,
+                None => {
+                    eprintln!("Other symbol not found: {}", other);
+                    return 1;
+                }
+            };
+            let (first_loc, second_loc) = if loc.start_byte < other_loc.start_byte {
+                (&loc, &other_loc)
+            } else {
+                (&other_loc, &loc)
+            };
+            let first_content = content[first_loc.start_byte..first_loc.end_byte].to_string();
+            let second_content = content[second_loc.start_byte..second_loc.end_byte].to_string();
+            let mut new = content.clone();
+            new.replace_range(second_loc.start_byte..second_loc.end_byte, &first_content);
+            new.replace_range(first_loc.start_byte..first_loc.end_byte, &second_content);
+            (Operation::Swap, new)
+        }
+
+        EditAction::Insert {
+            content: ref insert_content,
+            at,
+        } => {
+            let result = match at {
+                Position::Before => editor.insert_before(&content, &loc, insert_content),
+                Position::After => editor.insert_after(&content, &loc, insert_content),
+                Position::Prepend | Position::Append => {
+                    let body = match editor.find_container_body(&file_path, &content, symbol_name) {
+                        Some(b) => b,
+                        None => {
+                            eprintln!("Error: '{}' is not a container", symbol_name);
+                            return 1;
+                        }
+                    };
+                    if matches!(at, Position::Prepend) {
+                        editor.prepend_to_container(&content, &body, insert_content)
+                    } else {
+                        editor.append_to_container(&content, &body, insert_content)
+                    }
+                }
+            };
+            (Operation::Insert(at), result)
+        }
+
+        EditAction::Move {
+            ref destination,
+            at,
+        } => {
+            let source_content = content[loc.start_byte..loc.end_byte].to_string();
+            let without_source = editor.delete_symbol(&content, &loc);
+
+            let result = match at {
+                Position::Before | Position::After => {
+                    let dest_loc =
+                        match editor.find_symbol(&file_path, &without_source, destination) {
+                            Some(l) => l,
+                            None => {
+                                eprintln!("Destination not found: {}", destination);
+                                return 1;
+                            }
+                        };
+                    if matches!(at, Position::Before) {
+                        editor.insert_before(&without_source, &dest_loc, &source_content)
+                    } else {
+                        editor.insert_after(&without_source, &dest_loc, &source_content)
+                    }
+                }
+                Position::Prepend | Position::Append => {
+                    let body = match editor.find_container_body(
+                        &file_path,
+                        &without_source,
+                        destination,
+                    ) {
+                        Some(b) => b,
+                        None => {
+                            eprintln!("Container not found: {}", destination);
+                            return 1;
+                        }
+                    };
+                    if matches!(at, Position::Prepend) {
+                        editor.prepend_to_container(&without_source, &body, &source_content)
+                    } else {
+                        editor.append_to_container(&without_source, &body, &source_content)
+                    }
+                }
+            };
+            (Operation::Move(at), result)
+        }
+
+        EditAction::Copy {
+            ref destination,
+            at,
+        } => {
+            let source_content = &content[loc.start_byte..loc.end_byte];
+
+            let result = match at {
+                Position::Before | Position::After => {
+                    let dest_loc = match editor.find_symbol(&file_path, &content, destination) {
+                        Some(l) => l,
+                        None => {
+                            eprintln!("Destination not found: {}", destination);
+                            return 1;
+                        }
+                    };
+                    if matches!(at, Position::Before) {
+                        editor.insert_before(&content, &dest_loc, source_content)
+                    } else {
+                        editor.insert_after(&content, &dest_loc, source_content)
+                    }
+                }
+                Position::Prepend | Position::Append => {
+                    let body = match editor.find_container_body(&file_path, &content, destination) {
+                        Some(b) => b,
+                        None => {
+                            eprintln!("Container not found: {}", destination);
+                            return 1;
+                        }
+                    };
+                    if matches!(at, Position::Prepend) {
+                        editor.prepend_to_container(&content, &body, source_content)
+                    } else {
+                        editor.append_to_container(&content, &body, source_content)
+                    }
+                }
+            };
+            (Operation::Copy(at), result)
+        }
     };
 
+    output_result(
+        dry_run,
+        json,
+        &unified.file_path,
+        Some(symbol_name),
+        operation,
+        &new_content,
+        &file_path,
+    )
+}
+
+/// Handle file-level operations (prepend/append to file without symbol target)
+fn handle_file_level(
+    action: &EditAction,
+    editor: &edit::Editor,
+    content: &str,
+    file_path: &Path,
+    rel_path: &str,
+    dry_run: bool,
+    json: bool,
+) -> i32 {
+    let (operation, new_content) = match action {
+        EditAction::Insert {
+            content: insert_content,
+            at: Position::Prepend,
+        } => (
+            Operation::Insert(Position::Prepend),
+            editor.prepend_to_file(content, insert_content),
+        ),
+        EditAction::Insert {
+            content: insert_content,
+            at: Position::Append,
+        } => (
+            Operation::Insert(Position::Append),
+            editor.append_to_file(content, insert_content),
+        ),
+        _ => {
+            eprintln!(
+                "Error: This operation requires a symbol target. Use a path like 'src/foo.py/MyClass'"
+            );
+            eprintln!(
+                "Hint: Only 'insert --at prepend' and 'insert --at append' work on files directly"
+            );
+            return 1;
+        }
+    };
+
+    output_result(
+        dry_run,
+        json,
+        rel_path,
+        None,
+        operation,
+        &new_content,
+        file_path,
+    )
+}
+
+/// Output result (dry-run or actual write)
+fn output_result(
+    dry_run: bool,
+    json: bool,
+    rel_path: &str,
+    symbol: Option<&str>,
+    operation: Operation,
+    new_content: &str,
+    file_path: &Path,
+) -> i32 {
     if dry_run {
         if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "dry_run": true,
-                    "file": unified.file_path,
-                    "symbol": symbol_name,
-                    "operation": operation,
-                    "new_content": new_content
-                })
-            );
+            let mut obj = serde_json::json!({
+                "dry_run": true,
+                "file": rel_path,
+                "operation": operation.to_string(),
+                "new_content": new_content
+            });
+            if let Some(s) = symbol {
+                obj["symbol"] = serde_json::json!(s);
+            }
+            println!("{}", obj);
         } else {
-            println!("--- Dry run: {} on {} ---", operation, symbol_name);
+            if let Some(s) = symbol {
+                println!("--- Dry run: {} on {} ---", operation, s);
+            } else {
+                println!("--- Dry run: {} ---", rel_path);
+            }
             println!("{}", new_content);
         }
         return 0;
     }
 
-    if let Err(e) = std::fs::write(&file_path, &new_content) {
+    if let Err(e) = std::fs::write(file_path, new_content) {
         eprintln!("Error writing file: {}", e);
         return 1;
     }
 
     if json {
-        println!(
-            "{}",
-            serde_json::json!({
-                "success": true,
-                "file": unified.file_path,
-                "symbol": symbol_name,
-                "operation": operation
-            })
-        );
+        let mut obj = serde_json::json!({
+            "success": true,
+            "file": rel_path,
+            "operation": operation.to_string()
+        });
+        if let Some(s) = symbol {
+            obj["symbol"] = serde_json::json!(s);
+        }
+        println!("{}", obj);
+    } else if let Some(s) = symbol {
+        println!("{}: {} in {}", operation, s, rel_path);
     } else {
-        println!("{}: {} in {}", operation, symbol_name, unified.file_path);
+        println!("{}: {}", operation, rel_path);
     }
 
     0
