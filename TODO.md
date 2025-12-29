@@ -8,7 +8,7 @@ Test Status: 113 passing, 0 failing (moss)
 
 ## Remaining Work
 
-**Configuration System:**
+### Configuration System
 Sections: `[daemon]`, `[index]`, `[filter.aliases]`, `[todo]`, `[view]`, `[analyze]`, `[grep]`
 
 Adding a new section (3 places):
@@ -18,16 +18,16 @@ Adding a new section (3 places):
 
 Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 
-**Workflow Engine:**
+### Workflow Engine
 - [x] Port LLM calling logic (streaming, tool use) as workflow component
 - [x] Memory system: `store()`, `recall()`, `forget()` Lua API with SQLite persistence
 
-**Token-Efficient Output:**
+### Token-Efficient Output
 - [x] Default output optimized for LLM context (compact mode)
 - [x] `--pretty` for human-friendly display with colors
 - [x] Elide keywords in compact mode (`pub fn` → just signature)
 
-**Rust Redesign Candidates:**
+### Rust Redesign Candidates
 - Rules engine: consider semgrep/ruff integration instead of custom
 - Plugin system: Rust trait-based plugins or external tool orchestration
 - Edit routing: workflow engine with LLM decision points
@@ -35,24 +35,25 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - PR/diff analysis: `moss analyze --pr` or similar
 ## Backlog
 
-**Language Support:** 98 languages implemented - all arborium grammars covered.
+### Language Support
+98 languages implemented - all arborium grammars covered.
 See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to verify.
 
-**Grammar Loading (external .so files):**
+### Grammar Loading (external .so files)
 Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so files (~142MB total).
 - Grammars load from: `MOSS_GRAMMAR_PATH` env var, `~/.config/moss/grammars/`
 - See `crates/moss-languages/src/grammar_loader.rs` for loader implementation
 - [x] `moss grammars install` downloads from GitHub releases
 - [x] Release workflow builds and packages grammars per platform
 
-**Workflow Engine:**
+### Workflow Engine
 - Consider streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)
 
-**Performance:**
+### Performance
 - [x] View command performance: fixed by lazy symbol search + auto-build index (470ms → 14ms for file view, 47ms for symbol search)
 
-**Code Quality:**
+### Code Quality
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
@@ -61,11 +62,11 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - [x] Binary size optimization: LTO + strip reduced 25MB → 18MB (main contributors: moss 2.1MB, bundled C libs 2MB, moss_languages 1.6MB)
 - [x] Avoid Command::new in crates/moss-packages/src/ecosystems/: replaced 14 curl calls with ureq HTTP client. bun.lockb properly ported from Bun source (inline + external strings). Remaining Command uses are legitimate CLI tools: npm/cargo/pip-audit/bundle-audit/govulncheck (security audits), nix/nix-env (local queries)
 
-**Daemon Design:**
+### Daemon Design
 - [x] Multi-codebase: single global daemon at `~/.config/moss/daemon.sock`, manages multiple roots via `daemon add/remove/list`
 - [x] Minimal memory footprint: SQLite file-based (~2MB per connection), no LRU eviction needed
 
-**Tooling:**
+### Tooling
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
 - Interactive config editor: `moss config` TUI for editing `.moss/config.toml`
 - Todo improvements:
@@ -77,12 +78,12 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
   - `moss todo section rename <old> <new>`: rename section
   - `moss todo archive [--format=changelog]`: format done items, remove them
 
-**Workspace/Context Management:**
+### Workspace/Context Management
 - Persistent workspace concept (like Notion): files, tool results, context stored permanently
 - Cross-session continuity without re-reading everything
 - Investigate memory-mapped context, incremental updates
 
-**Agent Research:**
+### Agent Research
 - Conversational loop pattern (vs hierarchical)
 - YOLO mode evaluation
 - Diffusion-like parallel refactors
@@ -90,14 +91,14 @@ Status: Implemented. `cargo xtask build-grammars` compiles 97 grammars to .so fi
 - Claude Code lacks navigation: clicking paths/links in output doesn't open them in editor (significant UX gap)
 - Rich links in LLM output: structured links (file:line, symbols) or cheap model postprocessing. Clickable refs in terminal/IDE.
 
-**Session Analysis:**
+### Session Analysis
 - Better `--compact` format: key:value pairs, no tables, all info preserved
 - Better `--pretty` format: bar charts for tools, progress bar for success rate
 - `moss sessions stats`: cross-session aggregates (session count, token hotspots, total usage)
 - `moss sessions mark <id>`: mark as reviewed (store in `.moss/sessions-reviewed`)
 - Friction signal detection: correction patterns, tool chains, avoidance
 
-**Friction Signals:** (see `docs/research/agent-adaptation.md`)
+### Friction Signals (see `docs/research/agent-adaptation.md`)
 How do we know when tools aren't working? Implicit signals from agent behavior:
 - Correction patterns: "You're right", "Should have" after tool calls
 - Long tool chains: 5+ calls without acting
@@ -105,13 +106,13 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - Follow-up patterns: `--types-only` → immediately view symbol
 - Repeated queries: same file viewed multiple times
 
-**Distribution:**
+### Distribution
 - Wrapper packages for ecosystems: npm, PyPI, Homebrew, etc.
   - Auto-generate and publish in sync with GitHub releases
   - Single binary + thin wrapper scripts per ecosystem
 - Direct download: platform-detected link to latest GitHub release binary (avoid cargo install overhead)
 
-**Vision (Aspirational):**
+### Vision (Aspirational)
 - [x] Shadow Git: hunk-level edit tracking in `.moss/.git` (see `workflow/shadow.rs`, Lua API: `shadow.*`)
   - TODO: auto-track all edits made via `moss edit` / workflow edit tools
   - TODO: `[shadow]` config section (enabled, retention policy, deletion warnings)
@@ -126,7 +127,7 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 
 ## Python Features Not Yet Ported
 
-**Orchestration:**
+### Orchestration
 - Session management with checkpointing
 - Driver protocol for agent decision-making
 - Plugin system (partial - Rust traits exist)
@@ -135,16 +136,16 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - TUI (Textual-based explorer)
 - DWIM tool routing with aliases
 
-**LLM-Powered:**
+### LLM-Powered
 - Edit routing (complexity assessment → structural vs LLM)
 - Summarization with local models
 - Working memory with summarization
 
-**Memory System:**
+### Memory System
 See `docs/design/memory.md`. Core API: `store(content, opts)`, `recall(query)`, `forget(query)`.
 SQLite-backed persistence in `.moss/memory.db`. Slots are user-space (metadata), not special-cased.
 
-**Local NN Budget (from deleted docs):**
+### Local NN Budget (from deleted docs)
 | Model | Params | FP16 RAM |
 |-------|--------|----------|
 | all-MiniLM-L6-v2 | 33M | 65MB |
@@ -153,13 +154,13 @@ SQLite-backed persistence in `.moss/memory.db`. Slots are user-space (metadata),
 
 Pre-summarization tiers: extractive (free) → small NN → LLM (expensive)
 
-**Usage Patterns (from dogfooding):**
+### Usage Patterns (from dogfooding)
 - Investigation flow: `view .` → `view <file> --types-only` → `analyze --complexity` → `view <symbol>`
 - Token efficiency: use `--types-only` for architecture, `--depth` sparingly
 
 ## Implementation Notes
 
-**Self-update (`moss update`):**
+### Self-update (`moss update`)
 - Now in commands/update.rs
 - GITHUB_REPO constant → "pterror/moss"
 - Custom SHA256 implementation (Sha256 struct)
@@ -167,7 +168,7 @@ Pre-summarization tiers: extractive (free) → small NN → LLM (expensive)
 
 ## When Ready
 
-**First Release:**
+### First Release
 ```bash
 git tag v0.1.0
 git push --tags
