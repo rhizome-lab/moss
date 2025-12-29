@@ -13,6 +13,13 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
   - Store diffs in memory, use worktree as "materialized view"
   - Apply patch to worktree → run validator → if pass, apply to user dir
   - Zero user interruption (user can edit while agent tests in background)
+- `analyze --trace <symbol>`: backward data flow / value provenance
+  - Trace where a value comes from (like "blame" for values, not lines)
+  - Cross-function tracing with function signatures at boundaries
+  - Conditionals: trace both branches
+  - Stop conditions: literals, external calls (show signature)
+  - `--max-depth N` or `--max-items N` to limit output
+  - Example: `y = f(x, z)` → trace y ← f ← (x, z), showing f's signature
 - "Smart Header" as default view output (not a flag):
   - Problem: bare skeletons strip semantic intent (imports, comments, deprecation notices)
   - Default output should synthesize context:
