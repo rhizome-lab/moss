@@ -2,13 +2,16 @@
 
 use crate::filter::Filter;
 use crate::output::OutputFormatter;
+use crate::symbols::SymbolParser;
 use grep_matcher::Matcher;
 use grep_regex::RegexMatcher;
 use grep_searcher::sinks::UTF8;
 use grep_searcher::Searcher;
 use ignore::WalkBuilder;
-use nu_ansi_term::Color::{Cyan, Red, Yellow};
+use nu_ansi_term::Color::{Cyan, Green, Red, Yellow};
+use std::collections::HashMap;
 use std::fmt::Write;
+use std::fs;
 use std::io;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -22,6 +25,15 @@ pub struct GrepMatch {
     pub content: String,
     pub start: usize,
     pub end: usize,
+    /// Containing symbol name (if found)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<String>,
+    /// Containing symbol start line
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbol_start: Option<usize>,
+    /// Containing symbol end line
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbol_end: Option<usize>,
 }
 
 /// Result of a grep search
@@ -118,6 +130,9 @@ pub fn grep(
                         content: line.trim_end().to_string(),
                         start,
                         end,
+                        symbol: None,
+                        symbol_start: None,
+                        symbol_end: None,
                     });
                     Ok(true)
                 }),
@@ -143,12 +158,90 @@ pub fn grep(
         })
     });
 
-    let matches = matches.into_inner().unwrap();
+    let mut matches = matches.into_inner().unwrap();
+
+    // Enrich matches with containing symbol info
+    add_symbol_context(&mut matches, root);
+
     Ok(GrepResult {
         matches,
         total_matches: total_matches.load(Ordering::Relaxed),
         files_searched: files_searched.load(Ordering::Relaxed),
     })
+}
+
+/// Enrich grep matches with containing symbol information.
+fn add_symbol_context(matches: &mut [GrepMatch], root: &Path) {
+    if matches.is_empty() {
+        return;
+    }
+
+    // Group match indices by file (clone file strings to avoid borrow issues)
+    let mut by_file: HashMap<String, Vec<usize>> = HashMap::new();
+    for (idx, m) in matches.iter().enumerate() {
+        by_file.entry(m.file.clone()).or_default().push(idx);
+    }
+
+    let parser = SymbolParser::new();
+
+    // For each file with matches, parse symbols and find containing symbol
+    for (file, indices) in by_file {
+        let path = root.join(&file);
+        let content = match fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let symbols = parser.parse_file(&path, &content);
+        if symbols.is_empty() {
+            continue;
+        }
+
+        // For each match in this file, find the smallest containing symbol
+        for idx in indices {
+            let line = matches[idx].line;
+
+            // Find smallest symbol that contains this line
+            let mut best: Option<&crate::symbols::FlatSymbol> = None;
+            for sym in &symbols {
+                if sym.start_line <= line && line <= sym.end_line {
+                    // Prefer smaller (more specific) symbols
+                    if best.is_none()
+                        || (sym.end_line - sym.start_line)
+                            < (best.unwrap().end_line - best.unwrap().start_line)
+                    {
+                        best = Some(sym);
+                    }
+                }
+            }
+
+            if let Some(sym) = best {
+                // Format name with parent if present
+                let name = if let Some(parent) = &sym.parent {
+                    format!("{}.{}", parent, sym.name)
+                } else {
+                    sym.name.clone()
+                };
+                matches[idx].symbol = Some(name);
+                matches[idx].symbol_start = Some(sym.start_line);
+                matches[idx].symbol_end = Some(sym.end_line);
+            }
+        }
+    }
+}
+
+/// Format symbol info for display: " (symbol_name L10-25)" or empty string
+fn format_symbol_info(m: &GrepMatch, colorize: bool) -> String {
+    match (&m.symbol, m.symbol_start, m.symbol_end) {
+        (Some(name), Some(start), Some(end)) => {
+            if colorize {
+                format!(" ({} L{}-{})", Green.paint(name), start, end)
+            } else {
+                format!(" ({} L{}-{})", name, start, end)
+            }
+        }
+        _ => String::new(),
+    }
 }
 
 impl OutputFormatter for GrepResult {
@@ -165,7 +258,8 @@ impl OutputFormatter for GrepResult {
         for (file, matches) in by_file {
             writeln!(out, "{}:", file).unwrap();
             for m in matches {
-                writeln!(out, "  {}:{}", m.line, m.content).unwrap();
+                let sym_info = format_symbol_info(m, false);
+                writeln!(out, "  {}{}:{}", m.line, sym_info, m.content).unwrap();
             }
         }
         write!(
@@ -201,7 +295,15 @@ impl OutputFormatter for GrepResult {
                 } else {
                     m.content.clone()
                 };
-                writeln!(out, "  {}:{}", Yellow.paint(m.line.to_string()), content).unwrap();
+                let sym_info = format_symbol_info(m, true);
+                writeln!(
+                    out,
+                    "  {}{}:{}",
+                    Yellow.paint(m.line.to_string()),
+                    sym_info,
+                    content
+                )
+                .unwrap();
             }
         }
         write!(
