@@ -93,6 +93,10 @@ pub struct ViewArgs {
     #[arg(long)]
     pub docs: bool,
 
+    /// Hide parent/ancestor context (shown by default for nested symbols)
+    #[arg(long)]
+    pub no_parent: bool,
+
     /// Context view: skeleton + imports combined
     #[arg(long)]
     pub context: bool,
@@ -129,6 +133,7 @@ pub fn run(args: ViewArgs, format: crate::output::OutputFormat) -> i32 {
         args.full,
         args.docs || config.view.show_docs(),
         args.context,
+        !args.no_parent,
         format.is_json(),
         format.is_pretty(),
         format.use_colors(),
@@ -279,6 +284,7 @@ fn cmd_view_symbol_direct(
     depth: i32,
     full: bool,
     show_docs: bool,
+    show_parent: bool,
     json: bool,
     pretty: bool,
     use_colors: bool,
@@ -290,6 +296,7 @@ fn cmd_view_symbol_direct(
         depth,
         full,
         show_docs,
+        show_parent,
         json,
         pretty,
         use_colors,
@@ -312,6 +319,7 @@ pub fn cmd_view(
     full: bool,
     show_docs: bool,
     context: bool,
+    show_parent: bool,
     json: bool,
     pretty: bool,
     use_colors: bool,
@@ -402,7 +410,16 @@ pub fn cmd_view(
             // Single symbol match - construct path to it
             let sym = &symbol_matches[0];
             return cmd_view_symbol_direct(
-                &sym.file, &sym.name, &root, depth, full, show_docs, json, pretty, use_colors,
+                &sym.file,
+                &sym.name,
+                &root,
+                depth,
+                full,
+                show_docs,
+                show_parent,
+                json,
+                pretty,
+                use_colors,
             );
         }
         _ => {
@@ -497,6 +514,7 @@ pub fn cmd_view(
             depth,
             full,
             show_docs,
+            show_parent,
             json,
             pretty,
             use_colors,
@@ -1074,6 +1092,58 @@ fn find_symbol<'a>(
     None
 }
 
+/// Info about one ancestor in the chain
+struct AncestorInfo<'a> {
+    symbol: &'a skeleton::SkeletonSymbol,
+    sibling_count: usize,
+}
+
+/// Find a symbol by name along with all its ancestors (outermost first)
+fn find_symbol_with_ancestors<'a>(
+    symbols: &'a [skeleton::SkeletonSymbol],
+    name: &str,
+    ancestors: &mut Vec<AncestorInfo<'a>>,
+) -> Option<&'a skeleton::SkeletonSymbol> {
+    for sym in symbols {
+        if sym.name == name {
+            return Some(sym);
+        }
+        // Check if target is in this symbol's children
+        for child in &sym.children {
+            if child.name == name {
+                ancestors.push(AncestorInfo {
+                    symbol: sym,
+                    sibling_count: sym.children.len().saturating_sub(1),
+                });
+                return Some(child);
+            }
+        }
+        // Recursively search in children
+        if let Some(found) = find_symbol_with_ancestors(&sym.children, name, ancestors) {
+            // Found deeper - add this symbol as an ancestor
+            ancestors.insert(
+                0,
+                AncestorInfo {
+                    symbol: sym,
+                    sibling_count: sym.children.len().saturating_sub(1),
+                },
+            );
+            return Some(found);
+        }
+    }
+    None
+}
+
+/// Helper that returns ancestors in a Vec
+fn find_symbol_with_parent<'a>(
+    symbols: &'a [skeleton::SkeletonSymbol],
+    name: &str,
+) -> (Option<&'a skeleton::SkeletonSymbol>, Vec<AncestorInfo<'a>>) {
+    let mut ancestors = Vec::new();
+    let found = find_symbol_with_ancestors(symbols, name, &mut ancestors);
+    (found, ancestors)
+}
+
 /// Find a symbol's signature in a skeleton
 fn find_symbol_signature(symbols: &[skeleton::SkeletonSymbol], name: &str) -> Option<String> {
     find_symbol(symbols, name).map(|sym| sym.signature.clone())
@@ -1086,6 +1156,7 @@ fn cmd_view_symbol(
     depth: i32,
     full: bool,
     show_docs: bool,
+    show_parent: bool,
     json: bool,
     pretty: bool,
     use_colors: bool,
@@ -1210,6 +1281,31 @@ fn cmd_view_symbol(
                 }
             }
 
+            // Show ancestor context by default (unless --no-parent)
+            // Extract skeleton once if we need ancestor info
+            let skeleton_result;
+            let ancestors: Vec<(String, usize)> = if show_parent {
+                let extractor = skeleton::SkeletonExtractor::new();
+                skeleton_result = extractor.extract(&full_path, &content);
+                let (_, ancestor_infos) =
+                    find_symbol_with_parent(&skeleton_result.symbols, symbol_name);
+                // Copy the data we need so we don't hold references
+                ancestor_infos
+                    .into_iter()
+                    .map(|a| (a.symbol.signature.clone(), a.sibling_count))
+                    .collect()
+            } else {
+                Vec::new()
+            };
+
+            // Show all ancestors (outermost first)
+            for (signature, _) in &ancestors {
+                println!("{}", signature);
+            }
+            if !ancestors.is_empty() {
+                println!();
+            }
+
             // Apply syntax highlighting in pretty mode
             let highlighted = if let Some(ref g) = grammar {
                 tree::highlight_source(&source, g, use_colors)
@@ -1217,6 +1313,14 @@ fn cmd_view_symbol(
                 source
             };
             println!("{}", highlighted);
+
+            // Show collapsed sibling count from immediate parent
+            if let Some((_, sibling_count)) = ancestors.last() {
+                if *sibling_count > 0 {
+                    println!();
+                    println!("    /* {} other members */", sibling_count);
+                }
+            }
         }
         0
     } else {
