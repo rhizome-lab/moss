@@ -172,6 +172,14 @@ pub struct AnalyzeArgs {
     #[arg(long)]
     pub clones: bool,
 
+    /// Detect duplicate type definitions (structs with similar fields)
+    #[arg(long)]
+    pub duplicate_types: bool,
+
+    /// Minimum field overlap percentage for duplicate type detection (default: 70)
+    #[arg(long, default_value = "70")]
+    pub min_overlap: usize,
+
     /// Elide identifier names when detecting clones (default: true)
     #[arg(long, default_value = "true")]
     pub elide_identifiers: bool,
@@ -254,6 +262,16 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
     };
 
     let weights = config.analyze.weights();
+
+    // Handle --duplicate-types as standalone pass
+    if args.duplicate_types {
+        let scan_root = args
+            .target
+            .as_ref()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| effective_root.clone());
+        return cmd_duplicate_types(&scan_root, args.min_overlap, format.is_json());
+    }
 
     cmd_analyze(
         args.target.as_deref(),
@@ -2159,6 +2177,231 @@ fn cmd_clones_with_count(
     let count = clone_groups.len();
     let exit_code = if count == 0 { 0 } else { 1 };
     (exit_code, count)
+}
+
+/// Detect duplicate type definitions (structs with similar fields)
+fn cmd_duplicate_types(root: &Path, min_overlap_percent: usize, json: bool) -> i32 {
+    use regex::Regex;
+
+    let extractor = Extractor::new();
+
+    // Type location info
+    #[derive(Debug, Clone)]
+    struct TypeInfo {
+        file: String,
+        name: String,
+        start_line: usize,
+        fields: Vec<String>,
+    }
+
+    // Collect types with their fields
+    let mut types: Vec<TypeInfo> = Vec::new();
+    let mut files_scanned = 0;
+
+    // Regex to extract field names from struct definitions
+    // Matches patterns like: field_name: Type or pub field_name: Type
+    let field_re = Regex::new(r"(?m)^\s*(?:pub\s+)?(\w+)\s*:\s*\S").unwrap();
+
+    // Collect files to scan - either a single file or walk a directory
+    let files: Vec<PathBuf> = if root.is_file() {
+        vec![root.to_path_buf()]
+    } else {
+        ignore::WalkBuilder::new(root)
+            .hidden(true)
+            .git_ignore(true)
+            .git_global(true)
+            .git_exclude(true)
+            .build()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                let path = e.path();
+                path.is_file() && is_source_file(path)
+            })
+            .map(|e| e.path().to_path_buf())
+            .collect()
+    };
+
+    for path in &files {
+        let path = path.as_path();
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        files_scanned += 1;
+
+        // Extract symbols
+        let result = extractor.extract(path, &content);
+        let lines: Vec<&str> = content.lines().collect();
+
+        // Find type symbols (struct, class, interface, etc.)
+        for sym in result.symbols.iter().flat_map(|s| flatten_symbols(s)) {
+            let kind = sym.kind.as_str();
+            if !matches!(kind, "struct" | "class" | "interface" | "type") {
+                continue;
+            }
+
+            // Extract field names from source
+            let start = sym.start_line.saturating_sub(1);
+            let end = sym.end_line.min(lines.len());
+            let source: String = lines[start..end].join("\n");
+
+            let fields: Vec<String> = field_re
+                .captures_iter(&source)
+                .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_string()))
+                .collect();
+
+            // Skip types with too few fields
+            if fields.len() < 2 {
+                continue;
+            }
+
+            let rel_path = if root.is_file() {
+                path.file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| path.display().to_string())
+            } else {
+                path.strip_prefix(root)
+                    .unwrap_or(path)
+                    .display()
+                    .to_string()
+            };
+
+            types.push(TypeInfo {
+                file: rel_path,
+                name: sym.name.clone(),
+                start_line: sym.start_line,
+                fields,
+            });
+        }
+    }
+
+    // Find duplicate pairs based on field overlap
+    #[derive(Debug)]
+    struct DuplicatePair {
+        type1: TypeInfo,
+        type2: TypeInfo,
+        overlap_percent: usize,
+        common_fields: Vec<String>,
+    }
+
+    let mut duplicates: Vec<DuplicatePair> = Vec::new();
+
+    for i in 0..types.len() {
+        for j in (i + 1)..types.len() {
+            let t1 = &types[i];
+            let t2 = &types[j];
+
+            // Skip if same name (intentional reimplementation)
+            if t1.name == t2.name {
+                continue;
+            }
+
+            // Calculate field overlap
+            let set1: std::collections::HashSet<_> = t1.fields.iter().collect();
+            let set2: std::collections::HashSet<_> = t2.fields.iter().collect();
+
+            let common: Vec<String> = set1.intersection(&set2).map(|s| (*s).clone()).collect();
+
+            let min_size = t1.fields.len().min(t2.fields.len());
+            let overlap_percent = if min_size > 0 {
+                (common.len() * 100) / min_size
+            } else {
+                0
+            };
+
+            if overlap_percent >= min_overlap_percent {
+                duplicates.push(DuplicatePair {
+                    type1: t1.clone(),
+                    type2: t2.clone(),
+                    overlap_percent,
+                    common_fields: common,
+                });
+            }
+        }
+    }
+
+    // Sort by overlap percentage (highest first)
+    duplicates.sort_by(|a, b| b.overlap_percent.cmp(&a.overlap_percent));
+
+    // Output results
+    if json {
+        let output = serde_json::json!({
+            "files_scanned": files_scanned,
+            "types_analyzed": types.len(),
+            "duplicate_pairs": duplicates.len(),
+            "min_overlap_percent": min_overlap_percent,
+            "duplicates": duplicates.iter().map(|d| {
+                serde_json::json!({
+                    "overlap_percent": d.overlap_percent,
+                    "common_fields": d.common_fields,
+                    "type1": {
+                        "file": d.type1.file,
+                        "name": d.type1.name,
+                        "line": d.type1.start_line,
+                        "fields": d.type1.fields,
+                    },
+                    "type2": {
+                        "file": d.type2.file,
+                        "name": d.type2.name,
+                        "line": d.type2.start_line,
+                        "fields": d.type2.fields,
+                    },
+                })
+            }).collect::<Vec<_>>(),
+        });
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    } else {
+        println!("Duplicate Type Detection");
+        println!();
+        println!("Files scanned: {}", files_scanned);
+        println!("Types analyzed: {}", types.len());
+        println!("Duplicate pairs: {}", duplicates.len());
+        println!("Min overlap: {}%", min_overlap_percent);
+        println!();
+
+        if duplicates.is_empty() {
+            println!("No duplicate types detected.");
+        } else {
+            println!("Potential Duplicates (sorted by overlap):");
+            println!();
+
+            for (i, dup) in duplicates.iter().take(20).enumerate() {
+                println!(
+                    "{}. {}% overlap ({} common fields):",
+                    i + 1,
+                    dup.overlap_percent,
+                    dup.common_fields.len()
+                );
+                println!(
+                    "   {} ({}:{}) - {} fields",
+                    dup.type1.name,
+                    dup.type1.file,
+                    dup.type1.start_line,
+                    dup.type1.fields.len()
+                );
+                println!(
+                    "   {} ({}:{}) - {} fields",
+                    dup.type2.name,
+                    dup.type2.file,
+                    dup.type2.start_line,
+                    dup.type2.fields.len()
+                );
+                println!("   Common: {}", dup.common_fields.join(", "));
+                println!();
+            }
+
+            if duplicates.len() > 20 {
+                println!("... and {} more pairs", duplicates.len() - 20);
+            }
+        }
+    }
+
+    if duplicates.is_empty() {
+        0
+    } else {
+        1
+    }
 }
 
 /// Flatten nested symbols into a flat list

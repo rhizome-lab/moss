@@ -4,7 +4,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 - `moss grep` context flags: add `-C`, `-A`, `-B` for context lines (like ripgrep)
-- Detect duplicate types: structural hashing of type definitions, flag >70% field overlap
 
 ## Remaining Work
 - Rethink 'unified tree' - codebases are graphs (namespaces, inheritance, calls), not trees

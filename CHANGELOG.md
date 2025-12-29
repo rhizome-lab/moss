@@ -35,6 +35,14 @@ Grammar build tooling:
 - Copies .scm files for already-built grammars (highlights.scm, injections.scm)
 - `--force` flag to recompile existing grammars
 
+### Analyze Command
+
+`moss analyze` improvements:
+- `--duplicate-types`: detect structurally similar types via field name overlap
+- `--min-overlap N`: configurable threshold (default 70%)
+- Supports single file or directory scanning
+- JSON output with `--json`
+
 ### Init Command
 
 `moss init` for idempotent project setup:
