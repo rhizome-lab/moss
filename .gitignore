@@ -70,5 +70,6 @@ cache/
 # Moss
 .moss/*
 !.moss/config.toml
-!.moss/clone-allow
+!.moss/duplicate-functions-allow
+!.moss/duplicate-types-allow
 **/.moss/

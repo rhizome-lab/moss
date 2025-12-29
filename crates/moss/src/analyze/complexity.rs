@@ -100,11 +100,7 @@ impl FunctionComplexity {
 }
 
 /// Complexity report for a file
-#[derive(Debug)]
-pub struct ComplexityReport {
-    pub functions: Vec<FunctionComplexity>,
-    pub file_path: String,
-}
+pub type ComplexityReport = super::FileReport<FunctionComplexity>;
 
 impl ComplexityReport {
     pub fn avg_complexity(&self) -> f64 {

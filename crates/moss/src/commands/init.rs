@@ -136,7 +136,12 @@ fn detect_todo_files(root: &Path) -> Vec<String> {
 }
 
 /// Entries we want in .gitignore
-const GITIGNORE_ENTRIES: &[&str] = &[".moss/*", "!.moss/config.toml", "!.moss/clone-allow"];
+const GITIGNORE_ENTRIES: &[&str] = &[
+    ".moss/*",
+    "!.moss/config.toml",
+    "!.moss/duplicate-functions-allow",
+    "!.moss/duplicate-types-allow",
+];
 
 /// Update .gitignore with moss entries. Returns list of changes made.
 fn update_gitignore(path: &Path) -> Vec<String> {
@@ -283,7 +288,12 @@ mod tests {
 
         // But negation entries should still be added
         assert!(lines.iter().any(|l| l.trim() == "!.moss/config.toml"));
-        assert!(lines.iter().any(|l| l.trim() == "!.moss/clone-allow"));
+        assert!(lines
+            .iter()
+            .any(|l| l.trim() == "!.moss/duplicate-functions-allow"));
+        assert!(lines
+            .iter()
+            .any(|l| l.trim() == "!.moss/duplicate-types-allow"));
     }
 
     #[test]

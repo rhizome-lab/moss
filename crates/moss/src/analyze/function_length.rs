@@ -83,11 +83,7 @@ impl FunctionLength {
 }
 
 /// Length report for a file.
-#[derive(Debug)]
-pub struct LengthReport {
-    pub functions: Vec<FunctionLength>,
-    pub file_path: String,
-}
+pub type LengthReport = super::FileReport<FunctionLength>;
 
 impl LengthReport {
     pub fn avg_length(&self) -> f64 {

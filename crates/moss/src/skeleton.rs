@@ -45,11 +45,8 @@ impl SymbolExt for Symbol {
     }
 }
 
-/// Result of skeleton extraction
-pub struct SkeletonResult {
-    pub symbols: Vec<SkeletonSymbol>,
-    pub file_path: String,
-}
+/// Result of skeleton extraction (alias for ExtractResult)
+pub type SkeletonResult = crate::extract::ExtractResult;
 
 impl SkeletonResult {
     /// Convert to a ViewNode with file as root and symbols as children.

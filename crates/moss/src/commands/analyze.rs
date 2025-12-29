@@ -29,8 +29,8 @@ pub struct AnalyzeConfig {
     pub complexity: Option<bool>,
     /// Run security analysis by default
     pub security: Option<bool>,
-    /// Run clone detection by default
-    pub clones: Option<bool>,
+    /// Run duplicate function detection by default
+    pub duplicate_functions: Option<bool>,
     /// Weights for final grade calculation
     pub weights: Option<AnalyzeWeights>,
 }
@@ -42,7 +42,7 @@ pub struct AnalyzeWeights {
     pub health: Option<f64>,
     pub complexity: Option<f64>,
     pub security: Option<f64>,
-    pub clones: Option<f64>,
+    pub duplicate_functions: Option<f64>,
 }
 
 impl AnalyzeWeights {
@@ -55,8 +55,8 @@ impl AnalyzeWeights {
     pub fn security(&self) -> f64 {
         self.security.unwrap_or(2.0)
     }
-    pub fn clones(&self) -> f64 {
-        self.clones.unwrap_or(0.3)
+    pub fn duplicate_functions(&self) -> f64 {
+        self.duplicate_functions.unwrap_or(0.3)
     }
 }
 
@@ -81,8 +81,8 @@ impl AnalyzeConfig {
         self.security.unwrap_or(true)
     }
 
-    pub fn clones(&self) -> bool {
-        self.clones.unwrap_or(false)
+    pub fn duplicate_functions(&self) -> bool {
+        self.duplicate_functions.unwrap_or(false)
     }
 
     pub fn weights(&self) -> AnalyzeWeights {
@@ -100,7 +100,7 @@ pub struct AnalyzeArgs {
     #[arg(short, long)]
     pub root: Option<PathBuf>,
 
-    /// Run all analysis passes including clones
+    /// Run all analysis passes including duplicate function detection
     #[arg(long)]
     pub all: bool,
 
@@ -168,9 +168,9 @@ pub struct AnalyzeArgs {
     #[arg(long)]
     pub check_examples: bool,
 
-    /// Detect code clones (duplicate functions/methods)
+    /// Detect duplicate functions (code clones)
     #[arg(long)]
-    pub clones: bool,
+    pub duplicate_functions: bool,
 
     /// Detect duplicate type definitions (structs with similar fields)
     #[arg(long)]
@@ -184,27 +184,27 @@ pub struct AnalyzeArgs {
     #[arg(long, num_args = 2, value_names = ["TYPE1", "TYPE2"])]
     pub allow_type: Option<Vec<String>>,
 
-    /// Elide identifier names when detecting clones (default: true)
+    /// Elide identifier names when detecting duplicate functions (default: true)
     #[arg(long, default_value = "true")]
     pub elide_identifiers: bool,
 
-    /// Elide literal values when detecting clones (default: false)
+    /// Elide literal values when detecting duplicate functions (default: false)
     #[arg(long)]
     pub elide_literals: bool,
 
-    /// Show source code for detected clones
+    /// Show source code for detected duplicate functions
     #[arg(long)]
     pub show_source: bool,
 
-    /// Minimum lines for a function to be considered for clone detection
+    /// Minimum lines for a function to be considered for duplicate detection
     #[arg(long, default_value = "1")]
     pub min_lines: usize,
 
-    /// Allow a clone group by location (add to .moss/clone-allow). Format: path:symbol
+    /// Allow a duplicate function group by location (add to .moss/duplicate-functions-allow). Format: path:symbol
     #[arg(long, value_name = "LOCATION")]
-    pub allow_group: Option<String>,
+    pub allow_function: Option<String>,
 
-    /// Reason for allowing (required for new clone groups or type pairs)
+    /// Reason for allowing (required for new groups or type pairs)
     #[arg(long, value_name = "REASON")]
     pub reason: Option<String>,
 
@@ -225,9 +225,9 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = MossConfig::load(&effective_root);
 
-    // Handle --allow-group mode
-    if let Some(ref location) = args.allow_group {
-        return cmd_allow_clone_group(
+    // Handle --allow-function mode
+    if let Some(ref location) = args.allow_function {
+        return cmd_allow_duplicate_function(
             &effective_root,
             location,
             args.reason.as_deref(),
@@ -241,18 +241,21 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
     // --all: run everything
     // Specific flags: run only those
     // No flags: use config defaults
-    let (health, complexity, length, security, clones) = if args.all {
+    let (health, complexity, length, security, duplicate_functions) = if args.all {
         (true, true, true, true, true)
     } else {
-        let any_pass_flag =
-            args.health || args.complexity || args.length || args.security || args.clones;
+        let any_pass_flag = args.health
+            || args.complexity
+            || args.length
+            || args.security
+            || args.duplicate_functions;
         if any_pass_flag {
             (
                 args.health,
                 args.complexity,
                 args.length,
                 args.security,
-                args.clones,
+                args.duplicate_functions,
             )
         } else {
             (
@@ -260,7 +263,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                 config.analyze.complexity(),
                 false, // length off by default
                 config.analyze.security(),
-                config.analyze.clones(),
+                config.analyze.duplicate_functions(),
             )
         }
     };
@@ -313,7 +316,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
         args.check_refs,
         args.stale_docs,
         args.check_examples,
-        clones,
+        duplicate_functions,
         args.elide_identifiers,
         args.elide_literals,
         args.show_source,
@@ -347,7 +350,7 @@ pub fn cmd_analyze(
     check_refs: bool,
     stale_docs: bool,
     check_examples: bool,
-    clones: bool,
+    duplicate_functions: bool,
     elide_identifiers: bool,
     elide_literals: bool,
     show_source: bool,
@@ -470,9 +473,9 @@ pub fn cmd_analyze(
         }
     }
 
-    // Run clone detection if enabled
-    if clones {
-        let (clone_result, clone_count) = cmd_clones_with_count(
+    // Run duplicate function detection if enabled
+    if duplicate_functions {
+        let (result, count) = cmd_duplicate_functions_with_count(
             &root,
             elide_identifiers,
             elide_literals,
@@ -480,9 +483,12 @@ pub fn cmd_analyze(
             min_lines,
             json,
         );
-        scores.push((score_clones(clone_count), weights.clones()));
-        if clone_result != 0 {
-            exit_code = clone_result;
+        scores.push((
+            score_duplicate_functions(count),
+            weights.duplicate_functions(),
+        ));
+        if result != 0 {
+            exit_code = result;
         }
     }
 
@@ -515,9 +521,9 @@ fn score_security(report: &analysis_report::SecurityReport) -> f64 {
     (100.0 - penalty as f64).max(0.0)
 }
 
-/// Score clones: 100 if no clones, -5 per clone group
-fn score_clones(clone_groups: usize) -> f64 {
-    (100.0 - (clone_groups * 5) as f64).max(0.0)
+/// Score duplicate functions: 100 if none, -5 per group
+fn score_duplicate_functions(groups: usize) -> f64 {
+    (100.0 - (groups * 5) as f64).max(0.0)
 }
 
 /// Calculate weighted average grade from scores
@@ -1739,7 +1745,7 @@ fn cmd_check_examples(root: &Path, json: bool) -> i32 {
 }
 
 // ============================================================================
-// Clone Detection
+// Duplicate Function Detection
 // ============================================================================
 
 use crate::extract::Extractor;
@@ -1747,26 +1753,26 @@ use crate::parsers::Parsers;
 use moss_languages::support_for_path;
 use std::hash::{Hash, Hasher};
 
-/// A detected code clone group
+/// A group of duplicate functions
 #[derive(Debug)]
-struct CloneGroup {
+struct DuplicateFunctionGroup {
     hash: u64,
-    locations: Vec<CloneLocation>,
+    locations: Vec<DuplicateFunctionLocation>,
     line_count: usize,
 }
 
-/// Location of a clone instance
+/// Location of a duplicate function instance
 #[derive(Debug)]
-struct CloneLocation {
+struct DuplicateFunctionLocation {
     file: String,
     symbol: String,
     start_line: usize,
     end_line: usize,
 }
 
-/// Load allowed clone locations from .moss/clone-allow file
-fn load_clone_allowlist(root: &Path) -> std::collections::HashSet<String> {
-    let path = root.join(".moss/clone-allow");
+/// Load allowed duplicate function locations from .moss/duplicate-functions-allow file
+fn load_duplicate_functions_allowlist(root: &Path) -> std::collections::HashSet<String> {
+    let path = root.join(".moss/duplicate-functions-allow");
     let mut allowed = std::collections::HashSet::new();
     if let Ok(content) = std::fs::read_to_string(&path) {
         for line in content.lines() {
@@ -1780,17 +1786,17 @@ fn load_clone_allowlist(root: &Path) -> std::collections::HashSet<String> {
     allowed
 }
 
-/// Detect all clone groups in the codebase (before filtering by allowlist)
-fn detect_clone_groups(
+/// Detect all duplicate function groups in the codebase (before filtering by allowlist)
+fn detect_duplicate_function_groups(
     root: &Path,
     elide_identifiers: bool,
     elide_literals: bool,
     min_lines: usize,
-) -> Vec<CloneGroup> {
+) -> Vec<DuplicateFunctionGroup> {
     let extractor = Extractor::new();
     let parsers = Parsers::new();
 
-    let mut hash_groups: std::collections::HashMap<u64, Vec<CloneLocation>> =
+    let mut hash_groups: std::collections::HashMap<u64, Vec<DuplicateFunctionLocation>> =
         std::collections::HashMap::new();
 
     let walker = ignore::WalkBuilder::new(root)
@@ -1834,7 +1840,7 @@ fn detect_clone_groups(
                     continue;
                 }
 
-                let hash = compute_clone_hash(
+                let hash = compute_function_hash(
                     &node,
                     content.as_bytes(),
                     elide_identifiers,
@@ -1847,18 +1853,21 @@ fn detect_clone_groups(
                     .display()
                     .to_string();
 
-                hash_groups.entry(hash).or_default().push(CloneLocation {
-                    file: rel_path,
-                    symbol: sym.name.clone(),
-                    start_line: sym.start_line,
-                    end_line: sym.end_line,
-                });
+                hash_groups
+                    .entry(hash)
+                    .or_default()
+                    .push(DuplicateFunctionLocation {
+                        file: rel_path,
+                        symbol: sym.name.clone(),
+                        start_line: sym.start_line,
+                        end_line: sym.end_line,
+                    });
             }
         }
     }
 
-    // Filter to groups with 2+ instances (actual clones)
-    let mut clone_groups: Vec<CloneGroup> = hash_groups
+    // Filter to groups with 2+ instances (actual duplicates)
+    let mut groups: Vec<DuplicateFunctionGroup> = hash_groups
         .into_iter()
         .filter(|(_, locs)| locs.len() >= 2)
         .map(|(hash, locations)| {
@@ -1866,7 +1875,7 @@ fn detect_clone_groups(
                 .first()
                 .map(|l| l.end_line - l.start_line + 1)
                 .unwrap_or(0);
-            CloneGroup {
+            DuplicateFunctionGroup {
                 hash,
                 locations,
                 line_count,
@@ -1874,18 +1883,18 @@ fn detect_clone_groups(
         })
         .collect();
 
-    // Sort by line count (larger clones first), then by number of instances
-    clone_groups.sort_by(|a, b| {
+    // Sort by line count (larger duplicates first), then by number of instances
+    groups.sort_by(|a, b| {
         b.line_count
             .cmp(&a.line_count)
             .then_with(|| b.locations.len().cmp(&a.locations.len()))
     });
 
-    clone_groups
+    groups
 }
 
-/// Allow a specific clone group by adding it to .moss/clone-allow
-fn cmd_allow_clone_group(
+/// Allow a specific duplicate function group by adding it to .moss/duplicate-functions-allow
+fn cmd_allow_duplicate_function(
     root: &Path,
     location: &str,
     reason: Option<&str>,
@@ -1893,8 +1902,9 @@ fn cmd_allow_clone_group(
     elide_literals: bool,
     min_lines: usize,
 ) -> i32 {
-    // Detect all clone groups
-    let all_groups = detect_clone_groups(root, elide_identifiers, elide_literals, min_lines);
+    // Detect all duplicate function groups
+    let all_groups =
+        detect_duplicate_function_groups(root, elide_identifiers, elide_literals, min_lines);
 
     // Find the group containing this location
     let target_group = all_groups.iter().find(|g| {
@@ -1907,14 +1917,14 @@ fn cmd_allow_clone_group(
     let group = match target_group {
         Some(g) => g,
         None => {
-            eprintln!("No clone group found containing: {}", location);
-            eprintln!("Run `moss analyze --clones` to see available groups.");
+            eprintln!("No duplicate function group found containing: {}", location);
+            eprintln!("Run `moss analyze --duplicate-functions` to see available groups.");
             return 1;
         }
     };
 
     // Load existing allowlist to check for overlap
-    let allowlist_path = root.join(".moss/clone-allow");
+    let allowlist_path = root.join(".moss/duplicate-functions-allow");
     let existing_content = std::fs::read_to_string(&allowlist_path).unwrap_or_default();
     let existing_lines: Vec<&str> = existing_content.lines().collect();
 
@@ -1934,7 +1944,7 @@ fn cmd_allow_clone_group(
 
     // Require reason for new groups
     if !has_existing && reason.is_none() {
-        eprintln!("Reason required for new clone groups. Use --reason \"...\"");
+        eprintln!("Reason required for new groups. Use --reason \"...\"");
         return 1;
     }
 
@@ -1977,11 +1987,14 @@ fn cmd_allow_clone_group(
     // Write back
     let new_content = new_lines.join("\n") + "\n";
     if let Err(e) = std::fs::write(&allowlist_path, new_content) {
-        eprintln!("Failed to write .moss/clone-allow: {}", e);
+        eprintln!("Failed to write .moss/duplicate-functions-allow: {}", e);
         return 1;
     }
 
-    println!("Added {} entries to .moss/clone-allow:", to_add.len());
+    println!(
+        "Added {} entries to .moss/duplicate-functions-allow:",
+        to_add.len()
+    );
     for entry in &to_add {
         println!("  {}", entry);
     }
@@ -1989,8 +2002,8 @@ fn cmd_allow_clone_group(
     0
 }
 
-/// Detect code clones - returns (exit_code, clone_group_count)
-fn cmd_clones_with_count(
+/// Detect duplicate functions - returns (exit_code, group_count)
+fn cmd_duplicate_functions_with_count(
     root: &Path,
     elide_identifiers: bool,
     elide_literals: bool,
@@ -2000,10 +2013,10 @@ fn cmd_clones_with_count(
 ) -> (i32, usize) {
     let extractor = Extractor::new();
     let parsers = Parsers::new();
-    let allowlist = load_clone_allowlist(root);
+    let allowlist = load_duplicate_functions_allowlist(root);
 
     // Collect function hashes: hash -> [(file, symbol, start, end)]
-    let mut hash_groups: std::collections::HashMap<u64, Vec<CloneLocation>> =
+    let mut hash_groups: std::collections::HashMap<u64, Vec<DuplicateFunctionLocation>> =
         std::collections::HashMap::new();
     let mut files_scanned = 0;
     let mut functions_hashed = 0;
@@ -2056,7 +2069,7 @@ fn cmd_clones_with_count(
                     continue;
                 }
 
-                let hash = compute_clone_hash(
+                let hash = compute_function_hash(
                     &node,
                     content.as_bytes(),
                     elide_identifiers,
@@ -2070,19 +2083,22 @@ fn cmd_clones_with_count(
                     .display()
                     .to_string();
 
-                hash_groups.entry(hash).or_default().push(CloneLocation {
-                    file: rel_path,
-                    symbol: sym.name.clone(),
-                    start_line: sym.start_line,
-                    end_line: sym.end_line,
-                });
+                hash_groups
+                    .entry(hash)
+                    .or_default()
+                    .push(DuplicateFunctionLocation {
+                        file: rel_path,
+                        symbol: sym.name.clone(),
+                        start_line: sym.start_line,
+                        end_line: sym.end_line,
+                    });
             }
         }
     }
 
-    // Filter to groups with 2+ instances (actual clones)
+    // Filter to groups with 2+ instances (actual duplicates)
     // Skip groups where ALL locations are in the allowlist
-    let mut clone_groups: Vec<CloneGroup> = hash_groups
+    let mut groups: Vec<DuplicateFunctionGroup> = hash_groups
         .into_iter()
         .filter(|(_, locs)| locs.len() >= 2)
         .filter(|(_, locs)| {
@@ -2095,7 +2111,7 @@ fn cmd_clones_with_count(
                 .first()
                 .map(|l| l.end_line - l.start_line + 1)
                 .unwrap_or(0);
-            CloneGroup {
+            DuplicateFunctionGroup {
                 hash,
                 locations,
                 line_count,
@@ -2103,15 +2119,15 @@ fn cmd_clones_with_count(
         })
         .collect();
 
-    // Sort by line count (larger clones first), then by number of instances
-    clone_groups.sort_by(|a, b| {
+    // Sort by line count (larger duplicates first), then by number of instances
+    groups.sort_by(|a, b| {
         b.line_count
             .cmp(&a.line_count)
             .then_with(|| b.locations.len().cmp(&a.locations.len()))
     });
 
-    let total_clones: usize = clone_groups.iter().map(|g| g.locations.len()).sum();
-    let clone_lines: usize = clone_groups
+    let total_duplicates: usize = groups.iter().map(|g| g.locations.len()).sum();
+    let duplicated_lines: usize = groups
         .iter()
         .map(|g| g.line_count * g.locations.len())
         .sum();
@@ -2120,12 +2136,12 @@ fn cmd_clones_with_count(
         let output = serde_json::json!({
             "files_scanned": files_scanned,
             "functions_hashed": functions_hashed,
-            "clone_groups": clone_groups.len(),
-            "total_clones": total_clones,
-            "clone_lines": clone_lines,
+            "duplicate_groups": groups.len(),
+            "total_duplicates": total_duplicates,
+            "duplicated_lines": duplicated_lines,
             "elide_identifiers": elide_identifiers,
             "elide_literals": elide_literals,
-            "groups": clone_groups.iter().map(|g| {
+            "groups": groups.iter().map(|g| {
                 serde_json::json!({
                     "hash": format!("{:016x}", g.hash),
                     "line_count": g.line_count,
@@ -2143,22 +2159,22 @@ fn cmd_clones_with_count(
         });
         println!("{}", serde_json::to_string_pretty(&output).unwrap());
     } else {
-        println!("Clone Detection");
+        println!("Duplicate Function Detection");
         println!();
         println!("Files scanned: {}", files_scanned);
         println!("Functions hashed: {}", functions_hashed);
-        println!("Clone groups: {}", clone_groups.len());
-        println!("Total clones: {}", total_clones);
-        println!("Duplicated lines: ~{}", clone_lines);
+        println!("Duplicate groups: {}", groups.len());
+        println!("Total duplicates: {}", total_duplicates);
+        println!("Duplicated lines: ~{}", duplicated_lines);
         println!();
 
-        if clone_groups.is_empty() {
-            println!("No code clones detected.");
+        if groups.is_empty() {
+            println!("No duplicate functions detected.");
         } else {
-            println!("Clone Groups (sorted by size):");
+            println!("Duplicate Groups (sorted by size):");
             println!();
 
-            for (i, group) in clone_groups.iter().take(20).enumerate() {
+            for (i, group) in groups.iter().take(20).enumerate() {
                 println!(
                     "{}. {} lines, {} instances:",
                     i + 1,
@@ -2189,13 +2205,13 @@ fn cmd_clones_with_count(
                 println!();
             }
 
-            if clone_groups.len() > 20 {
-                println!("... and {} more groups", clone_groups.len() - 20);
+            if groups.len() > 20 {
+                println!("... and {} more groups", groups.len() - 20);
             }
         }
     }
 
-    let count = clone_groups.len();
+    let count = groups.len();
     let exit_code = if count == 0 { 0 } else { 1 };
     (exit_code, count)
 }
@@ -2586,8 +2602,8 @@ fn find_node_at_line_recursive<'a>(
     None
 }
 
-/// Compute a normalized AST hash for clone detection.
-fn compute_clone_hash(
+/// Compute a normalized AST hash for duplicate function detection.
+fn compute_function_hash(
     node: &tree_sitter::Node,
     content: &[u8],
     elide_identifiers: bool,
@@ -2672,48 +2688,48 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn test_load_clone_allowlist_empty() {
+    fn test_load_duplicate_functions_allowlist_empty() {
         let tmp = tempdir().unwrap();
-        let allowlist = load_clone_allowlist(tmp.path());
+        let allowlist = load_duplicate_functions_allowlist(tmp.path());
         assert!(allowlist.is_empty());
     }
 
     #[test]
-    fn test_load_clone_allowlist_with_entries() {
+    fn test_load_duplicate_functions_allowlist_with_entries() {
         let tmp = tempdir().unwrap();
         let moss_dir = tmp.path().join(".moss");
         fs::create_dir_all(&moss_dir).unwrap();
         fs::write(
-            moss_dir.join("clone-allow"),
+            moss_dir.join("duplicate-functions-allow"),
             "# Comment\nsrc/foo.rs:bar\nsrc/baz.rs:qux\n",
         )
         .unwrap();
 
-        let allowlist = load_clone_allowlist(tmp.path());
+        let allowlist = load_duplicate_functions_allowlist(tmp.path());
         assert_eq!(allowlist.len(), 2);
         assert!(allowlist.contains("src/foo.rs:bar"));
         assert!(allowlist.contains("src/baz.rs:qux"));
     }
 
     #[test]
-    fn test_load_clone_allowlist_ignores_comments() {
+    fn test_load_duplicate_functions_allowlist_ignores_comments() {
         let tmp = tempdir().unwrap();
         let moss_dir = tmp.path().join(".moss");
         fs::create_dir_all(&moss_dir).unwrap();
         fs::write(
-            moss_dir.join("clone-allow"),
+            moss_dir.join("duplicate-functions-allow"),
             "# This is a comment\n# Another comment\nsrc/foo.rs:bar\n",
         )
         .unwrap();
 
-        let allowlist = load_clone_allowlist(tmp.path());
+        let allowlist = load_duplicate_functions_allowlist(tmp.path());
         assert_eq!(allowlist.len(), 1);
         assert!(allowlist.contains("src/foo.rs:bar"));
     }
 
-    /// Helper to check if a clone group is fully allowed
+    /// Helper to check if a duplicate function group is fully allowed
     fn is_group_allowed(
-        locations: &[CloneLocation],
+        locations: &[DuplicateFunctionLocation],
         allowlist: &std::collections::HashSet<String>,
     ) -> bool {
         locations
@@ -2728,13 +2744,13 @@ mod tests {
         allowlist.insert("src/b.rs:bar".to_string());
 
         let locations = vec![
-            CloneLocation {
+            DuplicateFunctionLocation {
                 file: "src/a.rs".to_string(),
                 symbol: "foo".to_string(),
                 start_line: 1,
                 end_line: 5,
             },
-            CloneLocation {
+            DuplicateFunctionLocation {
                 file: "src/b.rs".to_string(),
                 symbol: "bar".to_string(),
                 start_line: 10,
@@ -2751,13 +2767,13 @@ mod tests {
         allowlist.insert("src/a.rs:foo".to_string());
 
         let locations = vec![
-            CloneLocation {
+            DuplicateFunctionLocation {
                 file: "src/a.rs".to_string(),
                 symbol: "foo".to_string(),
                 start_line: 1,
                 end_line: 5,
             },
-            CloneLocation {
+            DuplicateFunctionLocation {
                 file: "src/b.rs".to_string(),
                 symbol: "bar".to_string(),
                 start_line: 10,
@@ -2780,7 +2796,7 @@ mod tests {
     #[test]
     fn test_calculate_grade_weights() {
         // Security weight is 2.0, so a security issue hurts more than complexity
-        // 50% health (weight 1.0), 100% complexity (weight 0.5), 0% security (weight 2.0), 100% clones
+        // 50% health (weight 1.0), 100% complexity (weight 0.5), 0% security (weight 2.0), 100% duplicate-functions
         let scores = [(50.0, 1.0), (100.0, 0.5), (0.0, 2.0), (100.0, 0.3)];
         let (_, percentage) = calculate_grade(&scores);
         // Expected: (50*1 + 100*0.5 + 0*2 + 100*0.3) / (1+0.5+2+0.3) = 130/3.8 ≈ 34.2%
