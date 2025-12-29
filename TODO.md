@@ -4,8 +4,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 - [x] `moss view` symbol output should include line range (e.g., `foo: L10-25`) - enabled by default
-- `moss view --full` incorrectly prefixes every line with line numbers (pre-existing bug)
-- Data formats (TOML, JSON) don't have syntax highlighting in view output
+- [x] `moss view --full` line number prefixes removed, now outputs raw/highlighted content
+- [x] Data formats (TOML, JSON) syntax highlighting - works with `--pretty`
 - `moss view` for JSON files returns useless output (just filename + line count, no structure)
 - Consolidate SkeletonSymbol: could use moss_languages::Symbol directly (just ignoring visibility field)
 

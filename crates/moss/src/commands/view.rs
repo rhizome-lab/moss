@@ -739,7 +739,7 @@ fn cmd_view_file(
     file_path: &str,
     root: &Path,
     depth: i32,
-    line_numbers: bool,
+    _line_numbers: bool, // Reserved for future use (e.g., line number gutter)
     show_deps: bool,
     types_only: bool,
     focus: Option<&str>,
@@ -776,12 +776,20 @@ fn cmd_view_file(
                     "content": content
                 })
             );
-        } else if line_numbers {
-            for (i, line) in content.lines().enumerate() {
-                println!("{:4} {}", i + 1, line);
-            }
         } else {
-            print!("{}", content);
+            // Apply syntax highlighting in pretty mode
+            let grammar =
+                moss_languages::support_for_path(&full_path).map(|s| s.grammar_name().to_string());
+            let output = if pretty {
+                if let Some(ref g) = grammar {
+                    tree::highlight_source(&content, g, use_colors)
+                } else {
+                    content.clone()
+                }
+            } else {
+                content.clone()
+            };
+            print!("{}", output);
         }
         return 0;
     }
