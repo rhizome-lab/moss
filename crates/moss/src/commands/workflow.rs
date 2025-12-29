@@ -34,36 +34,12 @@ pub fn cmd_workflow(action: WorkflowAction, root: Option<&Path>, json: bool) -> 
 
 fn cmd_script_list(root: Option<&Path>, json: bool) -> i32 {
     let root = root.unwrap_or_else(|| Path::new("."));
-    let scripts_dir = root.join(".moss").join("scripts");
-
-    if !scripts_dir.exists() {
-        if json {
-            println!("[]");
-        } else {
-            println!("No scripts directory at .moss/scripts/");
-        }
-        return 0;
-    }
-
-    let mut scripts = Vec::new();
-
-    if let Ok(entries) = std::fs::read_dir(&scripts_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().map(|e| e == "lua").unwrap_or(false) {
-                if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                    scripts.push(name.to_string());
-                }
-            }
-        }
-    }
-
-    scripts.sort();
+    let scripts = super::script::list_scripts(root);
 
     if json {
         println!("{}", serde_json::to_string(&scripts).unwrap());
     } else if scripts.is_empty() {
-        println!("No scripts found in .moss/scripts/");
+        println!("No scripts found");
     } else {
         for name in scripts {
             println!("{}", name);
@@ -77,16 +53,38 @@ fn cmd_script_list(root: Option<&Path>, json: bool) -> i32 {
 fn cmd_script_run(script: &str, task: Option<&str>, root: Option<&Path>, json: bool) -> i32 {
     let root = root.unwrap_or_else(|| Path::new("."));
 
+    // Check for explicit .lua path first
     let script_path = if script.ends_with(".lua") {
-        root.join(script)
+        Some(root.join(script))
     } else {
-        root.join(".moss")
+        let path = root
+            .join(".moss")
             .join("scripts")
-            .join(format!("{}.lua", script))
+            .join(format!("{}.lua", script));
+        if path.exists() {
+            Some(path)
+        } else {
+            None
+        }
     };
 
-    if !script_path.exists() {
-        eprintln!("Script not found: {}", script_path.display());
+    // Get builtin if no user script
+    let builtin_code = if script_path.is_none() {
+        super::script::builtins::get(script)
+    } else {
+        None
+    };
+
+    if script_path.is_none() && builtin_code.is_none() {
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({"error": format!("Script not found: {}", script)})
+            );
+        } else {
+            eprintln!("Script not found: {}", script);
+            eprintln!("Create it at: .moss/scripts/{}.lua", script);
+        }
         return 1;
     }
 
@@ -110,7 +108,19 @@ fn cmd_script_run(script: &str, task: Option<&str>, root: Option<&Path>, json: b
         }
     }
 
-    match runtime.run_file(&script_path) {
+    // Set args = {} for consistency with @ invocation
+    if let Err(e) = runtime.run_string("args = {}") {
+        eprintln!("Failed to set args: {}", e);
+        return 1;
+    }
+
+    let result = if let Some(path) = script_path {
+        runtime.run_file(&path)
+    } else {
+        runtime.run_string(builtin_code.unwrap())
+    };
+
+    match result {
         Ok(()) => {
             if json {
                 println!("{}", serde_json::json!({"success": true}));
