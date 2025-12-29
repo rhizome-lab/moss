@@ -264,14 +264,14 @@ fn elide_keywords(sig: &str) -> String {
 }
 
 /// A span of text with highlight information.
-struct HighlightSpan {
-    start: usize,
-    end: usize,
-    kind: HighlightKind,
+pub struct HighlightSpan {
+    pub start: usize,
+    pub end: usize,
+    pub kind: HighlightKind,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum HighlightKind {
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum HighlightKind {
     Keyword,
     Type,
     Comment,
@@ -354,7 +354,7 @@ pub fn highlight_source(sig: &str, grammar: &str, use_colors: bool) -> String {
 }
 
 /// Collect highlight spans from AST nodes.
-fn collect_highlight_spans(node: tree_sitter::Node, spans: &mut Vec<HighlightSpan>) {
+pub fn collect_highlight_spans(node: tree_sitter::Node, spans: &mut Vec<HighlightSpan>) {
     let kind = node.kind();
     let highlight = classify_node_kind(kind);
 
@@ -927,6 +927,8 @@ struct CollapsedChain<'a, T> {
     path: String,
     end_node: &'a T,
 }
+
+// Highlighting tests: see `highlight_tests.rs`
 
 #[cfg(test)]
 mod tests {

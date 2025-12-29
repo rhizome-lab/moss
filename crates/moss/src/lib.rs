@@ -41,3 +41,6 @@ pub mod skeleton;
 pub mod symbols;
 pub mod tree;
 pub mod workflow;
+
+#[cfg(test)]
+mod highlight_tests;
