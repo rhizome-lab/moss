@@ -3,12 +3,8 @@
 See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
-- [x] `moss view` symbol output should include line range (e.g., `foo: L10-25`) - enabled by default
-- [x] `moss view --full` line number prefixes removed, now outputs raw/highlighted content
-- [x] Data formats (TOML, JSON) syntax highlighting - works with `--pretty`
-- [x] `cargo xtask build-grammars` now copies .scm files for already-built grammars, added --force flag
-- [x] `moss view` for JSON files now shows key structure with line ranges
-- [x] Consolidate SkeletonSymbol: now type alias to moss_languages::Symbol (SymbolExt trait for to_view_node)
+- `moss grep` context flags: add `-C`, `-A`, `-B` for context lines (like ripgrep)
+- Detect duplicate types: structural hashing of type definitions, flag >70% field overlap
 
 ## Remaining Work
 - Rethink 'unified tree' - codebases are graphs (namespaces, inheritance, calls), not trees
@@ -50,22 +46,11 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 - Consider streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)
 
-### Highlighting
-- [x] Markdown code blocks: highlight embedded code with language-specific highlighting (tree-sitter injections.scm)
-
 ### Code Quality
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
-- [x] Highlighting test coverage: 145 tests across 59 languages (see `highlight_tests.rs`)
-- [x] Query-based highlighting using tree-sitter .scm files:
-  - [x] xtask copies `queries/highlights.scm` alongside grammar .so files
-  - [x] GrammarLoader.get_highlights(name) loads and caches .scm files
-  - [x] Use tree-sitter Query API in `highlight_source()` instead of `classify_node_kind()`
-  - [x] Map query capture names (@keyword, @string, etc.) to HighlightKind
-  - Manual node kind classification kept as fallback (when no .scm file available)
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
-- Detect duplicate types: structs with similar fields across modules (e.g., Symbol in 3 places, Import in 3 places). Could use structural hashing of type definitions, flag when >70% field overlap. Caught Symbol/Import/SymbolKind duplication manually - tooling should surface this proactively.
 
 ### `@` Sigil
 - As target prefix, expands to well-known paths:
@@ -101,7 +86,6 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 
 ### Tooling
 - `moss fetch`: web content retrieval for LLM context (needs design: chunking, streaming, headless browser?)
-- `moss grep` context flags: add `-C`, `-A`, `-B` for context lines (like ripgrep)
 - Multi-file batch edit: less latency than N sequential edits. Not for identical replacements (use sed) or semantic renames (use LSP). For structured batch edits where each file needs similar-but-contextual changes (e.g., adding a trait method to 35 language files).
 - Structured config crate (`moss-config`): trait-based view/edit for known config formats (TOML, JSON, YAML, INI). Unified interface across formats. (xkcd 927 risk acknowledged)
   - Examples: .editorconfig, prettierrc, prettierignore, oxlintrc.json[c], oxfmtrc.json[c], eslint.config.js, pom.xml

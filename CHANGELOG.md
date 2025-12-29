@@ -9,16 +9,31 @@ First release. See `docs/` for design docs and `README.md` for usage.
 Reduced duplicate type definitions across crates:
 - `symbols.rs`: Symbol → FlatSymbol, Import → FlatImport, deleted SymbolKind (uses moss_languages::SymbolKind)
 - `deps.rs`: Uses moss_languages::Import/Export directly, removed conversion functions
-- Remaining: SkeletonSymbol could be consolidated with moss_languages::Symbol
+- `skeleton.rs`: SkeletonSymbol now type alias to moss_languages::Symbol (SymbolExt trait for to_view_node)
 
 ### Syntax Highlighting
 
 Query-based highlighting using tree-sitter .scm files:
 - Uses arborium highlight queries for accurate, grammar-author-defined highlighting
 - 98 languages with highlight queries (copied alongside grammar .so files)
+- Injection support for embedded languages (e.g., code blocks in markdown get language-specific highlighting)
 - Document format support: headings, code blocks, links, emphasis, punctuation
 - Falls back to manual node classification when no .scm file available
 - 145 highlighting tests across 59 languages
+
+### View Command
+
+`moss view` improvements:
+- Symbol output includes line ranges (e.g., `foo: L10-25`) - enabled by default
+- `--full` mode outputs raw/highlighted content without line number prefixes
+- Data format support: TOML, JSON syntax highlighting with `--pretty`
+- JSON files show key structure with line ranges
+
+### xtask build-grammars
+
+Grammar build tooling:
+- Copies .scm files for already-built grammars (highlights.scm, injections.scm)
+- `--force` flag to recompile existing grammars
 
 ### Init Command
 
