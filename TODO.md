@@ -54,9 +54,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 
 ### View Command
 - Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
-- Line range doc filtering: `file:10-20` should respect `--docs` flag (strip doc comments when false)
-- Line target fuzzy resolution: `typescript.rs:300` should resolve like `typescript.rs` does
-- Investigate intermittent hang on `moss view typescript.rs`
+- Investigate intermittent hang on `moss view typescript.rs` (couldn't reproduce)
 
 ### Code Quality
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)

@@ -37,7 +37,10 @@ Query-based highlighting using tree-sitter .scm files:
 `moss view` improvements:
 - Smart Header: symbol view shows imports filtered by used names within multi-imports
 - Ancestor context: nested symbols show parent signatures by default (`--no-parent` to hide)
-- Line ranges: `moss view file.rs:30-55` for arbitrary sections
+- Line ranges: `moss view file.rs:30-55` for arbitrary sections with syntax highlighting
+- Line targets: `moss view file.rs:300` finds symbol containing that line
+- Fuzzy path resolution: `typescript.rs:300` works like `typescript.rs` (partial names supported)
+- Doc filtering: line ranges respect `--docs` flag (hides comments when false)
 - Symbol output includes line ranges (e.g., `foo: L10-25`) - enabled by default
 - `--full` mode outputs raw/highlighted content without line number prefixes
 - Data format support: TOML, JSON syntax highlighting with `--pretty`
