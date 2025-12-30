@@ -145,7 +145,11 @@ fn has_language_support(path: &str) -> bool {
 }
 
 /// Search for symbols in the index by name
+/// Supports qualified names like "ClassName/method" or "file.rs/ClassName/method"
 fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
+    // Parse qualified symbol path: "Parent/name" or "file.rs/Parent/name"
+    let (file_hint, parent_hint, symbol_name) = parse_symbol_query(query);
+
     // Try index first - if enabled, use it (or build it if empty)
     if let Some(mut idx) = index::FileIndex::open_if_enabled(root) {
         let stats = idx.call_graph_stats().unwrap_or_default();
@@ -158,13 +162,62 @@ fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
                 return search_symbols_unindexed(query, root);
             }
         }
-        if let Ok(symbols) = idx.find_symbols(query, None, true, 10) {
-            return symbols;
+        // Search by symbol name, then filter by parent/file hints
+        if let Ok(mut symbols) = idx.find_symbols(&symbol_name, None, true, 50) {
+            // Filter by parent hint if provided
+            if let Some(ref parent) = parent_hint {
+                let parent_lower = parent.to_lowercase();
+                symbols.retain(|s| {
+                    s.parent
+                        .as_ref()
+                        .map(|p| p.to_lowercase().contains(&parent_lower))
+                        .unwrap_or(false)
+                });
+            }
+            // Filter by file hint if provided
+            if let Some(ref file) = file_hint {
+                let file_lower = file.to_lowercase();
+                symbols.retain(|s| s.file.to_lowercase().contains(&file_lower));
+            }
+            if !symbols.is_empty() {
+                symbols.truncate(10);
+                return symbols;
+            }
         }
     }
 
     // Fallback: walk filesystem and parse files (only if index disabled)
     search_symbols_unindexed(query, root)
+}
+
+/// Parse a symbol query like "Tsx/format_import" or "typescript.rs/Tsx/format_import"
+/// Returns (file_hint, parent_hint, symbol_name)
+fn parse_symbol_query(query: &str) -> (Option<String>, Option<String>, String) {
+    let parts: Vec<&str> = query.split('/').collect();
+    match parts.len() {
+        1 => (None, None, parts[0].to_string()),
+        2 => {
+            // Could be "Parent/method" or "file.rs/symbol"
+            // If first part looks like a file (has extension), treat as file/symbol
+            if parts[0].contains('.') && !parts[0].starts_with('.') {
+                (Some(parts[0].to_string()), None, parts[1].to_string())
+            } else {
+                (None, Some(parts[0].to_string()), parts[1].to_string())
+            }
+        }
+        _ => {
+            // "file.rs/Parent/method" - last is symbol, second-to-last is parent
+            let symbol = parts.last().unwrap().to_string();
+            let parent = parts.get(parts.len() - 2).map(|s| s.to_string());
+            // Everything before parent could be file path
+            if parts.len() > 2 {
+                let file = parts[..parts.len() - 2].join("/");
+                (Some(file), parent, symbol)
+            } else {
+                (None, parent, symbol)
+            }
+        }
+    }
 }
 
 /// Search for symbols by walking filesystem and parsing files
@@ -275,6 +328,7 @@ fn collect_matching_symbols(
 fn cmd_view_symbol_direct(
     file_path: &str,
     symbol_name: &str,
+    parent_name: Option<&str>,
     root: &Path,
     depth: i32,
     full: bool,
@@ -284,9 +338,14 @@ fn cmd_view_symbol_direct(
     pretty: bool,
     use_colors: bool,
 ) -> i32 {
+    // Build symbol path: [parent, symbol] if parent exists, else just [symbol]
+    let symbol_path: Vec<String> = match parent_name {
+        Some(p) => vec![p.to_string(), symbol_name.to_string()],
+        None => vec![symbol_name.to_string()],
+    };
     cmd_view_symbol(
         file_path,
-        &[symbol_name.to_string()],
+        &symbol_path,
         root,
         depth,
         full,
@@ -383,15 +442,25 @@ pub fn cmd_view(
         return cmd_view_line_range(&file_path, start, end, &root, line_numbers, json, pretty);
     }
 
-    // Use unified path resolution - get ALL matches
-    let matches = path_resolve::resolve_unified_all(target, &root);
+    // Check if query looks like a symbol path (contains / but first segment isn't a real path)
+    // e.g., "Tsx/format_import" where "Tsx" is a class name, not a directory
+    let is_symbol_query = target.contains('/') && !target.starts_with('/') && {
+        let first_seg = target.split('/').next().unwrap_or("");
+        !root.join(first_seg).exists()
+    };
 
-    // Only search for symbols if no file/directory matches found
-    // This avoids expensive filesystem walks when we already have a match
-    let symbol_matches = if matches.is_empty() {
-        search_symbols(target, &root)
+    // For symbol queries, only search symbols (skip file resolution)
+    // For path queries, do normal resolution and optionally add symbol matches
+    let (matches, symbol_matches) = if is_symbol_query {
+        (Vec::new(), search_symbols(target, &root))
     } else {
-        Vec::new()
+        let matches = path_resolve::resolve_unified_all(target, &root);
+        let symbol_matches = if matches.is_empty() {
+            search_symbols(target, &root)
+        } else {
+            Vec::new()
+        };
+        (matches, symbol_matches)
     };
 
     let unified = match (matches.len(), symbol_matches.len()) {
@@ -406,6 +475,7 @@ pub fn cmd_view(
             return cmd_view_symbol_direct(
                 &sym.file,
                 &sym.name,
+                sym.parent.as_deref(),
                 &root,
                 depth,
                 full,
@@ -458,14 +528,9 @@ pub fn cmd_view(
                         Some(p) => format!("{}/{}", p, sym.name),
                         None => sym.name.clone(),
                     };
-                    // Show just filename (not full path) so users can copy it directly
-                    let file_name = std::path::Path::new(&sym.file)
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or_else(|| sym.file.clone());
                     println!(
                         "  {}/{} ({}, line {})",
-                        file_name, symbol_path, sym.kind, sym.start_line
+                        sym.file, symbol_path, sym.kind, sym.start_line
                     );
                 }
             }
@@ -1085,6 +1150,32 @@ fn find_symbol<'a>(
     None
 }
 
+/// Find a symbol by qualified path (e.g., ["Tsx", "format_import"])
+fn find_symbol_by_path<'a>(
+    symbols: &'a [skeleton::SkeletonSymbol],
+    path: &[String],
+) -> Option<&'a skeleton::SkeletonSymbol> {
+    if path.is_empty() {
+        return None;
+    }
+
+    // For single-element path, just search by name
+    if path.len() == 1 {
+        return find_symbol(symbols, &path[0]);
+    }
+
+    // For multi-element path, walk through the hierarchy
+    let mut current_symbols = symbols;
+    for (i, name) in path.iter().enumerate() {
+        let found = current_symbols.iter().find(|s| s.name == *name)?;
+        if i == path.len() - 1 {
+            return Some(found);
+        }
+        current_symbols = &found.children;
+    }
+    None
+}
+
 /// Info about one ancestor in the chain
 struct AncestorInfo<'a> {
     symbol: &'a skeleton::SkeletonSymbol,
@@ -1175,7 +1266,14 @@ fn cmd_view_symbol(
     let deps_result = deps_extractor.extract(&full_path, &content);
 
     // Try to find and extract the symbol
-    if let Some(source) = parser.extract_symbol_source(&full_path, &content, symbol_name) {
+    // For qualified paths (e.g., Tsx/format_import), skip this fast path and use skeleton
+    // since extract_symbol_source only searches by name and would find the wrong symbol
+    let source_opt = if symbol_path.len() == 1 {
+        parser.extract_symbol_source(&full_path, &content, symbol_name)
+    } else {
+        None
+    };
+    if let Some(source) = source_opt {
         let full_symbol_path = format!("{}/{}", file_path, symbol_path.join("/"));
 
         if json {
@@ -1321,7 +1419,14 @@ fn cmd_view_symbol(
         let extractor = skeleton::SkeletonExtractor::new();
         let skeleton_result = extractor.extract(&full_path, &content);
 
-        if let Some(sym) = find_symbol(&skeleton_result.symbols, symbol_name) {
+        // Use qualified path lookup for multi-element paths (e.g., Tsx/format_import)
+        let found_sym = if symbol_path.len() > 1 {
+            find_symbol_by_path(&skeleton_result.symbols, symbol_path)
+        } else {
+            find_symbol(&skeleton_result.symbols, symbol_name)
+        };
+
+        if let Some(sym) = found_sym {
             let full_symbol_path = format!("{}/{}", file_path, symbol_path.join("/"));
 
             // When --full is requested, extract source using line numbers
