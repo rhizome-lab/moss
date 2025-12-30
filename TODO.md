@@ -54,7 +54,6 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 
 ### View Command
 - Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
-- Highlighting bug: function names with `&'static [&'static str]` return type don't get highlighted
 
 ### Code Quality
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)

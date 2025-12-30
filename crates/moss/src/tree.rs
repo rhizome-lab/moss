@@ -262,7 +262,45 @@ fn format_node_line(node: &ViewNode, options: &FormatOptions) -> String {
                 let sig_display = if options.minimal {
                     elide_keywords(sig)
                 } else if let Some(grammar) = &node.grammar {
-                    highlight_source(sig, grammar, options.use_colors)
+                    // Signatures are fragments - append {} so tree-sitter parses them correctly
+                    let parseable = if grammar == "rust" && sig.starts_with("fn ") {
+                        format!("{} {{}}", sig)
+                    } else {
+                        sig.clone()
+                    };
+                    let highlighted = highlight_source(&parseable, grammar, options.use_colors);
+                    // Strip the appended {} from output (handle ANSI codes)
+                    if grammar == "rust" && sig.starts_with("fn ") {
+                        // Find last { and strip from there, plus any trailing ANSI codes
+                        if let Some(pos) = highlighted.rfind('{') {
+                            let mut result = highlighted[..pos].to_string();
+                            // Strip trailing ANSI escape sequences (ESC[...m) and whitespace
+                            loop {
+                                let trimmed = result.trim_end();
+                                if trimmed.len() < result.len() {
+                                    result = trimmed.to_string();
+                                    continue;
+                                }
+                                // Check for trailing ANSI escape: must end with 'm' preceded by digits/semicolons after ESC[
+                                if result.ends_with('m') {
+                                    if let Some(esc_pos) = result.rfind("\x1b[") {
+                                        // Verify everything between ESC[ and m is digits/semicolons
+                                        let params = &result[esc_pos + 2..result.len() - 1];
+                                        if params.chars().all(|c| c.is_ascii_digit() || c == ';') {
+                                            result.truncate(esc_pos);
+                                            continue;
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                            result
+                        } else {
+                            highlighted
+                        }
+                    } else {
+                        highlighted
+                    }
                 } else {
                     sig.clone()
                 };
