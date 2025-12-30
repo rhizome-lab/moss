@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus
-- [x] Smart Header: filter names within multi-imports, parent context with collapsed siblings
+- Investigate: `moss view <function_name>` returns no matches (only finds types/classes)
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -41,10 +41,6 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - PR/diff analysis: `moss analyze --pr` or similar
 ## Backlog
 
-### View Command
-- `moss view <function_name>` returns no matches for functions - only finds types/classes
-  - Need to investigate why function symbol search fails
-
 ### Language Support
 98 languages implemented - all arborium grammars covered.
 See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to verify.
@@ -59,10 +55,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 - JSON Schema for complex action parameters (currently string-only)
 
 ### View Command
-- Smart Header improvements:
-  - [x] Parent context: show class/impl/module containing target, with siblings collapsed (`--show-parent`)
-    - e.g., viewing `Foo::bar()` shows `impl Foo { fn bar() { ... } /* 3 other methods */ }`
-  - Optionally pull in referenced types as context (show type definitions used by the symbol)
+- Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
 
 ### Code Quality
 - Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar

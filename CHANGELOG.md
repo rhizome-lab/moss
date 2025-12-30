@@ -23,10 +23,15 @@ Query-based highlighting using tree-sitter .scm files:
 - Falls back to manual node classification when no .scm file available
 - 145 highlighting tests across 59 languages
 
+### Language Support
+
+- `format_import` implemented for all 98 languages with proper syntax (no generic fallbacks)
+
 ### View Command
 
 `moss view` improvements:
-- Smart Header (partial): symbol view shows imports filtered by used modules
+- Smart Header: symbol view shows imports filtered by used names within multi-imports
+- Ancestor context: nested symbols show parent signatures by default (`--no-parent` to hide)
 - Line ranges: `moss view file.rs:30-55` for arbitrary sections
 - Symbol output includes line ranges (e.g., `foo: L10-25`) - enabled by default
 - `--full` mode outputs raw/highlighted content without line number prefixes
