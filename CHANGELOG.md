@@ -8,6 +8,7 @@ First release. See `docs/` for design docs and `README.md` for usage.
 
 - **Fixed symbol search for trait impl methods**: `moss view <function_name>` now correctly finds methods in trait implementations. Previously, methods without explicit `pub` modifiers (like trait impl methods) were filtered out by default. Changed `ExtractOptions::include_private` to default to `true` since moss is for code exploration, not API documentation. Also removed the now-redundant `--include-private` flag.
 - **Fixed qualified symbol paths**: `moss view Tsx/format_import` now works as expected. Previously, typing a qualified symbol path from the multi-match list would trigger fuzzy file matching instead of symbol lookup. Now paths like `Parent/method` are recognized as symbol queries when the first segment isn't an existing path.
+- **Fixed `moss view file --pretty` hang**: Syntax highlighting was recompiling tree-sitter queries (~117ms each) for every signature. Now queries are cached globally - a file with 80+ functions went from 10+ seconds to ~100ms.
 
 ### Type Consolidation
 
