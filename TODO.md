@@ -94,7 +94,14 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 - Lua test framework for user scripts: busted-style assertions, property-based testing (QuickCheck-style), test discovery for `.moss/tests/`
   - Note: builtin modules (cli, type, validate) already have Rust integration tests in `lua_runtime/test_*.rs`
 - Type system uses beyond validation: fuzzing/property testing, serialization, mock generation
-- Lua CLI library open questions:
+- Lua CLI library improvements:
+  - Argument count validation (required args, error on missing/extra)
+  - Short option bundling (`-abc` → `-a -b -c`)
+  - Negatable flags (`--no-verbose`)
+  - Required options validation
+  - Type coercion for options (currently all strings)
+  - Environment variable fallbacks (`env = "PORT"`)
+  - Mutually exclusive options
   - Global options inheritance (--verbose on app → subcommands?)
   - Command aliases (`rm`/`remove`/`delete`)
 
