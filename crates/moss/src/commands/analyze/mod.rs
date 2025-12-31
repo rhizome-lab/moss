@@ -130,6 +130,56 @@ fn load_allow_file(root: &Path, filename: &str) -> Vec<String> {
         .collect()
 }
 
+/// Append a pattern to a .moss allow file
+fn append_to_allow_file(root: &Path, filename: &str, pattern: &str, reason: Option<&str>) -> i32 {
+    let path = root.join(".moss").join(filename);
+
+    // Ensure .moss directory exists
+    if let Err(e) = std::fs::create_dir_all(root.join(".moss")) {
+        eprintln!("Failed to create .moss directory: {}", e);
+        return 1;
+    }
+
+    // Check if pattern already exists
+    let existing = std::fs::read_to_string(&path).unwrap_or_default();
+    for line in existing.lines() {
+        let trimmed = line.trim();
+        if trimmed == pattern {
+            println!("Pattern already in {}: {}", filename, pattern);
+            return 0;
+        }
+    }
+
+    // Build entry with optional reason comment
+    let entry = if let Some(r) = reason {
+        format!("{}  # {}\n", pattern, r)
+    } else {
+        format!("{}\n", pattern)
+    };
+
+    // Append to file
+    use std::io::Write;
+    let mut file = match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("Failed to open {}: {}", filename, e);
+            return 1;
+        }
+    };
+
+    if let Err(e) = file.write_all(entry.as_bytes()) {
+        eprintln!("Failed to write to {}: {}", filename, e);
+        return 1;
+    }
+
+    println!("Added to {}: {}", filename, pattern);
+    0
+}
+
 /// Run analyze command with args.
 pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
     let effective_root = args
@@ -227,11 +277,22 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
 
         Some(AnalyzeCommand::Docs { limit }) => docs::cmd_docs(&effective_root, limit, json),
 
-        Some(AnalyzeCommand::Files { limit, allow }) => {
-            // Combine: allow file + CLI args
-            let mut excludes = load_allow_file(&effective_root, "large-files-allow");
-            excludes.extend(allow);
-            files::cmd_files(&effective_root, limit, &excludes, json)
+        Some(AnalyzeCommand::Files {
+            limit,
+            allow,
+            reason,
+        }) => {
+            if let Some(pattern) = allow {
+                append_to_allow_file(
+                    &effective_root,
+                    "large-files-allow",
+                    &pattern,
+                    reason.as_deref(),
+                )
+            } else {
+                let excludes = load_allow_file(&effective_root, "large-files-allow");
+                files::cmd_files(&effective_root, limit, &excludes, json)
+            }
         }
 
         Some(AnalyzeCommand::Trace {
@@ -261,12 +322,19 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             lint::cmd_lint_analyze(&effective_root, target.as_deref(), json)
         }
 
-        Some(AnalyzeCommand::Hotspots { allow }) => {
-            // Combine: config excludes + allow file + CLI args
-            let mut excludes = config.analyze.hotspots_exclude.clone();
-            excludes.extend(load_allow_file(&effective_root, "hotspots-allow"));
-            excludes.extend(allow);
-            hotspots::cmd_hotspots(&effective_root, &excludes, json)
+        Some(AnalyzeCommand::Hotspots { allow, reason }) => {
+            if let Some(pattern) = allow {
+                append_to_allow_file(
+                    &effective_root,
+                    "hotspots-allow",
+                    &pattern,
+                    reason.as_deref(),
+                )
+            } else {
+                let mut excludes = config.analyze.hotspots_exclude.clone();
+                excludes.extend(load_allow_file(&effective_root, "hotspots-allow"));
+                hotspots::cmd_hotspots(&effective_root, &excludes, json)
+            }
         }
 
         Some(AnalyzeCommand::CheckRefs) => check_refs::cmd_check_refs(&effective_root, json),

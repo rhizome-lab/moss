@@ -88,9 +88,13 @@ pub enum AnalyzeCommand {
         #[arg(short = 'n', long, default_value = "20")]
         limit: usize,
 
-        /// Patterns to exclude (glob syntax, can be repeated)
+        /// Add pattern to .moss/large-files-allow
         #[arg(long, value_name = "PATTERN")]
-        allow: Vec<String>,
+        allow: Option<String>,
+
+        /// Reason for allowing
+        #[arg(long)]
+        reason: Option<String>,
     },
 
     /// Trace value provenance for a symbol
@@ -131,9 +135,13 @@ pub enum AnalyzeCommand {
 
     /// Show git history hotspots (frequently changed files)
     Hotspots {
-        /// Patterns to exclude (glob syntax, can be repeated)
+        /// Add pattern to .moss/hotspots-allow
         #[arg(long, value_name = "PATTERN")]
-        allow: Vec<String>,
+        allow: Option<String>,
+
+        /// Reason for allowing
+        #[arg(long)]
+        reason: Option<String>,
     },
 
     /// Check documentation references for broken links

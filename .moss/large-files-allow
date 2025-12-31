@@ -13,3 +13,13 @@ docs/prior-art.md
 
 # Test data
 *_tests.rs
+
+# Language node mappings - inherently large
+**/moss-languages/src/python.rs
+**/moss-languages/src/java.rs
+**/moss-languages/src/rust.rs
+**/moss-languages/src/ecmascript.rs
+**/moss-languages/src/go.rs
+
+# Lockfile parsers - data-driven
+**/lockfile_bun.rs
