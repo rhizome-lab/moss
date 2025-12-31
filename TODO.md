@@ -4,8 +4,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
+- Index bug: symbols not being stored during rebuild (0 symbols in index despite 390 files)
 - Lua test discovery: `moss script test` or similar to run `.moss/tests/*.lua`
-- `analyze --trace`: cross-file function lookup via index
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -15,7 +15,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
   - Store diffs in memory, use worktree as "materialized view"
   - Apply patch to worktree → run validator → if pass, apply to user dir
   - Zero user interruption (user can edit while agent tests in background)
-- `analyze --trace <symbol>`: cross-file function lookup via index (same-file recursive done)
 
 ### Configuration System
 Sections: `[daemon]`, `[index]`, `[filter.aliases]`, `[todo]`, `[view]`, `[analyze]`, `[text-search]`
