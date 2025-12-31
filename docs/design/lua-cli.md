@@ -296,21 +296,14 @@ app:run()
 
 ## Open Questions
 
-1. **Chaining vs separate calls?**
-   ```lua
-   -- Chaining (shown above)
-   app:command("add", {...}):arg("text", {...})
-
-   -- Separate (more explicit)
-   local add = app:command("add", {...})
-   add:arg("text", {...})
-   ```
-
-2. **Global options inheritance?**
+1. **Global options inheritance?**
    Should `--verbose` on the app apply to all subcommands automatically?
 
-3. **Nested subcommands?**
-   `moss @git remote add` - probably overkill for scripts
+2. **Aliases?**
+   `{ name = "remove", aliases = {"rm", "delete"}, ... }`
 
-4. **Aliases?**
-   `app:command("remove", { aliases = {"rm", "delete"} })`
+3. **Type coercion API?**
+   How to specify `type = "number"` / `"boolean"` / `"list"` in declarative style?
+
+4. **Validation functions?**
+   Inline `validate = function(v) ... end` or something else?

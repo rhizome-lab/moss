@@ -93,8 +93,13 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
   - Builtin `workflow` runner script interprets TOML files
   - Users can also write pure Lua scripts directly
 - Lua CLI parsing library: opinionated arg parsing for scripts
+  - Design: `docs/design/lua-cli.md`
   - Add as new template (`moss script new foo --template cli`)
-  - Keep `basic` template for simple scripts
+  - Open questions:
+    - Global options inheritance (--verbose on app → subcommands?)
+    - Command aliases (`rm`/`remove`/`delete`)
+    - Type coercion API (number, boolean, list)
+    - Validation functions
 
 ### Edit Improvements
 - `--at primary`: explicit opt-in to primary section detection (discoverable via error message)
