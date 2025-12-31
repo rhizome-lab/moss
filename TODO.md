@@ -43,7 +43,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Edit routing: workflow engine with LLM decision points
 - Session/checkpoint: workflow state persistence
 - PR/diff analysis: `moss analyze --pr` or similar
-- Analyze subcommands: `moss analyze health`, `moss analyze trace`, etc. instead of flags. Split after file modularization.
+
 ## Backlog
 
 ### Workflow Engine
@@ -55,6 +55,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - `moss grep` naming collision with shell grep: CLAUDE.md says use `|` not `\|` but `moss grep 'a|b'` looks like shell grep syntax. Consider renaming (not `search`/`find` - those should be semantic)
 
 ### Code Quality
+- Doc coverage metric: "0% (18 of 6217)" seems wrong - check what's being counted (denominator too high? detection broken?)
 - `is_source_file` function: hardcoded extension list duplicated in analyze modules - use `moss-languages` support detection instead
 - Git hotspot allowlist: `.moss/hotspot-allow` file to filter expected hotspots (generated code, vendored deps) from `--hotspots`
 - Large file analysis: run `./target/debug/moss analyze` on very large files (1000+ functions) - assess performance, output format, usefulness
