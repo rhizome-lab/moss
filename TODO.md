@@ -43,6 +43,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Edit routing: workflow engine with LLM decision points
 - Session/checkpoint: workflow state persistence
 - PR/diff analysis: `moss analyze --pr` or similar
+- Analyze subcommands: `moss analyze health`, `moss analyze trace`, etc. instead of flags. Split after file modularization.
 ## Backlog
 
 ### Workflow Engine
