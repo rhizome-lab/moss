@@ -79,14 +79,14 @@ pub enum AnalyzeCommand {
     Docs {
         /// Number of worst-covered files to show
         #[arg(short = 'n', long, default_value = "10")]
-        top: usize,
+        limit: usize,
     },
 
     /// Show longest files in codebase
     Files {
         /// Number of files to show
         #[arg(short = 'n', long, default_value = "20")]
-        top: usize,
+        limit: usize,
     },
 
     /// Trace value provenance for a symbol

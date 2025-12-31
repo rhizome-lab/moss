@@ -204,9 +204,9 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             print_report(&report, json, pretty)
         }
 
-        Some(AnalyzeCommand::Docs { top }) => docs::cmd_docs(&effective_root, top, json),
+        Some(AnalyzeCommand::Docs { limit }) => docs::cmd_docs(&effective_root, limit, json),
 
-        Some(AnalyzeCommand::Files { top }) => files::cmd_files(&effective_root, top, json),
+        Some(AnalyzeCommand::Files { limit }) => files::cmd_files(&effective_root, limit, json),
 
         Some(AnalyzeCommand::Trace {
             symbol,

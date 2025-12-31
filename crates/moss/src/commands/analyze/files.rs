@@ -70,8 +70,8 @@ impl FileLengthReport {
 }
 
 /// Run file length analysis
-pub fn cmd_files(root: &Path, top: usize, json: bool) -> i32 {
-    let report = analyze_files(root, top);
+pub fn cmd_files(root: &Path, limit: usize, json: bool) -> i32 {
+    let report = analyze_files(root, limit);
 
     if json {
         println!(
@@ -86,7 +86,7 @@ pub fn cmd_files(root: &Path, top: usize, json: bool) -> i32 {
 }
 
 /// Analyze file lengths
-pub fn analyze_files(root: &Path, top: usize) -> FileLengthReport {
+pub fn analyze_files(root: &Path, limit: usize) -> FileLengthReport {
     let all_files = path_resolve::all_files(root);
     let files: Vec<_> = all_files.iter().filter(|f| f.kind == "file").collect();
 
@@ -116,7 +116,7 @@ pub fn analyze_files(root: &Path, top: usize) -> FileLengthReport {
 
     let mut sorted = file_lengths;
     sorted.sort_by(|a, b| b.lines.cmp(&a.lines));
-    sorted.truncate(top);
+    sorted.truncate(limit);
 
     FileLengthReport {
         files: sorted,

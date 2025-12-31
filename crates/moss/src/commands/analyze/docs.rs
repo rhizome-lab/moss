@@ -98,10 +98,10 @@ impl DocCoverageReport {
 }
 
 /// Run documentation coverage analysis
-pub fn cmd_docs(root: &Path, top: usize, json: bool) -> i32 {
+pub fn cmd_docs(root: &Path, limit: usize, json: bool) -> i32 {
     let config = crate::config::MossConfig::load(root);
     let exclude_interface_impls = config.analyze.exclude_interface_impls();
-    let report = analyze_docs(root, top, exclude_interface_impls);
+    let report = analyze_docs(root, limit, exclude_interface_impls);
 
     if json {
         println!(
@@ -116,7 +116,7 @@ pub fn cmd_docs(root: &Path, top: usize, json: bool) -> i32 {
 }
 
 /// Analyze documentation coverage
-pub fn analyze_docs(root: &Path, top: usize, exclude_interface_impls: bool) -> DocCoverageReport {
+pub fn analyze_docs(root: &Path, limit: usize, exclude_interface_impls: bool) -> DocCoverageReport {
     use crate::extract::{IndexedResolver, InterfaceResolver, OnDemandResolver};
     use crate::index::FileIndex;
     use crate::path_resolve;
@@ -153,7 +153,7 @@ pub fn analyze_docs(root: &Path, top: usize, exclude_interface_impls: bool) -> D
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    let worst_files: Vec<FileDocCoverage> = file_coverages.into_iter().take(top).collect();
+    let worst_files: Vec<FileDocCoverage> = file_coverages.into_iter().take(limit).collect();
 
     // Calculate totals
     let total_callables: usize = by_language.values().map(|(_, t)| t).sum();
