@@ -11,132 +11,6 @@ use crate::config::AliasConfig;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use std::path::Path;
 
-/// Built-in filter aliases.
-/// Each alias maps to patterns that vary by detected language.
-pub struct BuiltinAliases;
-
-impl BuiltinAliases {
-    /// Get patterns for the @tests alias based on detected languages.
-    pub fn tests(languages: &[&str]) -> Vec<&'static str> {
-        let mut patterns = Vec::new();
-        for lang in languages {
-            match *lang {
-                "go" => patterns.extend(["*_test.go", "**/*_test.go"]),
-                "python" => patterns.extend([
-                    "test_*.py",
-                    "*_test.py",
-                    "**/test_*.py",
-                    "**/*_test.py",
-                    "tests/**",
-                    "**/tests/**",
-                ]),
-                "rust" => patterns.extend(["*_test.rs", "tests/**", "**/tests/**"]),
-                "javascript" | "typescript" => patterns.extend([
-                    "*.test.js",
-                    "*.test.ts",
-                    "*.test.jsx",
-                    "*.test.tsx",
-                    "*.spec.js",
-                    "*.spec.ts",
-                    "*.spec.jsx",
-                    "*.spec.tsx",
-                    "**/*.test.js",
-                    "**/*.test.ts",
-                    "**/*.spec.js",
-                    "**/*.spec.ts",
-                    "__tests__/**",
-                    "**/__tests__/**",
-                ]),
-                "java" => patterns.extend(["*Test.java", "**/*Test.java", "src/test/**"]),
-                "ruby" => {
-                    patterns.extend(["*_test.rb", "test_*.rb", "*_spec.rb", "spec/**", "test/**"])
-                }
-                "c" | "cpp" => patterns.extend([
-                    "*_test.c",
-                    "*_test.cpp",
-                    "*_test.cc",
-                    "test_*.c",
-                    "test_*.cpp",
-                ]),
-                _ => {}
-            }
-        }
-        if patterns.is_empty() {
-            // Fallback: common test patterns
-            patterns.extend(["*test*", "*spec*", "tests/**", "test/**"]);
-        }
-        patterns
-    }
-
-    /// Get patterns for the @config alias.
-    pub fn config() -> Vec<&'static str> {
-        vec![
-            "*.toml",
-            "*.yaml",
-            "*.yml",
-            "*.json",
-            "*.ini",
-            "*.cfg",
-            ".env",
-            ".env.*",
-            "*.config.js",
-            "*.config.ts",
-            "**/*.toml",
-            "**/*.yaml",
-            "**/*.yml",
-        ]
-    }
-
-    /// Get patterns for the @build alias.
-    pub fn build() -> Vec<&'static str> {
-        vec![
-            "target/**",
-            "dist/**",
-            "build/**",
-            "out/**",
-            "node_modules/**",
-            ".next/**",
-            ".nuxt/**",
-            "__pycache__/**",
-            "*.pyc",
-            ".pytest_cache/**",
-            "*.o",
-            "*.a",
-            "*.so",
-            "*.dylib",
-        ]
-    }
-
-    /// Get patterns for the @docs alias.
-    pub fn docs() -> Vec<&'static str> {
-        vec![
-            "*.md",
-            "*.rst",
-            "*.txt",
-            "docs/**",
-            "doc/**",
-            "README*",
-            "CHANGELOG*",
-            "LICENSE*",
-            "CONTRIBUTING*",
-        ]
-    }
-
-    /// Get patterns for the @generated alias.
-    pub fn generated() -> Vec<&'static str> {
-        vec![
-            "*.gen.*",
-            "*.generated.*",
-            "*.pb.go",
-            "*.pb.rs",
-            "*_generated.go",
-            "*_generated.rs",
-            "generated/**",
-            "**/generated/**",
-        ]
-    }
-}
-
 /// Status of an alias (for display purposes).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AliasStatus {
@@ -289,40 +163,18 @@ fn resolve_patterns(
 
 /// Resolve a single alias name to patterns.
 fn resolve_alias(name: &str, config: &AliasConfig, languages: &[&str]) -> ResolveResult {
-    // Check config override first
+    // Check if explicitly disabled
     if let Some(patterns) = config.entries.get(name) {
         if patterns.is_empty() {
             return ResolveResult::DisabledAlias(name.to_string());
         }
-        return ResolveResult::Patterns(patterns.clone());
     }
 
-    // Fall back to built-in
-    let patterns: Vec<String> = match name {
-        "tests" => BuiltinAliases::tests(languages)
-            .into_iter()
-            .map(String::from)
-            .collect(),
-        "config" => BuiltinAliases::config()
-            .into_iter()
-            .map(String::from)
-            .collect(),
-        "build" => BuiltinAliases::build()
-            .into_iter()
-            .map(String::from)
-            .collect(),
-        "docs" => BuiltinAliases::docs()
-            .into_iter()
-            .map(String::from)
-            .collect(),
-        "generated" => BuiltinAliases::generated()
-            .into_iter()
-            .map(String::from)
-            .collect(),
-        _ => return ResolveResult::UnknownAlias(name.to_string()),
-    };
-
-    ResolveResult::Patterns(patterns)
+    // Use unified alias lookup
+    match config.get_with_languages(name, languages) {
+        Some(patterns) => ResolveResult::Patterns(patterns),
+        None => ResolveResult::UnknownAlias(name.to_string()),
+    }
 }
 
 /// Build a gitignore-style matcher from patterns.
@@ -343,12 +195,12 @@ fn build_matcher(patterns: &[String]) -> Result<Gitignore, String> {
 /// Get all resolved aliases for display (moss filter aliases).
 pub fn list_aliases(config: &AliasConfig, languages: &[&str]) -> Vec<ResolvedAlias> {
     let mut aliases = Vec::new();
-    let builtin_names = ["tests", "config", "build", "docs", "generated"];
+    let builtin_names = AliasConfig::builtin_names();
 
     // Process built-in aliases
-    for name in builtin_names {
-        if let Some(patterns) = config.entries.get(name) {
-            if patterns.is_empty() {
+    for &name in builtin_names {
+        if let Some(user_patterns) = config.entries.get(name) {
+            if user_patterns.is_empty() {
                 aliases.push(ResolvedAlias {
                     name: name.to_string(),
                     patterns: vec![],
@@ -357,34 +209,11 @@ pub fn list_aliases(config: &AliasConfig, languages: &[&str]) -> Vec<ResolvedAli
             } else {
                 aliases.push(ResolvedAlias {
                     name: name.to_string(),
-                    patterns: patterns.clone(),
+                    patterns: user_patterns.clone(),
                     status: AliasStatus::Overridden,
                 });
             }
-        } else {
-            let patterns: Vec<String> = match name {
-                "tests" => BuiltinAliases::tests(languages)
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
-                "config" => BuiltinAliases::config()
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
-                "build" => BuiltinAliases::build()
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
-                "docs" => BuiltinAliases::docs()
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
-                "generated" => BuiltinAliases::generated()
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
-                _ => unreachable!(),
-            };
+        } else if let Some(patterns) = config.get_with_languages(name, languages) {
             aliases.push(ResolvedAlias {
                 name: name.to_string(),
                 patterns,
@@ -394,8 +223,9 @@ pub fn list_aliases(config: &AliasConfig, languages: &[&str]) -> Vec<ResolvedAli
     }
 
     // Add custom aliases from config
+    let builtin_set: std::collections::HashSet<&str> = builtin_names.iter().copied().collect();
     for (name, patterns) in &config.entries {
-        if !builtin_names.contains(&name.as_str()) {
+        if !builtin_set.contains(name.as_str()) {
             aliases.push(ResolvedAlias {
                 name: name.clone(),
                 patterns: patterns.clone(),
