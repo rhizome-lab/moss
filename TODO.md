@@ -4,8 +4,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- `--full --pretty` performance: 250ms for 109 lines is too slow (parsing each signature)
-
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
   - Consider: namespace-qualified lookups (`moss view std::vector`, `moss view com.example.Foo`)
