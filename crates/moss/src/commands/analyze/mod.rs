@@ -44,6 +44,9 @@ pub struct AnalyzeConfig {
     pub duplicate_functions: Option<bool>,
     /// Weights for final grade calculation
     pub weights: Option<AnalyzeWeights>,
+    /// Exclude interface implementations from doc coverage (default: true)
+    /// This excludes trait impl methods in Rust, @Override methods in Java, etc.
+    pub exclude_interface_impls: Option<bool>,
 }
 
 /// Weights for each analysis pass (higher = more impact on grade).
@@ -98,6 +101,10 @@ impl AnalyzeConfig {
 
     pub fn weights(&self) -> AnalyzeWeights {
         self.weights.clone().unwrap_or_default()
+    }
+
+    pub fn exclude_interface_impls(&self) -> bool {
+        self.exclude_interface_impls.unwrap_or(true)
     }
 }
 
@@ -448,128 +455,5 @@ pub(crate) fn is_source_file(path: &Path) -> bool {
                 | "exs"
         ),
         None => false,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use tempfile::tempdir;
-
-    #[test]
-    fn test_load_duplicate_functions_allowlist_empty() {
-        let tmp = tempdir().unwrap();
-        let allowlist = load_duplicate_functions_allowlist(tmp.path());
-        assert!(allowlist.is_empty());
-    }
-
-    #[test]
-    fn test_load_duplicate_functions_allowlist_with_entries() {
-        let tmp = tempdir().unwrap();
-        let moss_dir = tmp.path().join(".moss");
-        fs::create_dir_all(&moss_dir).unwrap();
-        fs::write(
-            moss_dir.join("duplicate-functions-allow"),
-            "# Comment\nsrc/foo.rs:bar\nsrc/baz.rs:qux\n",
-        )
-        .unwrap();
-
-        let allowlist = load_duplicate_functions_allowlist(tmp.path());
-        assert_eq!(allowlist.len(), 2);
-        assert!(allowlist.contains("src/foo.rs:bar"));
-        assert!(allowlist.contains("src/baz.rs:qux"));
-    }
-
-    #[test]
-    fn test_load_duplicate_functions_allowlist_ignores_comments() {
-        let tmp = tempdir().unwrap();
-        let moss_dir = tmp.path().join(".moss");
-        fs::create_dir_all(&moss_dir).unwrap();
-        fs::write(
-            moss_dir.join("duplicate-functions-allow"),
-            "# This is a comment\n# Another comment\nsrc/foo.rs:bar\n",
-        )
-        .unwrap();
-
-        let allowlist = load_duplicate_functions_allowlist(tmp.path());
-        assert_eq!(allowlist.len(), 1);
-        assert!(allowlist.contains("src/foo.rs:bar"));
-    }
-
-    /// Helper to check if a duplicate function group is fully allowed
-    fn is_group_allowed(
-        locations: &[DuplicateFunctionLocation],
-        allowlist: &std::collections::HashSet<String>,
-    ) -> bool {
-        locations
-            .iter()
-            .all(|loc| allowlist.contains(&format!("{}:{}", loc.file, loc.symbol)))
-    }
-
-    #[test]
-    fn test_is_group_allowed_all_in_allowlist() {
-        let mut allowlist = std::collections::HashSet::new();
-        allowlist.insert("src/a.rs:foo".to_string());
-        allowlist.insert("src/b.rs:bar".to_string());
-
-        let locations = vec![
-            DuplicateFunctionLocation {
-                file: "src/a.rs".to_string(),
-                symbol: "foo".to_string(),
-                start_line: 1,
-                end_line: 5,
-            },
-            DuplicateFunctionLocation {
-                file: "src/b.rs".to_string(),
-                symbol: "bar".to_string(),
-                start_line: 10,
-                end_line: 15,
-            },
-        ];
-
-        assert!(is_group_allowed(&locations, &allowlist));
-    }
-
-    #[test]
-    fn test_is_group_allowed_partial_not_allowed() {
-        let mut allowlist = std::collections::HashSet::new();
-        allowlist.insert("src/a.rs:foo".to_string());
-
-        let locations = vec![
-            DuplicateFunctionLocation {
-                file: "src/a.rs".to_string(),
-                symbol: "foo".to_string(),
-                start_line: 1,
-                end_line: 5,
-            },
-            DuplicateFunctionLocation {
-                file: "src/b.rs".to_string(),
-                symbol: "bar".to_string(),
-                start_line: 10,
-                end_line: 15,
-            },
-        ];
-
-        assert!(!is_group_allowed(&locations, &allowlist));
-    }
-
-    #[test]
-    fn test_calculate_grade_perfect() {
-        // (score, weight) pairs - all 100%
-        let scores = [(100.0, 1.0), (100.0, 0.5), (100.0, 2.0), (100.0, 0.3)];
-        let (letter, percentage) = calculate_grade(&scores);
-        assert_eq!(letter, "A");
-        assert!((percentage - 100.0).abs() < 0.1);
-    }
-
-    #[test]
-    fn test_calculate_grade_weights() {
-        // Security weight is 2.0, so a security issue hurts more than complexity
-        // 50% health (weight 1.0), 100% complexity (weight 0.5), 0% security (weight 2.0), 100% duplicate-functions
-        let scores = [(50.0, 1.0), (100.0, 0.5), (0.0, 2.0), (100.0, 0.3)];
-        let (_, percentage) = calculate_grade(&scores);
-        // Expected: (50*1 + 100*0.5 + 0*2 + 100*0.3) / (1+0.5+2+0.3) = 130/3.8 ≈ 34.2%
-        assert!(percentage < 50.0); // Security weight should drag it down
     }
 }

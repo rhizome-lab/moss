@@ -143,6 +143,7 @@ impl Language for R {
                 Visibility::Public
             },
             children: Vec::new(),
+            is_interface_impl: false,
         })
     }
 

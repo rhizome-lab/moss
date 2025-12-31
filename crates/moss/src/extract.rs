@@ -156,6 +156,11 @@ impl Extractor {
                             }
                         }
 
+                        // Propagate is_interface_impl to all children
+                        if sym.is_interface_impl {
+                            propagate_interface_impl(&mut sym.children);
+                        }
+
                         symbols.push(sym);
                     }
                 }
@@ -236,6 +241,7 @@ impl Extractor {
                     end_line: methods.last().map(|m| m.end_line).unwrap_or(0),
                     visibility: Visibility::Public,
                     children: methods,
+                    is_interface_impl: false,
                 });
             }
         }
@@ -296,6 +302,14 @@ impl Extractor {
                 symbols.push(completed);
             }
         }
+    }
+}
+
+/// Recursively mark all children as interface implementations.
+fn propagate_interface_impl(symbols: &mut [Symbol]) {
+    for sym in symbols {
+        sym.is_interface_impl = true;
+        propagate_interface_impl(&mut sym.children);
     }
 }
 

@@ -99,7 +99,9 @@ impl DocCoverageReport {
 
 /// Run documentation coverage analysis
 pub fn cmd_docs(root: &Path, top: usize, json: bool) -> i32 {
-    let report = analyze_docs(root, top);
+    let config = crate::config::MossConfig::load(root);
+    let exclude_interface_impls = config.analyze.exclude_interface_impls();
+    let report = analyze_docs(root, top, exclude_interface_impls);
 
     if json {
         println!(
@@ -114,7 +116,7 @@ pub fn cmd_docs(root: &Path, top: usize, json: bool) -> i32 {
 }
 
 /// Analyze documentation coverage
-pub fn analyze_docs(root: &Path, top: usize) -> DocCoverageReport {
+pub fn analyze_docs(root: &Path, top: usize, exclude_interface_impls: bool) -> DocCoverageReport {
     use crate::path_resolve;
     use crate::skeleton::SkeletonExtractor;
     use moss_languages::SymbolKind;
@@ -152,8 +154,13 @@ pub fn analyze_docs(root: &Path, top: usize) -> DocCoverageReport {
             symbols: &[crate::skeleton::SkeletonSymbol],
             documented: &mut usize,
             total: &mut usize,
+            exclude_interface_impls: bool,
         ) {
             for sym in symbols {
+                // Skip interface implementations if configured
+                if exclude_interface_impls && sym.is_interface_impl {
+                    continue;
+                }
                 match sym.kind {
                     SymbolKind::Function | SymbolKind::Method => {
                         *total += 1;
@@ -163,11 +170,16 @@ pub fn analyze_docs(root: &Path, top: usize) -> DocCoverageReport {
                     }
                     _ => {}
                 }
-                count_docs(&sym.children, documented, total);
+                count_docs(&sym.children, documented, total, exclude_interface_impls);
             }
         }
 
-        count_docs(&skeleton.symbols, &mut documented, &mut total);
+        count_docs(
+            &skeleton.symbols,
+            &mut documented,
+            &mut total,
+            exclude_interface_impls,
+        );
 
         if total > 0 {
             // Update language stats

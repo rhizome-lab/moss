@@ -168,6 +168,7 @@ impl Language for Swift {
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
+            is_interface_impl: false,
         })
     }
 
@@ -192,6 +193,7 @@ impl Language for Swift {
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
+            is_interface_impl: false,
         })
     }
 
@@ -212,6 +214,7 @@ impl Language for Swift {
                 end_line: node.end_position().row + 1,
                 visibility: self.get_visibility(node, content),
                 children: Vec::new(),
+                is_interface_impl: false,
             });
         }
         self.extract_container(node, content)

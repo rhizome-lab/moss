@@ -79,6 +79,8 @@ pub struct Symbol {
     pub end_line: usize,
     pub visibility: Visibility,
     pub children: Vec<Symbol>,
+    /// True if this symbol implements an interface/trait (e.g., method in `impl Trait for Type`)
+    pub is_interface_impl: bool,
 }
 
 /// An import statement

@@ -141,6 +141,7 @@ impl Language for Lua {
                 Visibility::Public
             },
             children: Vec::new(),
+            is_interface_impl: false,
         })
     }
 

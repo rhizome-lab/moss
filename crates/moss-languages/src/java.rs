@@ -470,6 +470,7 @@ impl Language for Java {
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
+            is_interface_impl: false,
         })
     }
 
@@ -491,6 +492,7 @@ impl Language for Java {
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
+            is_interface_impl: false,
         })
     }
 

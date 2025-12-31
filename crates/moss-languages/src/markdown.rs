@@ -106,6 +106,7 @@ impl Language for Markdown {
             end_line: node.end_position().row + 1,
             visibility: Visibility::Public,
             children: Vec::new(),
+            is_interface_impl: false,
         })
     }
 

@@ -239,6 +239,7 @@ impl Language for Rust {
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
+            is_interface_impl: false,
         })
     }
 
@@ -248,16 +249,27 @@ impl Language for Rust {
                 let type_node = node.child_by_field_name("type")?;
                 let type_name = &content[type_node.byte_range()];
 
+                // Check if this is a trait impl (impl Trait for Type)
+                let is_trait_impl = node.child_by_field_name("trait").is_some();
+
+                let signature = if let Some(trait_node) = node.child_by_field_name("trait") {
+                    let trait_name = &content[trait_node.byte_range()];
+                    format!("impl {} for {}", trait_name, type_name)
+                } else {
+                    format!("impl {}", type_name)
+                };
+
                 Some(Symbol {
                     name: type_name.to_string(),
                     kind: SymbolKind::Module, // impl blocks are like modules
-                    signature: format!("impl {}", type_name),
+                    signature,
                     docstring: None,
                     attributes: self.extract_attributes(node, content),
                     start_line: node.start_position().row + 1,
                     end_line: node.end_position().row + 1,
                     visibility: Visibility::Public,
                     children: Vec::new(),
+                    is_interface_impl: is_trait_impl,
                 })
             }
             "trait_item" => {
@@ -274,6 +286,7 @@ impl Language for Rust {
                     end_line: node.end_position().row + 1,
                     visibility: self.get_visibility(node, content),
                     children: Vec::new(),
+                    is_interface_impl: false,
                 })
             }
             "mod_item" => {
@@ -292,6 +305,7 @@ impl Language for Rust {
                     end_line: node.end_position().row + 1,
                     visibility: self.get_visibility(node, content),
                     children: Vec::new(),
+                    is_interface_impl: false,
                 })
             }
             _ => None,
@@ -320,6 +334,7 @@ impl Language for Rust {
             end_line: node.end_position().row + 1,
             visibility: self.get_visibility(node, content),
             children: Vec::new(),
+            is_interface_impl: false,
         })
     }
 

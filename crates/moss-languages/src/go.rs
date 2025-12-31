@@ -409,6 +409,7 @@ impl Language for Go {
                 Visibility::Private
             },
             children: Vec::new(),
+            is_interface_impl: false,
         })
     }
 
@@ -449,6 +450,7 @@ impl Language for Go {
                 Visibility::Private
             },
             children: Vec::new(),
+            is_interface_impl: false,
         })
     }
 

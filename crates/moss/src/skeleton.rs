@@ -99,6 +99,7 @@ impl SkeletonResult {
                     end_line: sym.end_line,
                     visibility: sym.visibility,
                     children: type_children,
+                    is_interface_impl: sym.is_interface_impl,
                 })
             } else {
                 None
@@ -160,6 +161,7 @@ impl SkeletonResult {
                 end_line: sym.end_line,
                 visibility: sym.visibility,
                 children: filtered_children,
+                is_interface_impl: sym.is_interface_impl,
             })
         }
 
