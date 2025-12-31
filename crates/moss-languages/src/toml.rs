@@ -55,6 +55,10 @@ impl Language for Toml {
         &[]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        ""
+    }
+
     fn extract_function(
         &self,
         _node: &Node,

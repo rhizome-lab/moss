@@ -79,6 +79,10 @@ impl Language for Prolog {
         &["clause_term"]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        ""
+    }
+
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         if node.kind() != "clause_term" {
             return None;

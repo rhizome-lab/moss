@@ -55,6 +55,10 @@ impl Language for JavaScript {
         ecmascript::NESTING_NODES
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        " {}"
+    }
+
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
         Some(ecmascript::extract_function(

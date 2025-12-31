@@ -172,6 +172,10 @@ impl Language for Rust {
         ]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        " {}"
+    }
+
     fn scope_creating_kinds(&self) -> &'static [&'static str] {
         // Additional scope-creating nodes beyond functions and containers
         &[

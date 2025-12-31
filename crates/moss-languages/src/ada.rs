@@ -123,6 +123,10 @@ impl Language for Ada {
         &["case_expression", "if_expression", "declare_expression"]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        ""
+    }
+
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         match node.kind() {
             "subprogram_declaration" | "subprogram_body" | "expression_function_declaration" => {

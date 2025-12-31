@@ -60,6 +60,10 @@ impl Language for X86Asm {
         &[]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        ""
+    }
+
     fn extract_function(
         &self,
         _node: &Node,

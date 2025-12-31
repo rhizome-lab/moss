@@ -79,6 +79,10 @@ impl Language for Wit {
         &["interface_item", "world_item"]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        ""
+    }
+
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         if node.kind() != "func_item" {
             return None;

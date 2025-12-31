@@ -88,6 +88,10 @@ impl Language for Idris {
         &["exp_if", "exp_case", "exp_do", "exp_let_in"]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        ""
+    }
+
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         match node.kind() {
             "function" | "signature" => {

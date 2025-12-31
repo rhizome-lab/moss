@@ -239,6 +239,14 @@ pub trait Language: Send + Sync {
     /// Nodes that indicate nesting depth
     fn nesting_nodes(&self) -> &'static [&'static str];
 
+    // === Display/Formatting ===
+
+    /// Suffix to append to signatures for tree-sitter parsing.
+    /// Function signatures are incomplete code fragments that need closing tokens
+    /// to parse correctly (e.g., Rust `fn foo()` needs `{}`, Lua `function foo()` needs `end`).
+    /// Returns the suffix to append, or empty string if none needed.
+    fn signature_suffix(&self) -> &'static str;
+
     // === Visibility ===
 
     /// Check if a node is public/exported

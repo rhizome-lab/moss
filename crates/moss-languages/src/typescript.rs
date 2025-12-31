@@ -58,6 +58,10 @@ impl Language for TypeScript {
         ecmascript::NESTING_NODES
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        " {}"
+    }
+
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
         Some(ecmascript::extract_function(
@@ -275,6 +279,10 @@ impl Language for Tsx {
     }
     fn nesting_nodes(&self) -> &'static [&'static str] {
         ecmascript::NESTING_NODES
+    }
+
+    fn signature_suffix(&self) -> &'static str {
+        " {}"
     }
 
     fn extract_function(&self, node: &Node, content: &str, in_container: bool) -> Option<Symbol> {

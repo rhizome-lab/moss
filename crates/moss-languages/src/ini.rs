@@ -84,6 +84,10 @@ impl Language for Ini {
         &["section"]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        ""
+    }
+
     fn extract_function(
         &self,
         _node: &Node,

@@ -88,6 +88,10 @@ impl Language for OCaml {
         &["let_expression", "module_definition", "match_expression"]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        ""
+    }
+
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let name = self.node_name(node, content)?;
         let text = &content[node.byte_range()];

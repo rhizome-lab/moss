@@ -74,6 +74,10 @@ impl Language for Caddy {
         &["site_block", "directive_block"]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        ""
+    }
+
     fn extract_function(
         &self,
         _node: &Node,

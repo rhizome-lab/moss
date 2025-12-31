@@ -5,7 +5,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 ## Next Up
 
 - Test subcommand: `moss test` proxies to native test runners (cargo test, bun test, go test, etc.)
-- Colorized --help: when pretty output + colors enabled, colorize help output
+- [x] Colorized --help: when pretty output + colors enabled, colorize help output
 - Type serialization: `T.serialize(schema)` / `T.deserialize(str, schema)` for config files
 - Lua docs: create `docs/design/lua-test.md` documenting test + test.property modules
 
@@ -47,7 +47,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 ### Language Support
 98 languages implemented - all arborium grammars covered.
 See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to verify.
-- Lua highlighting broken: `moss view todo.lua`, `moss view validate.lua` not highlighting correctly
+- [x] Lua highlighting broken: `moss view todo.lua`, `moss view validate.lua` not highlighting correctly
 
 ### Grammar Loading (external .so files)
 Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so files with highlight queries.

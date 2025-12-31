@@ -87,6 +87,10 @@ impl Language for C {
         ]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        " {}"
+    }
+
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         let declarator = node.child_by_field_name("declarator")?;
         let name = self.find_identifier(&declarator, content)?;

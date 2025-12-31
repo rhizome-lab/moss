@@ -5,7 +5,7 @@
 use crate::parsers::grammar_loader;
 use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use ignore::WalkBuilder;
-use moss_languages::{support_for_path, GrammarLoader};
+use moss_languages::{support_for_grammar, support_for_path, GrammarLoader};
 use nu_ansi_term::Color::{LightCyan, LightGreen, LightMagenta, Red, White as LightGray, Yellow};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -256,42 +256,23 @@ fn format_node_line(node: &ViewNode, options: &FormatOptions) -> String {
                 let sig_display = if options.minimal {
                     elide_keywords(sig)
                 } else if let Some(grammar) = &node.grammar {
-                    // Signatures are fragments - append {} so tree-sitter parses them correctly
-                    let parseable = if grammar == "rust" && sig.starts_with("fn ") {
-                        format!("{} {{}}", sig)
-                    } else {
+                    // Get language-specific suffix for parsing incomplete signatures
+                    let suffix = support_for_grammar(grammar)
+                        .map(|lang| lang.signature_suffix())
+                        .unwrap_or("");
+
+                    // Append suffix so tree-sitter can parse the fragment correctly
+                    let parseable = if suffix.is_empty() {
                         sig.clone()
+                    } else {
+                        format!("{}{}", sig, suffix)
                     };
+
                     let highlighted = highlight_source(&parseable, grammar, options.use_colors);
-                    // Strip the appended {} from output (handle ANSI codes)
-                    if grammar == "rust" && sig.starts_with("fn ") {
-                        // Find last { and strip from there, plus any trailing ANSI codes
-                        if let Some(pos) = highlighted.rfind('{') {
-                            let mut result = highlighted[..pos].to_string();
-                            // Strip trailing ANSI escape sequences (ESC[...m) and whitespace
-                            loop {
-                                let trimmed = result.trim_end();
-                                if trimmed.len() < result.len() {
-                                    result = trimmed.to_string();
-                                    continue;
-                                }
-                                // Check for trailing ANSI escape: must end with 'm' preceded by digits/semicolons after ESC[
-                                if result.ends_with('m') {
-                                    if let Some(esc_pos) = result.rfind("\x1b[") {
-                                        // Verify everything between ESC[ and m is digits/semicolons
-                                        let params = &result[esc_pos + 2..result.len() - 1];
-                                        if params.chars().all(|c| c.is_ascii_digit() || c == ';') {
-                                            result.truncate(esc_pos);
-                                            continue;
-                                        }
-                                    }
-                                }
-                                break;
-                            }
-                            result
-                        } else {
-                            highlighted
-                        }
+
+                    // Strip the appended suffix from output (handle ANSI codes)
+                    if !suffix.is_empty() {
+                        strip_suffix_with_ansi(&highlighted, suffix)
                     } else {
                         highlighted
                     }
@@ -350,6 +331,46 @@ fn elide_keywords(sig: &str) -> String {
         s = s.replacen(kw, "", 1);
     }
     s
+}
+
+/// Strip a suffix from highlighted text, handling ANSI escape codes.
+/// The suffix may be highlighted with its own colors, so we need to find
+/// and remove both the text and any surrounding ANSI codes.
+fn strip_suffix_with_ansi(highlighted: &str, suffix: &str) -> String {
+    // Find the first character of the suffix to locate where it starts
+    let suffix_first_char = match suffix.trim_start().chars().next() {
+        Some(c) => c,
+        None => return highlighted.to_string(),
+    };
+
+    // Find the last occurrence of this character (could be highlighted differently)
+    if let Some(pos) = highlighted.rfind(suffix_first_char) {
+        let mut result = highlighted[..pos].to_string();
+
+        // Strip trailing ANSI escape sequences and whitespace
+        loop {
+            let trimmed = result.trim_end();
+            if trimmed.len() < result.len() {
+                result = trimmed.to_string();
+                continue;
+            }
+            // Check for trailing ANSI escape: must end with 'm' preceded by digits/semicolons after ESC[
+            if result.ends_with('m') {
+                if let Some(esc_pos) = result.rfind("\x1b[") {
+                    // Verify everything between ESC[ and m is digits/semicolons
+                    let params = &result[esc_pos + 2..result.len() - 1];
+                    if params.chars().all(|c| c.is_ascii_digit() || c == ';') {
+                        result.truncate(esc_pos);
+                        continue;
+                    }
+                }
+            }
+            break;
+        }
+        result
+    } else {
+        highlighted.to_string()
+    }
 }
 
 /// A span of text with highlight information.

@@ -87,6 +87,10 @@ impl Language for Verilog {
         &["module_declaration"]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        ""
+    }
+
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         if node.kind() != "function_declaration" && node.kind() != "task_declaration" {
             return None;

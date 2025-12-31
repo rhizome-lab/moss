@@ -55,6 +55,10 @@ impl Language for Css {
         &[]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        ""
+    }
+
     fn extract_function(
         &self,
         _node: &Node,

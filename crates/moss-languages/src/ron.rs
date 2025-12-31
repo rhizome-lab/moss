@@ -78,6 +78,10 @@ impl Language for Ron {
         &["struct", "map"]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        ""
+    }
+
     fn extract_function(
         &self,
         _node: &Node,

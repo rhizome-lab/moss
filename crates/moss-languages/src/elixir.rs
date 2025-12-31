@@ -106,6 +106,10 @@ impl Language for Elixir {
         &["call", "do_block", "anonymous_function"]
     }
 
+    fn signature_suffix(&self) -> &'static str {
+        " end"
+    }
+
     fn extract_function(&self, node: &Node, content: &str, _in_container: bool) -> Option<Symbol> {
         if node.kind() != "call" {
             return None;
