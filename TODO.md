@@ -6,7 +6,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 - Lua test discovery: `moss script test` or similar to run `.moss/tests/*.lua`
 - Edit `--item` flag: format-aware insertion for lists (checkbox/bullet/numbered)
-- Analyze `--trace <symbol>`: backward data flow / value provenance
+- Analyze `--trace`: recursive cross-function tracing (trace INTO called functions)
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -17,12 +17,14 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
   - Apply patch to worktree → run validator → if pass, apply to user dir
   - Zero user interruption (user can edit while agent tests in background)
 - `analyze --trace <symbol>`: backward data flow / value provenance
-  - Trace where a value comes from (like "blame" for values, not lines)
-  - Cross-function tracing with function signatures at boundaries
-  - Conditionals: trace both branches
-  - Stop conditions: literals, external calls (show signature)
-  - `--max-depth N` or `--max-items N` to limit output
-  - Example: `y = f(x, z)` → trace y ← f ← (x, z), showing f's signature
+  - [x] Trace where a value comes from (like "blame" for values, not lines)
+  - [x] Same-file function signatures at call boundaries
+  - [x] Conditionals: branch context shown (if/else/match)
+  - [x] Stop conditions: literals marked as (terminal)
+  - [x] Stop conditions: same-file calls show signature + @L<line>
+  - [x] `--max-depth N` limits output
+  - [ ] Recursive cross-function tracing (trace INTO called functions)
+  - [ ] Cross-file function lookup via index
 
 ### Configuration System
 Sections: `[daemon]`, `[index]`, `[filter.aliases]`, `[todo]`, `[view]`, `[analyze]`, `[grep]`

@@ -73,6 +73,8 @@ Do not:
 - **Cut corners or use fallbacks** - implement features properly for each case. No "just use format_summary() for now" or generic fallbacks. If implementing for 98 languages, implement properly for each one - data languages return empty, each programming language uses its actual syntax.
 - **Dismiss tooling needs for "rare" operations** - error-prone manual operations need safety rails regardless of frequency. Build the tool.
 - **Fear "over-modularization"** - if code has its own dispatch table or is a self-contained unit, split it out. 100 lines is not "too small" for a module. Consistency with existing patterns trumps subjective size thresholds.
+- **Consider time constraints** - we are NOT short on time. Optimize for correctness, completeness, and architecture quality. Never say "for now" or "spending too much time on this" as justification for incomplete work.
+- **Mark as done prematurely** - if work is incomplete, note what remains in TODO.md. Don't mark a task complete just because you're ready to move on.
 
 ## Design Principles
 
