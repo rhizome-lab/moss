@@ -3,6 +3,7 @@ resolver = "2"
 default-members = ["crates/moss"]
 members = [
     "crates/moss",
+    "crates/moss-grammars",
     "crates/moss-jsonschema",
     "crates/moss-languages",
     "crates/moss-openapi",
