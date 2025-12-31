@@ -55,6 +55,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - `moss grep` naming collision with shell grep: CLAUDE.md says use `|` not `\|` but `moss grep 'a|b'` looks like shell grep syntax. Consider renaming (not `search`/`find` - those should be semantic)
 
 ### Code Quality
+- Analyze subcommand regression: default behavior changed from full health analysis to overview format. Need to match pre-refactor output for `moss analyze` (no args), `analyze health` vs old `--health`, etc.
 - Doc coverage metric: "0% (18 of 6217)" seems wrong - check what's being counted (denominator too high? detection broken?)
 - `is_source_file` function: hardcoded extension list duplicated in analyze modules - use `moss-languages` support detection instead
 - Git hotspot allowlist: `.moss/hotspot-allow` file to filter expected hotspots (generated code, vendored deps) from `--hotspots`
