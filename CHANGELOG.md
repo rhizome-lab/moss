@@ -8,6 +8,9 @@ See `docs/` for design docs and `README.md` for usage.
 - Colorized `--help` output when colors enabled (respects --pretty, --compact, NO_COLOR, config)
 
 ### Analyze Command
+- Fixed Rust doc coverage: now correctly finds `///` doc comments in tree-sitter AST
+  - Was: 0% (18 of 6217), Now: 9% (590 of 6217)
+- Consolidated analysis pass scoring into `report.rs`: `ComplexityReport::score()`, `SecurityReport::score()`, `calculate_grade()`
 - `--trace` now supports unified path format (`file.rs/symbol` like view command)
 - `--trace` enhanced with value provenance tracking:
   - `--max-depth` limits output entries
@@ -17,6 +20,8 @@ See `docs/` for design docs and `README.md` for usage.
   - Same-file function locations shown (`@L<line>`)
 
 ### View Command
+- Path suffix matching: `moss view analyze/report.rs` now finds `crates/moss/src/commands/analyze/report.rs`
+- Glob pattern support: `moss view '**/*.lua'` and `moss view 'src/**/*.rs'`
 - Signature highlighting fix: Lua, Ruby, Elixir signatures now highlight correctly
   - Added `Language::signature_suffix()` trait method for language-specific closing tokens
   - Replaces hardcoded Rust special case with proper trait-based solution

@@ -135,6 +135,18 @@ impl ComplexityReport {
             .filter(|f| f.risk_level() == RiskLevel::Critical)
             .count()
     }
+
+    /// Calculate complexity score (0-100).
+    /// 100 if no high-risk functions, decreases with complex code.
+    pub fn score(&self) -> f64 {
+        let high_risk = self.high_risk_count();
+        let total = self.functions.len();
+        if total == 0 {
+            return 100.0;
+        }
+        let ratio = high_risk as f64 / total as f64;
+        (100.0 * (1.0 - ratio)).max(0.0)
+    }
 }
 
 pub struct ComplexityAnalyzer {}

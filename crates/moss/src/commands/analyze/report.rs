@@ -76,6 +76,17 @@ impl SecurityReport {
         counts
     }
 
+    /// Calculate security score (0-100).
+    /// 100 if no findings, penalized by severity.
+    pub fn score(&self) -> f64 {
+        let counts = self.count_by_severity();
+        let penalty = counts["critical"] * 40
+            + counts["high"] * 20
+            + counts["medium"] * 10
+            + counts["low"] * 5;
+        (100.0 - penalty as f64).max(0.0)
+    }
+
     pub fn format(&self) -> String {
         let mut lines = Vec::new();
         lines.push("# Security Analysis".to_string());
@@ -678,4 +689,24 @@ pub fn analyze(
         target_path: target_path.to_string(),
         skipped,
     }
+}
+
+/// Calculate weighted average grade from scores.
+/// Each score is (value, weight) where value is 0-100.
+pub fn calculate_grade(scores: &[(f64, f64)]) -> (&'static str, f64) {
+    let total_weight: f64 = scores.iter().map(|(_, w)| w).sum();
+    if total_weight == 0.0 {
+        return ("N/A", 0.0);
+    }
+    let weighted_sum: f64 = scores.iter().map(|(s, w)| s * w).sum();
+    let percentage = weighted_sum / total_weight;
+
+    let grade = match percentage as u32 {
+        90..=100 => "A",
+        80..=89 => "B",
+        70..=79 => "C",
+        60..=69 => "D",
+        _ => "F",
+    };
+    (grade, percentage)
 }

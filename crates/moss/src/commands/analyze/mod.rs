@@ -15,7 +15,6 @@ pub mod security;
 mod stale_docs;
 mod trace;
 
-use crate::analyze::complexity::ComplexityReport;
 use crate::commands::filter::detect_project_languages;
 use crate::config::MossConfig;
 use crate::daemon;
@@ -374,12 +373,10 @@ fn run_all_passes(
     );
 
     if let Some(ref complexity_report) = report.complexity {
-        let score = score_complexity(complexity_report);
-        scores.push((score, weights.complexity()));
+        scores.push((complexity_report.score(), weights.complexity()));
     }
     if let Some(ref security_report) = report.security {
-        let score = score_security(security_report);
-        scores.push((score, weights.security()));
+        scores.push((security_report.score(), weights.security()));
     }
 
     if json {
@@ -413,50 +410,12 @@ fn run_all_passes(
 
     // Print overall grade
     if !json && !scores.is_empty() {
-        let (grade, percentage) = calculate_grade(&scores);
+        let (grade, percentage) = report::calculate_grade(&scores);
         println!();
         println!("Overall Grade: {} ({:.0}%)", grade, percentage);
     }
 
     exit_code
-}
-
-/// Score complexity: 100 if no high-risk functions, decreases with complex code
-fn score_complexity(report: &ComplexityReport) -> f64 {
-    let high_risk = report.high_risk_count();
-    let total = report.functions.len();
-    if total == 0 {
-        return 100.0;
-    }
-    let ratio = high_risk as f64 / total as f64;
-    (100.0 * (1.0 - ratio)).max(0.0)
-}
-
-/// Score security: 100 if no findings, penalized by severity
-fn score_security(report: &report::SecurityReport) -> f64 {
-    let counts = report.count_by_severity();
-    let penalty =
-        counts["critical"] * 40 + counts["high"] * 20 + counts["medium"] * 10 + counts["low"] * 5;
-    (100.0 - penalty as f64).max(0.0)
-}
-
-/// Calculate weighted average grade from scores
-fn calculate_grade(scores: &[(f64, f64)]) -> (&'static str, f64) {
-    let total_weight: f64 = scores.iter().map(|(_, w)| w).sum();
-    if total_weight == 0.0 {
-        return ("N/A", 0.0);
-    }
-    let weighted_sum: f64 = scores.iter().map(|(s, w)| s * w).sum();
-    let percentage = weighted_sum / total_weight;
-
-    let grade = match percentage as u32 {
-        90..=100 => "A",
-        80..=89 => "B",
-        70..=79 => "C",
-        60..=69 => "D",
-        _ => "F",
-    };
-    (grade, percentage)
 }
 
 /// Check if a path is a source file we care about
