@@ -101,7 +101,8 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 - Lua test framework for user scripts: busted-style assertions, property-based testing (QuickCheck-style), test discovery for `.moss/tests/`
   - Note: builtin modules (cli, type, validate) already have Rust integration tests in `lua_runtime/test_*.rs`
 - Type system uses beyond validation: serialization, schema introspection
-  - Note: `V.generate(schema)` now enables property testing (see `docs/design/lua-validate.md`)
+  - Note: `T.describe(schema)` for introspection, `type.generate` for property testing
+  - Future: extract descriptions from comments (LuaDoc-style) instead of `description` field
 
 ### Edit Improvements
 - `--at primary`: explicit opt-in to primary section detection (discoverable via error message)

@@ -37,6 +37,8 @@ pub mod modules {
     pub const TYPE: &str = include_str!("scripts/type.lua");
     pub const TYPE_VALIDATE: &str = include_str!("scripts/type/validate.lua");
     pub const TYPE_GENERATE: &str = include_str!("scripts/type/generate.lua");
+    pub const TEST: &str = include_str!("scripts/test.lua");
+    pub const TEST_PROPERTY: &str = include_str!("scripts/test/property.lua");
 
     /// Get builtin module by name.
     pub fn get(name: &str) -> Option<&'static str> {
@@ -45,6 +47,8 @@ pub mod modules {
             "type" => Some(TYPE),
             "type.validate" => Some(TYPE_VALIDATE),
             "type.generate" => Some(TYPE_GENERATE),
+            "test" => Some(TEST),
+            "test.property" => Some(TEST_PROPERTY),
             _ => None,
         }
     }

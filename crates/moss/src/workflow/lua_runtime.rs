@@ -814,7 +814,14 @@ impl LuaRuntime {
         let preload: Table = package.get("preload")?;
 
         // Register each builtin module
-        for name in &["cli", "type", "type.validate", "type.generate"] {
+        for name in &[
+            "cli",
+            "type",
+            "type.validate",
+            "type.generate",
+            "test",
+            "test.property",
+        ] {
             if let Some(src) = modules::get(name) {
                 let src = src.to_string();
                 let name = *name;
@@ -1526,6 +1533,12 @@ mod test_cli_module;
 #[cfg(test)]
 #[path = "lua_runtime/test_generate_module.rs"]
 mod test_generate_module;
+#[cfg(test)]
+#[path = "lua_runtime/test_property_module.rs"]
+mod test_property_module;
+#[cfg(test)]
+#[path = "lua_runtime/test_test_module.rs"]
+mod test_test_module;
 #[cfg(test)]
 #[path = "lua_runtime/test_type_module.rs"]
 mod test_type_module;
