@@ -1,4 +1,5 @@
-use clap::{Parser, Subcommand};
+use clap::builder::styling::{AnsiColor, Styles};
+use clap::{ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand};
 use std::path::{Path, PathBuf};
 
 use moss::commands;
@@ -284,6 +285,42 @@ enum ServeProtocol {
     Lsp,
 }
 
+/// Help output styling.
+const HELP_STYLES: Styles = Styles::styled()
+    .header(AnsiColor::Green.on_default().bold())
+    .usage(AnsiColor::Green.on_default().bold())
+    .literal(AnsiColor::Cyan.on_default().bold())
+    .placeholder(AnsiColor::Cyan.on_default());
+
+/// Determine color choice for help output.
+/// Checks args, config, and NO_COLOR before parsing since --help may exit early.
+fn help_color_choice() -> ColorChoice {
+    // NO_COLOR standard takes precedence
+    if std::env::var("NO_COLOR").is_ok() {
+        return ColorChoice::Never;
+    }
+
+    let args: Vec<String> = std::env::args().collect();
+    let has_compact = args.iter().any(|a| a == "--compact");
+    let has_pretty = args.iter().any(|a| a == "--pretty");
+
+    // CLI flags override config
+    if has_compact {
+        return ColorChoice::Never;
+    }
+    if has_pretty {
+        return ColorChoice::Always;
+    }
+
+    // Check config for color preference
+    let config = moss::config::MossConfig::load(Path::new("."));
+    match config.pretty.colors {
+        Some(moss::output::ColorMode::Always) => ColorChoice::Always,
+        Some(moss::output::ColorMode::Never) => ColorChoice::Never,
+        _ => ColorChoice::Auto,
+    }
+}
+
 /// Reset SIGPIPE to default behavior so piping to `head` etc. doesn't panic.
 #[cfg(unix)]
 fn reset_sigpipe() {
@@ -330,7 +367,12 @@ fn main() {
         std::process::exit(exit_code);
     }
 
-    let cli = Cli::parse();
+    // Parse with custom styles and color choice
+    let cli = Cli::command()
+        .styles(HELP_STYLES)
+        .color(help_color_choice())
+        .get_matches();
+    let cli = Cli::from_arg_matches(&cli).expect("clap mismatch");
 
     // Resolve output format at top level - pretty config is TTY-based, not root-specific
     let config = moss::config::MossConfig::load(Path::new("."));
