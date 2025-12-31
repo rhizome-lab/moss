@@ -1,26 +1,29 @@
-//! Grep command - search file contents for a pattern.
+//! Text search command - search file contents for a pattern.
+//!
+//! Named "text-search" to avoid confusion with unix grep. The internal implementation
+//! uses ripgrep, but the command name indicates purpose rather than tool.
 
 use crate::commands::filter::detect_project_languages;
 use crate::config::MossConfig;
 use crate::filter::Filter;
-use crate::grep;
 use crate::merge::Merge;
 use crate::output::{OutputFormat, OutputFormatter};
+use crate::text_search;
 use clap::Args;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
-/// Grep command configuration.
+/// Text search command configuration.
 #[derive(Debug, Clone, Deserialize, Default, Merge)]
 #[serde(default)]
-pub struct GrepConfig {
+pub struct TextSearchConfig {
     /// Default maximum number of matches
     pub limit: Option<usize>,
     /// Case-insensitive search by default
     pub ignore_case: Option<bool>,
 }
 
-impl GrepConfig {
+impl TextSearchConfig {
     pub fn limit(&self) -> usize {
         self.limit.unwrap_or(100)
     }
@@ -30,9 +33,9 @@ impl GrepConfig {
     }
 }
 
-/// Grep command arguments.
+/// Text search command arguments.
 #[derive(Args, Debug)]
-pub struct GrepArgs {
+pub struct TextSearchArgs {
     /// Regex pattern to search for
     pub pattern: String,
 
@@ -57,19 +60,19 @@ pub struct GrepArgs {
     pub only: Vec<String>,
 }
 
-/// Run grep command with args.
-pub fn run(args: GrepArgs, format: crate::output::OutputFormat) -> i32 {
+/// Run text-search command with args.
+pub fn run(args: TextSearchArgs, format: crate::output::OutputFormat) -> i32 {
     let effective_root = args
         .root
         .clone()
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = MossConfig::load(&effective_root);
 
-    cmd_grep(
+    cmd_text_search(
         &args.pattern,
         args.root.as_deref(),
-        args.limit.unwrap_or_else(|| config.grep.limit()),
-        args.ignore_case || config.grep.ignore_case(),
+        args.limit.unwrap_or_else(|| config.text_search.limit()),
+        args.ignore_case || config.text_search.ignore_case(),
         &format,
         &args.exclude,
         &args.only,
@@ -77,7 +80,7 @@ pub fn run(args: GrepArgs, format: crate::output::OutputFormat) -> i32 {
 }
 
 /// Search file contents for a pattern
-pub fn cmd_grep(
+pub fn cmd_text_search(
     pattern: &str,
     root: Option<&Path>,
     limit: usize,
@@ -112,7 +115,7 @@ pub fn cmd_grep(
         None
     };
 
-    match grep::grep(pattern, &root, filter.as_ref(), limit, ignore_case) {
+    match text_search::grep(pattern, &root, filter.as_ref(), limit, ignore_case) {
         Ok(result) => {
             if result.matches.is_empty() && !format.is_json() {
                 eprintln!("No matches found for: {}", pattern);

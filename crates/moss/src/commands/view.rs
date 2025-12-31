@@ -1711,7 +1711,10 @@ fn cmd_view_symbol(
                     text_matches.len(),
                     if text_matches.len() == 1 { "" } else { "s" }
                 );
-                eprintln!("Did you mean: moss grep '{}' {}", symbol_name, file_path);
+                eprintln!(
+                    "Did you mean: moss text-search '{}' {}",
+                    symbol_name, file_path
+                );
             }
             1
         }

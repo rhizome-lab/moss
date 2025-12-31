@@ -39,7 +39,7 @@ Run via `./target/debug/moss` (or `cargo build` first if needed):
 ./target/debug/moss view [path[/symbol]] [--types-only]   # structure, skeleton, or symbol source
 ./target/debug/moss view path:start-end                    # view specific line range
 ./target/debug/moss analyze [--complexity] [path]          # find complex functions
-./target/debug/moss grep <pattern> [--only "*.rs"]         # search (regex: use | not \|, --only filters files)
+./target/debug/moss text-search <pattern> [--only "*.rs"]  # search (real regex: use | not \|)
 ./target/debug/moss @todo [list|add|done|rm]              # manage TODO.md via Lua script
 ```
 

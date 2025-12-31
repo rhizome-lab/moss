@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Rename `moss grep` → `moss text-search` (search/find imply semantic). Document reasoning in `docs/decisions.md`: grep conflicts with unix mental model (Opus 4.5 in Claude Code constantly tries unix grep syntax), "search" implies semantic search in AI-era.
+- [x] Rename `moss grep` → `moss text-search` (search/find imply semantic). Document reasoning in `docs/decisions.md`.
 - Lua test discovery: `moss script test` or similar to run `.moss/tests/*.lua`
 - Edit `--item` flag: format-aware insertion for lists (checkbox/bullet/numbered)
 - [x] Analyze `--trace`: recursive cross-function tracing (trace INTO called functions)
@@ -53,7 +53,6 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 
 ### View Command
 - Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
-- `moss grep` naming collision with shell grep: CLAUDE.md says use `|` not `\|` but `moss grep 'a|b'` looks like shell grep syntax. Consider renaming (not `search`/`find` - those should be semantic)
 
 ### Code Quality
 - [x] Interface impl detection: TypeScript/JS semantic analysis with cross-file resolution via InterfaceResolver trait (IndexedResolver for index-based, OnDemandResolver for on-demand file parsing)

@@ -23,7 +23,7 @@ moss view src/main.rs
 | `moss view src/` | Code structure (symbols, hierarchy) | Understanding architecture |
 | `moss view --deps FILE` | Import/export analysis | Before modifying a file |
 | `moss analyze --health` | Codebase metrics and health score | Checking project state |
-| `moss grep "pattern"` | Search code | Finding usage, definitions |
+| `moss text-search "pattern"` | Search code | Finding usage, definitions |
 | `moss package audit` | Security vulnerability scan | Checking dependencies |
 
 ## Output Modes
@@ -76,8 +76,8 @@ moss package why tokio     # Why is this included?
 
 **Finding code:**
 ```bash
-moss grep "TODO"           # Search for patterns
-moss grep "fn main" -i     # Case insensitive
+moss text-search "TODO"           # Search for patterns
+moss text-search "fn main" -i     # Case insensitive
 ```
 
 ## Key Commands
@@ -112,17 +112,17 @@ moss lint --fix               # Auto-fix issues
 moss lint --list              # Available tools
 ```
 
-### grep - Search
+### text-search - Search
 
 ```bash
-moss grep "pattern"           # Full codebase search
-moss grep "TODO" --glob "*.rs"
+moss text-search "pattern"            # Full codebase search
+moss text-search "TODO" --only "*.rs"
 ```
 
 ## Key Insights
 
 - `moss view` is the primary navigation command - works on dirs, files, and symbols
 - `moss analyze` is the primary analysis command - health, complexity, security, lint
-- `moss grep` for text search, `moss view` for structural navigation
+- `moss text-search` for text search, `moss view` for structural navigation
 - Use `--json` when you need to parse output programmatically
 - The index (`.moss/index.sqlite`) caches symbols for fast lookups

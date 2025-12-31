@@ -131,9 +131,9 @@ Grammar build tooling:
 - Supports single file or directory scanning
 - JSON output with `--json`
 
-### Grep Command
+### Text Search Command
 
-`moss grep` improvements:
+`moss text-search` (renamed from `grep` to avoid unix grep mental model confusion):
 - Shows containing symbol with line range in output (e.g., `42 (process_request L30-55): ...`)
 - Semantic context is more useful than arbitrary surrounding lines
 
@@ -1459,10 +1459,10 @@ Replaced ~17 individual tree-sitter-* grammar crates with single arborium depend
 - Python API `SearchAPI.find_symbols()` now calls Rust CLI when available
 - Falls back to Python implementation when Rust CLI not found
 
-**Rust CLI grep command** (new)
-- `moss grep <pattern>` - fast text search using ripgrep's grep crate
+**Rust CLI text-search command** (new, renamed from grep)
+- `moss text-search <pattern>` - fast text search using ripgrep's grep crate
 - JSON output mode with `--json` for programmatic use
-- Supports glob patterns (`--glob "*.py"`), case-insensitive (`-i`), result limits (`-l`)
+- Supports glob patterns (`--only "*.py"`), case-insensitive (`-i`), result limits (`-l`)
 - ~4ms for codebase-wide searches (was 9.7s with pure Python)
 - Python API now calls Rust CLI when available
 

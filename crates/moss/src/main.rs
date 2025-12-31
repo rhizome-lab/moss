@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use moss::commands;
 use moss::commands::analyze::AnalyzeArgs;
 use moss::commands::edit::EditAction;
-use moss::commands::grep::GrepArgs;
+use moss::commands::text_search::TextSearchArgs;
 use moss::commands::view::ViewArgs;
 use moss::serve;
 
@@ -110,7 +110,8 @@ enum Commands {
     },
 
     /// Search for text patterns in files (fast ripgrep-based search)
-    Grep(GrepArgs),
+    #[command(name = "text-search")]
+    TextSearch(TextSearchArgs),
 
     /// Analyze Claude Code and other agent session logs
     Sessions {
@@ -440,7 +441,7 @@ fn main() {
         Commands::Filter { action, root } => {
             commands::filter::cmd_filter(action, root.as_deref(), cli.json)
         }
-        Commands::Grep(args) => commands::grep::run(args, format),
+        Commands::TextSearch(args) => commands::text_search::run(args, format),
         Commands::Sessions {
             session,
             project,

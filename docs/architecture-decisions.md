@@ -76,6 +76,26 @@ Once you need conditionals (`if is_dirty() then commit() end`), you're fighting 
 enabled = true  # Set to false to disable indexing entirely
 ```
 
+## Command Naming: `text-search` Not `grep`
+
+**Decision**: Use `moss text-search` for text pattern matching instead of `moss grep`.
+
+### Why Not `grep`?
+
+1. **AI agent confusion**: LLMs like Claude (especially Opus 4.5) conflate `moss grep` with unix grep syntax. They constantly try `moss grep pattern file` (unix style) instead of `moss text-search pattern` (our style).
+
+2. **Mental model conflict**: Unix grep has 50+ years of muscle memory. Our command uses ripgrep internally but has different semantics (no positional file args, `--only` instead of file patterns). Fighting the unix grep mental model wastes tokens and causes errors.
+
+3. **Semantic expectations**: In the AI era, "search" and "find" imply semantic/vector search. `text-search` explicitly signals regex-based text matching.
+
+### Why Not `search` or `find`?
+
+Those names should be reserved for future semantic search features (embeddings, vector similarity). `text-search` is explicit about the mechanism.
+
+### Config Section
+
+The config section is `[text-search]` to match the command name.
+
 ## Local Model Memory Budget
 
 For future local LLM/embedding integration:

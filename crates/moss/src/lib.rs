@@ -25,7 +25,6 @@ pub mod deps;
 pub mod edit;
 pub mod extract;
 pub mod filter;
-pub mod grep;
 pub mod health;
 pub mod index;
 pub mod merge;
@@ -37,6 +36,7 @@ pub mod serve;
 pub mod sessions;
 pub mod skeleton;
 pub mod symbols;
+pub mod text_search;
 pub mod tree;
 pub mod workflow;
 

@@ -31,7 +31,7 @@ moss view src/main.rs/main
 moss analyze --health
 
 # Search for text patterns
-moss grep "TODO"
+moss text-search "TODO"
 
 # Run linters
 moss lint
@@ -85,15 +85,15 @@ moss lint --list                # List available tools
 
 Supported tools: ruff, clippy, rustfmt, oxlint, biome, prettier, tsc, mypy, pyright, eslint, gofmt, go-vet, deno-check, and more.
 
-### grep - Search Code
+### text-search - Search Code
 
 Fast ripgrep-based search:
 
 ```bash
-moss grep "pattern"             # Search all files
-moss grep "TODO" --glob "*.rs"  # Filter by extension
-moss grep "fn main" -i          # Case insensitive
-moss grep "error" --limit 50    # Limit results
+moss text-search "pattern"            # Search all files
+moss text-search "TODO" --only "*.rs" # Filter by extension
+moss text-search "fn main" -i         # Case insensitive
+moss text-search "error" --limit 50   # Limit results
 ```
 
 ### package - Package Management

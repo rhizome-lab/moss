@@ -216,20 +216,20 @@ All commands support these output flags:
 There's no `--jsonl` flag. Use `--jq` instead:
 
 ```bash
-# Get one JSON object per grep match
-moss grep "pattern" --jq '.matches[]'
+# Get one JSON object per text-search match
+moss text-search "pattern" --jq '.matches[]'
 
 # Get one JSON object per todo item
 moss todo list --jq '.items[]'
 
 # Extract just file paths from matches
-moss grep "TODO" --jq '.matches[].file'
+moss text-search "TODO" --jq '.matches[].file'
 
 # Postprocess each match with pipe to jq
-moss grep "pattern" --jq '.matches[]' | jq -r '.file + ":" + (.line|tostring)'
+moss text-search "pattern" --jq '.matches[]' | jq -r '.file + ":" + (.line|tostring)'
 
 # Filter matches to specific directory
-moss grep "error" --jq '[.matches[] | select(.file | startswith("src/"))]'
+moss text-search "error" --jq '[.matches[] | select(.file | startswith("src/"))]'
 ```
 
 **Why no `--jsonl`?** Adding it would require `--jql` for consistency (same reasons we have `--jq`: discoverability, convenience, performance). The tiny discoverability gain isn't worth doubling the JSON-related flags.

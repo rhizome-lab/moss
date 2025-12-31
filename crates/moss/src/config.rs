@@ -36,7 +36,7 @@
 //! threshold = 10              # only show functions with complexity >= 10
 //! compact = true              # use compact output for --overview
 //!
-//! [grep]
+//! [text-search]
 //! limit = 50                  # default max results
 //! ignore_case = true          # case-insensitive by default
 //!
@@ -47,7 +47,7 @@
 //! ```
 
 use crate::commands::analyze::AnalyzeConfig;
-use crate::commands::grep::GrepConfig;
+use crate::commands::text_search::TextSearchConfig;
 use crate::commands::todo::TodoConfig;
 use crate::commands::view::ViewConfig;
 use crate::daemon::DaemonConfig;
@@ -122,7 +122,8 @@ pub struct MossConfig {
     pub todo: TodoConfig,
     pub view: ViewConfig,
     pub analyze: AnalyzeConfig,
-    pub grep: GrepConfig,
+    #[serde(rename = "text-search")]
+    pub text_search: TextSearchConfig,
     pub pretty: PrettyConfig,
 }
 
