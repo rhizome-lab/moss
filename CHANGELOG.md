@@ -152,6 +152,18 @@ Replaced TOML workflow engine with Lua (LuaJIT via mlua):
 - LuaCats type definitions for IDE support (`.moss/workflows/moss.lua`)
 - Example: `.moss/workflows/test.lua`
 
+### Lua Modules
+
+Builtin Lua modules for scripts (`require("module")`):
+- `cli`: Declarative CLI parsing with subcommands, options, and auto-generated help
+- `type`: Type definitions as plain tables (`T.string`, `T.struct`, `T.array`, etc.)
+- `validate`: Dispatcher-based type checker with coercion, constraints, and error paths
+  - Constraint checking: min/max, min_len/max_len, pattern, one_of
+  - Composite types: struct, array, tuple, dictionary, optional, any_of, all_of, literal
+  - Coercion: string→number, string→boolean
+  - Error paths: nested field paths (e.g., "config.port: must be at least 1")
+  - Design: `docs/design/lua-validate.md`
+
 ### LLM Agent Driver
 
 Implemented `auto{}` driver for Lua workflows (requires `llm` feature):
