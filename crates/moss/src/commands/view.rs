@@ -621,10 +621,17 @@ pub fn cmd_view(
 
     // Check if query looks like a symbol path (contains / but first segment isn't a real path)
     // e.g., "Tsx/format_import" where "Tsx" is a class name, not a directory
-    let is_symbol_query = target.contains('/') && !target.starts_with('/') && {
-        let first_seg = target.split('/').next().unwrap_or("");
-        !root.join(first_seg).exists()
-    };
+    // But NOT if it ends with a file extension (likely a file path like "analyze/report.rs")
+    let has_file_extension = target
+        .rsplit('/')
+        .next()
+        .map(|last| last.contains('.'))
+        .unwrap_or(false);
+    let is_symbol_query =
+        target.contains('/') && !target.starts_with('/') && !has_file_extension && {
+            let first_seg = target.split('/').next().unwrap_or("");
+            !root.join(first_seg).exists()
+        };
 
     // For symbol queries, only search symbols (skip file resolution)
     // For path queries, do normal resolution and optionally add symbol matches

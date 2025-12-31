@@ -462,6 +462,26 @@ fn normalize_for_match(s: &str) -> String {
 
 /// Resolve from a pre-loaded list of paths
 fn resolve_from_paths(query: &str, all_paths: &[(String, bool)]) -> Vec<PathMatch> {
+    // Handle glob patterns (* and **)
+    if query.contains('*') {
+        let pattern = glob::Pattern::new(query).ok();
+        if let Some(ref pat) = pattern {
+            let mut glob_matches: Vec<PathMatch> = Vec::new();
+            for (path, is_dir) in all_paths {
+                if pat.matches(path) || pat.matches(&path.replace('\\', "/")) {
+                    glob_matches.push(PathMatch {
+                        path: path.clone(),
+                        kind: if *is_dir { "directory" } else { "file" }.to_string(),
+                        score: u32::MAX,
+                    });
+                }
+            }
+            if !glob_matches.is_empty() {
+                return glob_matches;
+            }
+        }
+    }
+
     let query_lower = query.to_lowercase();
     let query_normalized = normalize_for_match(query);
 
@@ -505,6 +525,28 @@ fn resolve_from_paths(query: &str, all_paths: &[(String, bool)]) -> Vec<PathMatc
 
     if !exact_matches.is_empty() {
         return exact_matches;
+    }
+
+    // Try suffix match (query is end of path)
+    // e.g., "analyze/report.rs" matches "crates/moss/src/commands/analyze/report.rs"
+    if query.contains('/') || query.contains('\\') {
+        let query_suffix = query.replace('\\', "/");
+        let mut suffix_matches: Vec<PathMatch> = Vec::new();
+        for (path, is_dir) in all_paths {
+            let path_normalized = path.replace('\\', "/");
+            if path_normalized.ends_with(&query_suffix)
+                || path_normalized.ends_with(&format!("/{}", query_suffix))
+            {
+                suffix_matches.push(PathMatch {
+                    path: path.clone(),
+                    kind: if *is_dir { "directory" } else { "file" }.to_string(),
+                    score: u32::MAX - 2,
+                });
+            }
+        }
+        if !suffix_matches.is_empty() {
+            return suffix_matches;
+        }
     }
 
     // Fuzzy match using nucleo
