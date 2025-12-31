@@ -43,15 +43,6 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - PR/diff analysis: `moss analyze --pr` or similar
 ## Backlog
 
-### Language Support
-98 languages implemented - all arborium grammars covered.
-See `docs/language-support.md` for design. Run `scripts/missing-grammars.sh` to verify.
-
-### Grammar Loading (external .so files)
-Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so files with highlight queries.
-- Grammars load from: `MOSS_GRAMMAR_PATH` env var, `~/.config/moss/grammars/`
-- See `crates/moss-languages/src/grammar_loader.rs` for loader implementation
-
 ### Workflow Engine
 - Consider streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)
