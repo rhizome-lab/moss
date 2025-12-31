@@ -294,16 +294,116 @@ app:command("add", {
 app:run()
 ```
 
-## Open Questions
+## Implemented Features
 
-1. **Global options inheritance?**
-   Should `--verbose` on the app apply to all subcommands automatically?
+All open questions have been resolved and implemented:
 
-2. **Aliases?**
-   `{ name = "remove", aliases = {"rm", "delete"}, ... }`
+### Global Options Inheritance
 
-3. **Type coercion API?**
-   How to specify `type = "number"` / `"boolean"` / `"list"` in declarative style?
+App-level options are inherited by all subcommands:
 
-4. **Validation functions?**
-   Inline `validate = function(v) ... end` or something else?
+```lua
+cli.run {
+    name = "app",
+    options = {
+        { name = "verbose", short = "v", description = "Verbose output" },
+    },
+    commands = {
+        { name = "build", run = function(args)
+            if args.verbose then print("Building...") end
+        end },
+    },
+}
+```
+
+Usage: `moss @app --verbose build` or `moss @app build --verbose`
+
+### Command Aliases
+
+Commands can have multiple names:
+
+```lua
+{ name = "remove", aliases = {"rm", "delete"}, ... }
+```
+
+### Type Coercion
+
+Options can specify type for automatic conversion:
+
+```lua
+options = {
+    { name = "count", type = "number" },    -- string → number
+    { name = "port", type = "integer" },    -- string → integer (must be whole)
+    { name = "force", type = "boolean" },   -- "true"/"1" → true, "false"/"0" → false
+}
+```
+
+### Environment Variable Fallbacks
+
+Options can specify an environment variable to use as default:
+
+```lua
+{ name = "port", type = "integer", env = "PORT" }
+```
+
+### Required Options
+
+Options can be marked as required (only enforced in strict mode):
+
+```lua
+{ name = "output", short = "o", required = true }
+```
+
+### Mutually Exclusive Options
+
+Options can conflict with each other (only enforced in strict mode):
+
+```lua
+options = {
+    { name = "json", conflicts_with = "text" },
+    { name = "text", conflicts_with = "json" },
+}
+```
+
+## Config Flags
+
+These are opt-in behaviors, disabled by default:
+
+```lua
+cli.run {
+    name = "app",
+    bundling = true,   -- enable -abc → -a -b -c
+    negatable = true,  -- enable --no-* for all flags
+    strict = true,     -- enable validation (required args/options, conflicts)
+    ...
+}
+```
+
+### Short Option Bundling (`bundling = true`)
+
+When enabled, combined short flags expand:
+- `-abc` → `-a -b -c`
+- `-vvv` → `-v -v -v`
+
+Only works for flags (options without values).
+
+### Negatable Flags (`negatable = true`)
+
+When enabled globally, all flags can be negated with `--no-` prefix:
+- `--verbose` → sets `verbose = true`
+- `--no-verbose` → sets `verbose = false`
+
+Individual options can also opt-in/out:
+```lua
+{ name = "color", negatable = true }   -- allows --no-color even without global flag
+{ name = "force", negatable = false }  -- prevents --no-force even with global flag
+```
+
+### Strict Mode (`strict = true`)
+
+Enables validation errors for:
+- Missing required positional arguments
+- Missing required options
+- Mutually exclusive option conflicts
+
+Without strict mode, these issues are silently ignored (useful for lenient parsing).

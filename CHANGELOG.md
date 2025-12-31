@@ -4,6 +4,27 @@
 
 First release. See `docs/` for design docs and `README.md` for usage.
 
+### Lua Script Libraries
+
+CLI library (`cli.lua`) - full-featured argument parsing:
+- Config flags: `bundling`, `negatable`, `strict` (opt-in behaviors)
+- Short option bundling: `-abc` → `-a -b -c`
+- Negatable flags: `--no-verbose` sets `verbose = false`
+- Type coercion: `type = "number"/"integer"/"boolean"` on options
+- Environment variable fallbacks: `env = "PORT"` on options
+- Required options validation (with `strict = true`)
+- Mutually exclusive options: `conflicts_with = "other"`
+- Global options inheritance: app-level options passed to subcommands
+- Command aliases: `aliases = {"rm", "delete"}`
+
+Validation library (`validate.lua`) - random value generation:
+- `V.generate(schema, opts)` produces random values matching schemas
+- Supports all types: primitives, struct, array, tuple, dictionary, optional, any_of, all_of, literal
+- Options: `seed`, `max_depth`, `max_array_len`
+- Enables property-based testing (generate values, verify they validate)
+
+See `docs/design/lua-cli.md` and `docs/design/lua-validate.md`.
+
 ### Bug Fixes
 
 - **Fixed symbol search for trait impl methods**: `moss view <function_name>` now correctly finds methods in trait implementations. Previously, methods without explicit `pub` modifiers (like trait impl methods) were filtered out by default. Changed `ExtractOptions::include_private` to default to `true` since moss is for code exploration, not API documentation. Also removed the now-redundant `--include-private` flag.

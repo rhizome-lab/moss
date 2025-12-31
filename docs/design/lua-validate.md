@@ -233,31 +233,92 @@ cli.run {
 2. **Shorthand constructors are plain functions.** `T.array(item)` just returns
    `{ type = "array", item = item }`. No magic, no metatables.
 
+## Random Value Generation
+
+The `generate(schema, opts)` function produces random values that match a schema.
+Useful for property-based testing, fuzzing, and mock data generation.
+
+### Basic Usage
+
+```lua
+local V = require("validate")
+local T = V.type  -- or require("type")
+
+-- Generate a random string
+local s = V.generate(T.string)  -- e.g., "kJ7xQm2"
+
+-- Generate with constraints
+local n = V.generate({ type = "integer", min = 1, max = 10 })  -- e.g., 7
+
+-- Generate complex structures
+local user = V.generate({
+    type = "struct",
+    shape = {
+        name = T.string,
+        age = { type = "integer", min = 0, max = 120 },
+        active = T.boolean,
+    },
+})
+-- e.g., { name = "abc", age = 45, active = true }
+```
+
+### Options
+
+```lua
+V.generate(schema, {
+    seed = 12345,        -- for reproducible output
+    max_depth = 5,       -- limit nesting (default: 5)
+    max_array_len = 10,  -- limit array size (default: 10)
+})
+```
+
+### Supported Types
+
+All schema types support generation:
+
+| Type | Behavior |
+|------|----------|
+| `string` | Random alphanumeric, respects `min_len`/`max_len`/`one_of` |
+| `number` | Random float in `[min, max]` range (default: -1000 to 1000) |
+| `integer` | Random int in `[min, max]` range |
+| `boolean` | 50% true/false |
+| `nil` | Always nil |
+| `any` | Random string, number, or boolean |
+| `struct` | Recursively generates each field (optional fields 30% nil) |
+| `array` | Random length, generates each item |
+| `tuple` | Generates each positional item |
+| `dictionary` | Random key-value pairs |
+| `optional` | 30% nil, 70% inner value |
+| `any_of` | Picks random type from union |
+| `all_of` | Generates from first type (best effort) |
+| `literal` | Returns the literal value |
+
+### Property Testing Pattern
+
+```lua
+local V = require("validate")
+local T = V.type
+
+local user_schema = {
+    type = "struct",
+    shape = {
+        name = { type = "string", min_len = 1, required = true },
+        age = { type = "integer", min = 0, max = 150 },
+    },
+}
+
+-- Generate many random values and verify they validate
+for i = 1, 100 do
+    local user = V.generate(user_schema, { seed = i })
+    local result, err = V.check(user, user_schema)
+    assert(err == nil, "generated value should validate: " .. tostring(err))
+end
+```
+
 ## Open Questions
 
 1. **Transform/coerce hook?**
    `{ type = "string", transform = string.lower }` to normalize values?
 
 2. **LuaLS type annotations?**
-   Reference: https://github.com/pterror/lua/blob/master/lib/type.lua
-
-   Trick: annotate `T.string` as `--[[@type string]]` even though it's a table,
-   with `--[[@diagnostic disable-next-line: assign-type-mismatch]]` to suppress errors.
-
-   ```lua
-   --[[@type string]]
-   --[[@diagnostic disable-next-line: assign-type-mismatch]]
-   T.string = { type = "string" }
-
-   --[[@generic t]]
-   --[[@return t?]]
-   --[[@param t t]]
-   T.optional = function(t) return { type = "optional", inner = t } end
-   ```
-
-   Tradeoffs:
-   - Pro: IDE autocomplete, type checking on validated results
-   - Con: Hacky diagnostic suppression, LuaLS can't do mapped types like TS
-   - Con: Annotations are lies (the value IS a table, not the type it claims)
-
-   Decision: TBD. Could start without annotations, add later if valuable.
+   TBD. Could add later if valuable for IDE support.
