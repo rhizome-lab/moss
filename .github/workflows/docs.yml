@@ -6,7 +6,6 @@ on:
       - master
     paths:
       - 'docs/**'
-      - 'package.json'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -36,10 +35,12 @@ jobs:
           version: 10
 
       - name: Install dependencies
+        working-directory: docs
         run: pnpm install --frozen-lockfile
 
       - name: Build documentation
-        run: pnpm docs:build
+        working-directory: docs
+        run: pnpm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
