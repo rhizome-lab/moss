@@ -232,10 +232,33 @@ local function set_key(key, value)
     print(key .. " = " .. format_value(value))
 end
 
+-- Help text
+local function print_help()
+    print([[moss @config - Config file viewer/editor
+
+Usage: moss @config [command] [args...]
+
+Commands:
+  (none)        View full config (default)
+  get <key>     Get a specific key (e.g., daemon.port)
+  set <key> <v> Set key to value
+
+Examples:
+  moss @config                      # view full config
+  moss @config get daemon.port      # get specific key
+  moss @config set daemon.port 8080 # set daemon port to 8080
+  moss @config set view.tests true  # enable test display
+
+Config is stored at: .moss/config.toml]])
+end
+
 -- Main
 local action = args[1]
 
-if not action or action == "view" then
+if action == "--help" or action == "-h" or action == "help" then
+    print_help()
+    os.exit(0)
+elseif not action or action == "view" then
     -- View full config
     if file_exists(CONFIG_PATH) then
         local result = view("@config")
@@ -284,6 +307,6 @@ elseif action == "set" then
 
 else
     print("Unknown action: " .. action)
-    print("Usage: moss @config [get|set] [key] [value]")
+    print("Run 'moss @config --help' for usage")
     os.exit(1)
 end
