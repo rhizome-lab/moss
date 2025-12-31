@@ -4,13 +4,6 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Schema introspection: `type.describe(schema)` for human-readable descriptions
-  - Support `description` field on schemas for custom docs
-  - Useful for error messages, help text, debugging
-- Lua test framework: `test` module with busted-style assertions
-  - `test.property` sub-module for property-based testing (uses `type.generate`)
-  - Test discovery for `.moss/tests/`
-
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
   - Consider: namespace-qualified lookups (`moss view std::vector`, `moss view com.example.Foo`)
@@ -98,10 +91,9 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 - TOML workflow format: structured definition (steps, actions) - **deferred until use cases are clearer**
   - Builtin `workflow` runner script interprets TOML files
   - Users can also write pure Lua scripts directly
-- Lua test framework for user scripts: busted-style assertions, property-based testing (QuickCheck-style), test discovery for `.moss/tests/`
-  - Note: builtin modules (cli, type, validate) already have Rust integration tests in `lua_runtime/test_*.rs`
-- Type system uses beyond validation: serialization, schema introspection
-  - Note: `T.describe(schema)` for introspection, `type.generate` for property testing
+- Lua test framework: test discovery for `.moss/tests/` (test + test.property modules done)
+- Type system uses beyond validation: serialization
+  - Done: `T.describe(schema)` for introspection, `type.generate` for property testing
   - Future: extract descriptions from comments (LuaDoc-style) instead of `description` field
 
 ### Edit Improvements

@@ -18,9 +18,13 @@ CLI library (`cli.lua`) - full-featured argument parsing:
 - Command aliases: `aliases = {"rm", "delete"}`
 
 Type system modules:
-- `type` - schema definitions (T.string, T.struct, etc.)
+- `type` - schema definitions (T.string, T.struct, etc.) + `T.describe()` for introspection
 - `type.validate` - validation (check values against schemas)
 - `type.generate` - random value generation for property testing
+
+Test framework modules:
+- `test` - busted-style assertions (equals, same, is_true, throws, etc.)
+- `test.property` - property-based testing using type.generate
 
 See `docs/design/lua-cli.md` and `docs/design/lua-type.md`.
 
