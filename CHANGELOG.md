@@ -17,13 +17,12 @@ CLI library (`cli.lua`) - full-featured argument parsing:
 - Global options inheritance: app-level options passed to subcommands
 - Command aliases: `aliases = {"rm", "delete"}`
 
-Validation library (`validate.lua`) - random value generation:
-- `V.generate(schema, opts)` produces random values matching schemas
-- Supports all types: primitives, struct, array, tuple, dictionary, optional, any_of, all_of, literal
-- Options: `seed`, `max_depth`, `max_array_len`
-- Enables property-based testing (generate values, verify they validate)
+Type system modules:
+- `type` - schema definitions (T.string, T.struct, etc.)
+- `type.validate` - validation (check values against schemas)
+- `type.generate` - random value generation for property testing
 
-See `docs/design/lua-cli.md` and `docs/design/lua-validate.md`.
+See `docs/design/lua-cli.md` and `docs/design/lua-type.md`.
 
 ### Bug Fixes
 

@@ -9,7 +9,7 @@ fn primitives() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local V = require("type.validate")
 
         local r, e = V.check("hello", T.string)
         assert(r == "hello" and e == nil, "string check")
@@ -36,7 +36,7 @@ fn coercion() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local V = require("type.validate")
 
         -- String to number
         local r, e = V.check("123", T.number)
@@ -75,7 +75,7 @@ fn string_constraints() {
     let runtime = LuaRuntime::new(Path::new(".")).unwrap();
     let result = runtime.run_string(
         r#"
-        local V = require("validate")
+        local V = require("type.validate")
 
         -- min_len
         local r, e = V.check("ab", { type = "string", min_len = 3 })
@@ -114,7 +114,7 @@ fn number_constraints() {
     let runtime = LuaRuntime::new(Path::new(".")).unwrap();
     let result = runtime.run_string(
         r#"
-        local V = require("validate")
+        local V = require("type.validate")
 
         -- min/max
         local r, e = V.check(50, { type = "number", min = 0, max = 100 })
@@ -153,7 +153,7 @@ fn defaults_and_required() {
     let runtime = LuaRuntime::new(Path::new(".")).unwrap();
     let result = runtime.run_string(
         r#"
-        local V = require("validate")
+        local V = require("type.validate")
 
         -- Default value
         local r, e = V.check(nil, { type = "string", default = "default" })
@@ -182,7 +182,7 @@ fn struct_type() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local V = require("type.validate")
 
         local schema = T.struct({
             name = { type = "string", required = true },
@@ -213,7 +213,7 @@ fn array_type() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local V = require("type.validate")
 
         local schema = T.array(T.number)
 
@@ -242,7 +242,7 @@ fn tuple_type() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local V = require("type.validate")
 
         local schema = T.tuple({ T.string, T.number, T.boolean })
 
@@ -262,7 +262,7 @@ fn dictionary_type() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local V = require("type.validate")
 
         local schema = T.dictionary(T.string, T.number)
 
@@ -281,7 +281,7 @@ fn optional_type() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local V = require("type.validate")
 
         local schema = T.optional(T.string)
 
@@ -301,7 +301,7 @@ fn any_of_type() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local V = require("type.validate")
 
         local schema = T.any_of(T.string, T.number)
 
@@ -324,7 +324,7 @@ fn all_of_type() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local V = require("type.validate")
 
         local schema = T.all_of(
             { type = "string" },
@@ -351,7 +351,7 @@ fn literal_type() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local V = require("type.validate")
 
         local schema = T.literal("production")
 
@@ -371,7 +371,7 @@ fn error_paths() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local V = require("type.validate")
 
         -- Nested struct error path
         local schema = T.struct({
@@ -398,7 +398,7 @@ fn custom_check_function() {
     let runtime = LuaRuntime::new(Path::new(".")).unwrap();
     let result = runtime.run_string(
         r#"
-        local V = require("validate")
+        local V = require("type.validate")
 
         local schema = {
             type = "string",
@@ -427,7 +427,7 @@ fn type_reexport() {
     let runtime = LuaRuntime::new(Path::new(".")).unwrap();
     let result = runtime.run_string(
         r#"
-        local V = require("validate")
+        local V = require("type.validate")
 
         -- V.type should re-export the type module
         assert(V.type ~= nil, "V.type should exist")
@@ -450,20 +450,20 @@ fn generate_primitives() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local generate = require("type.generate")
 
         math.randomseed(42)
 
-        local s = V.generate(T.string)
+        local s = generate(T.string)
         assert(type(s) == "string", "generated string should be string")
 
-        local n = V.generate(T.number)
+        local n = generate(T.number)
         assert(type(n) == "number", "generated number should be number")
 
-        local i = V.generate(T.integer)
+        local i = generate(T.integer)
         assert(type(i) == "number" and i % 1 == 0, "generated integer should be whole")
 
-        local b = V.generate(T.boolean)
+        local b = generate(T.boolean)
         assert(type(b) == "boolean", "generated boolean should be boolean")
         "#,
     );
@@ -475,24 +475,24 @@ fn generate_with_constraints() {
     let runtime = LuaRuntime::new(Path::new(".")).unwrap();
     let result = runtime.run_string(
         r#"
-        local V = require("validate")
+        local generate = require("type.generate")
         math.randomseed(42)
 
         -- String with length constraints
         for i = 1, 10 do
-            local s = V.generate({ type = "string", min_len = 5, max_len = 10 })
+            local s = generate({ type = "string", min_len = 5, max_len = 10 })
             assert(#s >= 5 and #s <= 10, "string length should be 5-10")
         end
 
         -- Number with range
         for i = 1, 10 do
-            local n = V.generate({ type = "number", min = 0, max = 100 })
+            local n = generate({ type = "number", min = 0, max = 100 })
             assert(n >= 0 and n <= 100, "number should be 0-100")
         end
 
         -- one_of constraint
         for i = 1, 10 do
-            local s = V.generate({ type = "string", one_of = { "red", "green", "blue" } })
+            local s = generate({ type = "string", one_of = { "red", "green", "blue" } })
             assert(s == "red" or s == "green" or s == "blue", "should be one of choices")
         end
         "#,
@@ -506,26 +506,26 @@ fn generate_composite_types() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local generate = require("type.generate")
         math.randomseed(42)
 
         -- Struct (use required fields for deterministic test)
-        local s = V.generate(T.struct({
+        local s = generate(T.struct({
             name = { type = "string", required = true },
             age = { type = "integer", required = true }
         }))
         assert(type(s) == "table" and type(s.name) == "string", "struct generation")
 
         -- Array
-        local a = V.generate(T.array(T.number), { max_array_len = 5 })
+        local a = generate(T.array(T.number), { max_array_len = 5 })
         assert(type(a) == "table", "array generation")
 
         -- Tuple
-        local t = V.generate(T.tuple({ T.string, T.number }))
+        local t = generate(T.tuple({ T.string, T.number }))
         assert(type(t[1]) == "string" and type(t[2]) == "number", "tuple generation")
 
         -- Literal
-        assert(V.generate(T.literal("fixed")) == "fixed", "literal generation")
+        assert(generate(T.literal("fixed")) == "fixed", "literal generation")
         "#,
     );
     assert!(result.is_ok(), "generate composite failed: {:?}", result);
@@ -537,7 +537,8 @@ fn generate_validates() {
     let result = runtime.run_string(
         r#"
         local T = require("type")
-        local V = require("validate")
+        local validate = require("type.validate")
+        local generate = require("type.generate")
         math.randomseed(42)
 
         local schema = T.struct({
@@ -547,8 +548,8 @@ fn generate_validates() {
         })
 
         for i = 1, 5 do
-            local generated = V.generate(schema, { max_array_len = 3 })
-            local _, err = V.check(generated, schema)
+            local generated = generate(schema, { max_array_len = 3 })
+            local _, err = validate.check(generated, schema)
             assert(err == nil, "generated value should validate: " .. tostring(err))
         end
         "#,

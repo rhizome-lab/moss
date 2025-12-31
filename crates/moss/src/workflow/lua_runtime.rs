@@ -814,13 +814,13 @@ impl LuaRuntime {
         let preload: Table = package.get("preload")?;
 
         // Register each builtin module
-        for name in &["cli", "type", "validate"] {
+        for name in &["cli", "type", "type.validate", "type.generate"] {
             if let Some(src) = modules::get(name) {
                 let src = src.to_string();
                 let name = *name;
                 preload.set(
                     name,
-                    lua.create_function(move |lua, ()| lua.load(&src).eval::<Table>())?,
+                    lua.create_function(move |lua, ()| lua.load(&src).eval::<Value>())?,
                 )?;
             }
         }

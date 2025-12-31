@@ -35,14 +35,16 @@ pub mod builtins {
 pub mod modules {
     pub const CLI: &str = include_str!("scripts/cli.lua");
     pub const TYPE: &str = include_str!("scripts/type.lua");
-    pub const VALIDATE: &str = include_str!("scripts/validate.lua");
+    pub const TYPE_VALIDATE: &str = include_str!("scripts/type/validate.lua");
+    pub const TYPE_GENERATE: &str = include_str!("scripts/type/generate.lua");
 
     /// Get builtin module by name.
     pub fn get(name: &str) -> Option<&'static str> {
         match name {
             "cli" => Some(CLI),
             "type" => Some(TYPE),
-            "validate" => Some(VALIDATE),
+            "type.validate" => Some(TYPE_VALIDATE),
+            "type.generate" => Some(TYPE_GENERATE),
             _ => None,
         }
     }

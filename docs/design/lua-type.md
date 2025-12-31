@@ -1,6 +1,14 @@
-# Lua Validation Library Design
+# Lua Type System Design
 
-Declarative validation using plain data structures.
+Declarative type schemas with validation and generation.
+
+## Module Structure
+
+```
+type              -- Schema definitions (T.string, T.struct, etc.)
+type.validate     -- Validation (check values against schemas)
+type.generate     -- Generation (random values from schemas)
+```
 
 ## Goals
 
@@ -10,20 +18,19 @@ Declarative validation using plain data structures.
 4. Type coercion where sensible
 5. Works with CLI library's parsed args
 
-## API Sketch
-
-### Basic Usage
+## Basic Usage
 
 ```lua
-local T = require("validate")
+local T = require("type")
+local validate = require("type.validate")
 
-local schema = {
+local schema = T.struct({
     name = T.string,
     count = { type = "number", min = 1, max = 100, default = 10 },
     verbose = { type = "boolean", default = false },
-}
+})
 
-local result, err = T.check(args, schema)
+local result, err = validate.check(args, schema)
 if err then
     print("Error: " .. err)
     os.exit(1)
@@ -233,39 +240,34 @@ cli.run {
 2. **Shorthand constructors are plain functions.** `T.array(item)` just returns
    `{ type = "array", item = item }`. No magic, no metatables.
 
-## Random Value Generation
+## Random Value Generation (`type.generate`)
 
-The `generate(schema, opts)` function produces random values that match a schema.
+The `generate` function produces random values matching a schema.
 Useful for property-based testing, fuzzing, and mock data generation.
 
-### Basic Usage
-
 ```lua
-local V = require("validate")
-local T = V.type  -- or require("type")
+local T = require("type")
+local generate = require("type.generate")
 
 -- Generate a random string
-local s = V.generate(T.string)  -- e.g., "kJ7xQm2"
+local s = generate(T.string)  -- e.g., "kJ7xQm2"
 
 -- Generate with constraints
-local n = V.generate({ type = "integer", min = 1, max = 10 })  -- e.g., 7
+local n = generate({ type = "integer", min = 1, max = 10 })  -- e.g., 7
 
 -- Generate complex structures
-local user = V.generate({
-    type = "struct",
-    shape = {
-        name = T.string,
-        age = { type = "integer", min = 0, max = 120 },
-        active = T.boolean,
-    },
-})
+local user = generate(T.struct({
+    name = T.string,
+    age = { type = "integer", min = 0, max = 120 },
+    active = T.boolean,
+}))
 -- e.g., { name = "abc", age = 45, active = true }
 ```
 
 ### Options
 
 ```lua
-V.generate(schema, {
+generate(schema, {
     seed = 12345,        -- for reproducible output
     max_depth = 5,       -- limit nesting (default: 5)
     max_array_len = 10,  -- limit array size (default: 10)
@@ -273,8 +275,6 @@ V.generate(schema, {
 ```
 
 ### Supported Types
-
-All schema types support generation:
 
 | Type | Behavior |
 |------|----------|
@@ -296,21 +296,19 @@ All schema types support generation:
 ### Property Testing Pattern
 
 ```lua
-local V = require("validate")
-local T = V.type
+local T = require("type")
+local validate = require("type.validate")
+local generate = require("type.generate")
 
-local user_schema = {
-    type = "struct",
-    shape = {
-        name = { type = "string", min_len = 1, required = true },
-        age = { type = "integer", min = 0, max = 150 },
-    },
-}
+local user_schema = T.struct({
+    name = { type = "string", min_len = 1, required = true },
+    age = { type = "integer", min = 0, max = 150 },
+})
 
 -- Generate many random values and verify they validate
 for i = 1, 100 do
-    local user = V.generate(user_schema, { seed = i })
-    local result, err = V.check(user, user_schema)
+    local user = generate(user_schema, { seed = i })
+    local result, err = validate.check(user, user_schema)
     assert(err == nil, "generated value should validate: " .. tostring(err))
 end
 ```
