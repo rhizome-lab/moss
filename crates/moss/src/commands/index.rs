@@ -17,7 +17,11 @@ pub enum IndexAction {
     },
 
     /// Show index statistics (DB size vs codebase size)
-    Stats,
+    Stats {
+        /// Show storage usage for index and caches
+        #[arg(long)]
+        storage: bool,
+    },
 
     /// List indexed files (with optional prefix filter)
     Files {
@@ -45,7 +49,7 @@ pub enum IndexAction {
 pub fn cmd_index(action: IndexAction, root: Option<&Path>, json: bool) -> i32 {
     match action {
         IndexAction::Rebuild { call_graph } => cmd_rebuild(root, call_graph),
-        IndexAction::Stats => cmd_stats(root, json),
+        IndexAction::Stats { storage } => cmd_stats(root, json, storage),
         IndexAction::Files { prefix, limit } => {
             cmd_list_files(prefix.as_deref(), root, limit, json)
         }
@@ -115,10 +119,15 @@ fn is_binary_file(path: &Path) -> bool {
     buffer[..bytes_read].contains(&0)
 }
 
-fn cmd_stats(root: Option<&Path>, json: bool) -> i32 {
+fn cmd_stats(root: Option<&Path>, json: bool, storage: bool) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    // If --storage, just show storage usage
+    if storage {
+        return cmd_storage(&root, json);
+    }
 
     let moss_dir = get_moss_dir(&root);
     let db_path = moss_dir.join("index.sqlite");
@@ -493,4 +502,124 @@ fn index_package_symbols(
     }
 
     0
+}
+
+// =============================================================================
+// Storage
+// =============================================================================
+
+/// Show storage usage for index and caches
+fn cmd_storage(root: &Path, json: bool) -> i32 {
+    // Project index: .moss/index.sqlite
+    let index_path = root.join(".moss").join("index.sqlite");
+    let index_size = std::fs::metadata(&index_path).map(|m| m.len()).unwrap_or(0);
+
+    // Package cache: ~/.cache/moss/packages/
+    let cache_dir = get_cache_dir().map(|d| d.join("packages"));
+    let cache_size = cache_dir.as_ref().map(|d| dir_size(d)).unwrap_or(0);
+
+    // Global cache: ~/.cache/moss/ (total)
+    let global_cache_dir = get_cache_dir();
+    let global_size = global_cache_dir.as_ref().map(|d| dir_size(d)).unwrap_or(0);
+
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({
+                "index": {
+                    "path": index_path.display().to_string(),
+                    "bytes": index_size,
+                    "human": format_size(index_size),
+                },
+                "package_cache": {
+                    "path": cache_dir.as_ref().map(|d| d.display().to_string()),
+                    "bytes": cache_size,
+                    "human": format_size(cache_size),
+                },
+                "global_cache": {
+                    "path": global_cache_dir.as_ref().map(|d| d.display().to_string()),
+                    "bytes": global_size,
+                    "human": format_size(global_size),
+                },
+                "total_bytes": index_size + global_size,
+                "total_human": format_size(index_size + global_size),
+            })
+        );
+    } else {
+        println!("Storage Usage");
+        println!();
+        println!(
+            "Project index:   {:>10}  {}",
+            format_size(index_size),
+            index_path.display()
+        );
+        if let Some(ref cache) = cache_dir {
+            println!(
+                "Package cache:   {:>10}  {}",
+                format_size(cache_size),
+                cache.display()
+            );
+        }
+        if let Some(ref global) = global_cache_dir {
+            println!(
+                "Global cache:    {:>10}  {}",
+                format_size(global_size),
+                global.display()
+            );
+        }
+        println!();
+        println!(
+            "Total:           {:>10}",
+            format_size(index_size + global_size)
+        );
+    }
+
+    0
+}
+
+fn get_cache_dir() -> Option<PathBuf> {
+    if let Ok(cache) = std::env::var("XDG_CACHE_HOME") {
+        Some(PathBuf::from(cache).join("moss"))
+    } else if let Ok(home) = std::env::var("HOME") {
+        Some(PathBuf::from(home).join(".cache").join("moss"))
+    } else if let Ok(home) = std::env::var("USERPROFILE") {
+        Some(PathBuf::from(home).join(".cache").join("moss"))
+    } else {
+        None
+    }
+}
+
+fn dir_size(path: &Path) -> u64 {
+    if !path.exists() {
+        return 0;
+    }
+
+    let mut total = 0;
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                total += std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+            } else if path.is_dir() {
+                total += dir_size(&path);
+            }
+        }
+    }
+    total
+}
+
+fn format_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if bytes >= GB {
+        format!("{:.1} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
 }
