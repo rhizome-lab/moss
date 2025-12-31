@@ -91,7 +91,7 @@ Status: Implemented. `cargo xtask build-grammars` compiles 98 grammars to .so fi
 - TOML workflow format: structured definition (steps, actions)
   - Builtin `workflow` runner script interprets TOML files
   - Users can also write pure Lua scripts directly
-- Lua test framework: busted-style assertions, test discovery for `.moss/tests/`
+- Lua test framework: busted-style assertions, property-based testing (QuickCheck-style), test discovery for `.moss/tests/`
 - Type system uses beyond validation: fuzzing/property testing, serialization, mock generation
 - Lua CLI library open questions:
   - Global options inheritance (--verbose on app → subcommands?)

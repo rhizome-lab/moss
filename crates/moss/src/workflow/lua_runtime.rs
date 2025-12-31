@@ -1519,3 +1519,13 @@ mod tests {
         assert!(result.is_ok(), "array query failed: {:?}", result);
     }
 }
+
+#[cfg(test)]
+#[path = "lua_runtime/test_cli_module.rs"]
+mod test_cli_module;
+#[cfg(test)]
+#[path = "lua_runtime/test_type_module.rs"]
+mod test_type_module;
+#[cfg(test)]
+#[path = "lua_runtime/test_validate_module.rs"]
+mod test_validate_module;

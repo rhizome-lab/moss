@@ -16,10 +16,11 @@ end
 
 -- Check if an option is a flag (boolean, no value)
 local function is_flag(opt)
+    if opt.flag then return true end
     if opt.type == "boolean" then return true end
     if opt.type and opt.type ~= "boolean" then return false end
     if opt.default ~= nil and type(opt.default) ~= "boolean" then return false end
-    return true  -- default: flags
+    return false  -- default: options take values
 end
 
 -- Find option spec by long name
@@ -46,7 +47,16 @@ local function parse_args(argv, spec)
     local arg_specs = spec.args or {}
     local options = spec.options or {}
 
+    -- Apply defaults from options
+    for _, opt in ipairs(options) do
+        if opt.default ~= nil then
+            local key = opt.name:gsub("-", "_")
+            result[key] = opt.default
+        end
+    end
+
     local positional_idx = 1
+    local remaining_positional = {}
     local i = 1
 
     while i <= #argv do
@@ -102,9 +112,17 @@ local function parse_args(argv, spec)
                     result[name] = arg
                     positional_idx = positional_idx + 1
                 end
+            else
+                -- Extra positional args go into numeric indices
+                table.insert(remaining_positional, arg)
             end
         end
         i = i + 1
+    end
+
+    -- Add remaining positional args to result
+    for idx, val in ipairs(remaining_positional) do
+        result[idx] = val
     end
 
     return result
@@ -254,14 +272,8 @@ function M.run(config)
         end
 
         local cmd = find_command(commands, cmd_name)
-        if not cmd then
-            -- Try default command with full argv
-            cmd = find_default_command(commands)
-            cmd_argv = argv
-        end
-
         if cmd then
-            -- Check for command-level help
+            -- Found matching command
             if has_help_flag(cmd_argv) then
                 print_command_help(name, cmd)
                 return
@@ -271,8 +283,29 @@ function M.run(config)
             if cmd.run then
                 cmd.run(parsed)
             end
+        elseif cmd_name == nil or cmd_name == "" then
+            -- No command given
+            if config.run then
+                -- Top-level run handler
+                local parsed = parse_args(argv, config)
+                config.run(parsed)
+            else
+                -- Try default command
+                cmd = find_default_command(commands)
+                if cmd then
+                    local parsed = parse_args(argv, cmd)
+                    if cmd.run then
+                        cmd.run(parsed)
+                    end
+                else
+                    print_help(config, commands)
+                end
+            end
         else
+            -- Unknown command
+            io.stderr:write("Unknown command: " .. tostring(cmd_name) .. "\n")
             print_help(config, commands)
+            os.exit(1)
         end
     elseif config.run then
         -- Simple script
