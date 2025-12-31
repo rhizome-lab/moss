@@ -306,7 +306,7 @@ elseif action == "set" then
     set_key(key, value)
 
 else
-    print("Unknown action: " .. action)
-    print("Run 'moss @config --help' for usage")
+    print("Unknown action: " .. action .. "\n")
+    print_help()
     os.exit(1)
 end

@@ -374,7 +374,7 @@ elseif action == "clean" then
     print("Removed " .. #to_remove .. " completed item(s)")
 
 else
-    print("Unknown action: " .. action)
-    print("Usage: moss @todo [list|add|done|rm|clean] [args...]")
+    print("Unknown action: " .. action .. "\n")
+    print_help()
     os.exit(1)
 end
