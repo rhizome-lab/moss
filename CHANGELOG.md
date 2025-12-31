@@ -14,7 +14,7 @@ See `docs/` for design docs and `README.md` for usage.
   - Trait impl methods don't need docs - the trait defines the contract
   - Detects: Rust `impl Trait for`, Java `@Override`, Kotlin/C#/Swift `override` keyword
   - TypeScript/JS: semantic detection traces `implements`/`extends` clauses to match methods
-  - Cross-file resolution: `InterfaceResolver` trait with `IndexedResolver` (queries type_methods table in index)
+  - Cross-file resolution: `InterfaceResolver` trait with `IndexedResolver` (fast, uses index) or `OnDemandResolver` (fallback, parses files)
 - Consolidated analysis pass scoring into `report.rs`: `ComplexityReport::score()`, `SecurityReport::score()`, `calculate_grade()`
 - `--trace` now supports unified path format (`file.rs/symbol` like view command)
 - `--trace` enhanced with value provenance tracking:

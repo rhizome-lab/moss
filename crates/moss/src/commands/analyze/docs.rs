@@ -117,27 +117,30 @@ pub fn cmd_docs(root: &Path, top: usize, json: bool) -> i32 {
 
 /// Analyze documentation coverage
 pub fn analyze_docs(root: &Path, top: usize, exclude_interface_impls: bool) -> DocCoverageReport {
-    use crate::extract::IndexedResolver;
+    use crate::extract::{IndexedResolver, InterfaceResolver, OnDemandResolver};
     use crate::index::FileIndex;
     use crate::path_resolve;
 
     let all_files = path_resolve::all_files(root);
     let files: Vec<_> = all_files.iter().filter(|f| f.kind == "file").collect();
 
-    // Try to load index for cross-file resolution
+    // Try to load index for cross-file resolution, fall back to on-demand parsing
     let index = FileIndex::open(root).ok();
-    let resolver = index.as_ref().map(IndexedResolver::new);
+    let resolver: Box<dyn InterfaceResolver> = match &index {
+        Some(idx) => Box::new(IndexedResolver::new(idx)),
+        None => Box::new(OnDemandResolver::new(root)),
+    };
 
     let mut by_language: HashMap<String, (usize, usize)> = HashMap::new();
     let mut file_coverages: Vec<FileDocCoverage> = Vec::new();
 
-    // Process files sequentially (SQLite isn't thread-safe)
+    // Process files sequentially
     for file in &files {
         process_file(
             file,
             root,
             exclude_interface_impls,
-            resolver.as_ref(),
+            &*resolver,
             &mut by_language,
             &mut file_coverages,
         );
@@ -174,7 +177,7 @@ fn process_file(
     file: &crate::path_resolve::PathMatch,
     root: &Path,
     exclude_interface_impls: bool,
-    resolver: Option<&crate::extract::IndexedResolver>,
+    resolver: &dyn crate::extract::InterfaceResolver,
     by_language: &mut HashMap<String, (usize, usize)>,
     file_coverages: &mut Vec<FileDocCoverage>,
 ) {
@@ -195,11 +198,7 @@ fn process_file(
     };
 
     let skeleton_extractor = SkeletonExtractor::new();
-    let skeleton = skeleton_extractor.extract_with_resolver(
-        &path,
-        &content,
-        resolver.map(|r| r as &dyn crate::extract::InterfaceResolver),
-    );
+    let skeleton = skeleton_extractor.extract_with_resolver(&path, &content, Some(resolver));
 
     let mut documented = 0;
     let mut total = 0;
