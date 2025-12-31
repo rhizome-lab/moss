@@ -661,6 +661,9 @@ fn capture_name_to_highlight_kind(name: &str) -> Option<HighlightKind> {
         // Also treat constructors and some operators as keywords
         "constructor" | "operator" => Some(HighlightKind::Keyword),
 
+        // Control flow (if/else, for/while, try/catch) - highlight as keywords
+        "conditional" | "repeat" | "exception" => Some(HighlightKind::Keyword),
+
         // Punctuation - subtle highlighting (grey like comments)
         "punctuation" => Some(HighlightKind::Comment),
 
@@ -669,10 +672,9 @@ fn capture_name_to_highlight_kind(name: &str) -> Option<HighlightKind> {
 
         // Properties/fields - show as default (not highlighted)
         "property" | "field" | "variable" | "parameter" | "label" | "namespace" | "module"
-        | "include" | "conditional" | "repeat" | "exception" | "define" | "preproc"
-        | "storageclass" | "structure" | "text" | "title" | "uri" | "underline" | "todo"
-        | "note" | "warning" | "danger" | "embedded" | "error" | "conceal" | "spell" | "diff"
-        | "debug" | "symbol" | "identifier" | "markup" => None,
+        | "include" | "define" | "preproc" | "storageclass" | "structure" | "text" | "title"
+        | "uri" | "underline" | "todo" | "note" | "warning" | "danger" | "embedded" | "error"
+        | "conceal" | "spell" | "diff" | "debug" | "symbol" | "identifier" | "markup" => None,
 
         _ => None,
     }
