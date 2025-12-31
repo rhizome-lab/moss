@@ -75,6 +75,13 @@ pub enum AnalyzeCommand {
         target: Option<String>,
     },
 
+    /// Analyze documentation coverage
+    Docs {
+        /// Number of worst-covered files to show
+        #[arg(short = 'n', long, default_value = "10")]
+        top: usize,
+    },
+
     /// Trace value provenance for a symbol
     Trace {
         /// Symbol to trace (format: symbol or file:line or file/symbol)

@@ -5,6 +5,7 @@ mod call_graph;
 mod check_examples;
 mod check_refs;
 pub mod complexity;
+mod docs;
 mod duplicates;
 mod health;
 mod hotspots;
@@ -193,6 +194,8 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             );
             print_report(&report, json, pretty)
         }
+
+        Some(AnalyzeCommand::Docs { top }) => docs::cmd_docs(&effective_root, top, json),
 
         Some(AnalyzeCommand::Trace {
             symbol,

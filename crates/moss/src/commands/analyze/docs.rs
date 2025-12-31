@@ -1,0 +1,221 @@
+//! Documentation coverage analysis
+
+use crate::overview::FileDocCoverage;
+use std::collections::HashMap;
+use std::path::Path;
+
+/// Documentation coverage report
+pub struct DocCoverageReport {
+    pub total_callables: usize,
+    pub documented: usize,
+    pub coverage_percent: f64,
+    pub by_language: HashMap<String, (usize, usize)>, // (documented, total)
+    pub worst_files: Vec<FileDocCoverage>,
+}
+
+impl DocCoverageReport {
+    pub fn format(&self) -> String {
+        let mut lines = Vec::new();
+
+        lines.push("# Documentation Coverage".to_string());
+        lines.push(String::new());
+
+        // Overall stats
+        lines.push(format!(
+            "Overall: {:.0}% ({} of {} documented)",
+            self.coverage_percent, self.documented, self.total_callables
+        ));
+        lines.push(String::new());
+
+        // Per-language breakdown
+        if !self.by_language.is_empty() {
+            lines.push("## By Language".to_string());
+            let mut langs: Vec<_> = self.by_language.iter().collect();
+            langs.sort_by(|a, b| {
+                let pct_a = if a.1 .1 > 0 {
+                    a.1 .0 as f64 / a.1 .1 as f64
+                } else {
+                    1.0
+                };
+                let pct_b = if b.1 .1 > 0 {
+                    b.1 .0 as f64 / b.1 .1 as f64
+                } else {
+                    1.0
+                };
+                pct_a.partial_cmp(&pct_b).unwrap()
+            });
+            for (lang, (documented, total)) in langs {
+                if *total > 0 {
+                    let pct = 100.0 * *documented as f64 / *total as f64;
+                    lines.push(format!(
+                        "  {:>3.0}% ({:>3}/{:>4}) {}",
+                        pct, documented, total, lang
+                    ));
+                }
+            }
+            lines.push(String::new());
+        }
+
+        // Worst files
+        if !self.worst_files.is_empty() {
+            lines.push("## Worst Coverage".to_string());
+            for fc in &self.worst_files {
+                lines.push(format!(
+                    "  {:>3.0}% ({:>3}/{:>4}) {}",
+                    fc.coverage_percent(),
+                    fc.documented,
+                    fc.total,
+                    fc.file_path
+                ));
+            }
+        }
+
+        lines.join("\n")
+    }
+
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "total_callables": self.total_callables,
+            "documented": self.documented,
+            "coverage_percent": (self.coverage_percent * 10.0).round() / 10.0,
+            "by_language": self.by_language.iter().map(|(lang, (doc, total))| {
+                (lang.clone(), serde_json::json!({
+                    "documented": doc,
+                    "total": total,
+                    "percent": if *total > 0 { (1000.0 * *doc as f64 / *total as f64).round() / 10.0 } else { 0.0 }
+                }))
+            }).collect::<serde_json::Map<String, serde_json::Value>>(),
+            "worst_files": self.worst_files.iter().map(|fc| {
+                serde_json::json!({
+                    "file": fc.file_path,
+                    "documented": fc.documented,
+                    "total": fc.total,
+                    "percent": (fc.coverage_percent() * 10.0).round() / 10.0
+                })
+            }).collect::<Vec<_>>()
+        })
+    }
+}
+
+/// Run documentation coverage analysis
+pub fn cmd_docs(root: &Path, top: usize, json: bool) -> i32 {
+    let report = analyze_docs(root, top);
+
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report.to_json()).unwrap()
+        );
+    } else {
+        println!("{}", report.format());
+    }
+
+    0
+}
+
+/// Analyze documentation coverage
+pub fn analyze_docs(root: &Path, top: usize) -> DocCoverageReport {
+    use crate::path_resolve;
+    use crate::skeleton::SkeletonExtractor;
+    use moss_languages::SymbolKind;
+    use rayon::prelude::*;
+    use std::sync::Mutex;
+
+    let all_files = path_resolve::all_files(root);
+    let files: Vec<_> = all_files.iter().filter(|f| f.kind == "file").collect();
+
+    let by_language: Mutex<HashMap<String, (usize, usize)>> = Mutex::new(HashMap::new());
+    let file_coverages: Mutex<Vec<FileDocCoverage>> = Mutex::new(Vec::new());
+
+    // Process files in parallel
+    files.par_iter().for_each(|file| {
+        let path = root.join(&file.path);
+        let lang = moss_languages::support_for_path(&path);
+
+        if lang.is_none() || !lang.unwrap().has_symbols() {
+            return;
+        }
+
+        let lang = lang.unwrap();
+        let content = match std::fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => return,
+        };
+
+        let skeleton_extractor = SkeletonExtractor::new();
+        let skeleton = skeleton_extractor.extract(&path, &content);
+
+        let mut documented = 0;
+        let mut total = 0;
+
+        fn count_docs(
+            symbols: &[crate::skeleton::SkeletonSymbol],
+            documented: &mut usize,
+            total: &mut usize,
+        ) {
+            for sym in symbols {
+                match sym.kind {
+                    SymbolKind::Function | SymbolKind::Method => {
+                        *total += 1;
+                        if sym.docstring.is_some() {
+                            *documented += 1;
+                        }
+                    }
+                    _ => {}
+                }
+                count_docs(&sym.children, documented, total);
+            }
+        }
+
+        count_docs(&skeleton.symbols, &mut documented, &mut total);
+
+        if total > 0 {
+            // Update language stats
+            {
+                let mut langs = by_language.lock().unwrap();
+                let entry = langs.entry(lang.name().to_string()).or_insert((0, 0));
+                entry.0 += documented;
+                entry.1 += total;
+            }
+
+            // Add file coverage
+            {
+                let mut files = file_coverages.lock().unwrap();
+                files.push(FileDocCoverage {
+                    file_path: file.path.clone(),
+                    documented,
+                    total,
+                });
+            }
+        }
+    });
+
+    let by_language = by_language.into_inner().unwrap();
+    let mut file_coverages = file_coverages.into_inner().unwrap();
+
+    // Sort by Bayesian coverage (worst first)
+    file_coverages.sort_by(|a, b| {
+        a.bayesian_coverage()
+            .partial_cmp(&b.bayesian_coverage())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let worst_files: Vec<FileDocCoverage> = file_coverages.into_iter().take(top).collect();
+
+    // Calculate totals
+    let total_callables: usize = by_language.values().map(|(_, t)| t).sum();
+    let documented: usize = by_language.values().map(|(d, _)| d).sum();
+    let coverage_percent = if total_callables > 0 {
+        100.0 * documented as f64 / total_callables as f64
+    } else {
+        0.0
+    };
+
+    DocCoverageReport {
+        total_callables,
+        documented,
+        coverage_percent,
+        by_language,
+        worst_files,
+    }
+}
