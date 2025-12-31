@@ -87,6 +87,10 @@ pub enum AnalyzeCommand {
         /// Number of files to show
         #[arg(short = 'n', long, default_value = "20")]
         limit: usize,
+
+        /// Patterns to exclude (glob syntax, can be repeated)
+        #[arg(long, value_name = "PATTERN")]
+        allow: Vec<String>,
     },
 
     /// Trace value provenance for a symbol
@@ -126,7 +130,11 @@ pub enum AnalyzeCommand {
     },
 
     /// Show git history hotspots (frequently changed files)
-    Hotspots,
+    Hotspots {
+        /// Patterns to exclude (glob syntax, can be repeated)
+        #[arg(long, value_name = "PATTERN")]
+        allow: Vec<String>,
+    },
 
     /// Check documentation references for broken links
     CheckRefs,

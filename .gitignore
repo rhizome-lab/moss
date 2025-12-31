@@ -67,10 +67,13 @@ cache/
 
 *.cpuprofile
 
-# Moss (ignore all but config/allow files)
-.moss/*
-!.moss/config.toml
-!.moss/duplicate-functions-allow
-!.moss/duplicate-types-allow
-!.moss/hotspots-allow
-!.moss/large-files-allow
+# Moss - ignore .moss/ in subdirectories entirely
+**/.moss/
+
+# Root .moss/ - ignore all but config/allow files
+/.moss/*
+!/.moss/config.toml
+!/.moss/duplicate-functions-allow
+!/.moss/duplicate-types-allow
+!/.moss/hotspots-allow
+!/.moss/large-files-allow

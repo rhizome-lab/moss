@@ -1,6 +1,7 @@
 //! File length analysis - find longest files in codebase
 
 use crate::path_resolve;
+use glob::Pattern;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
@@ -70,8 +71,8 @@ impl FileLengthReport {
 }
 
 /// Run file length analysis
-pub fn cmd_files(root: &Path, limit: usize, json: bool) -> i32 {
-    let report = analyze_files(root, limit);
+pub fn cmd_files(root: &Path, limit: usize, exclude: &[String], json: bool) -> i32 {
+    let report = analyze_files(root, limit, exclude);
 
     if json {
         println!(
@@ -86,13 +87,24 @@ pub fn cmd_files(root: &Path, limit: usize, json: bool) -> i32 {
 }
 
 /// Analyze file lengths
-pub fn analyze_files(root: &Path, limit: usize) -> FileLengthReport {
+pub fn analyze_files(root: &Path, limit: usize, exclude: &[String]) -> FileLengthReport {
     let all_files = path_resolve::all_files(root);
     let files: Vec<_> = all_files.iter().filter(|f| f.kind == "file").collect();
+
+    // Compile exclude patterns
+    let excludes: Vec<Pattern> = exclude
+        .iter()
+        .filter_map(|p| Pattern::new(p).ok())
+        .collect();
 
     let file_lengths: Vec<FileLength> = files
         .par_iter()
         .filter_map(|file| {
+            // Skip excluded files
+            if excludes.iter().any(|pat| pat.matches(&file.path)) {
+                return None;
+            }
+
             let path = root.join(&file.path);
             let lang = moss_languages::support_for_path(&path)?;
 

@@ -227,7 +227,12 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
 
         Some(AnalyzeCommand::Docs { limit }) => docs::cmd_docs(&effective_root, limit, json),
 
-        Some(AnalyzeCommand::Files { limit }) => files::cmd_files(&effective_root, limit, json),
+        Some(AnalyzeCommand::Files { limit, allow }) => {
+            // Combine: allow file + CLI args
+            let mut excludes = load_allow_file(&effective_root, "large-files-allow");
+            excludes.extend(allow);
+            files::cmd_files(&effective_root, limit, &excludes, json)
+        }
 
         Some(AnalyzeCommand::Trace {
             symbol,
@@ -256,10 +261,11 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             lint::cmd_lint_analyze(&effective_root, target.as_deref(), json)
         }
 
-        Some(AnalyzeCommand::Hotspots) => {
-            // Combine config excludes with allow file
+        Some(AnalyzeCommand::Hotspots { allow }) => {
+            // Combine: config excludes + allow file + CLI args
             let mut excludes = config.analyze.hotspots_exclude.clone();
             excludes.extend(load_allow_file(&effective_root, "hotspots-allow"));
+            excludes.extend(allow);
             hotspots::cmd_hotspots(&effective_root, &excludes, json)
         }
 
