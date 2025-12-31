@@ -9,5 +9,5 @@
 clones = true
 # hotspots_exclude = ["*.md", "*.json"]  # example: exclude markdown and JSON
 
-[sigil]
+[aliases]
 todo = ["TODO.md"]

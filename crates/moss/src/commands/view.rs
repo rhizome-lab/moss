@@ -551,7 +551,7 @@ pub fn cmd_view(
         let languages = detect_project_languages(&root);
         let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
 
-        match Filter::new(exclude, only, &config.filter, &lang_refs) {
+        match Filter::new(exclude, only, &config.aliases, &lang_refs) {
             Ok(f) => {
                 // Print warnings for disabled aliases
                 for warning in f.warnings() {
@@ -622,13 +622,17 @@ pub fn cmd_view(
     // Check if query looks like a symbol path (contains / but first segment isn't a real path)
     // e.g., "Tsx/format_import" where "Tsx" is a class name, not a directory
     // But NOT if it ends with a file extension (likely a file path like "analyze/report.rs")
+    // And NOT if it starts with @ (alias/sigil)
     let has_file_extension = target
         .rsplit('/')
         .next()
         .map(|last| last.contains('.'))
         .unwrap_or(false);
-    let is_symbol_query =
-        target.contains('/') && !target.starts_with('/') && !has_file_extension && {
+    let is_symbol_query = !target.starts_with('@')
+        && target.contains('/')
+        && !target.starts_with('/')
+        && !has_file_extension
+        && {
             let first_seg = target.split('/').next().unwrap_or("");
             !root.join(first_seg).exists()
         };

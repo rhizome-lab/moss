@@ -30,7 +30,7 @@ fn cmd_filter_aliases(root: &Path, json: bool) -> i32 {
     let languages = detect_project_languages(root);
     let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
 
-    let aliases = list_aliases(&config.filter, &lang_refs);
+    let aliases = list_aliases(&config.aliases, &lang_refs);
 
     if json {
         let output: Vec<_> = aliases

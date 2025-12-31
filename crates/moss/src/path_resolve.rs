@@ -22,21 +22,33 @@ pub struct SigilExpansion {
     pub suffix: String,
 }
 
-/// Expand a sigil query like `@todo` or `@config/section`.
-/// Returns None if the query doesn't start with @ or the sigil is unknown.
+/// Expand an alias query like `@todo` or `@config/section`.
+/// Returns None if the query doesn't start with @ or the alias is unknown.
 pub fn expand_sigil(query: &str, root: &Path) -> Option<SigilExpansion> {
     if !query.starts_with('@') {
         return None;
     }
 
     let rest = &query[1..]; // Strip @
-    let (sigil_name, suffix) = match rest.find('/') {
-        Some(idx) => (&rest[..idx], &rest[idx + 1..]),
-        None => (rest, ""),
-    };
+
+    // Alias name: alphanumeric, underscore, hyphen
+    let alias_end = rest
+        .find(|c: char| !c.is_alphanumeric() && c != '_' && c != '-')
+        .unwrap_or(rest.len());
+
+    let alias_name = &rest[..alias_end];
+    let after_alias = &rest[alias_end..];
+
+    // Strip the separator to get suffix (supports /, :, ::, #)
+    let suffix = after_alias
+        .strip_prefix("::")
+        .or_else(|| after_alias.strip_prefix('/'))
+        .or_else(|| after_alias.strip_prefix(':'))
+        .or_else(|| after_alias.strip_prefix('#'))
+        .unwrap_or(after_alias);
 
     let config = MossConfig::load(root);
-    let targets = config.sigil.get(sigil_name)?;
+    let targets = config.aliases.get(alias_name)?;
 
     Some(SigilExpansion {
         paths: targets,

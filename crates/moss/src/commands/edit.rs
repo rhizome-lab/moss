@@ -136,7 +136,7 @@ pub fn cmd_edit(
         let languages = detect_project_languages(&root);
         let lang_refs: Vec<&str> = languages.iter().map(|s| s.as_str()).collect();
 
-        let filter = match Filter::new(exclude, only, &config.filter, &lang_refs) {
+        let filter = match Filter::new(exclude, only, &config.aliases, &lang_refs) {
             Ok(f) => {
                 for warning in f.warnings() {
                     eprintln!("warning: {}", warning);

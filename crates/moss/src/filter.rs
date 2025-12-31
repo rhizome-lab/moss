@@ -5,22 +5,11 @@
 //! - Aliases: `--exclude=@tests`, `--only=@docs`
 //!
 //! Built-in aliases are language-aware (e.g., @tests includes `*_test.go` for Go,
-//! `test_*.py` for Python). Config can override or add new aliases.
+//! `test_*.py` for Python). Config can override or add new aliases via `[aliases]`.
 
-use crate::merge::Merge;
+use crate::config::AliasConfig;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
-use serde::Deserialize;
-use std::collections::HashMap;
 use std::path::Path;
-
-/// Filter configuration for --exclude and --only flags.
-#[derive(Debug, Clone, Deserialize, Default, Merge)]
-#[serde(default)]
-pub struct FilterConfig {
-    /// Custom filter aliases. Keys are alias names (without @), values are glob patterns.
-    /// Setting an empty array disables a built-in alias.
-    pub aliases: HashMap<String, Vec<String>>,
-}
 
 /// Built-in filter aliases.
 /// Each alias maps to patterns that vary by detected language.
@@ -199,7 +188,7 @@ impl Filter {
     pub fn new(
         exclude: &[String],
         only: &[String],
-        config: &FilterConfig,
+        config: &AliasConfig,
         languages: &[&str],
     ) -> Result<Self, String> {
         let mut warnings = Vec::new();
@@ -271,7 +260,7 @@ impl Filter {
 /// Resolve patterns, expanding aliases.
 fn resolve_patterns(
     patterns: &[String],
-    config: &FilterConfig,
+    config: &AliasConfig,
     languages: &[&str],
     warnings: &mut Vec<String>,
 ) -> Result<Vec<String>, String> {
@@ -299,9 +288,9 @@ fn resolve_patterns(
 }
 
 /// Resolve a single alias name to patterns.
-fn resolve_alias(name: &str, config: &FilterConfig, languages: &[&str]) -> ResolveResult {
+fn resolve_alias(name: &str, config: &AliasConfig, languages: &[&str]) -> ResolveResult {
     // Check config override first
-    if let Some(patterns) = config.aliases.get(name) {
+    if let Some(patterns) = config.entries.get(name) {
         if patterns.is_empty() {
             return ResolveResult::DisabledAlias(name.to_string());
         }
@@ -352,13 +341,13 @@ fn build_matcher(patterns: &[String]) -> Result<Gitignore, String> {
 }
 
 /// Get all resolved aliases for display (moss filter aliases).
-pub fn list_aliases(config: &FilterConfig, languages: &[&str]) -> Vec<ResolvedAlias> {
+pub fn list_aliases(config: &AliasConfig, languages: &[&str]) -> Vec<ResolvedAlias> {
     let mut aliases = Vec::new();
     let builtin_names = ["tests", "config", "build", "docs", "generated"];
 
     // Process built-in aliases
     for name in builtin_names {
-        if let Some(patterns) = config.aliases.get(name) {
+        if let Some(patterns) = config.entries.get(name) {
             if patterns.is_empty() {
                 aliases.push(ResolvedAlias {
                     name: name.to_string(),
@@ -405,7 +394,7 @@ pub fn list_aliases(config: &FilterConfig, languages: &[&str]) -> Vec<ResolvedAl
     }
 
     // Add custom aliases from config
-    for (name, patterns) in &config.aliases {
+    for (name, patterns) in &config.entries {
         if !builtin_names.contains(&name.as_str()) {
             aliases.push(ResolvedAlias {
                 name: name.clone(),
@@ -441,7 +430,7 @@ mod tests {
 
     #[test]
     fn test_resolve_glob_pattern() {
-        let config = FilterConfig::default();
+        let config = AliasConfig::default();
         let filter =
             Filter::new(&["*.test.js".to_string()], &[], &config, &["javascript"]).unwrap();
 
@@ -452,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_resolve_alias() {
-        let config = FilterConfig::default();
+        let config = AliasConfig::default();
         let filter = Filter::new(&["@tests".to_string()], &[], &config, &["go"]).unwrap();
 
         assert!(filter.is_active());
@@ -462,7 +451,7 @@ mod tests {
 
     #[test]
     fn test_unknown_alias_error() {
-        let config = FilterConfig::default();
+        let config = AliasConfig::default();
         let result = Filter::new(&["@unknown".to_string()], &[], &config, &[]);
 
         assert!(result.is_err());
@@ -471,8 +460,8 @@ mod tests {
 
     #[test]
     fn test_disabled_alias_warning() {
-        let mut config = FilterConfig::default();
-        config.aliases.insert("tests".to_string(), vec![]);
+        let mut config = AliasConfig::default();
+        config.entries.insert("tests".to_string(), vec![]);
 
         let filter = Filter::new(&["@tests".to_string()], &[], &config, &["go"]).unwrap();
 
@@ -483,9 +472,9 @@ mod tests {
 
     #[test]
     fn test_config_override() {
-        let mut config = FilterConfig::default();
+        let mut config = AliasConfig::default();
         config
-            .aliases
+            .entries
             .insert("tests".to_string(), vec!["my_tests/**".to_string()]);
 
         let filter = Filter::new(&["@tests".to_string()], &[], &config, &["go"]).unwrap();
@@ -497,7 +486,7 @@ mod tests {
 
     #[test]
     fn test_only_mode() {
-        let config = FilterConfig::default();
+        let config = AliasConfig::default();
         let filter = Filter::new(&[], &["*.rs".to_string()], &config, &[]).unwrap();
 
         assert!(filter.is_active());
@@ -507,10 +496,10 @@ mod tests {
 
     #[test]
     fn test_list_aliases() {
-        let mut config = FilterConfig::default();
-        config.aliases.insert("tests".to_string(), vec![]); // Disabled
+        let mut config = AliasConfig::default();
+        config.entries.insert("tests".to_string(), vec![]); // Disabled
         config
-            .aliases
+            .entries
             .insert("vendor".to_string(), vec!["vendor/**".to_string()]); // Custom
 
         let aliases = list_aliases(&config, &["rust"]);
