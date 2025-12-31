@@ -13,7 +13,8 @@ First release. See `docs/` for design docs and `README.md` for usage.
 
 ### Type Consolidation
 
-Reduced duplicate type definitions across crates:
+Reduced duplicate type definitions and singletons:
+- `parsers.rs`: Converted Parsers struct to free functions backed by global GrammarLoader singleton
 - `symbols.rs`: Symbol → FlatSymbol, Import → FlatImport, deleted SymbolKind (uses moss_languages::SymbolKind)
 - `deps.rs`: Uses moss_languages::Import/Export directly, removed conversion functions
 - `skeleton.rs`: SkeletonSymbol now type alias to moss_languages::Symbol (SymbolExt trait for to_view_node)
