@@ -227,37 +227,56 @@ pub fn cmd_trace(
                     if seen_funcs.contains(&call.name) {
                         continue;
                     }
-                    if let (Some(start), Some(end)) = (call.defined_at, call.defined_end) {
-                        let returns = trace_returns(&tree.root_node(), source_bytes, start, end);
-                        if !returns.is_empty() {
-                            seen_funcs.insert(call.name.clone());
-                            if pretty {
-                                println!(
-                                    "    {} returns:",
-                                    nu_ansi_term::Color::Magenta.paint(&call.name)
-                                );
-                            } else {
-                                println!("    {} returns:", call.name);
-                            }
-                            for ret in &returns {
-                                let branch_info = ret
-                                    .branch_context
-                                    .as_ref()
-                                    .map(|b| format!(" ({})", b))
-                                    .unwrap_or_default();
-                                if pretty {
-                                    let branch_colored =
-                                        nu_ansi_term::Color::Blue.paint(&branch_info).to_string();
-                                    println!(
-                                        "      L{}: {}{}",
-                                        nu_ansi_term::Color::Yellow.paint(ret.line.to_string()),
-                                        ret.value,
-                                        branch_colored
-                                    );
-                                } else {
-                                    println!("      L{}: {}{}", ret.line, ret.value, branch_info);
-                                }
-                            }
+
+                    // Try same-file first, then cross-file via index
+                    let (returns, ext_file): (Vec<ReturnTrace>, Option<String>) =
+                        if let (Some(start), Some(end)) = (call.defined_at, call.defined_end) {
+                            // Same-file: use current tree
+                            let returns =
+                                trace_returns(&tree.root_node(), source_bytes, start, end);
+                            (returns, None)
+                        } else if let Some(cross) = trace_cross_file_returns(&call.name, root) {
+                            // Cross-file: look up in index
+                            (cross.returns, Some(cross.file))
+                        } else {
+                            continue;
+                        };
+
+                    if returns.is_empty() {
+                        continue;
+                    }
+
+                    seen_funcs.insert(call.name.clone());
+                    let file_suffix = ext_file
+                        .as_ref()
+                        .map(|f| format!(" ({})", f))
+                        .unwrap_or_default();
+                    if pretty {
+                        println!(
+                            "    {} returns:{}",
+                            nu_ansi_term::Color::Magenta.paint(&call.name),
+                            nu_ansi_term::Color::DarkGray.paint(&file_suffix)
+                        );
+                    } else {
+                        println!("    {} returns:{}", call.name, file_suffix);
+                    }
+                    for ret in &returns {
+                        let branch_info = ret
+                            .branch_context
+                            .as_ref()
+                            .map(|b| format!(" ({})", b))
+                            .unwrap_or_default();
+                        if pretty {
+                            let branch_colored =
+                                nu_ansi_term::Color::Blue.paint(&branch_info).to_string();
+                            println!(
+                                "      L{}: {}{}",
+                                nu_ansi_term::Color::Yellow.paint(ret.line.to_string()),
+                                ret.value,
+                                branch_colored
+                            );
+                        } else {
+                            println!("      L{}: {}{}", ret.line, ret.value, branch_info);
                         }
                     }
                 }
@@ -347,6 +366,12 @@ struct ReturnTrace {
     line: usize,
     value: String,
     branch_context: Option<String>,
+}
+
+/// Result of cross-file return tracing.
+struct CrossFileReturns {
+    returns: Vec<ReturnTrace>,
+    file: String,
 }
 
 /// Trace assignments within a function.
@@ -737,4 +762,43 @@ fn trace_returns(
         false,
     );
     returns
+}
+
+/// Look up a function in the index and trace its returns (cross-file).
+fn trace_cross_file_returns(call_name: &str, root: &std::path::Path) -> Option<CrossFileReturns> {
+    // Extract simple function name (last segment of method chain)
+    let simple_name = call_name.split(&['.', ':'][..]).last().unwrap_or(call_name);
+
+    // Look up in index
+    let mut idx = index::FileIndex::open_if_enabled(root)?;
+    let _ = idx.incremental_refresh();
+    let matches = idx
+        .find_symbols(simple_name, Some("function"), false, 5)
+        .ok()?;
+
+    // Find exact match
+    let sym = matches.iter().find(|m| m.name == simple_name)?;
+
+    // Read and parse the file
+    let full_path = root.join(&sym.file);
+    let content = std::fs::read_to_string(&full_path).ok()?;
+    let lang = moss_languages::support_for_path(&full_path)?;
+    let tree = parsers::parse_with_grammar(lang.grammar_name(), &content)?;
+
+    // Trace returns
+    let returns = trace_returns(
+        &tree.root_node(),
+        content.as_bytes(),
+        sym.start_line,
+        sym.end_line,
+    );
+
+    if returns.is_empty() {
+        None
+    } else {
+        Some(CrossFileReturns {
+            returns,
+            file: sym.file.clone(),
+        })
+    }
 }
