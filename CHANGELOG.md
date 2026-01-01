@@ -100,6 +100,11 @@ See `docs/` for design docs and `README.md` for usage.
   - `--dry-run` shows what would be changed; `--json` for structured output
 - Unified glob symbol resolution with view command via shared `path_resolve` module
 
+### Script Command
+- `moss script run` now accepts trailing arguments: `moss script run todo add "foo"`
+  - Args available in Lua as `args` table (1-indexed array)
+  - Consistent with `@script` syntax: `moss @todo add "foo"`
+
 ### Lua Script Libraries
 
 CLI library (`cli.lua`) - full-featured argument parsing:
