@@ -1,7 +1,7 @@
 //! Filter command for managing filter aliases.
 
 use crate::config::MossConfig;
-use crate::filter::{list_aliases, AliasStatus};
+use crate::filter::{AliasStatus, list_aliases};
 use clap::Subcommand;
 use std::path::Path;
 

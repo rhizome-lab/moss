@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 
 /// Convert a dot-notation key to a safe JSON path.
 /// SQLite uses $."key" for quoted keys, $.key1.key2 for nested.

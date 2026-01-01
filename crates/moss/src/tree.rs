@@ -5,7 +5,7 @@
 use crate::parsers::grammar_loader;
 use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use ignore::WalkBuilder;
-use moss_languages::{support_for_grammar, support_for_path, GrammarLoader};
+use moss_languages::{GrammarLoader, support_for_grammar, support_for_path};
 use nu_ansi_term::Color::{LightCyan, LightGreen, LightMagenta, Red, White as LightGray, Yellow};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -694,17 +694,17 @@ fn capture_name_to_highlight_kind(name: &str) -> Option<HighlightKind> {
 
         // Document formats: code blocks, literals, raw text
         "text.literal" | "markup.raw" | "markup.raw.inline" | "markup.raw.block" => {
-            return Some(HighlightKind::String)
+            return Some(HighlightKind::String);
         }
 
         // Document formats: links, URIs
         "text.uri" | "markup.link" | "markup.link.url" | "text.reference" => {
-            return Some(HighlightKind::Attribute)
+            return Some(HighlightKind::Attribute);
         }
 
         // Document formats: bold, italic (treat as keywords for emphasis)
         "text.strong" | "text.emphasis" | "markup.bold" | "markup.italic" => {
-            return Some(HighlightKind::Keyword)
+            return Some(HighlightKind::Keyword);
         }
 
         // Explicitly skip these (no highlighting)
@@ -1240,7 +1240,7 @@ impl InternalTreeNode {
             child.is_dir = is_dir;
         } else {
             child.is_dir = true; // intermediate nodes are directories
-                                 // Boilerplate dirs don't count against depth
+            // Boilerplate dirs don't count against depth
             let next_depth = if boilerplate_dirs.contains(name) {
                 effective_depth
             } else {

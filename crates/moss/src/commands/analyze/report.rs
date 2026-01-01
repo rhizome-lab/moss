@@ -9,7 +9,7 @@ use std::path::Path;
 use crate::analyze::complexity::{ComplexityReport, RiskLevel};
 use crate::analyze::function_length::{LengthCategory, LengthReport};
 use crate::filter::Filter;
-use crate::health::{analyze_health, HealthReport};
+use crate::health::{HealthReport, analyze_health};
 use crate::path_resolve;
 
 use super::{complexity, length, security};
@@ -625,12 +625,12 @@ pub fn analyze(
             }
 
             // Apply threshold filter
-            if let (Some(ref mut r), Some(threshold)) = (&mut report, complexity_threshold) {
+            if let (Some(r), Some(threshold)) = (&mut report, complexity_threshold) {
                 r.functions.retain(|f| f.complexity >= threshold);
             }
 
             // Apply kind filter (function = no parent, method = has parent)
-            if let (Some(ref mut r), Some(k)) = (&mut report, &kind) {
+            if let (Some(r), Some(k)) = (&mut report, &kind) {
                 match *k {
                     "function" => r.functions.retain(|f| f.parent.is_none()),
                     "method" => r.functions.retain(|f| f.parent.is_some()),

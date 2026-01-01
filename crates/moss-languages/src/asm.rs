@@ -151,11 +151,7 @@ impl Language for Asm {
         // Labels end with ':'
         let text = &content[node.byte_range()];
         let name = text.trim().trim_end_matches(':');
-        if !name.is_empty() {
-            Some(name)
-        } else {
-            None
-        }
+        if !name.is_empty() { Some(name) } else { None }
     }
 
     fn file_path_to_module_name(&self, path: &Path) -> Option<String> {

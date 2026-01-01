@@ -103,9 +103,5 @@ pub fn cmd_lint_analyze(root: &Path, target: Option<&str>, json: bool) -> i32 {
         }
     }
 
-    if total_errors > 0 {
-        1
-    } else {
-        0
-    }
+    if total_errors > 0 { 1 } else { 0 }
 }

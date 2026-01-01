@@ -4,7 +4,7 @@
 //! skeleton.rs (for viewing) and symbols.rs (for indexing).
 
 use crate::parsers;
-use moss_languages::{support_for_grammar, support_for_path, Language, Symbol, Visibility};
+use moss_languages::{Language, Symbol, Visibility, support_for_grammar, support_for_path};
 use std::path::Path;
 use tree_sitter;
 

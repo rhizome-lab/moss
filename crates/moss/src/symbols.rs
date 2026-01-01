@@ -1,7 +1,7 @@
 use crate::extract::{ExtractOptions, Extractor};
 use crate::parsers;
 use moss_languages::{
-    support_for_grammar, support_for_path, Language, Symbol as LangSymbol, SymbolKind,
+    Language, Symbol as LangSymbol, SymbolKind, support_for_grammar, support_for_path,
 };
 use std::path::Path;
 use tree_sitter;

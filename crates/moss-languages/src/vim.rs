@@ -269,11 +269,7 @@ impl Language for Vim {
     ) -> Option<PathBuf> {
         let dir = current_file.parent()?;
         let full = dir.join(import);
-        if full.is_file() {
-            Some(full)
-        } else {
-            None
-        }
+        if full.is_file() { Some(full) } else { None }
     }
 
     fn resolve_external_import(

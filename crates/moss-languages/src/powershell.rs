@@ -287,11 +287,7 @@ impl Language for PowerShell {
     }
     fn resolve_local_import(&self, import: &str, _: &Path, project_root: &Path) -> Option<PathBuf> {
         let full = project_root.join(format!("{}.psm1", import));
-        if full.is_file() {
-            Some(full)
-        } else {
-            None
-        }
+        if full.is_file() { Some(full) } else { None }
     }
     fn resolve_external_import(&self, _: &str, _: &Path) -> Option<ResolvedPackage> {
         None

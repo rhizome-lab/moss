@@ -42,11 +42,11 @@ mod sarif;
 pub mod test_runners;
 mod tools;
 
-pub use custom::{load_custom_tools, CustomTool, CustomToolConfig, ToolsConfig};
+pub use custom::{CustomTool, CustomToolConfig, ToolsConfig, load_custom_tools};
 pub use diagnostic::{Diagnostic, DiagnosticSeverity, Fix, Location};
 pub use registry::ToolRegistry;
 pub use sarif::SarifReport;
-pub use tools::{has_config_file, Tool, ToolCategory, ToolError, ToolInfo, ToolResult};
+pub use tools::{Tool, ToolCategory, ToolError, ToolInfo, ToolResult, has_config_file};
 
 use std::path::Path;
 

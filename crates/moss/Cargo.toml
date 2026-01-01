@@ -1,7 +1,7 @@
 [package]
 name = "moss"
 version.workspace = true
-edition = "2021"
+edition = "2024"
 license.workspace = true
 description = "Fast code intelligence CLI and library"
 

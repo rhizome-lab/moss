@@ -1,8 +1,8 @@
 //! OpenAI Codex CLI JSONL format parser.
 
-use super::{peek_lines, LogFormat};
+use super::{LogFormat, peek_lines};
 use crate::{
-    categorize_error, normalize_path, ErrorPattern, SessionAnalysis, TokenStats, ToolStats,
+    ErrorPattern, SessionAnalysis, TokenStats, ToolStats, categorize_error, normalize_path,
 };
 use serde_json::Value;
 use std::collections::HashMap;

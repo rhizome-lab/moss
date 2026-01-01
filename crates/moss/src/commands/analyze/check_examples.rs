@@ -162,9 +162,5 @@ pub fn cmd_check_examples(root: &Path, json: bool) -> i32 {
         }
     }
 
-    if missing.is_empty() {
-        0
-    } else {
-        1
-    }
+    if missing.is_empty() { 0 } else { 1 }
 }

@@ -138,8 +138,8 @@ fn collect_matching_symbols(
     parent: Option<&str>,
     matches: &mut Vec<(index::SymbolMatch, u32)>,
 ) {
-    use nucleo_matcher::pattern::{AtomKind, CaseMatching, Normalization, Pattern};
     use nucleo_matcher::Utf32Str;
+    use nucleo_matcher::pattern::{AtomKind, CaseMatching, Normalization, Pattern};
 
     let pattern = Pattern::new(
         query,

@@ -631,7 +631,8 @@ impl Shadow {
                 entry.target,
                 entry.hash,
                 files_to_undo.join(", "),
-                self.get_real_git_head().unwrap_or_else(|| "none".to_string())
+                self.get_real_git_head()
+                    .unwrap_or_else(|| "none".to_string())
             );
 
             let _ = Command::new("git")
@@ -787,7 +788,8 @@ impl Shadow {
             latest.target,
             undone_hash,
             files.join(", "),
-            self.get_real_git_head().unwrap_or_else(|| "none".to_string())
+            self.get_real_git_head()
+                .unwrap_or_else(|| "none".to_string())
         );
 
         let _ = Command::new("git")
@@ -938,7 +940,8 @@ impl Shadow {
             ref_str,
             target_hash,
             files.join(", "),
-            self.get_real_git_head().unwrap_or_else(|| "none".to_string())
+            self.get_real_git_head()
+                .unwrap_or_else(|| "none".to_string())
         );
 
         let _ = Command::new("git")

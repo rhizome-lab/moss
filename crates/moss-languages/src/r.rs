@@ -294,11 +294,7 @@ impl Language for R {
         project_root: &Path,
     ) -> Option<PathBuf> {
         let full = project_root.join("R").join(format!("{}.R", import));
-        if full.is_file() {
-            Some(full)
-        } else {
-            None
-        }
+        if full.is_file() { Some(full) } else { None }
     }
 
     fn resolve_external_import(

@@ -311,10 +311,12 @@ def greet(name: str) -> str:
         assert!(view_node.children.len() >= 1);
         let greet = &view_node.children[0];
         assert_eq!(greet.name, "greet");
-        assert!(greet
-            .signature
-            .as_ref()
-            .map_or(false, |s| s.contains("def greet")));
+        assert!(
+            greet
+                .signature
+                .as_ref()
+                .map_or(false, |s| s.contains("def greet"))
+        );
     }
 
     #[test]

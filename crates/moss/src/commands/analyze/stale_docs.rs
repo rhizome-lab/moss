@@ -173,11 +173,7 @@ pub fn cmd_stale_docs(root: &Path, json: bool) -> i32 {
         }
     }
 
-    if stale_docs.is_empty() {
-        0
-    } else {
-        1
-    }
+    if stale_docs.is_empty() { 0 } else { 1 }
 }
 
 /// Find files matching a cover pattern (glob or path prefix)

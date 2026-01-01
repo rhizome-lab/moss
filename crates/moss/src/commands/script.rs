@@ -304,11 +304,7 @@ fn cmd_script_run(
             .join(".moss")
             .join("scripts")
             .join(format!("{}.lua", script));
-        if path.exists() {
-            Some(path)
-        } else {
-            None
-        }
+        if path.exists() { Some(path) } else { None }
     };
 
     // Get builtin if no user script

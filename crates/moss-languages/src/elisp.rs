@@ -301,11 +301,7 @@ impl Language for Elisp {
     ) -> Option<PathBuf> {
         let dir = current_file.parent()?;
         let full = dir.join(format!("{}.el", import));
-        if full.is_file() {
-            Some(full)
-        } else {
-            None
-        }
+        if full.is_file() { Some(full) } else { None }
     }
 
     fn resolve_external_import(&self, _: &str, _: &Path) -> Option<ResolvedPackage> {

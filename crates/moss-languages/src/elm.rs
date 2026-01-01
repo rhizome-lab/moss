@@ -285,11 +285,7 @@ impl Language for Elm {
     ) -> Option<PathBuf> {
         let path = import.replace('.', "/");
         let full = project_root.join("src").join(format!("{}.elm", path));
-        if full.is_file() {
-            Some(full)
-        } else {
-            None
-        }
+        if full.is_file() { Some(full) } else { None }
     }
 
     fn resolve_external_import(

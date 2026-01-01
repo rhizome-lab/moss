@@ -182,11 +182,7 @@ impl Language for AsciiDoc {
         let first_line = text.lines().next()?;
         // Strip section markers (=, ==, etc.)
         let name = first_line.trim().trim_start_matches('=').trim();
-        if !name.is_empty() {
-            Some(name)
-        } else {
-            None
-        }
+        if !name.is_empty() { Some(name) } else { None }
     }
 
     fn file_path_to_module_name(&self, path: &Path) -> Option<String> {

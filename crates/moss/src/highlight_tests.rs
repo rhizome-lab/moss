@@ -4,7 +4,7 @@
 //! types, function names, attributes) across multiple languages.
 
 use crate::parsers;
-use crate::tree::{collect_highlight_spans, HighlightKind};
+use crate::tree::{HighlightKind, collect_highlight_spans};
 
 /// Helper to extract highlight spans from code
 fn get_spans(code: &str, grammar: &str) -> Vec<(String, HighlightKind)> {
@@ -141,9 +141,11 @@ fn test_highlight_python_strings() {
 r = 'world'"#;
     let spans = get_spans(code, "python");
     // Python uses string_content for the inner text
-    assert!(spans
-        .iter()
-        .any(|(t, k)| t.contains("hello") && *k == HighlightKind::String));
+    assert!(
+        spans
+            .iter()
+            .any(|(t, k)| t.contains("hello") && *k == HighlightKind::String)
+    );
 }
 
 #[test]
@@ -352,9 +354,11 @@ fn test_highlight_lua_strings() {
 t = 'world'"#;
     let spans = get_spans(code, "lua");
     // Lua strings include quotes
-    assert!(spans
-        .iter()
-        .any(|(t, k)| t.contains("hello") && *k == HighlightKind::String));
+    assert!(
+        spans
+            .iter()
+            .any(|(t, k)| t.contains("hello") && *k == HighlightKind::String)
+    );
 }
 
 #[test]
@@ -523,9 +527,11 @@ fn test_highlight_bash_keywords() {
 fn test_highlight_bash_strings() {
     let code = r#"echo "hello" 'world'"#;
     let spans = get_spans(code, "bash");
-    assert!(spans
-        .iter()
-        .any(|(t, k)| t.contains("hello") && *k == HighlightKind::String));
+    assert!(
+        spans
+            .iter()
+            .any(|(t, k)| t.contains("hello") && *k == HighlightKind::String)
+    );
 }
 
 #[test]

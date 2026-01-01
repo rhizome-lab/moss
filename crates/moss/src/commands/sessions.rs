@@ -454,11 +454,11 @@ fn format_age(seconds: u64) -> String {
 // ============================================================================
 
 use axum::{
+    Router,
     extract::{Path as AxumPath, State},
     http::StatusCode,
     response::{Html, IntoResponse},
     routing::get,
-    Router,
 };
 
 struct SessionsState {

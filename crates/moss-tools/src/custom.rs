@@ -18,7 +18,7 @@
 //! ```
 
 use crate::{
-    has_config_file, Diagnostic, SarifReport, Tool, ToolCategory, ToolError, ToolInfo, ToolResult,
+    Diagnostic, SarifReport, Tool, ToolCategory, ToolError, ToolInfo, ToolResult, has_config_file,
 };
 use serde::Deserialize;
 use std::collections::HashMap;

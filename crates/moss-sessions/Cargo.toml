@@ -1,7 +1,7 @@
 [package]
 name = "moss-sessions"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Session log parsing for AI coding agents"
 
 [dependencies]

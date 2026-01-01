@@ -78,7 +78,7 @@ pub fn version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
 // Global Package Index Database
 // =============================================================================
 
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 
 /// Parsed version as (major, minor).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -5,8 +5,8 @@ use crate::output::OutputFormatter;
 use crate::symbols::SymbolParser;
 use grep_matcher::Matcher;
 use grep_regex::RegexMatcher;
-use grep_searcher::sinks::UTF8;
 use grep_searcher::Searcher;
+use grep_searcher::sinks::UTF8;
 use ignore::WalkBuilder;
 use nu_ansi_term::Color::{Cyan, Green, Red, Yellow};
 use std::collections::HashMap;
@@ -14,8 +14,8 @@ use std::fmt::Write;
 use std::fs;
 use std::io;
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// A single match result
 #[derive(Debug, Clone, serde::Serialize)]

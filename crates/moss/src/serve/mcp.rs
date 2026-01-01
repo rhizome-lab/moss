@@ -21,7 +21,7 @@ mod implementation {
     use rmcp::handler::server::wrapper::Parameters;
     use rmcp::model::*;
     use rmcp::transport::stdio;
-    use rmcp::{tool, tool_handler, tool_router, ErrorData as McpError, ServiceExt};
+    use rmcp::{ErrorData as McpError, ServiceExt, tool, tool_handler, tool_router};
     use schemars::JsonSchema;
     use serde::Deserialize;
 

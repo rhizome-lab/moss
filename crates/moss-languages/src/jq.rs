@@ -225,11 +225,7 @@ impl Language for Jq {
     fn resolve_local_import(&self, import: &str, current_file: &Path, _: &Path) -> Option<PathBuf> {
         let dir = current_file.parent()?;
         let full = dir.join(format!("{}.jq", import));
-        if full.is_file() {
-            Some(full)
-        } else {
-            None
-        }
+        if full.is_file() { Some(full) } else { None }
     }
     fn resolve_external_import(&self, _: &str, _: &Path) -> Option<ResolvedPackage> {
         None

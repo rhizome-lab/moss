@@ -1,6 +1,6 @@
 //! Daemon management commands for moss CLI.
 
-use crate::daemon::{self, global_socket_path, DaemonClient};
+use crate::daemon::{self, DaemonClient, global_socket_path};
 use clap::Subcommand;
 use std::path::PathBuf;
 

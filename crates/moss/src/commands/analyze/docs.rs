@@ -32,13 +32,13 @@ impl DocCoverageReport {
             lines.push("## By Language".to_string());
             let mut langs: Vec<_> = self.by_language.iter().collect();
             langs.sort_by(|a, b| {
-                let pct_a = if a.1 .1 > 0 {
-                    a.1 .0 as f64 / a.1 .1 as f64
+                let pct_a = if a.1.1 > 0 {
+                    a.1.0 as f64 / a.1.1 as f64
                 } else {
                     1.0
                 };
-                let pct_b = if b.1 .1 > 0 {
-                    b.1 .0 as f64 / b.1 .1 as f64
+                let pct_b = if b.1.1 > 0 {
+                    b.1.0 as f64 / b.1.1 as f64
                 } else {
                     1.0
                 };

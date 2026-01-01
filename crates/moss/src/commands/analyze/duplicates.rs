@@ -722,11 +722,7 @@ pub fn cmd_duplicate_types(
         }
     }
 
-    if duplicates.is_empty() {
-        0
-    } else {
-        1
-    }
+    if duplicates.is_empty() { 0 } else { 1 }
 }
 
 /// Allow a duplicate type pair by adding to .moss/duplicate-types-allow

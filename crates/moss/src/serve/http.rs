@@ -5,10 +5,10 @@
 use crate::index::FileIndex;
 use crate::skeleton::SkeletonExtractor;
 use axum::{
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     routing::get,
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;

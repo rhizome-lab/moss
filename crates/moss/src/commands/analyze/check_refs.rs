@@ -144,11 +144,7 @@ pub fn cmd_check_refs(root: &Path, json: bool) -> i32 {
         }
     }
 
-    if broken_refs.is_empty() {
-        0
-    } else {
-        1
-    }
+    if broken_refs.is_empty() { 0 } else { 1 }
 }
 
 /// Check if a string is a common non-symbol pattern (command, path, etc.)

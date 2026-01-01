@@ -1,7 +1,7 @@
 //! Lint command - run linters, formatters, and type checkers.
 
 use crate::output::{OutputFormat, OutputFormatter};
-use moss_tools::{registry_with_custom, SarifReport, ToolCategory, ToolRegistry};
+use moss_tools::{SarifReport, ToolCategory, ToolRegistry, registry_with_custom};
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use nu_ansi_term::Color::{Blue, Red, Yellow};
 use nu_ansi_term::Style;
@@ -252,11 +252,7 @@ pub fn cmd_lint_run(
         }
     }
 
-    if had_errors {
-        1
-    } else {
-        0
-    }
+    if had_errors { 1 } else { 0 }
 }
 
 /// List available linting tools.
@@ -527,9 +523,5 @@ fn run_lint_once(
         }
     }
 
-    if had_errors {
-        1
-    } else {
-        0
-    }
+    if had_errors { 1 } else { 0 }
 }

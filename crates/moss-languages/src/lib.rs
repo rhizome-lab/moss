@@ -139,8 +139,8 @@ pub use registry::{
     validate_unused_kinds_audit,
 };
 pub use traits::{
-    has_extension, skip_dotfiles, EmbeddedBlock, Export, Import, Language, PackageSource,
-    PackageSourceKind, Symbol, SymbolKind, Visibility, VisibilityMechanism,
+    EmbeddedBlock, Export, Import, Language, PackageSource, PackageSourceKind, Symbol, SymbolKind,
+    Visibility, VisibilityMechanism, has_extension, skip_dotfiles,
 };
 
 // Re-export language structs

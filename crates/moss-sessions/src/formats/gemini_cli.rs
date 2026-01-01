@@ -1,7 +1,7 @@
 //! Gemini CLI JSON format parser.
 
-use super::{read_file, LogFormat};
-use crate::{normalize_path, SessionAnalysis, TokenStats, ToolStats};
+use super::{LogFormat, read_file};
+use crate::{SessionAnalysis, TokenStats, ToolStats, normalize_path};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::Path;

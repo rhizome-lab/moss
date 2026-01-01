@@ -1,7 +1,7 @@
 use crate::parsers;
 use crate::path_resolve;
 use crate::skeleton::SkeletonExtractor;
-use moss_languages::{support_for_path, Language, SymbolKind};
+use moss_languages::{Language, SymbolKind, support_for_path};
 use std::path::Path;
 
 /// Result of finding a symbol in a file

@@ -11,7 +11,7 @@ use mlua::{
 };
 
 #[cfg(feature = "llm")]
-use super::llm::{parse_agent_response, AgentAction, LlmClient, AGENT_SYSTEM_PROMPT};
+use super::llm::{AGENT_SYSTEM_PROMPT, AgentAction, LlmClient, parse_agent_response};
 
 use super::memory::MemoryStore;
 use super::shadow::ShadowGit;

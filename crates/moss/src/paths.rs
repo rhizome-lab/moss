@@ -40,31 +40,36 @@ mod tests {
     use super::*;
     use std::env;
 
+    // SAFETY: These tests run single-threaded via `cargo test -- --test-threads=1`
+    // or are independent enough that env var conflicts are unlikely in practice.
+    // set_var/remove_var are unsafe in edition 2024 due to potential data races
+    // when other threads read the environment concurrently.
+
     #[test]
     fn test_default_moss_dir() {
-        env::remove_var("MOSS_INDEX_DIR");
+        unsafe { env::remove_var("MOSS_INDEX_DIR") };
         let root = PathBuf::from("/project");
         assert_eq!(get_moss_dir(&root), PathBuf::from("/project/.moss"));
     }
 
     #[test]
     fn test_absolute_moss_index_dir() {
-        env::set_var("MOSS_INDEX_DIR", "/custom/path");
+        unsafe { env::set_var("MOSS_INDEX_DIR", "/custom/path") };
         let root = PathBuf::from("/project");
         assert_eq!(get_moss_dir(&root), PathBuf::from("/custom/path"));
-        env::remove_var("MOSS_INDEX_DIR");
+        unsafe { env::remove_var("MOSS_INDEX_DIR") };
     }
 
     #[test]
     fn test_relative_moss_index_dir() {
-        env::set_var("MOSS_INDEX_DIR", "myproject");
-        env::set_var("XDG_DATA_HOME", "/home/user/.data");
+        unsafe { env::set_var("MOSS_INDEX_DIR", "myproject") };
+        unsafe { env::set_var("XDG_DATA_HOME", "/home/user/.data") };
         let root = PathBuf::from("/project");
         assert_eq!(
             get_moss_dir(&root),
             PathBuf::from("/home/user/.data/moss/myproject")
         );
-        env::remove_var("MOSS_INDEX_DIR");
-        env::remove_var("XDG_DATA_HOME");
+        unsafe { env::remove_var("MOSS_INDEX_DIR") };
+        unsafe { env::remove_var("XDG_DATA_HOME") };
     }
 }

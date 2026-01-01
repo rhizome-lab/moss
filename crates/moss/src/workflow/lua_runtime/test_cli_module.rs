@@ -442,8 +442,8 @@ fn type_coercion() {
 #[test]
 fn env_var_fallback() {
     let runtime = LuaRuntime::new(Path::new(".")).unwrap();
-    // Set env var
-    std::env::set_var("TEST_CLI_PORT", "9000");
+    // SAFETY: Test runs single-threaded; no concurrent env access.
+    unsafe { std::env::set_var("TEST_CLI_PORT", "9000") };
     runtime.run_string("args = {'run'}").unwrap();
     let result = runtime.run_string(
         r#"
@@ -465,7 +465,8 @@ fn env_var_fallback() {
         assert(captured.port == 9000, "port should be 9000 from env, got: " .. tostring(captured.port))
         "#,
     );
-    std::env::remove_var("TEST_CLI_PORT");
+    // SAFETY: Test runs single-threaded; no concurrent env access.
+    unsafe { std::env::remove_var("TEST_CLI_PORT") };
     assert!(result.is_ok(), "env var fallback test failed: {:?}", result);
 }
 

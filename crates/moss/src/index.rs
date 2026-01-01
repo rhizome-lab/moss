@@ -3,7 +3,7 @@ use crate::paths::get_moss_dir;
 use ignore::WalkBuilder;
 use moss_languages::support_for_path;
 use rayon::prelude::*;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 

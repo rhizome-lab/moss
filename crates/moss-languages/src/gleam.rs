@@ -289,11 +289,7 @@ impl Language for Gleam {
     ) -> Option<PathBuf> {
         let path = import.replace('/', "/");
         let full = project_root.join("src").join(format!("{}.gleam", path));
-        if full.is_file() {
-            Some(full)
-        } else {
-            None
-        }
+        if full.is_file() { Some(full) } else { None }
     }
 
     fn resolve_external_import(&self, _: &str, _: &Path) -> Option<ResolvedPackage> {

@@ -294,11 +294,7 @@ impl Language for Perl {
     ) -> Option<PathBuf> {
         let path = import.replace("::", "/");
         let full = project_root.join("lib").join(format!("{}.pm", path));
-        if full.is_file() {
-            Some(full)
-        } else {
-            None
-        }
+        if full.is_file() { Some(full) } else { None }
     }
 
     fn resolve_external_import(

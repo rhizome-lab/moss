@@ -3,7 +3,7 @@
 //! Extracts imports and exports from source files.
 
 use crate::parsers;
-use moss_languages::{support_for_grammar, support_for_path, Export, Import, Language, SymbolKind};
+use moss_languages::{Export, Import, Language, SymbolKind, support_for_grammar, support_for_path};
 use std::path::Path;
 use tree_sitter;
 
@@ -135,7 +135,7 @@ impl DepsExtractor {
                     imports: Vec::new(),
                     exports: Vec::new(),
                     reexports: Vec::new(),
-                }
+                };
             }
         };
 
@@ -232,7 +232,7 @@ impl DepsExtractor {
                     imports: Vec::new(),
                     exports: Vec::new(),
                     reexports: Vec::new(),
-                }
+                };
             }
         };
         self.extract_js_ts_deps(&tree, content)
@@ -246,7 +246,7 @@ impl DepsExtractor {
                     imports: Vec::new(),
                     exports: Vec::new(),
                     reexports: Vec::new(),
-                }
+                };
             }
         };
         self.extract_js_ts_deps(&tree, content)
@@ -260,7 +260,7 @@ impl DepsExtractor {
                     imports: Vec::new(),
                     exports: Vec::new(),
                     reexports: Vec::new(),
-                }
+                };
             }
         };
         self.extract_js_ts_deps(&tree, content)
@@ -717,10 +717,12 @@ var PublicVar = "hello"
         assert!(result.imports.iter().any(|i| i.module == "fmt"));
         assert!(result.imports.iter().any(|i| i.module == "os"));
         assert!(result.imports.iter().any(|i| i.module == "path/filepath"));
-        assert!(result
-            .imports
-            .iter()
-            .any(|i| i.module == "github.com/user/pkg" && i.alias == Some("alias".to_string())));
+        assert!(
+            result
+                .imports
+                .iter()
+                .any(|i| i.module == "github.com/user/pkg" && i.alias == Some("alias".to_string()))
+        );
 
         // Check exports (only uppercase names are exported in Go)
         assert!(result.exports.iter().any(|e| e.name == "PublicFunc"));

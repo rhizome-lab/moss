@@ -461,7 +461,7 @@ pub fn cmd_view_symbol(
 
             // Show referenced type definitions when --context is used
             if context {
-                if let (Some(ref sr), Some(ref g)) = (&skeleton_result, &grammar) {
+                if let (Some(sr), Some(g)) = (&skeleton_result, &grammar) {
                     display_referenced_types(
                         &source,
                         g,

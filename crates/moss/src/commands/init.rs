@@ -288,12 +288,16 @@ mod tests {
 
         // But negation entries should still be added
         assert!(lines.iter().any(|l| l.trim() == "!.moss/config.toml"));
-        assert!(lines
-            .iter()
-            .any(|l| l.trim() == "!.moss/duplicate-functions-allow"));
-        assert!(lines
-            .iter()
-            .any(|l| l.trim() == "!.moss/duplicate-types-allow"));
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.trim() == "!.moss/duplicate-functions-allow")
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.trim() == "!.moss/duplicate-types-allow")
+        );
     }
 
     #[test]

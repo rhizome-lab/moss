@@ -3,8 +3,8 @@
 use crate::output::OutputFormat;
 use clap::Subcommand;
 use moss_packages::{
-    all_ecosystems, detect_all_ecosystems, AuditResult, PackageError, PackageInfo,
-    VulnerabilitySeverity,
+    AuditResult, PackageError, PackageInfo, VulnerabilitySeverity, all_ecosystems,
+    detect_all_ecosystems,
 };
 use nu_ansi_term::Color::Yellow;
 use std::path::Path;
