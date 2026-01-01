@@ -33,6 +33,7 @@ pub mod builtins {
 
 /// Builtin Lua modules (for require()).
 pub mod modules {
+    pub const AGENT: &str = include_str!("scripts/agent.lua");
     pub const CLI: &str = include_str!("scripts/cli.lua");
     pub const TYPE: &str = include_str!("scripts/type.lua");
     pub const TYPE_DESCRIBE: &str = include_str!("scripts/type/describe.lua");
@@ -44,6 +45,7 @@ pub mod modules {
     /// Get builtin module by name.
     pub fn get(name: &str) -> Option<&'static str> {
         match name {
+            "agent" => Some(AGENT),
             "cli" => Some(CLI),
             "type" => Some(TYPE),
             "type.describe" => Some(TYPE_DESCRIBE),
