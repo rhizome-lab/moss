@@ -383,6 +383,289 @@ impl Shadow {
             _ => 0,
         }
     }
+
+    /// Undo the most recent edit (or specified number of edits).
+    /// Returns information about what was undone.
+    ///
+    /// If `force` is false, checks for external modifications first and fails
+    /// if any files have been modified outside of moss.
+    pub fn undo(
+        &self,
+        count: usize,
+        dry_run: bool,
+        force: bool,
+    ) -> Result<Vec<UndoResult>, ShadowError> {
+        if !self.exists() {
+            return Err(ShadowError::Undo("No shadow history exists".to_string()));
+        }
+
+        let entries = self.history(None, count);
+        if entries.is_empty() {
+            return Err(ShadowError::Undo("No edits to undo".to_string()));
+        }
+
+        // Check for external modifications unless force is set
+        if !force && !dry_run {
+            let conflicts = self.detect_conflicts(&entries);
+            if !conflicts.is_empty() {
+                let files_str = conflicts.join(", ");
+                return Err(ShadowError::Undo(format!(
+                    "Files modified externally since last edit: {}. Use --force to override.",
+                    files_str
+                )));
+            }
+        }
+
+        let mut results = Vec::new();
+
+        for entry in entries.iter().take(count) {
+            if dry_run {
+                // Also report conflicts in dry-run mode
+                let conflicts = self.detect_conflicts(&[entry.clone()]);
+                results.push(UndoResult {
+                    files: entry.files.iter().map(PathBuf::from).collect(),
+                    undone_commit: entry.hash.clone(),
+                    description: format!("{}: {}", entry.operation, entry.target),
+                    conflicts,
+                });
+                continue;
+            }
+
+            // For each file in the commit, restore from the parent commit state
+            let parent_ref = format!("{}^", entry.hash);
+
+            for file_path in &entry.files {
+                let worktree_file = self.worktree.join(file_path);
+                let actual_file = self.root.join(file_path);
+
+                // Try to get the file content from parent commit
+                let show_output = Command::new("git")
+                    .args(["show", &format!("{}:{}", parent_ref, file_path)])
+                    .current_dir(&self.worktree)
+                    .output();
+
+                match show_output {
+                    Ok(output) if output.status.success() => {
+                        // File existed in parent - restore it
+                        if let Some(parent) = actual_file.parent() {
+                            let _ = std::fs::create_dir_all(parent);
+                        }
+                        std::fs::write(&actual_file, &output.stdout).map_err(|e| {
+                            ShadowError::Undo(format!("Failed to write {}: {}", file_path, e))
+                        })?;
+                        // Update worktree too
+                        if let Some(parent) = worktree_file.parent() {
+                            let _ = std::fs::create_dir_all(parent);
+                        }
+                        let _ = std::fs::write(&worktree_file, &output.stdout);
+                    }
+                    _ => {
+                        // File didn't exist in parent (was added) - delete it
+                        if actual_file.exists() {
+                            std::fs::remove_file(&actual_file).map_err(|e| {
+                                ShadowError::Undo(format!("Failed to delete {}: {}", file_path, e))
+                            })?;
+                        }
+                        let _ = std::fs::remove_file(&worktree_file);
+                    }
+                }
+            }
+
+            // Stage and commit the undo
+            let _ = Command::new("git")
+                .args(["add", "-A"])
+                .current_dir(&self.worktree)
+                .status();
+
+            let undo_msg = format!(
+                "moss edit: undo {}\n\nOperation: undo\nTarget: {}\nUndone-Commit: {}\nFiles: {}\nGit-HEAD: {}\n",
+                entry.target,
+                entry.target,
+                entry.hash,
+                entry.files.join(", "),
+                self.get_real_git_head().unwrap_or_else(|| "none".to_string())
+            );
+
+            let _ = Command::new("git")
+                .args(["commit", "-m", &undo_msg, "--allow-empty"])
+                .current_dir(&self.worktree)
+                .status();
+
+            results.push(UndoResult {
+                files: entry.files.iter().map(PathBuf::from).collect(),
+                undone_commit: entry.hash.clone(),
+                description: format!("{}: {}", entry.operation, entry.target),
+                conflicts: vec![], // Already checked/forced above
+            });
+        }
+
+        Ok(results)
+    }
+
+    /// Detect files that have been modified externally since last moss edit.
+    /// Returns list of file paths that differ between actual filesystem and shadow git HEAD.
+    fn detect_conflicts(&self, entries: &[HistoryEntry]) -> Vec<String> {
+        let mut conflicts = Vec::new();
+
+        for entry in entries {
+            for file_path in &entry.files {
+                let actual_file = self.root.join(file_path);
+
+                // Get expected content from shadow git HEAD
+                let show_output = Command::new("git")
+                    .args(["show", &format!("HEAD:{}", file_path)])
+                    .current_dir(&self.worktree)
+                    .output();
+
+                match show_output {
+                    Ok(output) if output.status.success() => {
+                        // File exists in shadow - compare with actual
+                        if actual_file.exists() {
+                            if let Ok(actual_content) = std::fs::read(&actual_file) {
+                                if actual_content != output.stdout {
+                                    conflicts.push(file_path.clone());
+                                }
+                            }
+                        } else {
+                            // File was deleted externally
+                            conflicts.push(file_path.clone());
+                        }
+                    }
+                    _ => {
+                        // File doesn't exist in shadow but might exist on disk
+                        if actual_file.exists() {
+                            conflicts.push(file_path.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        conflicts
+    }
+
+    /// Redo the most recently undone edit.
+    /// Only works if the last operation was an undo.
+    pub fn redo(&self) -> Result<UndoResult, ShadowError> {
+        if !self.exists() {
+            return Err(ShadowError::Undo("No shadow history exists".to_string()));
+        }
+
+        // Get the most recent entry to check if it's an undo
+        let entries = self.history(None, 1);
+        let latest = entries
+            .first()
+            .ok_or_else(|| ShadowError::Undo("No history to redo".to_string()))?;
+
+        if latest.operation != "undo" {
+            return Err(ShadowError::Undo(
+                "Last operation was not an undo - nothing to redo".to_string(),
+            ));
+        }
+
+        // Find the commit that was undone (from the undo commit message)
+        let log_output = Command::new("git")
+            .args(["log", "-1", "--format=%B", &latest.hash])
+            .current_dir(&self.worktree)
+            .output()
+            .map_err(|e| ShadowError::Undo(format!("Failed to get log: {}", e)))?;
+
+        let body = String::from_utf8_lossy(&log_output.stdout);
+        let undone_hash = body
+            .lines()
+            .find_map(|line| line.strip_prefix("Undone-Commit: "))
+            .ok_or_else(|| ShadowError::Undo("Cannot find undone commit reference".to_string()))?;
+
+        // Get file list from the undone commit
+        let files_output = Command::new("git")
+            .args(["show", "--format=", "--name-only", undone_hash])
+            .current_dir(&self.worktree)
+            .output()
+            .map_err(|e| ShadowError::Undo(format!("Failed to get files: {}", e)))?;
+
+        let files: Vec<String> = String::from_utf8_lossy(&files_output.stdout)
+            .lines()
+            .filter(|l| !l.is_empty())
+            .map(String::from)
+            .collect();
+
+        // For each file, restore from the undone commit state
+        for file_path in &files {
+            let worktree_file = self.worktree.join(file_path);
+            let actual_file = self.root.join(file_path);
+
+            // Get the file content from the undone commit
+            let show_output = Command::new("git")
+                .args(["show", &format!("{}:{}", undone_hash, file_path)])
+                .current_dir(&self.worktree)
+                .output();
+
+            match show_output {
+                Ok(output) if output.status.success() => {
+                    // File existed in undone commit - restore it
+                    if let Some(parent) = actual_file.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    std::fs::write(&actual_file, &output.stdout).map_err(|e| {
+                        ShadowError::Undo(format!("Failed to write {}: {}", file_path, e))
+                    })?;
+                    // Update worktree too
+                    if let Some(parent) = worktree_file.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    let _ = std::fs::write(&worktree_file, &output.stdout);
+                }
+                _ => {
+                    // File was deleted in undone commit - delete it
+                    if actual_file.exists() {
+                        std::fs::remove_file(&actual_file).map_err(|e| {
+                            ShadowError::Undo(format!("Failed to delete {}: {}", file_path, e))
+                        })?;
+                    }
+                    let _ = std::fs::remove_file(&worktree_file);
+                }
+            }
+        }
+
+        // Stage and commit the redo
+        let _ = Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(&self.worktree)
+            .status();
+
+        let redo_msg = format!(
+            "moss edit: redo {}\n\nOperation: redo\nTarget: {}\nRedone-Commit: {}\nFiles: {}\nGit-HEAD: {}\n",
+            latest.target,
+            latest.target,
+            undone_hash,
+            files.join(", "),
+            self.get_real_git_head().unwrap_or_else(|| "none".to_string())
+        );
+
+        let _ = Command::new("git")
+            .args(["commit", "-m", &redo_msg, "--allow-empty"])
+            .current_dir(&self.worktree)
+            .status();
+
+        Ok(UndoResult {
+            files: files.iter().map(PathBuf::from).collect(),
+            undone_commit: undone_hash.to_string(),
+            description: format!("redo: {}", latest.target),
+            conflicts: vec![], // Redo doesn't check for conflicts
+        })
+    }
+}
+
+/// Result of an undo operation.
+pub struct UndoResult {
+    /// Files that were modified by the undo
+    pub files: Vec<PathBuf>,
+    /// The commit that was undone
+    pub undone_commit: String,
+    /// Description of what was undone
+    pub description: String,
+    /// Files that have been modified externally (only populated in dry-run)
+    pub conflicts: Vec<String>,
 }
 
 /// Shadow git errors.
@@ -390,6 +673,7 @@ impl Shadow {
 pub enum ShadowError {
     Init(String),
     Commit(String),
+    Undo(String),
 }
 
 impl std::fmt::Display for ShadowError {
@@ -397,6 +681,7 @@ impl std::fmt::Display for ShadowError {
         match self {
             ShadowError::Init(msg) => write!(f, "Shadow init error: {}", msg),
             ShadowError::Commit(msg) => write!(f, "Shadow commit error: {}", msg),
+            ShadowError::Undo(msg) => write!(f, "Shadow undo error: {}", msg),
         }
     }
 }

@@ -42,11 +42,11 @@ enum Commands {
     /// Edit a node in the codebase tree (structural code modification)
     Edit {
         /// Target to edit (path like src/main.py/Foo/bar)
-        target: String,
+        target: Option<String>,
 
         /// Edit action to perform
         #[command(subcommand)]
-        action: EditAction,
+        action: Option<EditAction>,
 
         /// Root directory (defaults to current directory)
         #[arg(short, long, global = true)]
@@ -71,6 +71,18 @@ enum Commands {
         /// Message describing the edit (for shadow git history)
         #[arg(short, long, global = true, visible_alias = "reason")]
         message: Option<String>,
+
+        /// Undo the last N edits (default: 1)
+        #[arg(long, value_name = "N", num_args = 0..=1, default_missing_value = "1")]
+        undo: Option<usize>,
+
+        /// Redo the last undone edit
+        #[arg(long)]
+        redo: bool,
+
+        /// Force undo even if files were modified externally
+        #[arg(long)]
+        force: bool,
     },
 
     /// View shadow git edit history
@@ -439,17 +451,31 @@ fn main() {
             only,
             multiple,
             message,
-        } => commands::edit::cmd_edit(
-            &target,
-            action,
-            root.as_deref(),
-            dry_run,
-            cli.json,
-            &exclude,
-            &only,
-            multiple,
-            message.as_deref(),
-        ),
+            undo,
+            redo,
+            force,
+        } => {
+            // Handle undo/redo operations
+            if undo.is_some() || redo {
+                commands::edit::cmd_undo_redo(root.as_deref(), undo, redo, dry_run, force, cli.json)
+            } else {
+                // Regular edit requires target and action
+                let target = target.expect("Target is required for edit operations");
+                let action = action.expect("Action is required for edit operations");
+
+                commands::edit::cmd_edit(
+                    &target,
+                    action,
+                    root.as_deref(),
+                    dry_run,
+                    cli.json,
+                    &exclude,
+                    &only,
+                    multiple,
+                    message.as_deref(),
+                )
+            }
+        }
         Commands::History(args) => commands::history::run(args, format),
         Commands::Index { action, root } => {
             commands::index::cmd_index(action, root.as_deref(), cli.json)

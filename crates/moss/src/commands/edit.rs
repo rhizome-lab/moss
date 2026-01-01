@@ -833,3 +833,154 @@ fn handle_glob_edit(
     }
     0
 }
+
+/// Handle undo/redo operations on shadow git history.
+pub fn cmd_undo_redo(
+    root: Option<&Path>,
+    undo: Option<usize>,
+    redo: bool,
+    dry_run: bool,
+    force: bool,
+    json: bool,
+) -> i32 {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    let shadow = Shadow::new(&root);
+
+    if !shadow.exists() {
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "error": "No shadow history exists"
+                })
+            );
+        } else {
+            eprintln!("No shadow history exists. Make an edit first with `moss edit`.");
+        }
+        return 1;
+    }
+
+    if redo {
+        match shadow.redo() {
+            Ok(result) => {
+                if json {
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "operation": "redo",
+                            "description": result.description,
+                            "files": result.files.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
+                            "commit": result.undone_commit
+                        })
+                    );
+                } else {
+                    println!("Redone: {}", result.description);
+                    for file in &result.files {
+                        println!("  {}", file.display());
+                    }
+                }
+                0
+            }
+            Err(e) => {
+                if json {
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "error": e.to_string()
+                        })
+                    );
+                } else {
+                    eprintln!("{}", e);
+                }
+                1
+            }
+        }
+    } else if let Some(count) = undo {
+        let count = if count == 0 { 1 } else { count };
+        match shadow.undo(count, dry_run, force) {
+            Ok(results) => {
+                // Collect all conflicts across results
+                let all_conflicts: Vec<_> =
+                    results.iter().flat_map(|r| r.conflicts.clone()).collect();
+
+                if json {
+                    let items: Vec<_> = results
+                        .iter()
+                        .map(|r| {
+                            let mut obj = serde_json::json!({
+                                "description": r.description,
+                                "files": r.files.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
+                                "commit": r.undone_commit
+                            });
+                            if !r.conflicts.is_empty() {
+                                obj["conflicts"] = serde_json::json!(r.conflicts);
+                            }
+                            obj
+                        })
+                        .collect();
+                    let mut output = serde_json::json!({
+                        "operation": if dry_run { "undo_preview" } else { "undo" },
+                        "count": results.len(),
+                        "undone": items
+                    });
+                    if !all_conflicts.is_empty() {
+                        output["has_conflicts"] = serde_json::json!(true);
+                    }
+                    println!("{}", output);
+                } else {
+                    if dry_run {
+                        println!(
+                            "Would undo {} edit{}:",
+                            results.len(),
+                            if results.len() == 1 { "" } else { "s" }
+                        );
+                    } else {
+                        println!(
+                            "Undone {} edit{}:",
+                            results.len(),
+                            if results.len() == 1 { "" } else { "s" }
+                        );
+                    }
+                    for result in &results {
+                        println!("  {} ({})", result.description, result.undone_commit);
+                        for file in &result.files {
+                            println!("    {}", file.display());
+                        }
+                        if !result.conflicts.is_empty() {
+                            println!("    ⚠ Conflicts (modified externally):");
+                            for conflict in &result.conflicts {
+                                println!("      {}", conflict);
+                            }
+                        }
+                    }
+                    if !all_conflicts.is_empty() && dry_run {
+                        println!(
+                            "\n⚠ Warning: {} file(s) modified externally. Use --force to override.",
+                            all_conflicts.len()
+                        );
+                    }
+                }
+                0
+            }
+            Err(e) => {
+                if json {
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "error": e.to_string()
+                        })
+                    );
+                } else {
+                    eprintln!("{}", e);
+                }
+                1
+            }
+        }
+    } else {
+        eprintln!("No undo or redo operation specified");
+        1
+    }
+}

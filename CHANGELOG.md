@@ -12,7 +12,7 @@ See `docs/` for design docs and `README.md` for usage.
   - Works with both symbol paths (`file.rs/Symbol`) and line-based lookup (`file.rs:123`)
   - Shows signature and line number for each referenced type
 
-### Shadow Git (Phase 1)
+### Shadow Git (Phase 1 + Phase 2 Core)
 - Auto-track edits made via `moss edit` for undo/redo capability
 - Shadow repo created on first edit at `.moss/shadow/`
 - `--message`/`--reason` flag on edit command for edit descriptions
@@ -23,6 +23,15 @@ See `docs/` for design docs and `README.md` for usage.
   - `--status` for edits since last git checkpoint
   - `--limit/-n` for controlling output count
 - `[shadow]` config section: `enabled`, `warn_on_delete`
+- **Undo/Redo (Phase 2)**:
+  - `moss edit --undo` reverts the last edit
+  - `moss edit --undo N` reverts the last N edits
+  - `moss edit --undo --dry-run` previews what would be undone
+  - `moss edit --redo` re-applies the last undone edit
+  - Restores files to their previous state from shadow history
+  - **Conflict detection**: blocks undo if files modified externally since last moss edit
+  - `moss edit --undo --force` overrides conflict detection
+  - Dry-run shows which files have conflicts
 - See `docs/design/shadow-git.md` for full design
 
 ### CLI
