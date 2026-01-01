@@ -38,13 +38,6 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - JSON Schema for complex action parameters (currently string-only)
 
 ### View Command
-- [x] Smart Header: `--context` shows referenced types (done)
-  - Same-file and cross-file (via index) type lookup
-  - Works with symbol paths and line-based lookup
-- [x] view.rs split into submodules: file.rs (319), lines.rs (199), symbol.rs (922), tree.rs (214), search.rs (179), mod.rs (429)
-
-### Analyze Command
-- Glob pattern support: `moss analyze 'foo/**/bar.*'` for analyzing symbols matching patterns
 
 ### Code Quality
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
@@ -58,15 +51,6 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
   - Define patterns via tree-sitter queries, whitelist locations
 
 ### `@` Aliases
-- [x] Unified `[sigil]` and `[filter.aliases]` into single `[aliases]` section
-- [x] Target prefix: (`moss view @todo`, `moss edit @config`)
-- [x] Command prefix: `moss @script-name args` runs script with args
-- [x] `moss script run` passes trailing args to scripts
-
-### `moss todo` Future
-- Currently: Rust implementation with file/section detection, format preservation
-- Goal: port `todo.rs` to `@todo` script (Lua + `moss edit` primitives)
-- `add`, `rm`, `done` stay for now (convenience), but room for improvement:
   - These are conceptually `moss edit` ops on markdown
   - `@todo` target prefix is the path toward unification
 - `list` with filters, `clean`, `normalize` → port to Lua script (todo-specific semantics)
@@ -87,11 +71,6 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
   - Key ordering: sort alphabetically by default, `__keyorder` metatable field for explicit order
 
 ### Edit Improvements
-- [x] Fuzzy glob in paths: `moss edit "TODO.md/**/feature*" delete` for item matching
-
-### Tooling
-- [x] Unify glob symbol resolution: `view`, `edit`, `analyze` should share the same `path_resolve` plumbing for glob patterns
-- Documentation freshness: tooling to keep docs in sync with code
   - For moss itself: keep docs/cli/*.md in sync with CLI behavior (lint? generate from --help?)
   - For user projects: detect stale docs in fresh projects (full moss assistance) and legacy codebases (missing/outdated docs)
   - Consider boy scout rule: when touching code, improve nearby docs
@@ -149,8 +128,6 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - Direct download: platform-detected link to latest GitHub release binary (avoid cargo install overhead)
 
 ### Vision (Aspirational)
-- [x] Shadow Git Phase 2-3: complete (see CHANGELOG.md, `docs/design/shadow-git.md`)
-- Verification Loops: domain-specific validation (compiler, linter, tests) before accepting output
 - Synthesis: decompose complex tasks into solvable subproblems (`moss synthesize`)
 - Plugin Architecture: extensible view providers, synthesis strategies, code generators
 
