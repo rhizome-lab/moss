@@ -861,6 +861,7 @@ pub fn cmd_undo_redo(
     redo: bool,
     goto: Option<&str>,
     file_filter: Option<&str>,
+    cross_checkpoint: bool,
     dry_run: bool,
     force: bool,
     json: bool,
@@ -965,7 +966,7 @@ pub fn cmd_undo_redo(
         }
     } else if let Some(count) = undo {
         let count = if count == 0 { 1 } else { count };
-        match shadow.undo(count, file_filter, dry_run, force) {
+        match shadow.undo(count, file_filter, cross_checkpoint, dry_run, force) {
             Ok(results) => {
                 // Collect all conflicts across results
                 let all_conflicts: Vec<_> =

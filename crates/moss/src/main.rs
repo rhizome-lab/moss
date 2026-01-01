@@ -92,6 +92,10 @@ enum Commands {
         #[arg(long = "file", value_name = "PATH")]
         undo_file: Option<String>,
 
+        /// Allow undo to cross git commit boundaries (checkpoints)
+        #[arg(long)]
+        cross_checkpoint: bool,
+
         /// Confirm destructive operations (delete) without prompting
         #[arg(short = 'y', long)]
         yes: bool,
@@ -468,6 +472,7 @@ fn main() {
             force,
             goto,
             undo_file,
+            cross_checkpoint,
             yes,
         } => {
             // Handle undo/redo/goto operations
@@ -478,6 +483,7 @@ fn main() {
                     redo,
                     goto.as_deref(),
                     undo_file.as_deref(),
+                    cross_checkpoint,
                     dry_run,
                     force,
                     cli.json,

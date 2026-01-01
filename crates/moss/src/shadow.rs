@@ -492,10 +492,13 @@ impl Shadow {
     /// If `file_filter` is Some, only undo changes to files matching that path.
     /// If `force` is false, checks for external modifications first and fails
     /// if any files have been modified outside of moss.
+    ///
+    /// If `cross_checkpoint` is false, refuses to undo past a git commit boundary.
     pub fn undo(
         &self,
         count: usize,
         file_filter: Option<&str>,
+        cross_checkpoint: bool,
         dry_run: bool,
         force: bool,
     ) -> Result<Vec<UndoResult>, ShadowError> {
@@ -522,6 +525,19 @@ impl Shadow {
             return Err(ShadowError::Undo(
                 "No edits found matching the file filter".to_string(),
             ));
+        }
+
+        // Check for checkpoint boundaries (git commit changes) unless cross_checkpoint is set
+        if !cross_checkpoint && entries.len() > 1 {
+            let first_git_head = &entries[0].git_head;
+            for entry in entries.iter().skip(1) {
+                if entry.git_head != *first_git_head && entry.git_head != "none" {
+                    return Err(ShadowError::Undo(format!(
+                        "Cannot undo past checkpoint (git commit {}). Use --cross-checkpoint to override.",
+                        entry.git_head
+                    )));
+                }
+            }
         }
 
         // Check for external modifications unless force is set

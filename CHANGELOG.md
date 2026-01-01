@@ -35,6 +35,9 @@ See `docs/` for design docs and `README.md` for usage.
   - `moss edit --goto <ref>` jumps to arbitrary commit in shadow history
   - `moss edit --undo --file <path>` partial undo for specific file only
   - `moss history --all` shows full tree structure with git graph
+  - **Checkpoint integration**: undo respects git commit boundaries
+    - Refuses to undo past a git commit by default
+    - `--cross-checkpoint` allows undoing past real git commits
 - **Phase 3: Security + Polish**:
   - `moss history --prune N` removes old commits, keeping last N
   - `warn_on_delete` config option (default: true) requires `--yes`/`-y` for delete operations

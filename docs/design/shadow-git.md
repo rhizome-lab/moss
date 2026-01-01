@@ -290,7 +290,9 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - [x] `moss history --all` shows full tree structure
 - [x] `moss history <file>` filters to commits affecting that file
 - [x] `moss history --status` shows uncommitted shadow edits
-- [ ] Checkpoint integration: record real git HEAD, respect commit boundaries
+- [x] Checkpoint integration: record real git HEAD, respect commit boundaries
+  - `--undo` refuses to cross git commit boundaries by default
+  - `--cross-checkpoint` allows undoing past real git commits
 
 ### Phase 3: Security + Polish
 - [x] `moss history --prune N` for removing old commits (keep last N)
