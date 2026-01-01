@@ -48,6 +48,13 @@ See `docs/` for design docs and `README.md` for usage.
   - Added `Language::signature_suffix()` trait method for language-specific closing tokens
   - Replaces hardcoded Rust special case with proper trait-based solution
 
+### Edit Command
+- Glob pattern support for symbol deletion: `moss edit "file.py/foo*" delete`
+  - Matches multiple symbols using glob patterns (`*`, `**`, `?`, `[...]`)
+  - Path-based matching for nested symbols: `"TODO.md/Main/Feature*"` matches sections under Main
+  - Deletes from end-to-start for safe byte offset handling
+  - `--dry-run` shows what would be deleted; `--json` for structured output
+
 ### Lua Script Libraries
 
 CLI library (`cli.lua`) - full-featured argument parsing:

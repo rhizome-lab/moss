@@ -89,7 +89,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
   - Key ordering: sort alphabetically by default, `__keyorder` metatable field for explicit order
 
 ### Edit Improvements
-- Fuzzy glob in paths: `moss edit "TODO.md/**/feature*" delete` for item matching
+- [x] Fuzzy glob in paths: `moss edit "TODO.md/**/feature*" delete` for item matching
 
 ### Tooling
 - `moss fetch`: web content retrieval for LLM context (needs design: chunking, streaming, headless browser?)

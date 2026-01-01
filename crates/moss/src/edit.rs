@@ -1,5 +1,6 @@
 use crate::parsers;
-use crate::skeleton::SkeletonExtractor;
+use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
+use glob::Pattern;
 use moss_languages::{support_for_path, Language, SymbolKind};
 use std::path::Path;
 
@@ -79,6 +80,77 @@ impl Editor {
         }
 
         search_symbols(&result.symbols, name, content)
+    }
+
+    /// Check if a pattern contains glob characters
+    pub fn is_glob_pattern(pattern: &str) -> bool {
+        pattern.contains('*') || pattern.contains('?') || pattern.contains('[')
+    }
+
+    /// Find all symbols matching a glob pattern in their path.
+    /// Pattern like "**/Edit*" matches "Moss Roadmap/Backlog/Edit Improvements"
+    pub fn find_symbols_matching(
+        &self,
+        path: &Path,
+        content: &str,
+        pattern: &str,
+    ) -> Vec<SymbolLocation> {
+        let extractor = SkeletonExtractor::new();
+        let result = extractor.extract(path, content);
+
+        let glob = match Pattern::new(pattern) {
+            Ok(g) => g,
+            Err(_) => return Vec::new(),
+        };
+
+        fn line_to_byte(content: &str, line: usize) -> usize {
+            content
+                .lines()
+                .take(line.saturating_sub(1))
+                .map(|l| l.len() + 1)
+                .sum()
+        }
+
+        fn collect_matching(
+            symbols: &[SkeletonSymbol],
+            glob: &Pattern,
+            content: &str,
+            parent_path: &str,
+            matches: &mut Vec<SymbolLocation>,
+        ) {
+            for sym in symbols {
+                let sym_path = if parent_path.is_empty() {
+                    sym.name.clone()
+                } else {
+                    format!("{}/{}", parent_path, sym.name)
+                };
+
+                if glob.matches(&sym_path) {
+                    let start_byte = line_to_byte(content, sym.start_line);
+                    let end_byte = line_to_byte(content, sym.end_line + 1);
+
+                    matches.push(SymbolLocation {
+                        name: sym.name.clone(),
+                        kind: sym.kind.as_str().to_string(),
+                        start_byte,
+                        end_byte,
+                        start_line: sym.start_line,
+                        end_line: sym.end_line,
+                        indent: String::new(),
+                    });
+                }
+
+                // Recurse into children
+                collect_matching(&sym.children, glob, content, &sym_path, matches);
+            }
+        }
+
+        let mut matches = Vec::new();
+        collect_matching(&result.symbols, &glob, content, "", &mut matches);
+
+        // Sort by start position (reverse for safe deletion from end to start)
+        matches.sort_by(|a, b| b.start_byte.cmp(&a.start_byte));
+        matches
     }
 
     /// Delete a symbol from the content

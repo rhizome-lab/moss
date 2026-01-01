@@ -183,6 +183,23 @@ pub fn cmd_edit(
     }
 
     // Symbol-level operations
+    let symbol_pattern = unified.symbol_path.join("/");
+
+    // Check if this is a glob pattern (contains *, ?, or [)
+    if edit::Editor::is_glob_pattern(&symbol_pattern) {
+        return handle_glob_edit(
+            &symbol_pattern,
+            action,
+            &editor,
+            &content,
+            &file_path,
+            &unified.file_path,
+            dry_run,
+            json,
+        );
+    }
+
+    // Exact symbol match
     let symbol_name = unified.symbol_path.last().unwrap();
     let loc = match editor.find_symbol(&file_path, &content, symbol_name) {
         Some(l) => l,
@@ -446,4 +463,102 @@ fn output_result(
     }
 
     0
+}
+
+/// Handle glob pattern edits (multi-symbol operations)
+#[allow(clippy::too_many_arguments)]
+fn handle_glob_edit(
+    pattern: &str,
+    action: EditAction,
+    editor: &edit::Editor,
+    content: &str,
+    file_path: &std::path::PathBuf,
+    rel_path: &str,
+    dry_run: bool,
+    json: bool,
+) -> i32 {
+    let matches = editor.find_symbols_matching(file_path, content, pattern);
+
+    if matches.is_empty() {
+        eprintln!("No symbols match pattern: {}", pattern);
+        return 1;
+    }
+
+    // Only delete is supported for multi-match operations currently
+    match action {
+        EditAction::Delete => {
+            // Matches are sorted in reverse order (highest byte offset first)
+            // This ensures we can delete from end to start without offset shifts
+            let mut new_content = content.to_string();
+            let count = matches.len();
+
+            for loc in &matches {
+                new_content = editor.delete_symbol(&new_content, loc);
+            }
+
+            if dry_run {
+                if json {
+                    let names: Vec<&str> = matches.iter().map(|m| m.name.as_str()).collect();
+                    let obj = serde_json::json!({
+                        "dry_run": true,
+                        "file": rel_path,
+                        "operation": "delete",
+                        "pattern": pattern,
+                        "matched_count": count,
+                        "matched_symbols": names,
+                        "new_content": new_content
+                    });
+                    println!("{}", obj);
+                } else {
+                    println!(
+                        "--- Dry run: delete {} symbols matching '{}' ---",
+                        count, pattern
+                    );
+                    for m in &matches {
+                        println!("  - {} ({})", m.name, m.kind);
+                    }
+                    println!("{}", new_content);
+                }
+                return 0;
+            }
+
+            if let Err(e) = std::fs::write(file_path, &new_content) {
+                eprintln!("Error writing file: {}", e);
+                return 1;
+            }
+
+            if json {
+                let names: Vec<&str> = matches.iter().map(|m| m.name.as_str()).collect();
+                let obj = serde_json::json!({
+                    "success": true,
+                    "file": rel_path,
+                    "operation": "delete",
+                    "pattern": pattern,
+                    "deleted_count": count,
+                    "deleted_symbols": names
+                });
+                println!("{}", obj);
+            } else {
+                println!("Deleted {} symbols matching '{}':", count, pattern);
+                for m in &matches {
+                    println!("  - {} ({})", m.name, m.kind);
+                }
+            }
+            0
+        }
+
+        _ => {
+            eprintln!("Error: Glob patterns currently only support 'delete' operation");
+            eprintln!(
+                "Matched {} symbols: {}",
+                matches.len(),
+                matches
+                    .iter()
+                    .map(|m| m.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+            1
+        }
+    }
 }
