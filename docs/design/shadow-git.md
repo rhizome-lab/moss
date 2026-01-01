@@ -47,13 +47,23 @@ Optional `--message` (or `--reason`) flag attaches a description to the edit, di
 ```bash
 moss edit --undo              # Revert last moss edit, prints what was undone
 moss edit --undo 3            # Revert last 3 edits, prints summary of each
+moss edit --undo --dry-run    # Preview what would be undone
 moss edit --redo              # Re-apply last undone edit
-moss edit --history           # Show recent moss edits
-moss edit --history src/foo.rs  # Show edits for specific file
-moss edit --history --json    # Machine-readable output (for LLM/scripting)
-moss edit --diff <ref>        # Show what a commit changed (without undoing)
-moss edit --diff 2            # Diff for commit 2
+moss edit --goto <ref>        # Jump to specific commit
 ```
+
+### History (read-only)
+```bash
+moss history                  # Show recent moss edits
+moss history src/foo.rs       # Show edits for specific file
+moss history --all            # Show full tree structure
+moss history --json           # Machine-readable output (for LLM/scripting)
+moss history --status         # Uncommitted shadow edits since last git commit
+moss history --diff <ref>     # Show what a commit changed
+moss history --diff 2         # Diff for commit 2
+```
+
+Note: Read-only operations moved to `moss history` (cleaner than `moss edit --history`). Mutations (`--undo`, `--redo`, `--goto`, `--prune`) stay with `moss edit`.
 
 Undo output includes:
 - Files changed
@@ -235,24 +245,25 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - [ ] Create `.moss/shadow/` git repo on first `moss edit`
 - [ ] Commit file state before each edit
 - [ ] `--message`/`--reason` flag for edit descriptions
-- [ ] `--history` to list recent edits
-- [ ] `--history --json` for machine-readable output
-- [ ] `--diff <ref>` to view changes without undoing
+- [ ] `moss history` command (list recent edits)
+- [ ] `moss history --json` for machine-readable output
+- [ ] `moss history --diff <ref>` to view changes
 
 ### Phase 2: Undo/Redo + Git Integration
-- [ ] `--undo` applies reverse patch, moves HEAD backward, prints summary
-- [ ] `--undo N` reverts N edits in sequence
-- [ ] `--undo --file` partial undo for specific file
-- [ ] `--undo --hunk` interactive hunk-level undo
-- [ ] `--show-hunks` and `--undo --hunk-id` for non-interactive hunk selection
-- [ ] `--undo --lines` for line-range based undo
-- [ ] `--redo` moves HEAD forward, applies patch (error if at branch point)
-- [ ] `--goto <ref>` jumps to arbitrary commit
+- [ ] `moss edit --undo` applies reverse patch, moves HEAD backward
+- [ ] `moss edit --undo N` reverts N edits in sequence
+- [ ] `moss edit --undo --dry-run` preview without applying
+- [ ] `moss edit --undo --file` partial undo for specific file
+- [ ] `moss edit --undo --hunk` interactive hunk-level undo
+- [ ] `moss history --show-hunks` and `moss edit --undo --hunk-id` for non-interactive
+- [ ] `moss edit --undo --lines` for line-range based undo
+- [ ] `moss edit --redo` moves HEAD forward
+- [ ] `moss edit --goto <ref>` jumps to arbitrary commit
 - [ ] Conflict detection and `--force-undo` for external modifications
-- [ ] `--history --all` shows full tree structure
-- [ ] `--history <file>` filters to commits affecting that file
+- [ ] `moss history --all` shows full tree structure
+- [ ] `moss history <file>` filters to commits affecting that file
+- [ ] `moss history --status` shows uncommitted shadow edits
 - [ ] Checkpoint integration: record real git HEAD, respect commit boundaries
-- [ ] `--status` shows uncommitted shadow edits
 
 ### Phase 3: Security + Polish
 - [ ] `--prune` for removing commits/branches
@@ -281,7 +292,7 @@ delete: old_fn in src/foo.rs
 $ moss edit src/foo.rs/helper rename new_helper
 rename: helper -> new_helper in src/foo.rs
 
-$ moss edit --history
+$ moss history
   2. [HEAD] rename: helper -> new_helper in src/foo.rs
   1. delete: old_fn in src/foo.rs "Cleanup"
 
@@ -296,7 +307,7 @@ $ moss edit src/foo.rs/new_fn insert "fn new_fn() {}"
 insert: new_fn in src/foo.rs
 (created branch from initial state)
 
-$ moss edit --history --all
+$ moss history --all
   * 3. [HEAD] insert: new_fn in src/foo.rs
   |
   | 2. rename: helper -> new_helper in src/foo.rs
@@ -326,7 +337,7 @@ $ moss edit --undo
 error: Cannot undo past checkpoint (git commit abc123).
 hint: Use --undo --cross-checkpoint to undo past real git commits.
 
-$ moss edit --status
+$ moss history --status
 Shadow edits since last commit: 0
 Last checkpoint: abc123 "Remove bar"
 ```
