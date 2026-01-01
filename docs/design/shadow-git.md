@@ -26,6 +26,7 @@ Philosophy:
 - **Err on the side of keeping data** - disk is cheap, lost work is expensive
 - **Shadow is invisible until needed** - zero friction for normal workflow
 - **Real git is source of truth** - shadow serves the gap between edits and commits
+- **Minimize friction, maximize affordances** - prompts default to the common/safe choice (e.g., global prune defaults to yes for security)
 
 ## Core Features
 
@@ -272,8 +273,9 @@ Uses `git filter-branch` or similar under the hood. Important for:
 - **Rationale**: Shadow tracks file state, which differs per worktree. Config consistency with current worktree state is cleaner.
 - **Implementation**: Shadow repo at `.moss/shadow/` within each worktree's directory
 - **Pruning across worktrees**:
-  - `--prune` warns if same file has shadow history in other worktrees
-  - `--prune --all-worktrees` applies prune globally (for security incidents)
+  - `--prune` detects if same file has shadow history in other worktrees
+  - If so, prompts: "Also prune in N other worktrees? [Y/n]" (default: yes)
+  - `--prune --local` skips prompt, prunes only current worktree
 
 ## Implementation Plan
 
