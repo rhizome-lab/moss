@@ -85,6 +85,39 @@ if failed:
 
 Now we have `shadow.*` for this.
 
+## Unification Opportunities
+
+Fewer concepts = less cognitive load.
+
+### Task = Task
+
+No separate "TaskTree" vs "TaskList". A task has optional subtasks. That's a tree. Flattened, it's a list. Same data structure.
+
+```lua
+task = {
+  goal = "implement feature",
+  subtasks = {  -- optional
+    { goal = "understand code" },
+    { goal = "write impl" },
+    { goal = "add tests" },
+  }
+}
+```
+
+### One Invocation Format
+
+Don't support 5 formats. Pick one.
+
+Text/shell-style is probably right - it's what LLMs see in training data. JSON schemas are learned; shell commands are native.
+
+The "structured tool call" is the provider's problem (Anthropic tool_use, OpenAI function_call). Our agent just emits text.
+
+### Context is Context
+
+No separate concepts for "conversation", "memory", "relevant code", "system prompt". It's all strings in the prompt.
+
+The only question is what goes in and what stays out. That's curation, not categorization.
+
 ## Open Questions
 
 ### Tool Invocation Format
@@ -235,8 +268,7 @@ Not doing **A1/A2** (agent adaptation) - that requires fine-tuning LLMs, outside
 
 ## Next Steps
 
-1. Decide on tool invocation format (experiment?)
-2. Design context management strategy
-3. Port TaskTree/TaskList concepts if useful
-4. Add cost tracking
-5. Implement loop detection
+1. Decide on tool invocation format (experiment with text vs structured?)
+2. Prototype minimal agent loop (just the 4 lines: gather, decide, execute, check)
+3. Implement loop detection
+4. Test with real tasks, observe friction
