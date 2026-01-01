@@ -474,6 +474,7 @@ pub async fn cmd_sessions_serve(project: Option<&Path>, port: u16) -> i32 {
     let app = Router::new()
         .route("/", get(sessions_index))
         .route("/session/{id}", get(session_detail))
+        .route("/session/{id}/chat", get(session_chat))
         .route("/session/{id}/raw", get(session_raw))
         .with_state(state);
 
@@ -548,7 +549,7 @@ async fn sessions_index(State(state): State<Arc<SessionsState>>) -> Html<String>
     Html(html)
 }
 
-/// Session detail page: show analysis.
+/// Session detail page: show analysis with link to chat.
 async fn session_detail(
     State(state): State<Arc<SessionsState>>,
     AxumPath(id): AxumPath<String>,
@@ -559,12 +560,40 @@ async fn session_detail(
     let analysis = analyze_session(path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let mut html = String::from(HTML_HEADER);
-    html.push_str(&format!("<h1>Session: {}</h1>\n", id));
-    html.push_str("<p><a href=\"/\">← Back to list</a></p>\n");
+    html.push_str(&format!("<h1>Session: {}</h1>\n", html_escape(&id)));
+    html.push_str(&format!(
+        "<p><a href=\"/\">← Back</a> | <a href=\"/session/{}/chat\">View Chat</a> | <a href=\"/session/{}/raw\">Raw</a></p>\n",
+        id, id
+    ));
 
     // Render analysis as HTML
     html.push_str("<div class=\"analysis\">\n");
     html.push_str(&render_analysis_html(&analysis));
+    html.push_str("</div>\n");
+
+    html.push_str(HTML_FOOTER);
+    Ok(Html(html))
+}
+
+/// Session chat page: render full conversation.
+async fn session_chat(
+    State(state): State<Arc<SessionsState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Html<String>, StatusCode> {
+    let paths = resolve_session_paths(&id, state.project.as_deref());
+    let path = paths.first().ok_or(StatusCode::NOT_FOUND)?;
+
+    let content = std::fs::read_to_string(path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mut html = String::from(HTML_HEADER_CHAT);
+    html.push_str(&format!("<h1>Session: {}</h1>\n", html_escape(&id)));
+    html.push_str(&format!(
+        "<p><a href=\"/\">← Back</a> | <a href=\"/session/{}\">Analysis</a> | <a href=\"/session/{}/raw\">Raw</a></p>\n",
+        id, id
+    ));
+
+    html.push_str("<div class=\"chat\">\n");
+    html.push_str(&render_chat_html(&content));
     html.push_str("</div>\n");
 
     html.push_str(HTML_FOOTER);
@@ -688,6 +717,271 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
+/// Render JSONL chat log as HTML.
+fn render_chat_html(content: &str) -> String {
+    use serde_json::Value;
+
+    let mut html = String::new();
+
+    for line in content.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let Ok(entry) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+
+        // Detect format and render accordingly
+        if let Some(msg_type) = entry.get("type").and_then(|v| v.as_str()) {
+            match msg_type {
+                // Claude Code format
+                "user" => {
+                    if let Some(content) = extract_message_content(&entry) {
+                        html.push_str(&format!(
+                            "<div class=\"message user\"><div class=\"role\">User</div><div class=\"content\">{}</div></div>\n",
+                            render_content_blocks(&content)
+                        ));
+                    }
+                }
+                "assistant" => {
+                    if let Some(content) = extract_message_content(&entry) {
+                        html.push_str(&format!(
+                            "<div class=\"message assistant\"><div class=\"role\">Assistant</div><div class=\"content\">{}</div></div>\n",
+                            render_content_blocks(&content)
+                        ));
+                    }
+                }
+                "summary" => {
+                    if let Some(summary) = entry.get("summary").and_then(|v| v.as_str()) {
+                        html.push_str(&format!(
+                            "<div class=\"message summary\"><div class=\"role\">Summary</div><div class=\"content\"><pre>{}</pre></div></div>\n",
+                            html_escape(summary)
+                        ));
+                    }
+                }
+                // Codex format - check payload.type
+                "response_item" | "event_msg" => {
+                    if let Some(payload) = entry.get("payload") {
+                        render_codex_payload(&mut html, payload);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if html.is_empty() {
+        html.push_str("<p>No messages found in this session.</p>");
+    }
+
+    html
+}
+
+fn extract_message_content(entry: &serde_json::Value) -> Option<&serde_json::Value> {
+    entry.get("message").and_then(|m| m.get("content"))
+}
+
+fn render_content_blocks(content: &serde_json::Value) -> String {
+    let mut html = String::new();
+
+    if let Some(arr) = content.as_array() {
+        for block in arr {
+            let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            match block_type {
+                "text" => {
+                    if let Some(text) = block.get("text").and_then(|v| v.as_str()) {
+                        html.push_str(&format!(
+                            "<div class=\"text\">{}</div>",
+                            render_markdown(text)
+                        ));
+                    }
+                }
+                "tool_use" => {
+                    let name = block
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown");
+                    let input = block.get("input");
+                    html.push_str(&format!(
+                        "<div class=\"tool-use\"><span class=\"tool-name\">{}</span>",
+                        html_escape(name)
+                    ));
+                    if let Some(inp) = input {
+                        let json_str = serde_json::to_string_pretty(inp).unwrap_or_default();
+                        // Truncate very long inputs
+                        let display = if json_str.len() > 2000 {
+                            format!("{}...[truncated]", &json_str[..2000])
+                        } else {
+                            json_str
+                        };
+                        html.push_str(&format!(
+                            "<pre class=\"tool-input\">{}</pre>",
+                            html_escape(&display)
+                        ));
+                    }
+                    html.push_str("</div>");
+                }
+                "tool_result" => {
+                    let is_error = block
+                        .get("is_error")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    let result_class = if is_error {
+                        "tool-result error"
+                    } else {
+                        "tool-result"
+                    };
+                    html.push_str(&format!("<div class=\"{}\">", result_class));
+
+                    if let Some(content) = block.get("content") {
+                        if let Some(text) = content.as_str() {
+                            let display = if text.len() > 5000 {
+                                format!("{}...[truncated]", &text[..5000])
+                            } else {
+                                text.to_string()
+                            };
+                            html.push_str(&format!("<pre>{}</pre>", html_escape(&display)));
+                        } else if let Some(arr) = content.as_array() {
+                            for item in arr {
+                                if let Some(text) = item.get("text").and_then(|v| v.as_str()) {
+                                    let display = if text.len() > 5000 {
+                                        format!("{}...[truncated]", &text[..5000])
+                                    } else {
+                                        text.to_string()
+                                    };
+                                    html.push_str(&format!("<pre>{}</pre>", html_escape(&display)));
+                                }
+                            }
+                        }
+                    }
+                    html.push_str("</div>");
+                }
+                _ => {}
+            }
+        }
+    } else if let Some(text) = content.as_str() {
+        html.push_str(&format!(
+            "<div class=\"text\">{}</div>",
+            render_markdown(text)
+        ));
+    }
+
+    html
+}
+
+fn render_codex_payload(html: &mut String, payload: &serde_json::Value) {
+    let payload_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
+    match payload_type {
+        "message" => {
+            let role = payload
+                .get("role")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            if let Some(content) = payload.get("content") {
+                let role_class = if role == "user" { "user" } else { "assistant" };
+                let role_display = if role == "user" { "User" } else { "Assistant" };
+                html.push_str(&format!(
+                    "<div class=\"message {}\"><div class=\"role\">{}</div><div class=\"content\">",
+                    role_class, role_display
+                ));
+
+                if let Some(arr) = content.as_array() {
+                    for block in arr {
+                        if let Some(text) = block.get("text").and_then(|v| v.as_str()) {
+                            html.push_str(&format!(
+                                "<div class=\"text\">{}</div>",
+                                render_markdown(text)
+                            ));
+                        }
+                    }
+                }
+                html.push_str("</div></div>\n");
+            }
+        }
+        "function_call" => {
+            let name = payload
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            let args = payload
+                .get("arguments")
+                .and_then(|v| v.as_str())
+                .unwrap_or("{}");
+            html.push_str(&format!(
+                "<div class=\"message assistant\"><div class=\"tool-use\"><span class=\"tool-name\">{}</span><pre class=\"tool-input\">{}</pre></div></div>\n",
+                html_escape(name),
+                html_escape(args)
+            ));
+        }
+        "function_call_output" => {
+            let output = payload.get("output").and_then(|v| v.as_str()).unwrap_or("");
+            let display = if output.len() > 5000 {
+                format!("{}...[truncated]", &output[..5000])
+            } else {
+                output.to_string()
+            };
+            html.push_str(&format!(
+                "<div class=\"tool-result\"><pre>{}</pre></div>\n",
+                html_escape(&display)
+            ));
+        }
+        "reasoning" | "agent_reasoning" => {
+            if let Some(summary) = payload.get("summary").and_then(|v| v.as_array()) {
+                for item in summary {
+                    if let Some(text) = item.get("text").and_then(|v| v.as_str()) {
+                        html.push_str(&format!(
+                            "<div class=\"reasoning\"><em>{}</em></div>\n",
+                            html_escape(text)
+                        ));
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Simple markdown-ish rendering (code blocks, bold, links).
+fn render_markdown(text: &str) -> String {
+    let escaped = html_escape(text);
+
+    // Code blocks: ```...```
+    let mut result = String::new();
+    let mut in_code_block = false;
+    let mut code_content = String::new();
+
+    for line in escaped.lines() {
+        if line.starts_with("```") {
+            if in_code_block {
+                result.push_str(&format!("<pre><code>{}</code></pre>", code_content.trim()));
+                code_content.clear();
+                in_code_block = false;
+            } else {
+                in_code_block = true;
+            }
+        } else if in_code_block {
+            code_content.push_str(line);
+            code_content.push('\n');
+        } else {
+            // Inline code: `...`
+            let line = regex::Regex::new(r"`([^`]+)`")
+                .unwrap()
+                .replace_all(line, "<code>$1</code>");
+            result.push_str(&line);
+            result.push_str("<br>");
+        }
+    }
+
+    // Close unclosed code block
+    if in_code_block && !code_content.is_empty() {
+        result.push_str(&format!("<pre><code>{}</code></pre>", code_content.trim()));
+    }
+
+    result
+}
+
 const HTML_HEADER: &str = r#"<!DOCTYPE html>
 <html>
 <head>
@@ -707,6 +1001,40 @@ code { background: #0f0f23; padding: 0.2rem 0.4rem; border-radius: 3px; font-siz
 .analysis { margin-top: 1rem; }
 ul { list-style: none; padding-left: 0; }
 li { margin: 0.5rem 0; }
+</style>
+</head>
+<body>
+"#;
+
+const HTML_HEADER_CHAT: &str = r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moss Sessions - Chat</title>
+<style>
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 1rem; background: #1a1a2e; color: #eee; }
+h1, h2, h3 { color: #fff; }
+a { color: #6eb5ff; }
+.chat { margin-top: 1rem; }
+.message { margin: 1rem 0; padding: 1rem; border-radius: 8px; }
+.message.user { background: #16213e; border-left: 3px solid #6eb5ff; }
+.message.assistant { background: #1a1a2e; border-left: 3px solid #4ade80; }
+.message.summary { background: #2d1f3d; border-left: 3px solid #a78bfa; }
+.role { font-weight: bold; margin-bottom: 0.5rem; color: #888; font-size: 0.85em; text-transform: uppercase; }
+.content { line-height: 1.6; }
+.text { margin: 0.5rem 0; }
+.tool-use { background: #0f0f23; padding: 0.75rem; border-radius: 4px; margin: 0.5rem 0; border: 1px solid #333; }
+.tool-name { color: #f59e0b; font-weight: bold; font-family: monospace; }
+.tool-input { margin: 0.5rem 0 0 0; font-size: 0.85em; max-height: 300px; overflow: auto; }
+.tool-result { background: #0a0a15; padding: 0.75rem; border-radius: 4px; margin: 0.5rem 0; border: 1px solid #222; }
+.tool-result.error { border-color: #ef4444; background: #1f0a0a; }
+.tool-result pre { margin: 0; font-size: 0.85em; max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.reasoning { color: #888; font-style: italic; margin: 0.5rem 0; padding: 0.5rem; background: #0f0f23; border-radius: 4px; }
+pre, code { font-family: 'Fira Code', 'Consolas', monospace; background: #0f0f23; }
+code { padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.9em; }
+pre { padding: 0.75rem; border-radius: 4px; overflow-x: auto; }
+pre code { padding: 0; background: none; }
 </style>
 </head>
 <body>
