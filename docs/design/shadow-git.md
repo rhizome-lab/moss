@@ -63,6 +63,40 @@ moss history --diff <ref>     # Show what a commit changed
 moss history --diff 2         # Diff for commit 2
 ```
 
+JSON output example (`moss history --json`):
+```json
+{
+  "head": 3,
+  "checkpoint": "abc123",
+  "edits": [
+    {
+      "id": 3,
+      "operation": "insert",
+      "target": "src/foo.rs/new_fn",
+      "files": ["src/foo.rs"],
+      "message": null,
+      "workflow": null,
+      "git_head": "abc123",
+      "timestamp": "2025-01-15T10:30:00Z",
+      "parent": 0,
+      "children": []
+    },
+    {
+      "id": 2,
+      "operation": "rename",
+      "target": "src/foo.rs/helper",
+      "files": ["src/foo.rs"],
+      "message": null,
+      "workflow": null,
+      "git_head": "def456",
+      "timestamp": "2025-01-15T10:25:00Z",
+      "parent": 1,
+      "children": []
+    }
+  ]
+}
+```
+
 Note: `moss history` is the primary interface for shadow git. Mutations (`--undo`, `--redo`, `--goto`) work on both `moss history` and `moss edit` for convenience.
 
 Undo output includes:
@@ -234,10 +268,12 @@ Uses `git filter-branch` or similar under the hood. Important for:
 
 ### D6: Multiple worktrees
 - **Problem**: User may have multiple git worktrees of the same repo. Each worktree has its own file state.
-- **Decision**: Each worktree gets its own shadow repo (`.moss/shadow/` is per-worktree)
-- **Rationale**: Shadow tracks file state, which differs per worktree. Sharing would cause conflicts.
-- **Implementation**: Shadow repo path includes worktree identifier if in a linked worktree
-- **Open question**: Should shadow repos share any state? (e.g., pruning decisions, retention policy)
+- **Decision**: Each worktree gets its own shadow repo, sharing nothing
+- **Rationale**: Shadow tracks file state, which differs per worktree. Config consistency with current worktree state is cleaner.
+- **Implementation**: Shadow repo at `.moss/shadow/` within each worktree's directory
+- **Pruning across worktrees**:
+  - `--prune` warns if same file has shadow history in other worktrees
+  - `--prune --all-worktrees` applies prune globally (for security incidents)
 
 ## Implementation Plan
 
