@@ -179,4 +179,5 @@ Session handoffs: Add "Next Up" section to TODO.md with 3-5 tasks. Goal is to co
 ### Commits
 
 Commit consistently. Each commit = one logical change.
+Avoid tiny commits - batch related changes unless they're truly independent logical units.
 Move completed TODOs to CHANGELOG.md.

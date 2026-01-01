@@ -49,11 +49,13 @@ See `docs/` for design docs and `README.md` for usage.
   - Replaces hardcoded Rust special case with proper trait-based solution
 
 ### Edit Command
-- Glob pattern support for symbol deletion: `moss edit "file.py/foo*" delete`
-  - Matches multiple symbols using glob patterns (`*`, `**`, `?`, `[...]`)
+- Glob pattern support for multi-symbol operations: `moss edit "file.py/foo*" delete --multiple`
+  - Matches symbols using glob patterns (`*`, `**`, `?`, `[...]`)
   - Path-based matching for nested symbols: `"TODO.md/Main/Feature*"` matches sections under Main
-  - Deletes from end-to-start for safe byte offset handling
-  - `--dry-run` shows what would be deleted; `--json` for structured output
+  - `--multiple` flag required when pattern matches more than one symbol (safety)
+  - Supports `delete` and `replace` operations on multiple matches
+  - Applies changes from end-to-start for safe byte offset handling
+  - `--dry-run` shows what would be changed; `--json` for structured output
 
 ### Lua Script Libraries
 

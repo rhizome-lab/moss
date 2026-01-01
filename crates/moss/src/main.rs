@@ -62,6 +62,10 @@ enum Commands {
         /// Only include files matching patterns or aliases
         #[arg(long, value_delimiter = ',', global = true)]
         only: Vec<String>,
+
+        /// Allow glob patterns to match multiple symbols
+        #[arg(long, global = true)]
+        multiple: bool,
     },
 
     /// Manage file index
@@ -425,6 +429,7 @@ fn main() {
             dry_run,
             exclude,
             only,
+            multiple,
         } => commands::edit::cmd_edit(
             &target,
             action,
@@ -433,6 +438,7 @@ fn main() {
             cli.json,
             &exclude,
             &only,
+            multiple,
         ),
         Commands::Index { action, root } => {
             commands::index::cmd_index(action, root.as_deref(), cli.json)

@@ -99,6 +99,7 @@ pub enum EditAction {
 }
 
 /// Perform structural edits on a file
+#[allow(clippy::too_many_arguments)]
 pub fn cmd_edit(
     target: &str,
     action: EditAction,
@@ -107,6 +108,7 @@ pub fn cmd_edit(
     json: bool,
     exclude: &[String],
     only: &[String],
+    multiple: bool,
 ) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
@@ -196,6 +198,7 @@ pub fn cmd_edit(
             &unified.file_path,
             dry_run,
             json,
+            multiple,
         );
     }
 
@@ -476,6 +479,7 @@ fn handle_glob_edit(
     rel_path: &str,
     dry_run: bool,
     json: bool,
+    multiple: bool,
 ) -> i32 {
     let matches = editor.find_symbols_matching(file_path, content, pattern);
 
@@ -484,81 +488,103 @@ fn handle_glob_edit(
         return 1;
     }
 
-    // Only delete is supported for multi-match operations currently
-    match action {
+    let count = matches.len();
+
+    // Require --multiple flag when matching more than one symbol
+    if count > 1 && !multiple {
+        eprintln!(
+            "Error: Pattern '{}' matches {} symbols. Use --multiple to confirm.",
+            pattern, count
+        );
+        for m in &matches {
+            eprintln!("  - {} ({})", m.name, m.kind);
+        }
+        return 1;
+    }
+    let names: Vec<&str> = matches.iter().map(|m| m.name.as_str()).collect();
+
+    // Matches are sorted in reverse order (highest byte offset first)
+    // This ensures we can apply changes from end to start without offset shifts
+    let (operation, new_content) = match action {
         EditAction::Delete => {
-            // Matches are sorted in reverse order (highest byte offset first)
-            // This ensures we can delete from end to start without offset shifts
-            let mut new_content = content.to_string();
-            let count = matches.len();
-
+            let mut result = content.to_string();
             for loc in &matches {
-                new_content = editor.delete_symbol(&new_content, loc);
+                result = editor.delete_symbol(&result, loc);
             }
+            ("delete", result)
+        }
 
-            if dry_run {
-                if json {
-                    let names: Vec<&str> = matches.iter().map(|m| m.name.as_str()).collect();
-                    let obj = serde_json::json!({
-                        "dry_run": true,
-                        "file": rel_path,
-                        "operation": "delete",
-                        "pattern": pattern,
-                        "matched_count": count,
-                        "matched_symbols": names,
-                        "new_content": new_content
-                    });
-                    println!("{}", obj);
-                } else {
-                    println!(
-                        "--- Dry run: delete {} symbols matching '{}' ---",
-                        count, pattern
-                    );
-                    for m in &matches {
-                        println!("  - {} ({})", m.name, m.kind);
-                    }
-                    println!("{}", new_content);
-                }
-                return 0;
+        EditAction::Replace {
+            content: ref new_code,
+        } => {
+            let mut result = content.to_string();
+            for loc in &matches {
+                result = editor.replace_symbol(&result, loc, new_code);
             }
-
-            if let Err(e) = std::fs::write(file_path, &new_content) {
-                eprintln!("Error writing file: {}", e);
-                return 1;
-            }
-
-            if json {
-                let names: Vec<&str> = matches.iter().map(|m| m.name.as_str()).collect();
-                let obj = serde_json::json!({
-                    "success": true,
-                    "file": rel_path,
-                    "operation": "delete",
-                    "pattern": pattern,
-                    "deleted_count": count,
-                    "deleted_symbols": names
-                });
-                println!("{}", obj);
-            } else {
-                println!("Deleted {} symbols matching '{}':", count, pattern);
-                for m in &matches {
-                    println!("  - {} ({})", m.name, m.kind);
-                }
-            }
-            0
+            ("replace", result)
         }
 
         _ => {
-            eprintln!("Error: Glob patterns currently only support 'delete' operation");
-            eprintln!(
-                "Matched {} symbols: {}",
-                matches.len(),
-                matches
-                    .iter()
-                    .map(|m| m.name.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
+            eprintln!("Error: Glob patterns only support 'delete' and 'replace' operations");
+            eprintln!("Matched {} symbols: {}", count, names.join(", "));
+            return 1;
+        }
+    };
+
+    if dry_run {
+        if json {
+            let obj = serde_json::json!({
+                "dry_run": true,
+                "file": rel_path,
+                "operation": operation,
+                "pattern": pattern,
+                "matched_count": count,
+                "matched_symbols": names,
+                "new_content": new_content
+            });
+            println!("{}", obj);
+        } else {
+            println!(
+                "--- Dry run: {} {} symbols matching '{}' ---",
+                operation, count, pattern
             );
-            1
+            for m in &matches {
+                println!("  - {} ({})", m.name, m.kind);
+            }
+            println!("{}", new_content);
+        }
+        return 0;
+    }
+
+    if let Err(e) = std::fs::write(file_path, &new_content) {
+        eprintln!("Error writing file: {}", e);
+        return 1;
+    }
+
+    if json {
+        let obj = serde_json::json!({
+            "success": true,
+            "file": rel_path,
+            "operation": operation,
+            "pattern": pattern,
+            "count": count,
+            "symbols": names
+        });
+        println!("{}", obj);
+    } else {
+        println!(
+            "{} {} symbols matching '{}':",
+            if operation == "delete" {
+                "Deleted"
+            } else {
+                "Replaced"
+            },
+            count,
+            pattern
+        );
+        for m in &matches {
+            println!("  - {} ({})", m.name, m.kind);
         }
     }
+    0
 }
