@@ -53,8 +53,8 @@ See `docs/` for design docs and `README.md` for usage.
   - Matches symbols using glob patterns (`*`, `**`, `?`, `[...]`)
   - Path-based matching for nested symbols: `"TODO.md/Main/Feature*"` matches sections under Main
   - `--multiple` flag required when pattern matches more than one symbol (safety)
-  - Supports `delete` and `replace` operations on multiple matches
-  - Applies changes from end-to-start for safe byte offset handling
+  - Supports all operations except `swap`: delete, replace, insert, move, copy
+  - Preserves original file order when moving/copying multiple symbols
   - `--dry-run` shows what would be changed; `--json` for structured output
 
 ### Lua Script Libraries

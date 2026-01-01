@@ -524,8 +524,169 @@ fn handle_glob_edit(
             ("replace", result)
         }
 
-        _ => {
-            eprintln!("Error: Glob patterns only support 'delete' and 'replace' operations");
+        EditAction::Insert {
+            content: ref insert_content,
+            at,
+        } => {
+            let mut result = content.to_string();
+            for loc in &matches {
+                result = match at {
+                    Position::Before => editor.insert_before(&result, loc, insert_content),
+                    Position::After => editor.insert_after(&result, loc, insert_content),
+                    Position::Prepend | Position::Append => {
+                        // For prepend/append, each match must be a container
+                        match editor.find_container_body(file_path, &result, &loc.name) {
+                            Some(body) => {
+                                if matches!(at, Position::Prepend) {
+                                    editor.prepend_to_container(&result, &body, insert_content)
+                                } else {
+                                    editor.append_to_container(&result, &body, insert_content)
+                                }
+                            }
+                            None => {
+                                eprintln!("Error: '{}' is not a container", loc.name);
+                                return 1;
+                            }
+                        }
+                    }
+                };
+            }
+            (
+                match at {
+                    Position::Before => "insert_before",
+                    Position::After => "insert_after",
+                    Position::Prepend => "prepend",
+                    Position::Append => "append",
+                },
+                result,
+            )
+        }
+
+        EditAction::Move {
+            ref destination,
+            at,
+        } => {
+            // Delete all sources first (matches in reverse byte order for safe deletion)
+            let mut result = content.to_string();
+            for loc in &matches {
+                result = editor.delete_symbol(&result, loc);
+            }
+
+            // Insert at destination, order depends on position type:
+            // - append: original order [first..last] → iterate reversed matches
+            // - others: reverse order [last..first] → iterate matches as-is
+            let iter: Box<dyn Iterator<Item = _>> = if matches!(at, Position::Append) {
+                Box::new(matches.iter().rev())
+            } else {
+                Box::new(matches.iter())
+            };
+
+            for loc in iter {
+                let source_content = &content[loc.start_byte..loc.end_byte];
+                result = match at {
+                    Position::Before | Position::After => {
+                        let dest_loc = match editor.find_symbol(file_path, &result, destination) {
+                            Some(l) => l,
+                            None => {
+                                eprintln!("Destination not found: {}", destination);
+                                return 1;
+                            }
+                        };
+                        if matches!(at, Position::Before) {
+                            editor.insert_before(&result, &dest_loc, source_content)
+                        } else {
+                            editor.insert_after(&result, &dest_loc, source_content)
+                        }
+                    }
+                    Position::Prepend | Position::Append => {
+                        let body = match editor.find_container_body(file_path, &result, destination)
+                        {
+                            Some(b) => b,
+                            None => {
+                                eprintln!("Container not found: {}", destination);
+                                return 1;
+                            }
+                        };
+                        if matches!(at, Position::Prepend) {
+                            editor.prepend_to_container(&result, &body, source_content)
+                        } else {
+                            editor.append_to_container(&result, &body, source_content)
+                        }
+                    }
+                };
+            }
+            (
+                match at {
+                    Position::Before => "move_before",
+                    Position::After => "move_after",
+                    Position::Prepend => "move_prepend",
+                    Position::Append => "move_append",
+                },
+                result,
+            )
+        }
+
+        EditAction::Copy {
+            ref destination,
+            at,
+        } => {
+            let mut result = content.to_string();
+            // Insert at destination, order depends on position type:
+            // - append: original order [first..last] → iterate reversed matches
+            // - others: reverse order [last..first] → iterate matches as-is
+            let iter: Box<dyn Iterator<Item = _>> = if matches!(at, Position::Append) {
+                Box::new(matches.iter().rev())
+            } else {
+                Box::new(matches.iter())
+            };
+
+            for loc in iter {
+                let source_content = &content[loc.start_byte..loc.end_byte];
+                result = match at {
+                    Position::Before | Position::After => {
+                        let dest_loc = match editor.find_symbol(file_path, &result, destination) {
+                            Some(l) => l,
+                            None => {
+                                eprintln!("Destination not found: {}", destination);
+                                return 1;
+                            }
+                        };
+                        if matches!(at, Position::Before) {
+                            editor.insert_before(&result, &dest_loc, source_content)
+                        } else {
+                            editor.insert_after(&result, &dest_loc, source_content)
+                        }
+                    }
+                    Position::Prepend | Position::Append => {
+                        let body = match editor.find_container_body(file_path, &result, destination)
+                        {
+                            Some(b) => b,
+                            None => {
+                                eprintln!("Container not found: {}", destination);
+                                return 1;
+                            }
+                        };
+                        if matches!(at, Position::Prepend) {
+                            editor.prepend_to_container(&result, &body, source_content)
+                        } else {
+                            editor.append_to_container(&result, &body, source_content)
+                        }
+                    }
+                };
+            }
+            (
+                match at {
+                    Position::Before => "copy_before",
+                    Position::After => "copy_after",
+                    Position::Prepend => "copy_prepend",
+                    Position::Append => "copy_append",
+                },
+                result,
+            )
+        }
+
+        EditAction::Swap { .. } => {
+            eprintln!("Error: 'swap' is not supported with glob patterns (ambiguous pairing)");
             eprintln!("Matched {} symbols: {}", count, names.join(", "));
             return 1;
         }

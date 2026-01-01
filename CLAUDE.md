@@ -90,6 +90,7 @@ Do not:
 - HashMap > inventory crate. OnceLock > lazy_static. Functions > traits (until you need the trait).
 - "Going in circles" = signal to simplify, not add complexity.
 - **Don't reinvent the wheel**: if ecosystem tooling exists (e.g., tree-sitter highlight queries), use it. Arborium ships `.scm` query files for every grammar - use those rather than hand-rolling node kind classifications.
+- **Avoid redundant work** (soft rule): watch for patterns like double-collect (`.collect()` then `.iter().collect()`), double-reverse, or re-computing values in loops. Not a hard rule, but a smell to notice.
 
 **Rust/Lua boundary: native ops and perf-critical only.**
 - Rust bindings for Lua should only expose: native operations (tree-sitter parsing, file I/O, subprocess), performance-critical code
