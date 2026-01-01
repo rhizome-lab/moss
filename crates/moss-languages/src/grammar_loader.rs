@@ -161,11 +161,18 @@ impl GrammarLoader {
 
     /// Load grammar from a specific path.
     fn load_from_path(&self, name: &str, path: &Path) -> Option<Language> {
-        // Safety: Loading shared libraries is inherently unsafe.
-        // We trust that grammars in the search paths are legitimate.
+        // SAFETY: Loading shared libraries is inherently unsafe. We accept this risk because:
+        // 1. Grammars come from arborium (bundled) or user-configured search paths
+        // 2. The alternative (no dynamic loading) would require compiling all grammars statically
+        // 3. Tree-sitter grammars are widely used and well-tested
         let library = unsafe { Library::new(path).ok()? };
 
         let symbol_name = grammar_symbol_name(name);
+        // SAFETY: We call the tree-sitter grammar function which returns a Language pointer.
+        // The function signature is defined by tree-sitter's C ABI. We trust that:
+        // 1. The symbol exists (checked by library.get)
+        // 2. The function conforms to tree-sitter's expected signature
+        // 3. The returned Language is valid for the lifetime of the library
         let language = unsafe {
             let func: Symbol<unsafe extern "C" fn() -> *const ()> =
                 library.get(symbol_name.as_bytes()).ok()?;

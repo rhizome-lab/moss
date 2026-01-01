@@ -352,6 +352,10 @@ fn help_color_choice() -> ColorChoice {
 /// Reset SIGPIPE to default behavior so piping to `head` etc. doesn't panic.
 #[cfg(unix)]
 fn reset_sigpipe() {
+    // SAFETY: libc::signal is a standard POSIX function. We reset SIGPIPE to default
+    // behavior (terminate on broken pipe) instead of Rust's default (ignore, causing
+    // write errors). This prevents panics when output is piped to commands like `head`.
+    // No memory safety concerns - just changes signal disposition.
     unsafe {
         libc::signal(libc::SIGPIPE, libc::SIG_DFL);
     }
