@@ -4,11 +4,9 @@
 
 mod claude_code;
 mod gemini_cli;
-mod moss;
 
 pub use claude_code::ClaudeCodeFormat;
 pub use gemini_cli::GeminiCliFormat;
-pub use moss::MossFormat;
 
 use crate::SessionAnalysis;
 use std::fs::File;
@@ -17,7 +15,7 @@ use std::path::Path;
 
 /// Trait for session log format plugins.
 pub trait LogFormat: Send + Sync {
-    /// Format identifier (e.g., "claude", "gemini", "moss").
+    /// Format identifier (e.g., "claude", "gemini").
     fn name(&self) -> &'static str;
 
     /// Check if this format can parse the given file.
@@ -42,11 +40,7 @@ impl Default for FormatRegistry {
 impl FormatRegistry {
     pub fn new() -> Self {
         Self {
-            formats: vec![
-                Box::new(ClaudeCodeFormat),
-                Box::new(GeminiCliFormat),
-                Box::new(MossFormat),
-            ],
+            formats: vec![Box::new(ClaudeCodeFormat), Box::new(GeminiCliFormat)],
         }
     }
 

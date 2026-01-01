@@ -3,7 +3,6 @@
 //! Parses session logs from various AI coding agents:
 //! - Claude Code (JSONL)
 //! - Gemini CLI (JSON)
-//! - Moss internal sessions (JSON)
 //!
 //! # Plugin Architecture
 //!
