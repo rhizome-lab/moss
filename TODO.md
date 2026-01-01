@@ -154,15 +154,7 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - Direct download: platform-detected link to latest GitHub release binary (avoid cargo install overhead)
 
 ### Vision (Aspirational)
-- Shadow Git Phase 2-3: undo/redo and security (see `docs/design/shadow-git.md`)
-  - `moss edit --undo`: undo last edit, prints what was undone
-  - `moss edit --undo N`: undo N edits in sequence
-  - `moss edit --undo --file`: partial undo for specific file
-  - `moss edit --undo --hunk`: interactive hunk-level undo
-  - `moss edit --redo`: redo undone edit
-  - `moss edit --goto <ref>`: jump to specific commit
-  - Checkpoint integration: `--cross-checkpoint` for undoing past real git commits
-  - `--prune` for removing sensitive content from history
+- [x] Shadow Git Phase 2-3: complete (see CHANGELOG.md, `docs/design/shadow-git.md`)
 - Verification Loops: domain-specific validation (compiler, linter, tests) before accepting output
 - Synthesis: decompose complex tasks into solvable subproblems (`moss synthesize`)
 - Plugin Architecture: extensible view providers, synthesis strategies, code generators
