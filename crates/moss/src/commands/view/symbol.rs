@@ -18,6 +18,7 @@ pub fn cmd_view_symbol_direct(
     full: bool,
     show_docs: bool,
     show_parent: bool,
+    context: bool,
     json: bool,
     pretty: bool,
     use_colors: bool,
@@ -34,6 +35,7 @@ pub fn cmd_view_symbol_direct(
         full,
         show_docs,
         show_parent,
+        context,
         json,
         pretty,
         use_colors,
@@ -49,6 +51,7 @@ pub fn cmd_view_symbol_at_line(
     depth: i32,
     show_docs: bool,
     show_parent: bool,
+    _context: bool, // TODO: implement context display for line-based symbol lookup
     json: bool,
     pretty: bool,
     use_colors: bool,
@@ -272,6 +275,7 @@ pub fn cmd_view_symbol(
     _full: bool,
     show_docs: bool,
     show_parent: bool,
+    context: bool,
     json: bool,
     pretty: bool,
     use_colors: bool,
@@ -391,17 +395,24 @@ pub fn cmd_view_symbol(
                 }
             }
 
-            // Show ancestor context
-            let skeleton_result;
-            let ancestors: Vec<(String, usize)> = if show_parent {
+            // Show ancestor context (extract skeleton if needed for parent or context)
+            let skeleton_result = if show_parent || context {
                 let extractor = skeleton::SkeletonExtractor::new();
-                skeleton_result = extractor.extract(&full_path, &content);
-                let (_, ancestor_infos) =
-                    find_symbol_with_parent(&skeleton_result.symbols, symbol_name);
-                ancestor_infos
-                    .into_iter()
-                    .map(|a| (a.symbol.signature.clone(), a.sibling_count))
-                    .collect()
+                Some(extractor.extract(&full_path, &content))
+            } else {
+                None
+            };
+
+            let ancestors: Vec<(String, usize)> = if show_parent {
+                if let Some(ref sr) = skeleton_result {
+                    let (_, ancestor_infos) = find_symbol_with_parent(&sr.symbols, symbol_name);
+                    ancestor_infos
+                        .into_iter()
+                        .map(|a| (a.symbol.signature.clone(), a.sibling_count))
+                        .collect()
+                } else {
+                    Vec::new()
+                }
             } else {
                 Vec::new()
             };
@@ -416,7 +427,7 @@ pub fn cmd_view_symbol(
             let highlighted = if let Some(ref g) = grammar {
                 tree::highlight_source(&source, g, use_colors)
             } else {
-                source
+                source.clone()
             };
             println!("{}", highlighted);
 
@@ -424,6 +435,13 @@ pub fn cmd_view_symbol(
                 if *sibling_count > 0 {
                     println!();
                     println!("    /* {} other members */", sibling_count);
+                }
+            }
+
+            // Show referenced type definitions when --context is used
+            if context {
+                if let (Some(ref sr), Some(ref g)) = (&skeleton_result, &grammar) {
+                    display_referenced_types(&source, g, &sr.symbols, symbol_name, use_colors);
                 }
             }
         }
@@ -480,9 +498,22 @@ pub fn cmd_view_symbol(
                     let highlighted = if let Some(ref g) = grammar {
                         tree::highlight_source(&source, g, use_colors)
                     } else {
-                        source
+                        source.clone()
                     };
                     println!("{}", highlighted);
+
+                    // Show referenced type definitions when --context is used
+                    if context {
+                        if let Some(ref g) = grammar {
+                            display_referenced_types(
+                                &source,
+                                g,
+                                &skeleton_result.symbols,
+                                symbol_name,
+                                use_colors,
+                            );
+                        }
+                    }
                 }
                 return 0;
             }
@@ -589,6 +620,131 @@ fn collect_identifiers(
         if !cursor.goto_next_sibling() {
             break;
         }
+    }
+}
+
+/// Extract type identifiers from source code (for --context feature).
+/// Returns a set of type names referenced in the source.
+fn extract_type_references(source: &str, grammar: &str) -> HashSet<String> {
+    let mut types = HashSet::new();
+
+    if let Some(tree) = parsers::parse_with_grammar(grammar, source) {
+        let mut cursor = tree.walk();
+        collect_type_identifiers(&mut cursor, source.as_bytes(), &mut types);
+    }
+
+    types
+}
+
+/// Recursively collect only type identifiers from AST.
+fn collect_type_identifiers(
+    cursor: &mut tree_sitter::TreeCursor,
+    source: &[u8],
+    types: &mut HashSet<String>,
+) {
+    loop {
+        let node = cursor.node();
+        let kind = node.kind();
+
+        // Collect type identifier nodes
+        if kind == "type_identifier" {
+            if let Ok(text) = node.utf8_text(source) {
+                types.insert(text.to_string());
+            }
+        }
+
+        // For scoped types like std::Vec, extract the last component
+        if kind == "scoped_type_identifier" {
+            if let Some(last_child) = node.child(node.child_count().saturating_sub(1)) {
+                if let Ok(text) = last_child.utf8_text(source) {
+                    types.insert(text.to_string());
+                }
+            }
+        }
+
+        // Generic type arguments (e.g., T in Vec<T>)
+        if kind == "generic_type" {
+            // First child is usually the type name
+            if let Some(first_child) = node.child(0) {
+                if let Ok(text) = first_child.utf8_text(source) {
+                    types.insert(text.to_string());
+                }
+            }
+        }
+
+        if cursor.goto_first_child() {
+            collect_type_identifiers(cursor, source, types);
+            cursor.goto_parent();
+        }
+
+        if !cursor.goto_next_sibling() {
+            break;
+        }
+    }
+}
+
+/// Find type definitions in skeleton that match the given type names.
+/// Returns symbols that are type definitions (struct, enum, type alias, trait, interface, class).
+fn find_type_definitions<'a>(
+    symbols: &'a [skeleton::SkeletonSymbol],
+    type_names: &HashSet<String>,
+) -> Vec<&'a skeleton::SkeletonSymbol> {
+    let mut found = Vec::new();
+
+    for sym in symbols {
+        // Check if this is a type definition
+        let is_type_def = matches!(
+            sym.kind,
+            moss_languages::SymbolKind::Struct
+                | moss_languages::SymbolKind::Enum
+                | moss_languages::SymbolKind::Type
+                | moss_languages::SymbolKind::Trait
+                | moss_languages::SymbolKind::Interface
+                | moss_languages::SymbolKind::Class
+        );
+
+        if is_type_def && type_names.contains(&sym.name) {
+            found.push(sym);
+        }
+
+        // Recurse into children
+        found.extend(find_type_definitions(&sym.children, type_names));
+    }
+
+    found
+}
+
+/// Display referenced type definitions for --context feature.
+fn display_referenced_types(
+    source: &str,
+    grammar: &str,
+    symbols: &[skeleton::SkeletonSymbol],
+    symbol_name: &str,
+    use_colors: bool,
+) {
+    let type_refs = extract_type_references(source, grammar);
+
+    // Exclude the symbol itself from type references
+    let mut type_refs = type_refs;
+    type_refs.remove(symbol_name);
+
+    if type_refs.is_empty() {
+        return;
+    }
+
+    let type_defs = find_type_definitions(symbols, &type_refs);
+
+    if type_defs.is_empty() {
+        return;
+    }
+
+    println!();
+    println!("// Referenced types:");
+
+    for sym in type_defs {
+        // Show signature only, not full source
+        let highlighted = tree::highlight_source(&sym.signature, grammar, use_colors);
+        println!("//   {} (L{})", highlighted.trim(), sym.start_line);
     }
 }
 

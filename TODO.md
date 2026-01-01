@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Smart Header: `moss view --context` pulls in referenced type definitions
+(empty - pick from Remaining Work or Backlog)
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
@@ -40,7 +40,9 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - JSON Schema for complex action parameters (currently string-only)
 
 ### View Command
-- Smart Header: optionally pull in referenced types as context (show type definitions used by the symbol)
+- [x] Smart Header: `--context` shows referenced types from same file (done)
+  - Future: cross-file type resolution via index
+  - Future: `--context` for line-based symbol lookup (file:line syntax)
 - Review view.rs scope: 1990 lines doing search, tree, file, symbol, line-range viewing. Consider consolidating before splitting into submodules.
 
 ### Analyze Command

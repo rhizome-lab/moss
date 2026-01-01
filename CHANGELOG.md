@@ -4,6 +4,12 @@
 
 See `docs/` for design docs and `README.md` for usage.
 
+### View Command
+- Smart Header: `--context` flag shows referenced type definitions when viewing a symbol
+  - Extracts type identifiers from symbol source using tree-sitter
+  - Looks up types defined in the same file (struct, enum, type, trait, interface, class)
+  - Shows signature and line number for each referenced type
+
 ### Shadow Git (Phase 1)
 - Auto-track edits made via `moss edit` for undo/redo capability
 - Shadow repo created on first edit at `.moss/shadow/`
