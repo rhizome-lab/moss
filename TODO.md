@@ -128,7 +128,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Claude Code lacks navigation: clicking paths/links in output doesn't open them in editor (significant UX gap)
 - Rich links in LLM output: structured links (file:line, symbols) or cheap model postprocessing. Clickable refs in terminal/IDE.
 - Large file edits: agentic tools (Claude Code) struggle with large deletions/replacements - Edit tool fails when strings don't match exactly, requiring shell workarounds
-- Context compaction appears unreliable: session summaries may miss in-progress work or recent context. This is a weakness moss's architecture explicitly avoids (dynamic context reshaping vs append-only accumulation).
+- Context compaction unreliable in practice: observed with Claude Code + Opus 4.5 losing in-progress design work (shadow-git mid-refinement treated as "done"). Session summaries may miss recent exchanges or misrepresent completion state. Moss's architecture explicitly avoids this (dynamic context reshaping vs append-only accumulation).
 
 ### Session Analysis
 - Better `--compact` format: key:value pairs, no tables, all info preserved
