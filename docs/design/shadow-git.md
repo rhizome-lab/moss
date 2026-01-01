@@ -10,6 +10,23 @@ When `moss edit` modifies files, there's no easy way to undo changes. Users must
 
 Maintain a hidden git repository (`.moss/shadow/`) that automatically commits after each `moss edit` operation, preserving full edit history as a tree.
 
+## Why Shadow Git?
+
+**Primary goal: prevent catastrophic loss.** LLM-driven edits can be unpredictable. A single bad edit or a chain of "fixes" can destroy working code. Shadow git provides a safety net that doesn't rely on user discipline.
+
+Use cases:
+- **Oops recovery**: "That delete was wrong, undo it"
+- **Experiment freely**: Try aggressive refactors knowing you can always go back
+- **Audit trail**: See exactly what moss changed, when, and why
+- **Checkpoint comparison**: "What did moss do since my last git commit?"
+- **Partial rollback**: Undo specific hunks while keeping others
+
+Philosophy:
+- **Never destroy history** - even undo preserves the undone state as a branch
+- **Err on the side of keeping data** - disk is cheap, lost work is expensive
+- **Shadow is invisible until needed** - zero friction for normal workflow
+- **Real git is source of truth** - shadow serves the gap between edits and commits
+
 ## Core Features
 
 ### Automatic Tracking
@@ -203,7 +220,7 @@ Uses `git filter-branch` or similar under the hood. Important for:
   - Detected on next `moss edit` via HEAD or file content mismatch
   - Shadow re-syncs: records new file state as baseline, creates checkpoint
   - Old shadow history preserved but marked as pre-divergence
-- **Open question**: Should old shadow history be auto-pruned after checkpoint? Or keep for archaeology?
+- **Decision**: Keep old shadow history after checkpoint (archaeology). Disk is cheap, lost work is expensive. Manual `--prune` available if needed.
 
 ### D6: Multiple worktrees
 - **Problem**: User may have multiple git worktrees of the same repo. Each worktree has its own file state.
