@@ -110,6 +110,8 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Context compaction unreliable in practice: observed with Claude Code + Opus 4.5 losing in-progress design work (shadow-git mid-refinement treated as "done"). Session summaries may miss recent exchanges or misrepresent completion state. Moss's architecture explicitly avoids this (dynamic context reshaping vs append-only accumulation).
 
 ### Session Analysis
+- Antigravity conversations: `~/.gemini/antigravity/conversations/*.pb` (protobuf - needs schema)
+- Antigravity brain artifacts: `~/.gemini/antigravity/brain/*/` (task/plan/walkthrough metadata)
 - Better `--compact` format: key:value pairs, no tables, all info preserved
 - Better `--pretty` format: bar charts for tools, progress bar for success rate
 - `moss sessions stats`: cross-session aggregates (session count, token hotspots, total usage)
