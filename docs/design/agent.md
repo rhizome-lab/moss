@@ -108,20 +108,21 @@ Factors:
 
 **Experiment needed**: Same task with different formats, measure success rate.
 
-### Context Management
+### Context Model
 
-Current: append everything, let context window fill up.
+Current: append everything (conversation style).
 
-Problems:
-- Early context gets "lost in the middle"
-- Irrelevant output stays in context
-- No prioritization
+The problem isn't "context fills up" - 200k tokens is huge. The problem is:
+- Append-only model keeps irrelevant old stuff
+- Verbose tools waste space
+- Same content re-read multiple times
 
-Ideas:
-- **Sliding window**: Keep last N turns, summarize earlier
-- **Priority queue**: Score context chunks by relevance to current task
-- **Structured context**: Always include { task, current_file, recent_errors }
-- **Memory offload**: Use `store()`/`recall()` to persist across turns
+**Not the solution:** sliding windows, priority queues, compression. These are bandaids.
+
+**Actual solution:**
+- Tools return minimal structural output (already what moss does)
+- Context can be *reshaped*, not just appended (drop irrelevant, keep relevant)
+- Memory (`store`/`recall`) for cross-session persistence, not in-session compression
 
 ### Planning vs Reactive
 
@@ -147,14 +148,27 @@ Responses:
 - Escalate (ask user for help)
 - Give up (exit with explanation)
 
-### Cost Awareness
+### No Budget
 
-Current: no visibility into token usage.
+**Rejected idea:** token budgets, context compression, `/compact` commands.
 
-Options:
-- Track tokens per turn, show running total
-- Budget enforcement (stop at N tokens)
-- Cost-aware action selection (cheap probes before expensive operations)
+Why budgets exist elsewhere:
+- Append-only conversation fills up
+- Verbose tools dump entire files
+- Agent re-reads same content repeatedly
+
+Why budgets are a footgun:
+- Lost-in-the-middle problem (compression loses signal)
+- Complexity (priority queues, summarization, knobs to tune)
+- Bandaid for bad tool design
+
+**Instead:** Design tools that don't waste context.
+- `view --types-only` returns 50 lines, not 2000
+- `view Foo/bar` returns one function, not whole file
+- Index queries return answers, not grep output to scan
+- Context can be reshaped, not just appended
+
+If tools are good, 200k tokens is a novel. Plenty of room.
 
 ## Integration with Existing Primitives
 
