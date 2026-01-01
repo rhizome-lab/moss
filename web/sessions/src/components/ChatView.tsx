@@ -1,5 +1,6 @@
-import { For, Show, createSignal } from "solid-js";
+import { For, Show } from "solid-js";
 import type { LogEntry, ContentBlock, Payload } from "../App";
+import { renderMarkdown } from "../markdown";
 
 interface Props {
   entries: LogEntry[];
@@ -21,6 +22,20 @@ function Entry(props: { entry: LogEntry }) {
   if (type === "user" || type === "assistant") {
     const content = entry.message?.content;
     if (!content) return null;
+
+    // Handle content as string
+    if (typeof content === "string") {
+      return (
+        <div class={`message message--${type}`}>
+          <div class="message__role">{type}</div>
+          <div class="message__content">
+            <div class="message__text" innerHTML={renderMarkdown(content)} />
+          </div>
+        </div>
+      );
+    }
+
+    // Handle content as array of blocks
     return (
       <div class={`message message--${type}`}>
         <div class="message__role">{type}</div>
@@ -107,55 +122,76 @@ function PayloadView(props: { payload: Payload }) {
 }
 
 function ToolUse(props: { name: string; input: unknown }) {
-  const [expanded, setExpanded] = createSignal(false);
-  const inputStr =
-    typeof props.input === "string" ? props.input : JSON.stringify(props.input, null, 2);
+  // Parse input - could be string (JSON) or object
+  let params: Record<string, unknown> = {};
+  if (typeof props.input === "string") {
+    try {
+      params = JSON.parse(props.input);
+    } catch {
+      params = { raw: props.input };
+    }
+  } else if (props.input && typeof props.input === "object") {
+    params = props.input as Record<string, unknown>;
+  }
+
+  const entries = Object.entries(params);
 
   return (
     <div class="tool-use">
-      <button class="tool-use__header" onClick={() => setExpanded(!expanded())}>
+      <div class="tool-use__header">
         <span class="tool-use__name">{props.name}</span>
-        <span class="tool-use__toggle">{expanded() ? "▼" : "▶"}</span>
-      </button>
-      <Show when={expanded()}>
-        <pre class="tool-use__input">{inputStr}</pre>
+      </div>
+      <Show when={entries.length > 0}>
+        <table class="tool-use__params">
+          <tbody>
+            <For each={entries}>
+              {([key, value]) => (
+                <tr class="tool-use__param">
+                  <td class="tool-use__param-key">{key}</td>
+                  <td class="tool-use__param-value">
+                    <ParamValue value={value} />
+                  </td>
+                </tr>
+              )}
+            </For>
+          </tbody>
+        </table>
       </Show>
     </div>
   );
+}
+
+function ParamValue(props: { value: unknown }) {
+  const v = props.value;
+
+  if (v === null || v === undefined) {
+    return <span class="param-value--null">null</span>;
+  }
+
+  if (typeof v === "boolean") {
+    return <span class="param-value--bool">{v ? "true" : "false"}</span>;
+  }
+
+  if (typeof v === "number") {
+    return <span class="param-value--number">{v}</span>;
+  }
+
+  if (typeof v === "string") {
+    // Multi-line strings get a code block
+    if (v.includes("\n")) {
+      return <pre class="param-value--code">{v}</pre>;
+    }
+    return <span class="param-value--string">{v}</span>;
+  }
+
+  // Objects/arrays: show as JSON
+  return <pre class="param-value--json">{JSON.stringify(v, null, 2)}</pre>;
 }
 
 function ToolResult(props: { text: string; isError?: boolean }) {
-  const [expanded, setExpanded] = createSignal(false);
-  const isLong = props.text.length > 500;
-
   return (
     <div class="tool-result" classList={{ "tool-result--error": props.isError }}>
-      <Show when={isLong}>
-        <button class="tool-result__toggle" onClick={() => setExpanded(!expanded())}>
-          {expanded() ? "Collapse" : `Show output (${props.text.length} chars)`}
-        </button>
-      </Show>
-      <Show when={!isLong || expanded()}>
-        <pre class="tool-result__output">{props.text}</pre>
-      </Show>
+      <pre class="tool-result__output">{props.text}</pre>
     </div>
   );
-}
-
-function renderMarkdown(text: string): string {
-  // Escape HTML
-  let html = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  // Code blocks
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-    return `<pre class="code-block"><code>${code.trim()}</code></pre>`;
-  });
-
-  // Inline code
-  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
-
-  // Newlines
-  html = html.replace(/\n/g, "<br>");
-
-  return html;
 }

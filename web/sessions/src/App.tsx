@@ -10,7 +10,7 @@ export interface Session {
 
 export interface LogEntry {
   type: string;
-  message?: { content: ContentBlock[] };
+  message?: { content: ContentBlock[] | string; role?: string };
   payload?: Payload;
   summary?: string;
 }

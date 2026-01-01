@@ -111,6 +111,9 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Context compaction unreliable in practice: observed with Claude Code + Opus 4.5 losing in-progress design work (shadow-git mid-refinement treated as "done"). Session summaries may miss recent exchanges or misrepresent completion state. Moss's architecture explicitly avoids this (dynamic context reshaping vs append-only accumulation).
 
 ### Session Analysis
+- Web syntax highlighting: share tree-sitter grammars between native and web SPAs
+  - Option A: embed tree-sitter WASM runtime, load .so grammars
+  - Option B: `/api/highlight` endpoint, server-side highlighting
 - Antigravity conversations: `~/.gemini/antigravity/conversations/*.pb` (protobuf - needs schema, files appear encrypted)
 - Antigravity brain artifacts: `~/.gemini/antigravity/brain/*/` (task/plan/walkthrough metadata)
 - Additional agent formats (need to find log locations/formats):
