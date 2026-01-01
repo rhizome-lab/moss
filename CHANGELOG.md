@@ -90,6 +90,7 @@ See `docs/` for design docs and `README.md` for usage.
 - Split view.rs into submodules (search, tree, file, symbol, lines)
 
 ### Edit Command
+- Fixed "byte index out of bounds" panic when editing files without trailing newlines
 - Glob pattern support for multi-symbol operations: `moss edit "file.py/foo*" delete --multiple`
   - Matches symbols using glob patterns (`*`, `**`, `?`, `[...]`)
   - Path-based matching for nested symbols: `"TODO.md/Main/Feature*"` matches sections under Main
