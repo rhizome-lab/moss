@@ -340,37 +340,50 @@ fn get_sessions_dir(project: Option<&Path>) -> Option<PathBuf> {
     let home = std::env::var("HOME").ok()?;
     let claude_dir = PathBuf::from(home).join(".claude/projects");
 
-    if let Some(proj) = project {
-        // Convert project path to Claude's format: /home/user/foo -> -home-user-foo
-        let proj_str = proj.to_string_lossy().replace('/', "-");
-        let proj_dir = claude_dir.join(&proj_str);
+    // Helper to convert a path to Claude's format: /home/user/foo -> -home-user-foo
+    let path_to_claude_dir = |path: &Path| -> Option<PathBuf> {
+        let path_str = path.to_string_lossy().replace('/', "-");
+        // Try with leading dash first (Claude's format)
+        let proj_dir = claude_dir.join(format!("-{}", path_str.trim_start_matches('-')));
         if proj_dir.exists() {
             return Some(proj_dir);
         }
-        // Try with leading dash
-        let proj_dir = claude_dir.join(format!("-{}", proj_str.trim_start_matches('-')));
+        // Try without leading dash
+        let proj_dir = claude_dir.join(&path_str);
         if proj_dir.exists() {
             return Some(proj_dir);
+        }
+        None
+    };
+
+    // 1. Explicit project path
+    if let Some(proj) = project {
+        if let Some(dir) = path_to_claude_dir(proj) {
+            return Some(dir);
         }
     }
 
-    // Find the most recently modified project directory
-    let mut dirs: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(&claude_dir) {
-        for entry in entries.filter_map(|e| e.ok()) {
-            let path = entry.path();
-            if path.is_dir() {
-                if let Ok(meta) = path.metadata() {
-                    if let Ok(mtime) = meta.modified() {
-                        dirs.push((path, mtime));
-                    }
-                }
+    // 2. Git root of current directory
+    if let Ok(output) = std::process::Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+    {
+        if output.status.success() {
+            let git_root = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if let Some(dir) = path_to_claude_dir(Path::new(&git_root)) {
+                return Some(dir);
             }
         }
     }
 
-    dirs.sort_by(|a, b| b.1.cmp(&a.1));
-    dirs.first().map(|(p, _)| p.clone())
+    // 3. Current directory
+    if let Ok(cwd) = std::env::current_dir() {
+        if let Some(dir) = path_to_claude_dir(&cwd) {
+            return Some(dir);
+        }
+    }
+
+    None
 }
 
 /// Resolve a session ID pattern to matching paths.
