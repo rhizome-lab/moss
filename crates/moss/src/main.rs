@@ -174,6 +174,14 @@ enum Commands {
         #[arg(short, long)]
         analyze: bool,
 
+        /// Start web server for viewing sessions
+        #[arg(long)]
+        serve: bool,
+
+        /// Port for web server (default: 3939)
+        #[arg(long, default_value = "3939")]
+        port: u16,
+
         /// Limit number of sessions to list
         #[arg(short, long, default_value = "20")]
         limit: usize,
@@ -526,9 +534,17 @@ fn main() {
             jq,
             format,
             analyze,
+            serve,
+            port,
             limit,
         } => {
-            if let Some(session_id) = session {
+            if serve {
+                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+                rt.block_on(commands::sessions::cmd_sessions_serve(
+                    project.as_deref(),
+                    port,
+                ))
+            } else if let Some(session_id) = session {
                 commands::sessions::cmd_sessions_show(
                     &session_id,
                     project.as_deref(),

@@ -4,6 +4,7 @@ use crate::sessions::analyze_session;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// List available sessions in the Claude Code projects directory.
 pub fn cmd_sessions_list(project: Option<&Path>, limit: usize, json: bool) -> i32 {
@@ -447,3 +448,268 @@ fn format_age(seconds: u64) -> String {
         format!("{}d ago", seconds / 86400)
     }
 }
+
+// ============================================================================
+// Web server for session viewing
+// ============================================================================
+
+use axum::{
+    extract::{Path as AxumPath, State},
+    http::StatusCode,
+    response::Html,
+    routing::get,
+    Router,
+};
+
+struct SessionsState {
+    project: Option<PathBuf>,
+}
+
+/// Start the sessions web server.
+pub async fn cmd_sessions_serve(project: Option<&Path>, port: u16) -> i32 {
+    let state = Arc::new(SessionsState {
+        project: project.map(|p| p.to_path_buf()),
+    });
+
+    let app = Router::new()
+        .route("/", get(sessions_index))
+        .route("/session/{id}", get(session_detail))
+        .route("/session/{id}/raw", get(session_raw))
+        .with_state(state);
+
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    eprintln!("Sessions viewer at http://{}", addr);
+
+    let listener = match tokio::net::TcpListener::bind(addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("Failed to bind to port {}: {}", port, e);
+            return 1;
+        }
+    };
+
+    if let Err(e) = axum::serve(listener, app).await {
+        eprintln!("Server error: {}", e);
+        return 1;
+    }
+
+    0
+}
+
+/// Index page: list all sessions.
+async fn sessions_index(State(state): State<Arc<SessionsState>>) -> Html<String> {
+    let sessions_dir = get_sessions_dir(state.project.as_deref());
+
+    let mut sessions: Vec<(PathBuf, std::time::SystemTime, Option<String>)> = Vec::new();
+
+    if let Some(dir) = &sessions_dir {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+                    if let Ok(meta) = path.metadata() {
+                        if let Ok(mtime) = meta.modified() {
+                            // Detect format
+                            let format = crate::sessions::FormatRegistry::new()
+                                .detect(&path)
+                                .map(|f| f.name().to_string());
+                            sessions.push((path, mtime, format));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    sessions.sort_by(|a, b| b.1.cmp(&a.1));
+    sessions.truncate(100);
+
+    let mut html = String::from(HTML_HEADER);
+    html.push_str("<h1>Session Logs</h1>\n");
+
+    if sessions.is_empty() {
+        html.push_str("<p>No sessions found.</p>\n");
+    } else {
+        html.push_str("<table>\n<thead><tr><th>Session</th><th>Format</th><th>Age</th><th>Actions</th></tr></thead>\n<tbody>\n");
+        for (path, mtime, format) in &sessions {
+            let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            let age = format_age(mtime.elapsed().map(|d| d.as_secs()).unwrap_or(0));
+            let format_str = format.as_deref().unwrap_or("unknown");
+            let short_id = if id.len() > 20 { &id[..20] } else { id };
+            html.push_str(&format!(
+                "<tr><td title=\"{}\">{}</td><td>{}</td><td>{}</td><td><a href=\"/session/{}\">view</a> | <a href=\"/session/{}/raw\">raw</a></td></tr>\n",
+                id, short_id, format_str, age, id, id
+            ));
+        }
+        html.push_str("</tbody></table>\n");
+    }
+
+    html.push_str(HTML_FOOTER);
+    Html(html)
+}
+
+/// Session detail page: show analysis.
+async fn session_detail(
+    State(state): State<Arc<SessionsState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<Html<String>, StatusCode> {
+    let paths = resolve_session_paths(&id, state.project.as_deref());
+    let path = paths.first().ok_or(StatusCode::NOT_FOUND)?;
+
+    let analysis = analyze_session(path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mut html = String::from(HTML_HEADER);
+    html.push_str(&format!("<h1>Session: {}</h1>\n", id));
+    html.push_str("<p><a href=\"/\">← Back to list</a></p>\n");
+
+    // Render analysis as HTML
+    html.push_str("<div class=\"analysis\">\n");
+    html.push_str(&render_analysis_html(&analysis));
+    html.push_str("</div>\n");
+
+    html.push_str(HTML_FOOTER);
+    Ok(Html(html))
+}
+
+/// Raw session dump.
+async fn session_raw(
+    State(state): State<Arc<SessionsState>>,
+    AxumPath(id): AxumPath<String>,
+) -> Result<String, StatusCode> {
+    let paths = resolve_session_paths(&id, state.project.as_deref());
+    let path = paths.first().ok_or(StatusCode::NOT_FOUND)?;
+
+    std::fs::read_to_string(path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+/// Render SessionAnalysis as HTML.
+fn render_analysis_html(a: &crate::sessions::SessionAnalysis) -> String {
+    let mut html = String::new();
+
+    // Summary
+    let total_calls: usize = a.tool_stats.values().map(|s| s.calls).sum();
+    let total_errors: usize = a.tool_stats.values().map(|s| s.errors).sum();
+    let success_rate = if total_calls > 0 {
+        ((total_calls - total_errors) as f64 / total_calls as f64) * 100.0
+    } else {
+        100.0
+    };
+
+    html.push_str("<h2>Summary</h2>\n<ul>\n");
+    html.push_str(&format!("<li><strong>Format:</strong> {}</li>\n", a.format));
+    html.push_str(&format!(
+        "<li><strong>Tool calls:</strong> {}</li>\n",
+        total_calls
+    ));
+    html.push_str(&format!(
+        "<li><strong>Success rate:</strong> {:.1}%</li>\n",
+        success_rate
+    ));
+    html.push_str(&format!(
+        "<li><strong>Total turns:</strong> {}</li>\n",
+        a.total_turns
+    ));
+    html.push_str("</ul>\n");
+
+    // Token usage
+    if a.token_stats.api_calls > 0 {
+        html.push_str("<h2>Token Usage</h2>\n<ul>\n");
+        html.push_str(&format!(
+            "<li><strong>API calls:</strong> {}</li>\n",
+            a.token_stats.api_calls
+        ));
+        if a.token_stats.api_calls > 0 {
+            let avg_context = (a.token_stats.total_input + a.token_stats.cache_read)
+                / a.token_stats.api_calls as u64;
+            html.push_str(&format!(
+                "<li><strong>Avg context:</strong> {} tokens</li>\n",
+                avg_context
+            ));
+        }
+        if a.token_stats.max_context > 0 {
+            html.push_str(&format!(
+                "<li><strong>Context range:</strong> {} - {}</li>\n",
+                a.token_stats.min_context, a.token_stats.max_context
+            ));
+        }
+        if a.token_stats.cache_read > 0 {
+            html.push_str(&format!(
+                "<li><strong>Cache read:</strong> {} tokens</li>\n",
+                a.token_stats.cache_read
+            ));
+        }
+        html.push_str("</ul>\n");
+    }
+
+    // Tool usage table
+    if !a.tool_stats.is_empty() {
+        let mut tools: Vec<_> = a.tool_stats.values().collect();
+        tools.sort_by(|a, b| b.calls.cmp(&a.calls));
+
+        html.push_str("<h2>Tool Usage</h2>\n<table>\n");
+        html.push_str("<thead><tr><th>Tool</th><th>Calls</th><th>Errors</th><th>Success</th></tr></thead>\n<tbody>\n");
+        for tool in tools {
+            let rate = if tool.calls > 0 {
+                ((tool.calls - tool.errors) as f64 / tool.calls as f64) * 100.0
+            } else {
+                100.0
+            };
+            html.push_str(&format!(
+                "<tr><td>{}</td><td>{}</td><td>{}</td><td>{:.0}%</td></tr>\n",
+                tool.name, tool.calls, tool.errors, rate
+            ));
+        }
+        html.push_str("</tbody></table>\n");
+    }
+
+    // Error patterns
+    if !a.error_patterns.is_empty() {
+        html.push_str("<h2>Error Patterns</h2>\n");
+        for pattern in &a.error_patterns {
+            html.push_str(&format!(
+                "<h3>{} ({})</h3>\n",
+                pattern.category, pattern.count
+            ));
+            html.push_str("<ul>\n");
+            for example in &pattern.examples {
+                html.push_str(&format!("<li><code>{}</code></li>\n", html_escape(example)));
+            }
+            html.push_str("</ul>\n");
+        }
+    }
+
+    html
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+const HTML_HEADER: &str = r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moss Sessions</title>
+<style>
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 1200px; margin: 0 auto; padding: 1rem; background: #1a1a2e; color: #eee; }
+h1, h2, h3 { color: #fff; }
+a { color: #6eb5ff; }
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+th, td { border: 1px solid #333; padding: 0.5rem; text-align: left; }
+th { background: #16213e; }
+tr:nth-child(even) { background: #1a1a2e; }
+tr:nth-child(odd) { background: #0f0f23; }
+code { background: #0f0f23; padding: 0.2rem 0.4rem; border-radius: 3px; font-size: 0.9em; }
+.analysis { margin-top: 1rem; }
+ul { list-style: none; padding-left: 0; }
+li { margin: 0.5rem 0; }
+</style>
+</head>
+<body>
+"#;
+
+const HTML_FOOTER: &str = "</body></html>\n";

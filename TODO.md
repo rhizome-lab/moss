@@ -112,6 +112,13 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 ### Session Analysis
 - Antigravity conversations: `~/.gemini/antigravity/conversations/*.pb` (protobuf - needs schema, files appear encrypted)
 - Antigravity brain artifacts: `~/.gemini/antigravity/brain/*/` (task/plan/walkthrough metadata)
+- Additional agent formats (need to find log locations/formats):
+  - Windsurf (Codeium)
+  - Cursor
+  - Cline
+  - Roo Code
+  - Gemini Code Assist (VS Code extension)
+  - GitHub Copilot (VS Code)
 - Better `--compact` format: key:value pairs, no tables, all info preserved
 - Better `--pretty` format: bar charts for tools, progress bar for success rate
 - `moss sessions stats`: cross-session aggregates (session count, token hotspots, total usage)
