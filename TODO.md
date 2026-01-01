@@ -128,6 +128,7 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Claude Code lacks navigation: clicking paths/links in output doesn't open them in editor (significant UX gap)
 - Rich links in LLM output: structured links (file:line, symbols) or cheap model postprocessing. Clickable refs in terminal/IDE.
 - Large file edits: agentic tools (Claude Code) struggle with large deletions/replacements - Edit tool fails when strings don't match exactly, requiring shell workarounds
+- Context compaction is unreliable: session summaries often miss in-progress work or recent context. Coin toss whether final exchanges are captured. Need structured handoff (explicit "session state" artifact) rather than relying on summarization.
 
 ### Session Analysis
 - Better `--compact` format: key:value pairs, no tables, all info preserved
