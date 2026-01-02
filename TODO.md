@@ -9,6 +9,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 - Multi-file batch edit: reduce latency vs N sequential edits
 
 ## Remaining Work
+- agent: remove context bandaids (keep_last, truncation) - fix tool verbosity instead
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
   - Consider: namespace-qualified lookups (`moss view std::vector`, `moss view com.example.Foo`)
   - Requires language-specific namespace semantics - low priority

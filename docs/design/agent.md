@@ -234,19 +234,36 @@ Testing revealed certain phrases trigger 500 errors or empty responses:
 
 ### Context Model
 
-Current: append everything (conversation style).
+Current implementation has bandaids that violate our own "No Budget" principle:
+- `keep_last = 10` - caps history to last 10 turns
+- Output truncation - 2000 head + 1000 tail chars per command
 
-The problem isn't "context fills up" - 200k tokens is huge. The problem is:
-- Append-only model keeps irrelevant old stuff
-- Verbose tools waste space
-- Same content re-read multiple times
+These exist because of append-only thinking. The problem isn't context size - 200k tokens is huge. The problem is treating context as a log.
 
-**Not the solution:** sliding windows, priority queues, compression. These are bandaids.
+**Key insight: Alternating messages ≠ linear history.**
+
+Provider APIs want alternating user/assistant messages. But the content doesn't have to be a literal transcript. Messages can be assembled fresh each call:
+
+```lua
+-- NOT a log of what happened
+-- Curated working memory in message format
+messages = {
+    {"assistant", "Task: find main entry point"},
+    {"user", "Known: main.rs has fn main(), uses clap, Commands enum dispatches"},
+    {"assistant", "Need: understand Commands variants"},
+    {"user", "Commands: View, Edit, Analyze, TextSearch, ..."},
+}
+```
+
+The format is transport. Content is curated facts. Reshape freely between calls - drop irrelevant, synthesize, restructure.
+
+**Not the solution:** sliding windows, priority queues, compression, `keep_last`. These manage symptoms.
 
 **Actual solution:**
 - Tools return minimal structural output (already what moss does)
-- Context can be *reshaped*, not just appended (drop irrelevant, keep relevant)
-- Memory (`store`/`recall`) for cross-session persistence, not in-session compression
+- Tools support `--jq` for extracting exactly what's needed
+- Agent builds context from working memory, not turn history
+- "What do I know?" not "What did I do?"
 
 ### Planning vs Reactive
 
@@ -370,7 +387,8 @@ Not doing **A1/A2** (agent adaptation) - that requires fine-tuning LLMs, outside
 
 ## Next Steps
 
-1. Tune prompt for faster conclusions (Flash takes 4-5 turns vs ideal 2-3)
-2. Test with edit tasks (not just exploration)
-3. Improve `--explain` flag (Flash ignores step explanation request)
-4. Consider streaming output for long responses
+1. **Remove context bandaids** - Replace `keep_last`/truncation with proper context reshaping
+2. Tune prompt for faster conclusions (Flash takes 4-5 turns vs ideal 2-3)
+3. Test with edit tasks (not just exploration)
+4. Improve `--explain` flag (Flash ignores step explanation request)
+5. Consider streaming output for long responses
