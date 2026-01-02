@@ -242,27 +242,79 @@ These exist because of append-only thinking. The problem isn't context size - 20
 
 **Key insight: Alternating messages ≠ linear history.**
 
-Provider APIs want alternating user/assistant messages. But the content doesn't have to be a literal transcript. Messages can be assembled fresh each call:
+Provider APIs want alternating user/assistant messages. But the content doesn't have to be a literal transcript. Messages can be assembled fresh each call as curated working memory.
 
-```lua
--- NOT a log of what happened
--- Curated working memory in message format
-messages = {
-    {"assistant", "Task: find main entry point"},
-    {"user", "Known: main.rs has fn main(), uses clap, Commands enum dispatches"},
-    {"assistant", "Need: understand Commands variants"},
-    {"user", "Commands: View, Edit, Analyze, TextSearch, ..."},
-}
+#### Ephemeral by Default
+
+Outputs are shown once, then gone. Agent explicitly keeps what matters:
+
+```
+[1] $ view .
+src/, tests/, Cargo.toml
+
+[2] $ view src/main.rs --types-only
+fn main(), Commands enum, ...
 ```
 
-The format is transport. Content is curated facts. Reshape freely between calls - drop irrelevant, synthesize, restructure.
+Commands:
+- `keep` / `keep all` - keep all outputs from this turn
+- `keep 2` - keep only output #2
+- `keep 2 3` - keep outputs #2 and #3
+- `note <fact>` - record a synthesized insight (not raw output)
+
+#### Working Memory vs Sensory Buffer
+
+- **Sensory buffer**: Current turn's outputs. Visible now, gone next turn unless kept.
+- **Working memory**: Kept outputs + notes. Persists until task done.
+
+Context only grows when agent explicitly says "this matters."
+
+#### Why Not Drop?
+
+Considered `drop #id` to remove items. Problems:
+- Requires global ID tracking
+- Agent must remember to drop (forgets → bloat)
+- Default is bloated, requires active cleanup
+
+Inverting to `keep` is better:
+- No global IDs (per-turn indices only)
+- Default is lean
+- Agent takes positive action for what matters
+- Matches how attention works: notice and retain, not accumulate and prune
+
+#### Implementation
+
+```lua
+working_memory = {}  -- kept outputs and notes
+
+for turn = 1, max_turns do
+    -- Build context: task + working memory (not turn history)
+    context = build_context(task, working_memory)
+
+    -- Get response, execute commands
+    response = llm.chat(...)
+    outputs = execute_commands(response)
+
+    -- Show indexed outputs to agent
+    -- [1] $ cmd1 \n output1 \n [2] $ cmd2 \n output2
+
+    -- Parse keep/note commands
+    for kept_idx in response:gmatch("keep (%d+)") do
+        table.insert(working_memory, outputs[kept_idx])
+    end
+    for fact in response:gmatch("note (.+)") do
+        table.insert(working_memory, {type="note", content=fact})
+    end
+    -- bare "keep" or "keep all" keeps everything
+end
+```
 
 **Not the solution:** sliding windows, priority queues, compression, `keep_last`. These manage symptoms.
 
 **Actual solution:**
-- Tools return minimal structural output (already what moss does)
+- Outputs ephemeral by default
+- Agent explicitly keeps what matters
 - Tools support `--jq` for extracting exactly what's needed
-- Agent builds context from working memory, not turn history
 - "What do I know?" not "What did I do?"
 
 ### Planning vs Reactive

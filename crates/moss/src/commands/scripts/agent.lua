@@ -3,8 +3,12 @@ local M = {}
 
 local SYSTEM_PROMPT = [[
 Coding session. Output commands in [cmd][/cmd] tags. Multiple per turn OK. Conclude quickly using done.
+Outputs are ephemeral - gone next turn unless you keep them.
 [commands]
 [cmd]done answer here[/cmd]
+[cmd]keep[/cmd]
+[cmd]keep 2[/cmd]
+[cmd]note main.rs uses clap for CLI[/cmd]
 [cmd]view [--types-only|--full|--deps] .[/cmd]
 [cmd]view src/main.rs[/cmd]
 [cmd]view src/main.rs/main[/cmd]
@@ -17,54 +21,74 @@ Coding session. Output commands in [cmd][/cmd] tags. Multiple per turn OK. Concl
 [/commands]
 ]]
 
--- Check if last N turns have identical first command (loop detection)
-function M.is_looping(history, n)
+-- Check if last N commands are identical (loop detection)
+-- recent_cmds is a list of recent command strings
+function M.is_looping(recent_cmds, n)
     n = n or 3
-    if #history < n then return false end
+    if #recent_cmds < n then return false end
 
-    local last_turn = history[#history]
-    if not last_turn.outputs or #last_turn.outputs == 0 then return false end
-    local last_cmd = last_turn.outputs[1].cmd
-
+    local last_cmd = recent_cmds[#recent_cmds]
     for i = 1, n - 1 do
-        local turn = history[#history - i]
-        if not turn.outputs or #turn.outputs == 0 then return false end
-        if turn.outputs[1].cmd ~= last_cmd then
+        if recent_cmds[#recent_cmds - i] ~= last_cmd then
             return false
         end
     end
     return true
 end
 
--- Build chat messages from history
--- History is per-turn: {response, outputs: [{cmd, output, success}]}
--- Returns: messages (list of {role, content}), current_prompt
-function M.build_messages(base_context, history, keep_last)
-    keep_last = keep_last or 10
-    local messages = {}
+-- Build context from working memory
+-- working_memory: list of {type="output"|"note", cmd?, content}
+function M.build_context(task, working_memory, current_outputs)
+    local parts = {"Task: " .. task}
 
-    local start_idx = math.max(1, #history - keep_last + 1)
-    for i = start_idx, #history do
-        local turn = history[i]
-        -- Assistant message: LLM response
-        table.insert(messages, {"assistant", turn.response})
-        -- User message: all command outputs combined
-        local parts = {}
-        for _, cmd_result in ipairs(turn.outputs) do
-            local output = cmd_result.output or ""
-            if #output > 4000 then
-                output = output:sub(1, 2000) .. "\n...[truncated]...\n" .. output:sub(-1000)
+    -- Add working memory (kept outputs and notes)
+    if #working_memory > 0 then
+        table.insert(parts, "\n[working memory]")
+        for _, item in ipairs(working_memory) do
+            if item.type == "note" then
+                table.insert(parts, "- " .. item.content)
+            else
+                local header = "$ " .. item.cmd
+                if not item.success then header = header .. " (failed)" end
+                table.insert(parts, header .. "\n" .. item.content)
             end
-            local header = "$ " .. cmd_result.cmd
-            if not cmd_result.success then
-                header = header .. " (failed)"
-            end
-            table.insert(parts, header .. "\n" .. output)
         end
-        table.insert(messages, {"user", table.concat(parts, "\n\n")})
+        table.insert(parts, "[/working memory]")
     end
 
-    return messages, base_context
+    -- Add current turn outputs (ephemeral, indexed)
+    if current_outputs and #current_outputs > 0 then
+        table.insert(parts, "\n[outputs]")
+        for i, out in ipairs(current_outputs) do
+            local header = string.format("[%d] $ %s", i, out.cmd)
+            if not out.success then header = header .. " (failed)" end
+            table.insert(parts, header .. "\n" .. out.content)
+        end
+        table.insert(parts, "[/outputs]")
+    end
+
+    return table.concat(parts, "\n")
+end
+
+-- Parse keep command: "keep" | "keep all" | "keep 1" | "keep 1 2 3"
+function M.parse_keep(cmd, num_outputs)
+    local indices = {}
+    local args = cmd:match("^keep%s*(.*)")
+    if not args or args == "" or args == "all" then
+        -- keep all
+        for i = 1, num_outputs do
+            table.insert(indices, i)
+        end
+    else
+        -- keep specific indices
+        for idx in args:gmatch("%d+") do
+            local n = tonumber(idx)
+            if n and n >= 1 and n <= num_outputs then
+                table.insert(indices, n)
+            end
+        end
+    end
+    return indices
 end
 
 -- Main agent loop
@@ -72,26 +96,23 @@ function M.run(opts)
     opts = opts or {}
     local task = opts.prompt or opts.task or "Help with this codebase"
     local max_turns = opts.max_turns or 15
-    local max_tokens = opts.max_tokens or 4096
     local provider = opts.provider or "gemini"
     local model = opts.model
 
-    -- Build initial context
-    local context = "Task: " .. task .. "\n"
-    context = context .. "Directory: " .. _moss_root .. "\n"
+    -- Build task description
+    local task_desc = task
     if opts.explain then
-        context = context .. "IMPORTANT: Your final answer MUST end with '## Steps' listing each command you ran and why it was needed.\n"
+        task_desc = task_desc .. "\nIMPORTANT: Your final answer MUST end with '## Steps' listing each command you ran and why it was needed."
     end
-    context = context .. "\n"
+    task_desc = task_desc .. "\nDirectory: " .. _moss_root
 
-    -- Recall relevant memories
+    -- Recall relevant memories into working memory
+    local working_memory = {}
     local ok, memories = pcall(recall, task, 3)
     if ok and memories and #memories > 0 then
-        context = context .. "Relevant context from previous sessions:\n"
         for _, m in ipairs(memories) do
-            context = context .. "- " .. m.content .. "\n"
+            table.insert(working_memory, {type = "note", content = "(recalled) " .. m.content})
         end
-        context = context .. "\n"
     end
 
     -- Initialize shadow git for rollback capability
@@ -100,9 +121,10 @@ function M.run(opts)
         shadow.snapshot({})
     end)
 
-    local history = {}
+    local recent_cmds = {}  -- for loop detection
     local all_output = {}
     local total_retries = 0
+    local current_outputs = nil  -- outputs from last turn (ephemeral)
 
     -- Open log file if debug mode
     local log_file = nil
@@ -116,26 +138,18 @@ function M.run(opts)
     for turn = 1, max_turns do
         print(string.format("[agent] Turn %d/%d", turn, max_turns))
 
-        -- Build chat messages
-        local messages, prompt = M.build_messages(context, history)
+        -- Build context from working memory + current outputs
+        local prompt = M.build_context(task_desc, working_memory, current_outputs)
 
-        -- Add loop warning to current prompt if needed
-        if M.is_looping(history, 3) then
+        -- Add loop warning if needed
+        if M.is_looping(recent_cmds, 3) then
             prompt = prompt .. "\nWARNING: You've run the same command 3 times. Explain what's wrong and try a different approach.\n"
         end
 
-        -- Get LLM response
+        -- Debug output
         if os.getenv("MOSS_AGENT_DEBUG") then
             print("[DEBUG] Prompt length: " .. #prompt)
-            print("[DEBUG] Messages: " .. #messages)
-            if #history > 0 then
-                local last_turn = history[#history]
-                local total_len = 0
-                for _, o in ipairs(last_turn.outputs or {}) do
-                    total_len = total_len + #(o.output or "")
-                end
-                print("[DEBUG] Last turn output length: " .. total_len)
-            end
+            print("[DEBUG] Working memory items: " .. #working_memory)
         end
         io.write("[agent] Thinking... ")
         io.flush()
@@ -145,7 +159,7 @@ function M.run(opts)
         local max_retries = 3
         for attempt = 1, max_retries do
             local ok, result = pcall(function()
-                return llm.chat(provider, model, SYSTEM_PROMPT, prompt, messages)
+                return llm.chat(provider, model, SYSTEM_PROMPT, prompt, {})
             end)
             if ok then
                 response = result
@@ -187,10 +201,12 @@ function M.run(opts)
             return { success = true, output = table.concat(all_output, "\n") }
         end
 
-        -- Execute all commands, collect outputs
-        local turn_outputs = {}
+        -- Separate execution commands from memory commands
+        local exec_commands = {}
+        local keep_commands = {}
+        local note_commands = {}
+
         for _, cmd in ipairs(commands) do
-            -- Check for done command
             if cmd:match("^done") then
                 local summary = cmd:match("^done%s*(.*)") or ""
                 print("[agent] Done: " .. summary)
@@ -198,8 +214,47 @@ function M.run(opts)
                     print("[agent] API retries: " .. total_retries)
                 end
                 return { success = true, output = table.concat(all_output, "\n") }
+            elseif cmd:match("^keep") then
+                table.insert(keep_commands, cmd)
+            elseif cmd:match("^note ") then
+                table.insert(note_commands, cmd)
+            else
+                table.insert(exec_commands, cmd)
             end
+        end
 
+        -- Process keep commands FIRST (refers to previous turn's outputs)
+        local prev_outputs = current_outputs or {}
+        for _, cmd in ipairs(keep_commands) do
+            local indices = M.parse_keep(cmd, #prev_outputs)
+            for _, idx in ipairs(indices) do
+                local out = prev_outputs[idx]
+                if out then
+                    table.insert(working_memory, {
+                        type = "output",
+                        cmd = out.cmd,
+                        content = out.content,
+                        success = out.success
+                    })
+                    print("[agent] Kept output " .. idx)
+                end
+            end
+        end
+
+        -- Process note commands
+        for _, cmd in ipairs(note_commands) do
+            local fact = cmd:match("^note (.+)")
+            if fact then
+                table.insert(working_memory, {type = "note", content = fact})
+                print("[agent] Noted: " .. fact)
+            end
+        end
+
+        -- Clear for this turn's outputs
+        current_outputs = {}
+
+        -- Execute commands
+        for _, cmd in ipairs(exec_commands) do
             -- Snapshot before edits
             if cmd:match("^edit") and shadow_ok then
                 pcall(function() shadow.snapshot({}) end)
@@ -232,11 +287,17 @@ function M.run(opts)
                 log_file:flush()
             end
 
-            table.insert(turn_outputs, {
+            table.insert(current_outputs, {
                 cmd = cmd,
-                output = result.output,
+                content = result.output,
                 success = result.success
             })
+
+            -- Track for loop detection
+            table.insert(recent_cmds, cmd)
+            if #recent_cmds > 10 then
+                table.remove(recent_cmds, 1)
+            end
 
             -- Rollback on edit failure
             if cmd:match("^edit") and not result.success and shadow_ok then
@@ -249,12 +310,6 @@ function M.run(opts)
                 end)
             end
         end
-
-        -- Store turn in history (one entry per turn, not per command)
-        table.insert(history, {
-            response = response,
-            outputs = turn_outputs
-        })
     end
 
     print("[agent] Max turns reached")
