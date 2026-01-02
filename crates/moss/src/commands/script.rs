@@ -15,25 +15,26 @@ use crate::workflow::LuaRuntime;
 pub mod builtins {
     pub const TODO: &str = include_str!("scripts/todo.lua");
     pub const CONFIG: &str = include_str!("scripts/config.lua");
+    pub const AGENT: &str = include_str!("scripts/agent.lua");
 
     /// Get builtin script by name.
     pub fn get(name: &str) -> Option<&'static str> {
         match name {
             "todo" => Some(TODO),
             "config" => Some(CONFIG),
+            "agent" => Some(AGENT),
             _ => None,
         }
     }
 
     /// List all builtin script names.
     pub fn list() -> &'static [&'static str] {
-        &["config", "todo"]
+        &["agent", "config", "todo"]
     }
 }
 
 /// Builtin Lua modules (for require()).
 pub mod modules {
-    pub const AGENT: &str = include_str!("scripts/agent.lua");
     pub const CLI: &str = include_str!("scripts/cli.lua");
     pub const TYPE: &str = include_str!("scripts/type.lua");
     pub const TYPE_DESCRIBE: &str = include_str!("scripts/type/describe.lua");
@@ -45,7 +46,7 @@ pub mod modules {
     /// Get builtin module by name.
     pub fn get(name: &str) -> Option<&'static str> {
         match name {
-            "agent" => Some(AGENT),
+            "agent" => Some(super::builtins::AGENT),
             "cli" => Some(CLI),
             "type" => Some(TYPE),
             "type.describe" => Some(TYPE_DESCRIBE),

@@ -149,4 +149,15 @@ function M.run(opts)
     return { success = false, output = table.concat(all_output, "\n") }
 end
 
-return M
+-- When run as script (moss @agent), execute directly
+-- When required as module, return M
+if args and #args >= 0 then
+    local task = table.concat(args, " ")
+    if task == "" then task = nil end
+    local result = M.run({ prompt = task })
+    if not result.success then
+        os.exit(1)
+    end
+else
+    return M
+end

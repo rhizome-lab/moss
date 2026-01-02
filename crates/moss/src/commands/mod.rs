@@ -1,6 +1,5 @@
 //! CLI command implementations - one module per top-level command.
 
-pub mod agent;
 pub mod analyze;
 pub mod daemon;
 pub mod edit;

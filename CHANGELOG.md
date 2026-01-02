@@ -5,12 +5,11 @@
 See `docs/` for design docs and `README.md` for usage.
 
 ### Agent Command
-- `moss agent "task"` runs autonomous agent loop
+- `moss @agent "task"` runs autonomous agent loop (max 50 turns)
 - Pure Lua implementation (`require("agent")` module)
 - Loop detection: warns when same command repeated 3+ times
 - Shadow git integration for automatic rollback on failed edits
 - Memory integration via `recall()` for cross-session context
-- `--max-turns` flag (default 50) to limit iterations
 - `llm.complete(provider?, model?, system?, prompt)` exposed to Lua scripts
 - See `docs/design/agent.md` for design rationale
 

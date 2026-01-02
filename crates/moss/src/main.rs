@@ -211,20 +211,6 @@ enum Commands {
         limit: usize,
     },
 
-    /// Run autonomous agent with a task
-    Agent {
-        /// Task prompt for the agent
-        prompt: Option<String>,
-
-        /// Maximum number of turns
-        #[arg(short = 'n', long, default_value = "50")]
-        max_turns: usize,
-
-        /// Project root directory
-        #[arg(short, long)]
-        root: Option<PathBuf>,
-    },
-
     /// Run Lua scripts
     Script {
         #[command(subcommand)]
@@ -574,11 +560,6 @@ fn main() {
         Commands::Plans { name, limit } => {
             commands::plans::cmd_plans(name.as_deref(), limit, cli.json)
         }
-        Commands::Agent {
-            prompt,
-            max_turns,
-            root,
-        } => commands::agent::run(prompt.as_deref(), Some(max_turns), root.as_deref()),
         Commands::Package {
             action,
             ecosystem,
