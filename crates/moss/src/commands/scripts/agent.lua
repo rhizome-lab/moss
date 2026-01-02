@@ -2,7 +2,7 @@
 local M = {}
 
 local SYSTEM_PROMPT = [[
-Coding session. Output commands in [cmd][/cmd] tags. Conclude quickly using done.
+Coding session. Output commands in [cmd][/cmd] tags. Multiple per turn OK. Conclude quickly using done.
 [commands]
 [cmd]done answer here[/cmd]
 [cmd]view [--types-only|--full|--deps] .[/cmd]
@@ -78,7 +78,11 @@ function M.run(opts)
 
     -- Build initial context
     local context = "Task: " .. task .. "\n"
-    context = context .. "Directory: " .. _moss_root .. "\n\n"
+    context = context .. "Directory: " .. _moss_root .. "\n"
+    if opts.explain then
+        context = context .. "IMPORTANT: Your final answer MUST end with '## Steps' listing each command you ran and why it was needed.\n"
+    end
+    context = context .. "\n"
 
     -- Recall relevant memories
     local ok, memories = pcall(recall, task, 3)
@@ -276,6 +280,9 @@ function M.parse_args(args)
         elseif arg == "--max-turns" and args[i+1] then
             opts.max_turns = tonumber(args[i+1])
             i = i + 2
+        elseif arg == "--explain" then
+            opts.explain = true
+            i = i + 1
         else
             table.insert(task_parts, arg)
             i = i + 1
