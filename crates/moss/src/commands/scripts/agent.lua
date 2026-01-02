@@ -70,7 +70,7 @@ function M.build_context(task, working_memory, current_outputs)
         end
         table.insert(parts, "[/outputs]")
         -- Post-history reminder
-        table.insert(parts, "\nNow: $(done ANSWER), or keep/note and continue")
+        table.insert(parts, "\nAnswer with $(done ANSWER) if ready, or $(keep)/$(note) what you learned and continue.")
     end
 
     return table.concat(parts, "\n")
