@@ -3,7 +3,7 @@ local M = {}
 
 local SYSTEM_PROMPT = [[
 Coding session. Output commands in [cmd][/cmd] tags. Multiple commands per turn allowed.
-<pre>
+[commands]
 [cmd]view [--types-only|--full|--deps] .[/cmd]
 [cmd]view src/main.rs[/cmd]
 [cmd]view src/main.rs/main[/cmd]
@@ -14,7 +14,7 @@ Coding session. Output commands in [cmd][/cmd] tags. Multiple commands per turn 
 [cmd]run cargo test[/cmd]
 [cmd]ask which module?[/cmd]
 [cmd]done summary here[/cmd]
-</pre>
+[/commands]
 ]]
 
 -- Check if last N turns have identical first command (loop detection)
@@ -98,6 +98,7 @@ function M.run(opts)
 
     local history = {}
     local all_output = {}
+    local total_retries = 0
 
     -- Open log file if debug mode
     local log_file = nil
@@ -135,7 +136,7 @@ function M.run(opts)
         io.write("[agent] Thinking... ")
         io.flush()
 
-        -- Retry logic for intermittent API failures
+        -- Retry logic with exponential backoff
         local response
         local max_retries = 3
         for attempt = 1, max_retries do
@@ -146,8 +147,11 @@ function M.run(opts)
                 response = result
                 break
             elseif attempt < max_retries then
-                io.write("retry " .. attempt .. "... ")
+                total_retries = total_retries + 1
+                local delay = 2 ^ (attempt - 1)  -- 1s, 2s, 4s
+                io.write("retry in " .. delay .. "s... ")
                 io.flush()
+                os.execute("sleep " .. delay)
             else
                 error(result)
             end
@@ -173,6 +177,9 @@ function M.run(opts)
 
         if #commands == 0 then
             print("[agent] No commands found, finishing")
+            if total_retries > 0 then
+                print("[agent] API retries: " .. total_retries)
+            end
             return { success = true, output = table.concat(all_output, "\n") }
         end
 
@@ -183,6 +190,9 @@ function M.run(opts)
             if cmd:match("^done") then
                 local summary = cmd:match("^done%s*(.*)") or ""
                 print("[agent] Done: " .. summary)
+                if total_retries > 0 then
+                    print("[agent] API retries: " .. total_retries)
+                end
                 return { success = true, output = table.concat(all_output, "\n") }
             end
 
@@ -244,6 +254,9 @@ function M.run(opts)
     end
 
     print("[agent] Max turns reached")
+    if total_retries > 0 then
+        print("[agent] API retries: " .. total_retries)
+    end
     return { success = false, output = table.concat(all_output, "\n") }
 end
 

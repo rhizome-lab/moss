@@ -153,6 +153,7 @@ How do we know when tools aren't working? Implicit signals from agent behavior:
 - Plugin Architecture: extensible view providers, synthesis strategies, code generators
 
 ### Agent / MCP
+- Gemini Flash 3 prompt sensitivity: certain phrases ("shell", "execute", nested `[--opts]`) trigger 500 errors. Investigate if prompt can be further simplified to avoid safety filters entirely. See `docs/design/agent.md` for current workarounds.
 - `moss @agent` (crates/moss/src/commands/scripts/agent.lua): MCP support as second-class citizen
   - Our own tools take priority, MCP as fallback/extension mechanism
   - Need to design how MCP servers are discovered/configured
