@@ -102,9 +102,11 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Investigate memory-mapped context, incremental updates
 
 ### Agent Research
+- [x] Basic agent loop: `moss agent` with loop detection, shadow git, memory
 - Conversational loop pattern (vs hierarchical)
 - YOLO mode evaluation
 - Diffusion-like parallel refactors
+- Agent v2: planning/subtasks, better tool output formatting
 - LLM code consistency: see `docs/llm-code-consistency.md` for research notes
 - Claude Code lacks navigation: clicking paths/links in output doesn't open them in editor (significant UX gap)
 - Rich links in LLM output: structured links (file:line, symbols) or cheap model postprocessing. Clickable refs in terminal/IDE.
