@@ -10,6 +10,7 @@ You have these tools (run via "> command"):
   analyze --complexity       Find complex functions
   grep <pattern> [path]      Search code
   shell <cmd>                Run shell command
+  ask <question>             Ask user a question (use when unclear)
 
 Patterns:
   Explore: view . -> view <file> --types-only -> view <symbol>
@@ -18,6 +19,7 @@ Patterns:
 Commands: prefix with "> " (e.g., "> view src/main.rs")
 Finish: say "DONE: <summary>"
 
+If unclear about something, ask the user rather than guessing.
 If stuck, explain why before trying again.
 ]]
 
@@ -101,7 +103,10 @@ function M.run(opts)
         end
 
         -- Get LLM response
+        io.write("[agent] Thinking... ")
+        io.flush()
         local response = llm.complete(provider, model, SYSTEM_PROMPT, prompt)
+        io.write("done\n")
         print(response)
         table.insert(all_output, response)
 
@@ -124,9 +129,20 @@ function M.run(opts)
             pcall(function() shadow.snapshot({}) end)
         end
 
-        -- Execute command via moss
-        print("[agent] Running: " .. cmd)
-        local result = shell("./target/debug/moss " .. cmd)
+        -- Handle ask specially - read from user
+        local result
+        if cmd:match("^ask ") then
+            local question = cmd:match("^ask (.+)")
+            io.write("[agent] " .. question .. "\n> ")
+            io.flush()
+            local answer = io.read("*l") or ""
+            result = { output = "User: " .. answer, success = true }
+        else
+            -- Execute command via moss
+            print("[agent] Running: " .. cmd)
+            result = shell("./target/debug/moss " .. cmd)
+        end
+
         table.insert(history, {
             cmd = cmd,
             output = result.output,
