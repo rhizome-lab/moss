@@ -149,6 +149,12 @@ impl FromLua for GrepOpts {
 
 impl LuaRuntime {
     pub fn new(root: &Path) -> LuaResult<Self> {
+        // Load .env files (project root, then global config)
+        let _ = dotenvy::from_path(root.join(".env"));
+        if let Some(config_dir) = dirs::config_dir() {
+            let _ = dotenvy::from_path(config_dir.join("moss").join(".env"));
+        }
+
         let lua = Lua::new();
 
         {
