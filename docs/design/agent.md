@@ -9,27 +9,32 @@ Design decisions and implementation notes for `moss @agent`.
 ### System Prompt
 
 ```
-Coding session. Output commands in [cmd][/cmd] tags. Multiple per turn OK. Conclude quickly using done.
-[commands]
-[cmd]done answer here[/cmd]
-[cmd]view [--types-only|--full|--deps] .[/cmd]
-[cmd]view src/main.rs[/cmd]
-[cmd]view src/main.rs/main[/cmd]
-[cmd]text-search "pattern"[/cmd]
-[cmd]edit src/lib.rs/foo [delete|replace|insert|move][/cmd]
-[cmd]package [list|tree|info|outdated|audit][/cmd]
-[cmd]analyze [complexity|security|callers|callees|...][/cmd]
-[cmd]run cargo test[/cmd]
-[cmd]ask which module?[/cmd]
-[/commands]
+Coding session. Output commands in $(cmd) syntax. Multiple per turn OK.
+
+Command outputs disappear after each turn. To retain information:
+- $(keep) or $(keep 1 3) saves outputs to working memory
+- $(note key fact here) records insights
+- $(done YOUR FINAL ANSWER) ends the session
+
+$(done The answer is X because Y)
+$(keep)
+$(note uses clap for CLI)
+$(view .)
+$(view --types-only .)
+$(view src/main.rs/main)
+$(text-search "pattern")
+$(edit src/lib.rs/foo delete|replace|insert|move)
+$(package list|tree|info|outdated|audit)
+$(analyze complexity|security|callers|callees)
+$(run cargo test)
+$(ask which module?)
 ```
 
 Key design choices:
+- Shell-like `$(cmd)` syntax - natural for LLMs trained on shell scripts
 - `done` listed first to emphasize task completion
-- "Conclude quickly" efficiency hint
 - "Multiple per turn OK" enables batching
-- BBCode `[cmd][/cmd]` format (see Rejected Formats below)
-- `[commands][/commands]` wrapper for examples
+- Ephemeral context with explicit `keep`/`note` for memory management
 
 ### CLI Usage
 
@@ -195,37 +200,23 @@ Factors:
 - Claude models: Works correctly with multi-turn chat
 - Result: Inconsistent across providers
 
-#### Current Format: BBCode
-
 **`[cmd][/cmd]` (BBCode style)**
-- Chosen because it's visually distinct from HTML, XML, and thinking blocks
-- Less likely to trigger learned patterns from structured data
-- Still machine-parseable: `%[cmd%](.-)%[/cmd%]` (Lua pattern)
+- Tested but replaced - Gemini Flash would loop without concluding
+- Claude works but sometimes wraps in code blocks
+- Less natural than shell syntax
 
-#### Gemini Flash 3 Quirks (500 errors / empty responses)
+#### Current Format: Shell-like $()
 
-Testing revealed certain phrases trigger 500 errors or empty responses:
-
-**Trigger phrases (500 error):**
-- "shell" command in examples → use "run" or "exec" instead
-- "Multi-turn shell session" → use "Coding session" instead
-- Multiple example commands without `<pre>` wrapper
-
-**Trigger phrases (empty response):**
-- "Shell session" alone
-- "I execute them" → sounds like asking AI to do something dangerous
-- Various "session" + "execute" combinations
-
-**Workarounds:**
-- Wrap command examples in `[commands][/commands]` tags (BBCode, not `<pre>`)
-- Use "Coding session" instead of "shell session"
-- Avoid "execute" - use "run" or "show results"
-- Avoid "shell" command - use "run"
-
-**Works reliably:**
-- "Coding session. Output commands in [cmd][/cmd] tags."
-- `[commands][cmd]view .[/cmd][/commands]`
-- "view", "text-search", "edit", "done", "run", "ask" commands
+**`$(cmd)` syntax**
+- Familiar from shell command substitution
+- Models trained on lots of shell scripts recognize this pattern
+- Both Claude and Gemini follow format correctly
+- Gemini now concludes with `$(done answer)` instead of looping
+- Lua pattern: `%$%((.-)%)`
+- Caveat: nested parens would break parsing (rare in practice)
+- Issue: Gemini still hallucinates command output content (invents fake file contents)
+  - Format is correct, but model "thinks ahead" instead of waiting for real execution
+  - May need explicit "do not simulate outputs" instruction
 
 **Potential fix:**
 - Rig library hardcodes `safety_settings: None` for Gemini

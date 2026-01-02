@@ -2,29 +2,27 @@
 local M = {}
 
 local SYSTEM_PROMPT = [[
-Coding session. Output commands in [cmd][/cmd] tags. Multiple per turn OK.
+Coding session. Output commands in $(cmd) syntax. Multiple per turn OK.
 
 Command outputs disappear after each turn. To retain information:
-- [cmd]keep[/cmd] or [cmd]keep 1 3[/cmd] saves outputs to working memory
-- [cmd]note key fact here[/cmd] records insights
-- [cmd]done YOUR FINAL ANSWER[/cmd] ends the session
+- $(keep) or $(keep 1 3) saves outputs to working memory
+- $(note key fact here) records insights
+- $(done YOUR FINAL ANSWER) ends the session
 
-[commands]
-[cmd]done The answer is X because Y[/cmd]
-[cmd]keep[/cmd]
-[cmd]note uses clap for CLI[/cmd]
-[cmd]view .[/cmd]
-[cmd]view --types-only .[/cmd]
-[cmd]view --deps .[/cmd]
-[cmd]view src/main.rs[/cmd]
-[cmd]view src/main.rs/main[/cmd]
-[cmd]text-search "pattern"[/cmd]
-[cmd]edit src/lib.rs/foo delete|replace|insert|move[/cmd]
-[cmd]package list|tree|info|outdated|audit[/cmd]
-[cmd]analyze complexity|security|callers|callees[/cmd]
-[cmd]run cargo test[/cmd]
-[cmd]ask which module?[/cmd]
-[/commands]
+$(done The answer is X because Y)
+$(keep)
+$(note uses clap for CLI)
+$(view .)
+$(view --types-only .)
+$(view --deps .)
+$(view src/main.rs)
+$(view src/main.rs/main)
+$(text-search "pattern")
+$(edit src/lib.rs/foo delete|replace|insert|move)
+$(package list|tree|info|outdated|audit)
+$(analyze complexity|security|callers|callees)
+$(run cargo test)
+$(ask which module?)
 ]]
 
 -- Check if last N commands are identical (loop detection)
@@ -193,9 +191,9 @@ function M.run(opts)
         print(response)
         table.insert(all_output, response)
 
-        -- Extract all commands from response
+        -- Extract all commands from response: $(cmd here)
         local commands = {}
-        for cmd in response:gmatch("%[cmd%](.-)%[/cmd%]") do
+        for cmd in response:gmatch("%$%((.-)%)") do
             table.insert(commands, cmd)
         end
 
