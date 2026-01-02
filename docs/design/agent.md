@@ -1,27 +1,66 @@
 # Agent Design Notes
 
-Brainstorming for moss agent implementation. Raw ideas, not vetted.
+Design decisions and implementation notes for `moss @agent`.
 
-## Current State
+## Current Implementation
 
-`auto(config)` in `lua_runtime.rs`:
-- Basic turn loop with `max_turns`
-- Text-based command parsing (lines starting with `> `)
-- Appends command output to conversation (grows forever)
-- Calls moss CLI as subprocess
+**File:** `crates/moss/src/commands/scripts/agent.lua`
 
-System prompt (minimal):
+### System Prompt
+
 ```
-Tools:
-view <path|symbol|path/symbol>
-edit <path|symbol|path/symbol> <task>
-analyze [--health|--complexity] [path]
-grep <pattern> [path]
-lint [--fix] [path]
-shell <command>
-
-Run: "> cmd". End: DONE
+Coding session. Output commands in [cmd][/cmd] tags. Multiple per turn OK. Conclude quickly using done.
+[commands]
+[cmd]done answer here[/cmd]
+[cmd]view [--types-only|--full|--deps] .[/cmd]
+[cmd]view src/main.rs[/cmd]
+[cmd]view src/main.rs/main[/cmd]
+[cmd]text-search "pattern"[/cmd]
+[cmd]edit src/lib.rs/foo [delete|replace|insert|move][/cmd]
+[cmd]package [list|tree|info|outdated|audit][/cmd]
+[cmd]analyze [complexity|security|callers|callees|...][/cmd]
+[cmd]run cargo test[/cmd]
+[cmd]ask which module?[/cmd]
+[/commands]
 ```
+
+Key design choices:
+- `done` listed first to emphasize task completion
+- "Conclude quickly" efficiency hint
+- "Multiple per turn OK" enables batching
+- BBCode `[cmd][/cmd]` format (see Rejected Formats below)
+- `[commands][/commands]` wrapper for examples
+
+### CLI Usage
+
+```bash
+moss @agent "What language is this project?"
+moss @agent --provider anthropic "List dependencies"
+moss @agent --max-turns 10 "Refactor the auth module"
+moss @agent --explain "What does this do?"  # Asks for step-by-step reasoning
+```
+
+### Architecture
+
+- **Pure Lua**: Agent loop is 100% Lua, Rust only exposes primitives
+- **Multi-turn chat**: Proper user/assistant message boundaries via `llm.chat()`
+- **Per-turn history**: Each turn stores `{response, outputs: [{cmd, output, success}]}`
+- **Loop detection**: Warns if same command repeated 3+ times
+- **Shadow git**: Snapshots before edits, rollback on failure
+- **Memory**: Recalls relevant context from previous sessions via `recall()`
+
+### Retry Logic
+
+Exponential backoff (1s, 2s, 4s) for intermittent API failures. Reports total retry count at session end if > 0.
+
+### Model Behavior
+
+| Model | Turns for simple Q | Style |
+|-------|-------------------|-------|
+| Gemini Flash 3 | 4-5 | Thorough exploration, then answers |
+| Claude Sonnet | 3-4 | Efficient, uses `[cmd]done[/cmd]` wrapper |
+
+Flash explores more but concludes reliably with current prompt tuning.
 
 ## Python Implementation (to port)
 
@@ -178,16 +217,15 @@ Testing revealed certain phrases trigger 500 errors or empty responses:
 - Various "session" + "execute" combinations
 
 **Workarounds:**
-- Wrap command examples in `<pre></pre>` tags
+- Wrap command examples in `[commands][/commands]` tags (BBCode, not `<pre>`)
 - Use "Coding session" instead of "shell session"
 - Avoid "execute" - use "run" or "show results"
-- Avoid "shell" command - use "run" or "exec"
+- Avoid "shell" command - use "run"
 
 **Works reliably:**
 - "Coding session. Output commands in [cmd][/cmd] tags."
-- `<pre>[cmd]view .[/cmd]</pre>`
-- "view", "text-search", "edit", "done" commands
-- "run" command (renamed from "shell")
+- `[commands][cmd]view .[/cmd][/commands]`
+- "view", "text-search", "edit", "done", "run", "ask" commands
 
 **Potential fix:**
 - Rig library hardcodes `safety_settings: None` for Gemini
@@ -314,14 +352,25 @@ Not doing **A1/A2** (agent adaptation) - that requires fine-tuning LLMs, outside
 
 ## Related Files
 
-- `crates/moss/src/workflow/lua_runtime.rs` - Current `auto()` implementation
-- `crates/moss/src/workflow/llm.rs` - LLM client, system prompt
+- `crates/moss/src/commands/scripts/agent.lua` - Agent loop implementation
+- `crates/moss/src/workflow/lua_runtime.rs` - Lua bindings including `llm.chat()`
+- `crates/moss/src/workflow/llm.rs` - Multi-provider LLM client
 - `docs/research/agent-adaptation.md` - Adaptation framework analysis
 - `docs/lua-api.md` - Available Lua bindings
 
+## Completed
+
+- [x] Tool invocation format: BBCode `[cmd][/cmd]`
+- [x] Minimal agent loop in Lua
+- [x] Loop detection (same command 3+ times)
+- [x] Multi-turn chat with proper message boundaries
+- [x] Retry logic with exponential backoff
+- [x] Shadow git integration for rollback
+- [x] Memory integration via `recall()`
+
 ## Next Steps
 
-1. Decide on tool invocation format (experiment with text vs structured?)
-2. Prototype minimal agent loop (just the 4 lines: gather, decide, execute, check)
-3. Implement loop detection
-4. Test with real tasks, observe friction
+1. Tune prompt for faster conclusions (Flash takes 4-5 turns vs ideal 2-3)
+2. Test with edit tasks (not just exploration)
+3. Improve `--explain` flag (Flash ignores step explanation request)
+4. Consider streaming output for long responses
