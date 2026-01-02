@@ -189,9 +189,10 @@ Testing revealed certain phrases trigger 500 errors or empty responses:
 - "view", "text-search", "edit", "done" commands
 - "run" command (renamed from "shell")
 
-**Mitigation:**
-- Added retry logic (3 attempts) for intermittent 500 errors
-- ~40% of requests fail with 500, but retries usually succeed
+**Potential fix:**
+- Rig library hardcodes `safety_settings: None` for Gemini
+- Could set lower thresholds via `additional_params` or fork rig
+- Currently using retry logic as workaround (3 attempts)
 
 ### Context Model
 

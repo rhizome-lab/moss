@@ -2,8 +2,7 @@
 local M = {}
 
 local SYSTEM_PROMPT = [[
-Coding session. Output commands in [cmd][/cmd] tags, I run them and show results.
-You can queue multiple commands per turn.
+Coding session. Output commands in [cmd][/cmd] tags. Multiple commands per turn allowed.
 <pre>
 [cmd]view [--types-only|--full|--deps] .[/cmd]
 [cmd]view src/main.rs[/cmd]
@@ -16,7 +15,6 @@ You can queue multiple commands per turn.
 [cmd]ask which module?[/cmd]
 [cmd]done summary here[/cmd]
 </pre>
-Use --help for details. Prefer specialized commands over run.
 ]]
 
 -- Check if last N turns have identical first command (loop detection)
