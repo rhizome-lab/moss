@@ -148,13 +148,23 @@ impl LlmClient {
     }
 
     /// Generate a completion.
-    pub fn complete(&self, system: Option<&str>, prompt: &str) -> Result<String, String> {
+    pub fn complete(
+        &self,
+        system: Option<&str>,
+        prompt: &str,
+        max_tokens: Option<usize>,
+    ) -> Result<String, String> {
         let rt = tokio::runtime::Runtime::new()
             .map_err(|e| format!("Failed to create runtime: {}", e))?;
-        rt.block_on(self.complete_async(system, prompt))
+        rt.block_on(self.complete_async(system, prompt, max_tokens.unwrap_or(8192)))
     }
 
-    async fn complete_async(&self, system: Option<&str>, prompt: &str) -> Result<String, String> {
+    async fn complete_async(
+        &self,
+        system: Option<&str>,
+        prompt: &str,
+        max_tokens: usize,
+    ) -> Result<String, String> {
         macro_rules! run_provider {
             ($client:expr) => {{
                 let client = $client;
@@ -171,7 +181,19 @@ impl LlmClient {
         }
 
         match self.provider {
-            Provider::Anthropic => run_provider!(providers::anthropic::Client::from_env()),
+            Provider::Anthropic => {
+                // Anthropic requires max_tokens
+                let client = providers::anthropic::Client::from_env();
+                let mut builder = client.agent(&self.model).max_tokens(max_tokens as u64);
+                if let Some(sys) = system {
+                    builder = builder.preamble(sys);
+                }
+                let agent = builder.build();
+                agent
+                    .prompt(prompt)
+                    .await
+                    .map_err(|e| format!("LLM request failed: {}", e))
+            }
             Provider::OpenAI => run_provider!(providers::openai::Client::from_env()),
             Provider::Azure => run_provider!(providers::azure::Client::from_env()),
             Provider::Gemini => run_provider!(providers::gemini::Client::from_env()),

@@ -496,17 +496,18 @@ impl LuaRuntime {
                 "complete",
                 lua.create_function(
                     |_,
-                     (provider, model, system, prompt): (
+                     (provider, model, system, prompt, max_tokens): (
                         Option<String>,
                         Option<String>,
                         Option<String>,
                         String,
+                        Option<usize>,
                     )| {
                         let provider_str = provider.as_deref().unwrap_or("anthropic");
                         let client = LlmClient::new(provider_str, model.as_deref())
                             .map_err(mlua::Error::external)?;
                         client
-                            .complete(system.as_deref(), &prompt)
+                            .complete(system.as_deref(), &prompt, max_tokens)
                             .map_err(mlua::Error::external)
                     },
                 )?,
@@ -517,7 +518,7 @@ impl LuaRuntime {
         {
             llm_table.set(
                 "complete",
-                lua.create_function(|_, _: (Option<String>, Option<String>, Option<String>, String)| {
+                lua.create_function(|_, _: (Option<String>, Option<String>, Option<String>, String, Option<usize>)| {
                     Err::<String, _>(mlua::Error::external(
                         "llm.complete requires the 'llm' feature. Rebuild with: cargo build --features llm",
                     ))

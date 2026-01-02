@@ -2,25 +2,25 @@
 local M = {}
 
 local SYSTEM_PROMPT = [[
-You have these tools (run via "> command"):
+Commands start with "> ". Output from commands appears after your message.
 
-  view <path|symbol>         Show code structure
-  view <path> --types-only   Show just signatures
-  edit <path> <task>         Modify code
-  analyze --complexity       Find complex functions
-  grep <pattern> [path]      Search code
-  shell <cmd>                Run shell command
-  ask <question>             Ask user a question (use when unclear)
+> view <path>
+> grep <pattern>
+> edit <path> <task>
+> shell <cmd>
+> ask <question>
+> done <summary>
 
-Patterns:
-  Explore: view . -> view <file> --types-only -> view <symbol>
-  Investigate: analyze --complexity -> view <complex_fn>
-
-Commands: prefix with "> " (e.g., "> view src/main.rs")
-Finish: say "DONE: <summary>"
-
-If unclear about something, ask the user rather than guessing.
-If stuck, explain why before trying again.
+Example:
+  User: fix the typo
+  You: Let me find it.
+  > grep typo
+  [output appears here next turn]
+  You: Found it in README.md line 5.
+  > edit README.md fix typo on line 5
+  [output appears here next turn]
+  You: Fixed.
+  > done fixed typo in README.md
 ]]
 
 -- Check if last N commands are identical (loop detection)
@@ -66,7 +66,8 @@ end
 function M.run(opts)
     opts = opts or {}
     local task = opts.prompt or opts.task or "Help with this codebase"
-    local max_turns = opts.max_turns or 50
+    local max_turns = opts.max_turns or 1  -- TODO: increase after testing
+    local max_tokens = opts.max_tokens or 512  -- TODO: increase after testing
     local provider = opts.provider
     local model = opts.model
 
@@ -103,61 +104,76 @@ function M.run(opts)
         end
 
         -- Get LLM response
+        if os.getenv("MOSS_AGENT_DEBUG") then
+            print("[DEBUG] Prompt length: " .. #prompt)
+            print("[DEBUG] History entries: " .. #history)
+            if #history > 0 then
+                print("[DEBUG] Last output length: " .. #(history[#history].output or ""))
+            end
+        end
         io.write("[agent] Thinking... ")
         io.flush()
-        local response = llm.complete(provider, model, SYSTEM_PROMPT, prompt)
+        local response = llm.complete(provider, model, SYSTEM_PROMPT, prompt, max_tokens)
         io.write("done\n")
+
         print(response)
         table.insert(all_output, response)
 
-        -- Check for done
-        if response:match("DONE") then
-            print("[agent] Task completed")
+        -- Extract all commands from response
+        local commands = {}
+        for cmd in response:gmatch("> ([^\n]+)") do
+            table.insert(commands, cmd)
+        end
+
+        if #commands == 0 then
+            print("[agent] No commands found, finishing")
             return { success = true, output = table.concat(all_output, "\n") }
         end
 
-        -- Parse command (lines starting with "> ")
-        local cmd = response:match("> ([^\n]+)")
-        if not cmd then
-            -- No command found, agent is done or confused
-            print("[agent] No command found, finishing")
-            return { success = true, output = table.concat(all_output, "\n") }
-        end
+        -- Execute each command
+        for _, cmd in ipairs(commands) do
+            -- Check for done command
+            if cmd:match("^done") then
+                local summary = cmd:match("^done%s*(.*)") or ""
+                print("[agent] Done: " .. summary)
+                return { success = true, output = table.concat(all_output, "\n") }
+            end
 
-        -- Snapshot before edits
-        if cmd:match("^edit") and shadow_ok then
-            pcall(function() shadow.snapshot({}) end)
-        end
+            -- Snapshot before edits
+            if cmd:match("^edit") and shadow_ok then
+                pcall(function() shadow.snapshot({}) end)
+            end
 
-        -- Handle ask specially - read from user
-        local result
-        if cmd:match("^ask ") then
-            local question = cmd:match("^ask (.+)")
-            io.write("[agent] " .. question .. "\n> ")
-            io.flush()
-            local answer = io.read("*l") or ""
-            result = { output = "User: " .. answer, success = true }
-        else
-            -- Execute command via moss
-            print("[agent] Running: " .. cmd)
-            result = shell("./target/debug/moss " .. cmd)
-        end
+            -- Handle ask specially - read from user
+            local result
+            if cmd:match("^ask ") then
+                local question = cmd:match("^ask (.+)")
+                io.write("[agent] " .. question .. "\n> ")
+                io.flush()
+                local answer = io.read("*l") or ""
+                result = { output = "User: " .. answer, success = true }
+            else
+                -- Execute command via moss
+                print("[agent] Running: " .. cmd)
+                result = shell("./target/debug/moss " .. cmd)
+            end
 
-        table.insert(history, {
-            cmd = cmd,
-            output = result.output,
-            success = result.success
-        })
+            table.insert(history, {
+                cmd = cmd,
+                output = result.output,
+                success = result.success
+            })
 
-        -- Rollback on edit failure
-        if cmd:match("^edit") and not result.success and shadow_ok then
-            print("[agent] Edit failed, rolling back")
-            pcall(function()
-                local snapshots = shadow.list()
-                if #snapshots > 1 then
-                    shadow.restore(snapshots[#snapshots - 1].id)
-                end
-            end)
+            -- Rollback on edit failure
+            if cmd:match("^edit") and not result.success and shadow_ok then
+                print("[agent] Edit failed, rolling back")
+                pcall(function()
+                    local snapshots = shadow.list()
+                    if #snapshots > 1 then
+                        shadow.restore(snapshots[#snapshots - 1].id)
+                    end
+                end)
+            end
         end
     end
 
