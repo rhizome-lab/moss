@@ -70,7 +70,7 @@ function M.build_context(task, working_memory, current_outputs)
         end
         table.insert(parts, "[/outputs]")
         -- Post-history reminder
-        table.insert(parts, "\n$(done ANSWER) if ready. $(note) what you found or didn't find to avoid repeating searches.")
+        table.insert(parts, "\n$(done ANSWER) if ready, otherwise $(note) what you learned and continue.")
     end
 
     return table.concat(parts, "\n")
