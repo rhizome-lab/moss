@@ -11,6 +11,7 @@ use crate::analyze::function_length::{LengthCategory, LengthReport};
 use crate::filter::Filter;
 use crate::health::{HealthReport, analyze_health};
 use crate::path_resolve;
+use std::path::PathBuf;
 
 use super::{complexity, length, security};
 
@@ -516,6 +517,172 @@ impl AnalyzeReport {
     }
 }
 
+/// Check if a string contains glob characters
+fn is_glob_pattern(s: &str) -> bool {
+    s.contains('*') || s.contains('?') || s.contains('[') || s.contains('{')
+}
+
+/// Expand a glob pattern relative to root, returning matching file paths
+fn expand_glob(pattern: &str, root: &Path) -> Vec<PathBuf> {
+    let full_pattern = root.join(pattern);
+    let pattern_str = full_pattern.to_string_lossy();
+
+    match glob::glob(&pattern_str) {
+        Ok(entries) => entries
+            .filter_map(|entry| entry.ok())
+            .filter(|p| p.is_file())
+            .collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
+/// Analyze files matching a glob pattern
+fn analyze_glob(
+    pattern: &str,
+    root: &Path,
+    run_complexity: bool,
+    run_length: bool,
+    run_security: bool,
+    complexity_threshold: Option<usize>,
+    _kind_filter: Option<&str>, // Not currently used - FunctionComplexity doesn't have kind
+    filter: Option<&Filter>,
+) -> AnalyzeReport {
+    use rayon::prelude::*;
+
+    let files = expand_glob(pattern, root);
+
+    if files.is_empty() {
+        return AnalyzeReport {
+            target_path: pattern.to_string(),
+            health: None,
+            complexity: None,
+            length: None,
+            security: None,
+            skipped: vec![format!("No files matched pattern: {}", pattern)],
+        };
+    }
+
+    // Filter files if filter is provided
+    let files: Vec<_> = files
+        .into_iter()
+        .filter(|f| filter.map(|flt| flt.matches(f)).unwrap_or(true))
+        .collect();
+
+    let file_count = files.len();
+
+    let complexity = if run_complexity {
+        let mut all_functions: Vec<_> = files
+            .par_iter()
+            .filter_map(|path| {
+                let report = complexity::analyze_file_complexity(path)?;
+                let rel_path = path.strip_prefix(root).unwrap_or(path);
+                Some(
+                    report
+                        .functions
+                        .into_iter()
+                        .filter(|f| {
+                            // Apply threshold filter
+                            complexity_threshold
+                                .map(|t| f.complexity >= t)
+                                .unwrap_or(true)
+                        })
+                        .map(|mut f| {
+                            f.file_path = Some(rel_path.to_string_lossy().to_string());
+                            f
+                        })
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .flatten()
+            .collect();
+
+        // Sort by complexity descending
+        all_functions.sort_by(|a, b| b.complexity.cmp(&a.complexity));
+
+        if !all_functions.is_empty() {
+            Some(ComplexityReport {
+                functions: all_functions,
+                file_path: pattern.to_string(),
+            })
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let length = if run_length {
+        let mut all_functions: Vec<_> = files
+            .par_iter()
+            .filter_map(|path| {
+                let report = length::analyze_file_length(path)?;
+                let rel_path = path.strip_prefix(root).unwrap_or(path);
+                Some(
+                    report
+                        .functions
+                        .into_iter()
+                        .map(|mut f| {
+                            f.file_path = Some(rel_path.to_string_lossy().to_string());
+                            f
+                        })
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .flatten()
+            .collect();
+
+        // Sort by length descending
+        all_functions.sort_by(|a, b| b.lines.cmp(&a.lines));
+
+        if !all_functions.is_empty() {
+            Some(LengthReport {
+                functions: all_functions,
+                file_path: pattern.to_string(),
+            })
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Security analysis works at directory level, so we run on root and filter
+    let security = if run_security {
+        let full_report = security::analyze_security(root);
+        // Filter findings to only files matching our glob pattern
+        let matching_findings: Vec<_> = full_report
+            .findings
+            .into_iter()
+            .filter(|f| {
+                // Check if this finding's file matches our glob pattern
+                let finding_path = root.join(&f.file);
+                files.iter().any(|p| p == &finding_path)
+            })
+            .collect();
+
+        if !matching_findings.is_empty() {
+            Some(SecurityReport {
+                findings: matching_findings,
+                tools_run: full_report.tools_run,
+                tools_skipped: full_report.tools_skipped,
+            })
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    AnalyzeReport {
+        target_path: format!("{} ({} files)", pattern, file_count),
+        health: None, // Health doesn't apply to glob patterns
+        complexity,
+        length,
+        security,
+        skipped: Vec::new(),
+    }
+}
+
 /// Run unified analysis on a path
 pub fn analyze(
     target: Option<&str>,
@@ -536,6 +703,22 @@ pub fn analyze(
         "method" | "methods" => "method",
         _ => k,
     });
+
+    // Check for glob patterns in target
+    if let Some(t) = target {
+        if is_glob_pattern(t) {
+            return analyze_glob(
+                t,
+                root,
+                run_complexity,
+                run_length,
+                run_security,
+                complexity_threshold,
+                kind.as_deref(),
+                filter,
+            );
+        }
+    }
 
     // Use unified path resolution to handle file/symbol paths
     let (file_path, symbol_path, is_file) = if let Some(t) = target {
