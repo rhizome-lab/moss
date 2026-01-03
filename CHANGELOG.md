@@ -27,6 +27,15 @@ See `docs/` for design docs and `README.md` for usage.
   - Works with both symbol paths (`file.rs/Symbol`) and line-based lookup (`file.rs:123`)
   - Shows signature and line number for each referenced type
 
+### Analyze Command
+- Glob pattern support for target: `moss analyze 'src/**/*.rs'`
+  - Matches files with glob pattern and analyzes them
+  - Works with complexity, length, and security analysis
+  - Shows file count in header: "src/**/*.rs (18 files)"
+- `-i/--case-insensitive` flag for trace, callers, callees subcommands
+  - Matches symbol names case-insensitively
+  - Consistent with view and edit command flags
+
 ### Shadow Git (Phase 1 + Phase 2 Core)
 - Auto-track edits made via `moss edit` for undo/redo capability
 - Shadow repo created on first edit at `.moss/shadow/`
