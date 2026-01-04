@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Multi-file batch edit: implement design from `docs/design/batch-edit.md`
+- [x] Multi-file batch edit: implement design from `docs/design/batch-edit.md`
 
 ## Remaining Work
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)

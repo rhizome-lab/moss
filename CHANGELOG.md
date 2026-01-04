@@ -36,6 +36,15 @@ See `docs/` for design docs and `README.md` for usage.
   - Matches symbol names case-insensitively
   - Consistent with view and edit command flags
 
+### Edit Command
+- Batch edit: `moss edit --batch edits.json` for atomic multi-file edits
+  - JSON format: `[{"target": "file/sym", "action": "replace", "content": "..."}]`
+  - Stdin support: `cat edits.json | moss edit --batch -`
+  - Edits grouped by file, applied bottom-up to preserve line numbers
+  - Overlap detection rejects conflicting edits
+  - Single shadow git snapshot for entire batch
+- Lua API: `edit.batch({{target="file/sym", action="replace", content="..."}})`
+
 ### Shadow Git (Phase 1 + Phase 2 Core)
 - Auto-track edits made via `moss edit` for undo/redo capability
 - Shadow repo created on first edit at `.moss/shadow/`
