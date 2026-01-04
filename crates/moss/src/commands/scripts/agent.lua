@@ -1,12 +1,28 @@
 -- Agent module: autonomous task execution with moss tools
 local M = {}
 
+-- Generate random short IDs for memory items (avoid sequential to prevent LLM confusion)
+local id_chars = "abcdefghjkmnpqrstuvwxyz23456789"  -- no i,l,o,1,0 to avoid confusion
+function M.gen_id()
+    local id = ""
+    for _ = 1, 4 do
+        local idx = math.random(1, #id_chars)
+        id = id .. id_chars:sub(idx, idx)
+    end
+    return id
+end
+
+-- Seed random on first load
+math.randomseed(os.time())
+
 local SYSTEM_PROMPT = [[
 Coding session. Output commands in $(cmd) syntax. Multiple per turn OK.
 
-Command outputs disappear after each turn. To retain information:
+Command outputs disappear after each turn. To manage context:
 - $(keep) or $(keep 1 3) saves outputs to working memory
 - $(note key fact here) records insights
+- $(drop xk7f) removes item from working memory by ID
+- $(forget pattern) removes notes matching pattern
 - $(done YOUR FINAL ANSWER) ends the session
 
 $(done The answer is X because Y)
@@ -41,18 +57,18 @@ function M.is_looping(recent_cmds, n)
 end
 
 -- Build context from working memory
--- working_memory: list of {type="output"|"note", cmd?, content}
+-- working_memory: list of {type="output"|"note", cmd?, content, id}
 function M.build_context(task, working_memory, current_outputs)
     local parts = {"Task: " .. task}
 
-    -- Add working memory (kept outputs and notes)
+    -- Add working memory (kept outputs and notes) - stable IDs for $(drop ID)
     if #working_memory > 0 then
         table.insert(parts, "\n[working memory]")
         for _, item in ipairs(working_memory) do
             if item.type == "note" then
-                table.insert(parts, "- " .. item.content)
+                table.insert(parts, string.format("[%s] note: %s", item.id, item.content))
             else
-                local header = "$ " .. item.cmd
+                local header = string.format("[%s] $ %s", item.id, item.cmd)
                 if not item.success then header = header .. " (failed)" end
                 table.insert(parts, header .. "\n" .. item.content)
             end
@@ -117,7 +133,7 @@ function M.run(opts)
     local ok, memories = pcall(recall, task, 3)
     if ok and memories and #memories > 0 then
         for _, m in ipairs(memories) do
-            table.insert(working_memory, {type = "note", content = "(recalled) " .. m.content})
+            table.insert(working_memory, {type = "note", id = M.gen_id(), content = "(recalled) " .. m.content})
         end
     end
 
@@ -222,6 +238,8 @@ function M.run(opts)
         local exec_commands = {}
         local keep_commands = {}
         local note_commands = {}
+        local drop_commands = {}
+        local forget_commands = {}
         local done_summary = nil
 
         for _, cmd in ipairs(commands) do
@@ -231,6 +249,10 @@ function M.run(opts)
                 table.insert(keep_commands, cmd)
             elseif cmd:match("^note ") then
                 table.insert(note_commands, cmd)
+            elseif cmd:match("^drop ") then
+                table.insert(drop_commands, cmd)
+            elseif cmd:match("^forget ") then
+                table.insert(forget_commands, cmd)
             else
                 table.insert(exec_commands, cmd)
             end
@@ -245,7 +267,36 @@ function M.run(opts)
             return { success = true, output = table.concat(all_output, "\n") }
         end
 
-        -- Process keep commands FIRST (refers to previous turn's outputs)
+        -- Process drop commands FIRST (removes from working memory by ID)
+        for _, cmd in ipairs(drop_commands) do
+            local id = cmd:match("^drop%s+(%S+)")
+            if id then
+                for i = #working_memory, 1, -1 do
+                    if working_memory[i].id == id then
+                        table.remove(working_memory, i)
+                        print("[agent] Dropped: " .. id)
+                        break
+                    end
+                end
+            end
+        end
+
+        -- Process forget commands (removes notes matching pattern)
+        for _, cmd in ipairs(forget_commands) do
+            local pattern = cmd:match("^forget%s+(.+)")
+            if pattern then
+                local removed = 0
+                for i = #working_memory, 1, -1 do
+                    if working_memory[i].type == "note" and working_memory[i].content:find(pattern, 1, true) then
+                        table.remove(working_memory, i)
+                        removed = removed + 1
+                    end
+                end
+                print("[agent] Forgot " .. removed .. " note(s) matching: " .. pattern)
+            end
+        end
+
+        -- Process keep commands (refers to previous turn's outputs)
         local prev_outputs = current_outputs or {}
         for _, cmd in ipairs(keep_commands) do
             local indices = M.parse_keep(cmd, #prev_outputs)
@@ -254,6 +305,7 @@ function M.run(opts)
                 if out then
                     table.insert(working_memory, {
                         type = "output",
+                        id = M.gen_id(),
                         cmd = out.cmd,
                         content = out.content,
                         success = out.success
@@ -267,7 +319,7 @@ function M.run(opts)
         for _, cmd in ipairs(note_commands) do
             local fact = cmd:match("^note (.+)")
             if fact then
-                table.insert(working_memory, {type = "note", content = fact})
+                table.insert(working_memory, {type = "note", id = M.gen_id(), content = fact})
                 print("[agent] Noted: " .. fact)
             end
         end

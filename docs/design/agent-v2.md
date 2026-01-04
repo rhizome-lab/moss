@@ -158,6 +158,7 @@ Organization: both manual and LLM-assisted
 2. **Parallel validation** - shadow worktree configurable, default OFF (complexity vs benefit)
 3. **Memory heuristics** - what to auto-memorize vs explicit `memorize` only?
 4. **Sub-agent error attribution** - when validation fails, which sub-agent caused it? Need tracing/blame mechanism
+5. **Working memory IDs** - using random 4-char strings (e.g., "xk7f") to avoid sequential autocomplete issues
 
 ## Success Criteria
 
