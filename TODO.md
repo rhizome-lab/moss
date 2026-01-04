@@ -4,8 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-**Paused** - focusing on agent testing/dogfooding. See Agent Research in Backlog.
+**Agent testing/dogfooding** - see "Agent Testing" in Backlog for details.
 
+After agent validation:
 - PR/diff analysis: `moss analyze --pr` for changed code focus
 - Streaming output for workflow engine `auto{}` driver
 
@@ -102,35 +103,43 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Cross-session continuity without re-reading everything
 - Investigate memory-mapped context, incremental updates
 
-### Agent Research
-- [x] Basic agent loop: `moss agent` with loop detection, shadow git, memory
-- [x] Ephemeral context with $(keep)/$(note)/$(done) - working with "otherwise" post-history prompt
-- Gemini quirks (still present):
-  - Hallucinates command outputs (answers before seeing real results)
-  - Random Chinese characters mid-response
-  - Intermittent 500 errors and timeouts
-  - Occasionally outputs duplicate/excessive commands
+### Agent Testing (Current Focus)
+
+Core v2 is implemented. Now: validate through real use before adding more features.
+
+**Immediate** (dogfooding):
+- Run agent on real moss tasks, analyze session logs
+- Document friction points: where does the agent get stuck?
+- Prompt tuning: adjust based on observed Gemini/Claude behavior
+- Compare providers: Claude works reliably, Gemini has quirks (see below)
+
+**Log analysis**:
+- Review `.moss/agent/logs/*.jsonl` for patterns
+- Identify: long tool chains, repeated commands, error recovery paths
+- Track: which commands are used, success rates, typical session length
+
+**Known Gemini issues** (still present):
+- Hallucinates command outputs (answers before seeing results)
+- Random Chinese characters mid-response
+- Intermittent 500 errors and timeouts
+- Occasionally outputs duplicate/excessive commands
+
+### Agent Future
+
+After testing validates the core:
+- Automatic validation: shadow worktree for testing changes before commit
+- Planning/subtasks: break complex tasks into steps
+- Prompt optimization tooling: A/B testing, codebase-specific tuning
+- Session log format: proper design (events, timing, token counts, diffs, replayability)
+- Box-thinking mitigation: counteract LLMs' tendency to stay in familiar patterns
+
+### Agent Observations
+
 - Claude works reliably with current prompt
-- Automatic validation: agent validates changes in shadow worktree before committing (ephemeral, transparent)
-- Session format: save/replay agent sessions for debugging and analysis
-  - Current: JSONL with basic events (turn_start, llm_response, command, etc.)
-  - Future: properly design structured session log format (events, timing, token counts, diffs, replayability)
-- Conversational loop pattern (vs hierarchical)
-- YOLO mode evaluation
-- Diffusion-like parallel refactors
-- Agent v2: planning/subtasks, better tool output formatting
-- LLM code consistency: see `docs/llm-code-consistency.md` for research notes
-- Claude Code lacks navigation: clicking paths/links in output doesn't open them in editor (significant UX gap)
-- Rich links in LLM output: structured links (file:line, symbols) or cheap model postprocessing. Clickable refs in terminal/IDE.
-- Large file edits: agentic tools (Claude Code) struggle with large deletions/replacements - Edit tool fails when strings don't match exactly, requiring shell workarounds
-- Context compaction unreliable in practice: observed with Claude Code + Opus 4.5 losing in-progress design work (shadow-git mid-refinement treated as "done"). Session summaries may miss recent exchanges or misrepresent completion state. Moss's architecture explicitly avoids this (dynamic context reshaping vs append-only accumulation).
-- Prompt testing framework: systematic evaluation of different prompts across LLMs
-- Prompt optimization tool: semi-automatic tuning for specific LLMs (especially proprietary/internal models)
-  - Users should be able to hyper-optimize for their specific LLM setup
-  - Codebase-specific tuning: prompts can be optimized for user's own codebase (another form of specialization)
-  - Could involve A/B testing, success rate tracking, automatic refinement
-  - Session/run tracking: save all sessions with diffs of what changed, for post-meta-optimization analysis
-  - Box-thinking mitigation: find ways to counteract LLMs' tendency to think inside the box (fundamental problem)
+- Context compaction unreliable in practice (Claude Code + Opus 4.5 lost in-progress work)
+- Moss's dynamic context reshaping avoids append-only accumulation problems
+- LLM code consistency: see `docs/llm-code-consistency.md`
+- Large file edits: agentic tools struggle with large deletions (Edit tool match failures)
 
 ### Session Analysis
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs
