@@ -141,6 +141,7 @@ const GITIGNORE_ENTRIES: &[&str] = &[
     "!.moss/duplicate-types-allow",
     "!.moss/hotspots-allow",
     "!.moss/large-files-allow",
+    "!.moss/memory/",
 ];
 
 /// Update .gitignore with moss entries. Returns list of changes made.

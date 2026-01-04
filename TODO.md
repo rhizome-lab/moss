@@ -124,6 +124,10 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Rich links in LLM output: structured links (file:line, symbols) or cheap model postprocessing. Clickable refs in terminal/IDE.
 - Large file edits: agentic tools (Claude Code) struggle with large deletions/replacements - Edit tool fails when strings don't match exactly, requiring shell workarounds
 - Context compaction unreliable in practice: observed with Claude Code + Opus 4.5 losing in-progress design work (shadow-git mid-refinement treated as "done"). Session summaries may miss recent exchanges or misrepresent completion state. Moss's architecture explicitly avoids this (dynamic context reshaping vs append-only accumulation).
+- Prompt testing framework: systematic evaluation of different prompts across LLMs
+- Prompt optimization tool: semi-automatic tuning for specific LLMs (especially proprietary/internal models)
+  - Users should be able to hyper-optimize for their specific LLM setup
+  - Could involve A/B testing, success rate tracking, automatic refinement
 
 ### Session Analysis
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs
