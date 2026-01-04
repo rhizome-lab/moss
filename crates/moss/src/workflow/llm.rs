@@ -276,7 +276,21 @@ impl LlmClient {
             Provider::Groq => run_provider!(providers::groq::Client::from_env()),
             Provider::Mistral => run_provider!(providers::mistral::Client::from_env()),
             Provider::Ollama => run_provider!(providers::ollama::Client::from_env()),
-            Provider::OpenRouter => run_provider!(providers::openrouter::Client::from_env()),
+            Provider::OpenRouter => {
+                // Create custom HTTP client for SSL bypass if needed
+                if should_bypass_ssl() {
+                    let http_client = create_http_client()?;
+                    let api_key = std::env::var("OPENROUTER_API_KEY").map_err(|_| "OPENROUTER_API_KEY not set")?;
+                    let client: providers::openrouter::Client<reqwest::Client> = providers::openrouter::Client::<reqwest::Client>::builder()
+                        .api_key(&api_key)
+                        .http_client(http_client)
+                        .build()
+                        .map_err(|e| format!("Failed to create OpenRouter client: {:?}", e))?;
+                    run_provider!(client)
+                } else {
+                    run_provider!(providers::openrouter::Client::from_env())
+                }
+            }
             Provider::Perplexity => run_provider!(providers::perplexity::Client::from_env()),
             Provider::Together => run_provider!(providers::together::Client::from_env()),
             Provider::XAI => run_provider!(providers::xai::Client::from_env()),
