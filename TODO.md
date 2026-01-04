@@ -123,6 +123,7 @@ Core v2 is implemented. Now: validate through real use before adding more featur
 - Random Chinese characters mid-response
 - Intermittent 500 errors and timeouts
 - Occasionally outputs duplicate/excessive commands
+- SSL certificate validation failures in some environments (`InvalidCertificate(UnknownIssuer)` - missing CA certs or SSL inspection proxy)
 
 ### Agent Future
 

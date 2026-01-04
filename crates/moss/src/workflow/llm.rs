@@ -212,7 +212,7 @@ impl LlmClient {
                 agent
                     .chat(prompt, messages.clone())
                     .await
-                    .map_err(|e| format!("LLM request failed: {}", e))
+                    .map_err(|e| format!("LLM request failed: {:?}", e))
             }};
         }
 
