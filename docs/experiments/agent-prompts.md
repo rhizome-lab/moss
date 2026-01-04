@@ -207,3 +207,25 @@ End with "next turn:" until you reach your conclusion.
 - "next turn:" ignored - LLM writes "Turn 1:", "Turn 2:" as story beats
 - Hallucination of file contents inline
 
+## Experiment 7: Minimal "next command" prompt
+
+**Hypothesis**: Ultra-simple prompt might prevent overthinking.
+
+Variations tried:
+- "Answer with one or more commands. I will show you the output." - still XML + hallucination
+- "Respond with commands to explore this codebase." - still XML + hallucination
+- "Respond with your next command." - still XML + hallucination
+
+**Result**: All failed. Model consistently:
+1. Uses XML function-call format despite $(cmd) in examples
+2. Outputs multiple commands in one response
+3. Hallucinates command outputs inline
+4. Pre-answers based on hallucinated data
+
+**Key observation**: No prompt variation has successfully prevented the model from:
+- Defaulting to XML format (its trained function-calling syntax)
+- Generating imagined outputs alongside commands
+- Completing the entire task in one generation
+
+The model treats every prompt as "write a complete story about solving this task."
+

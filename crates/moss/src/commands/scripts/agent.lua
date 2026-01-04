@@ -364,27 +364,18 @@ function M.execute_batch_edit(edits_str)
 end
 
 local SYSTEM_PROMPT = [[
-Unfamiliar codebase. Express intentions, I will show results.
+Respond with your next command.
 
-I want to view <path>
-I want to view <path/Symbol>
-I want to view only types in <path>
-I want to view dependencies of <path>
-I want to search for "<pattern>"
-I want to search for "<pattern>" only in <glob>
-I want to analyze complexity
-I want to analyze callers of <symbol>
-I want to list packages
-I want to see outdated packages
-I want to run <shell command>
-I want to delete <path/Symbol>
-I want to replace <path/Symbol> with <code>
-I want to insert <code> before <path/Symbol>
-I note: <finding>
-I want to ask the user: <question>
-My conclusion is: <answer>
-
-End with "next turn:" until you reach your conclusion.
+$(view <path>) $(view <path/Symbol>) $(view --types-only <path>) $(view --deps <path>)
+$(text-search "<pattern>") $(text-search "<pattern>" --only <glob>)
+$(analyze complexity) $(analyze callers <symbol>) $(analyze callees <symbol>)
+$(package list) $(package tree) $(package outdated) $(package audit)
+$(edit <target> delete|replace|insert <code>)
+$(run <shell command>)
+$(note <finding>) $(keep) $(keep 1 3) $(drop <id>)
+$(checkpoint <progress> | <questions>)
+$(ask <question>)
+$(done <answer>)
 ]]
 
 -- Check if last N commands are identical (loop detection)
