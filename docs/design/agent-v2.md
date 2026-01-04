@@ -159,6 +159,7 @@ Organization: both manual and LLM-assisted
 - [x] Error escalation: retry → rollback → ask user (automatic after 3 failures)
 - [x] Working memory IDs: random 4-char strings to avoid LLM autocomplete
 - [x] Batch edit: $(batch-edit target1 action content | target2 action content)
+- [x] Session logging: JSONL logs in .moss/agent/logs/, --list-logs to view
 
 ## Open Questions
 

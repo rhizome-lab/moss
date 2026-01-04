@@ -115,6 +115,8 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Claude works reliably with current prompt
 - Automatic validation: agent validates changes in shadow worktree before committing (ephemeral, transparent)
 - Session format: save/replay agent sessions for debugging and analysis
+  - Current: JSONL with basic events (turn_start, llm_response, command, etc.)
+  - Future: properly design structured session log format (events, timing, token counts, diffs, replayability)
 - Conversational loop pattern (vs hierarchical)
 - YOLO mode evaluation
 - Diffusion-like parallel refactors

@@ -34,6 +34,104 @@ local function get_session_dir()
     return _moss_root .. "/.moss/agent"
 end
 
+-- Session log directory (for full session recording/replay)
+local function get_log_dir()
+    return _moss_root .. "/.moss/agent/logs"
+end
+
+-- Start recording a session log
+-- Returns a logger object with :log(event, data) method
+function M.start_session_log(session_id)
+    local log_dir = get_log_dir()
+    os.execute("mkdir -p " .. log_dir)
+
+    local log_file_path = log_dir .. "/" .. session_id .. ".jsonl"
+    local log_file = io.open(log_file_path, "w")
+    if not log_file then
+        return nil
+    end
+
+    local logger = {
+        file = log_file,
+        session_id = session_id,
+        start_time = os.time(),
+        turn_count = 0
+    }
+
+    -- Write session start event
+    logger.file:write(M.json_log_entry("session_start", {
+        session_id = session_id,
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+        moss_root = _moss_root
+    }) .. "\n")
+    logger.file:flush()
+
+    function logger:log(event, data)
+        self.file:write(M.json_log_entry(event, data) .. "\n")
+        self.file:flush()
+    end
+
+    function logger:close()
+        self:log("session_end", {
+            duration_seconds = os.time() - self.start_time,
+            total_turns = self.turn_count
+        })
+        self.file:close()
+    end
+
+    return logger
+end
+
+-- Format a log entry as JSON
+function M.json_log_entry(event, data)
+    local parts = {"{"}
+    table.insert(parts, string.format('"event": "%s",', event))
+    table.insert(parts, string.format('"timestamp": "%s"', os.date("!%Y-%m-%dT%H:%M:%SZ")))
+
+    if data then
+        for key, value in pairs(data) do
+            if type(value) == "string" then
+                table.insert(parts, string.format(', "%s": %s', key, M.json_encode_string(value)))
+            elseif type(value) == "number" then
+                table.insert(parts, string.format(', "%s": %s', key, tostring(value)))
+            elseif type(value) == "boolean" then
+                table.insert(parts, string.format(', "%s": %s', key, tostring(value)))
+            elseif type(value) == "table" then
+                -- Simple array/object serialization for logs
+                local json_arr = {}
+                for _, v in ipairs(value) do
+                    if type(v) == "string" then
+                        table.insert(json_arr, M.json_encode_string(v))
+                    else
+                        table.insert(json_arr, tostring(v))
+                    end
+                end
+                table.insert(parts, string.format(', "%s": [%s]', key, table.concat(json_arr, ", ")))
+            end
+        end
+    end
+
+    table.insert(parts, "}")
+    return table.concat(parts, "")
+end
+
+-- List available session logs
+function M.list_logs()
+    local logs = {}
+    local log_dir = get_log_dir()
+    local handle = io.popen("ls -t " .. log_dir .. "/*.jsonl 2>/dev/null")
+    if handle then
+        for line in handle:lines() do
+            local id = line:match("/([^/]+)%.jsonl$")
+            if id then
+                table.insert(logs, id)
+            end
+        end
+        handle:close()
+    end
+    return logs
+end
+
 -- Save session checkpoint to JSON file
 -- Returns: session_id on success, nil + error on failure
 function M.save_checkpoint(session_id, state)
@@ -444,6 +542,18 @@ function M.run(opts)
 
     print("[agent] Session: " .. session_id)
 
+    -- Start session logging (always enabled for analysis)
+    local session_log = M.start_session_log(session_id)
+    if session_log then
+        session_log:log("task", {
+            prompt = task,
+            provider = provider,
+            model = model or "default",
+            max_turns = max_turns,
+            resumed = opts.resume ~= nil
+        })
+    end
+
     -- Build task description
     local task_desc = task
     if opts.explain then
@@ -477,6 +587,17 @@ function M.run(opts)
 
         -- Build context from working memory + current outputs + error state
         local prompt = M.build_context(task_desc, working_memory, current_outputs, error_state)
+
+        -- Log turn start
+        if session_log then
+            session_log.turn_count = turn
+            session_log:log("turn_start", {
+                turn = turn,
+                prompt_length = #prompt,
+                working_memory_count = #working_memory,
+                has_error_state = error_state ~= nil
+            })
+        end
 
         -- Add loop warning if needed
         if M.is_looping(recent_cmds, 3) then
@@ -524,6 +645,15 @@ function M.run(opts)
         print(response)
         table.insert(all_output, response)
 
+        -- Log LLM response
+        if session_log then
+            session_log:log("llm_response", {
+                turn = turn,
+                response_length = #response,
+                retries = total_retries
+            })
+        end
+
         -- Extract all commands from response: $(cmd here)
         local commands = {}
         for cmd in response:gmatch("%$%((.-)%)") do
@@ -532,6 +662,9 @@ function M.run(opts)
 
         if #commands == 0 then
             print("[agent] No commands found, finishing")
+            if session_log then
+                session_log:close()
+            end
             if total_retries > 0 then
                 print("[agent] API retries: " .. total_retries)
             end
@@ -582,6 +715,10 @@ function M.run(opts)
         -- If ONLY done (no exec commands), return immediately
         if done_summary and #exec_commands == 0 then
             print("[agent] Done: " .. done_summary)
+            if session_log then
+                session_log:log("done", { summary = done_summary:sub(1, 200) })
+                session_log:close()
+            end
             if total_retries > 0 then
                 print("[agent] API retries: " .. total_retries)
             end
@@ -702,6 +839,10 @@ function M.run(opts)
                 print("[agent] Failed to checkpoint: " .. (err or "unknown error"))
             end
 
+            if session_log then
+                session_log:log("checkpoint", { progress = progress, open_questions = open_questions })
+                session_log:close()
+            end
             return { success = true, output = table.concat(all_output, "\n"), session_id = session_id, checkpointed = true }
         end
 
@@ -752,6 +893,16 @@ function M.run(opts)
                 content = result.output,
                 success = result.success
             })
+
+            -- Log command execution
+            if session_log then
+                session_log:log("command", {
+                    turn = turn,
+                    cmd = cmd:sub(1, 100),  -- Truncate for log
+                    success = result.success,
+                    output_length = #result.output
+                })
+            end
 
             -- Track for loop detection
             table.insert(recent_cmds, cmd)
@@ -813,6 +964,10 @@ function M.run(opts)
         -- If done was requested along with commands, return after executing them
         if done_summary then
             print("[agent] Done: " .. done_summary)
+            if session_log then
+                session_log:log("done", { summary = done_summary:sub(1, 200) })
+                session_log:close()
+            end
             if total_retries > 0 then
                 print("[agent] API retries: " .. total_retries)
             end
@@ -835,6 +990,11 @@ function M.run(opts)
         print("[agent] Resume with: moss @agent --resume " .. saved_id)
     else
         print("[agent] Warning: Failed to auto-checkpoint: " .. (err or "unknown error"))
+    end
+
+    if session_log then
+        session_log:log("max_turns_reached", { turn = max_turns })
+        session_log:close()
     end
 
     if total_retries > 0 then
@@ -868,6 +1028,9 @@ function M.parse_args(args)
         elseif arg == "--list-sessions" then
             opts.list_sessions = true
             i = i + 1
+        elseif arg == "--list-logs" then
+            opts.list_logs = true
+            i = i + 1
         else
             table.insert(task_parts, arg)
             i = i + 1
@@ -889,7 +1052,7 @@ if args and #args >= 0 then
         if #sessions == 0 then
             print("No saved sessions found.")
         else
-            print("Available sessions:")
+            print("Available sessions (checkpoints):")
             for _, id in ipairs(sessions) do
                 local state = M.load_checkpoint(id)
                 if state then
@@ -900,6 +1063,25 @@ if args and #args >= 0 then
                     print(string.format("  %s  (failed to load)", id))
                 end
             end
+        end
+        os.exit(0)
+    end
+
+    -- Handle --list-logs
+    if opts.list_logs then
+        local logs = M.list_logs()
+        if #logs == 0 then
+            print("No session logs found.")
+        else
+            print("Available session logs:")
+            for _, id in ipairs(logs) do
+                local log_path = _moss_root .. "/.moss/agent/logs/" .. id .. ".jsonl"
+                local handle = io.popen("wc -l < " .. log_path .. " 2>/dev/null")
+                local line_count = handle and handle:read("*n") or 0
+                if handle then handle:close() end
+                print(string.format("  %s  (%d events)", id, line_count))
+            end
+            print("\nView with: cat .moss/agent/logs/<session-id>.jsonl | jq")
         end
         os.exit(0)
     end
