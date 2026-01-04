@@ -145,10 +145,11 @@ After testing validates the core:
   - Possible fixes: better prompting, richer view output, or guide agent to use text-search for specific patterns
   - Contrast: text-search task succeeded in 1 turn (session 6ruc3djn) - tool output contained answer directly
   - Pattern: agent succeeds when tool output = answer, struggles when output requires interpretation/assembly
-- **Hallucination**: Claude can hallucinate command outputs (session 2x6yejkh: `find | wc -l` returned "245" but agent reported "134")
-  - Not just Gemini - Claude also hallucinates despite "working reliably"
-  - Agent received correct data but gave wrong answer confidently
-  - Mitigation: validation layer, show raw outputs to user, or confidence scoring
+- **Pre-answering**: Claude outputs commands and `done` in same response, answering before seeing results (session 2x6yejkh: wrote 4 commands + `done "134"` in one turn, actual answer was "245")
+  - Agent can't have seen command output when it wrote the done statement - they're in the same LLM response
+  - "Works reliably" is misleading - both Claude and Gemini pre-answer instead of waiting for data
+  - Root cause: agent protocol allows `done` in same response as commands that produce the answer
+  - Fix: enforce wait-for-results (commands in turn N, done only allowed in turn N+1 after seeing outputs)
 
 ### Session Analysis
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs
