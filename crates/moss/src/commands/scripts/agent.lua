@@ -368,12 +368,26 @@ Respond with commands to accomplish the task.
 Conclude with $(done ANSWER) as soon as you have enough evidence.
 ]]
 
--- Bootstrap exchange: model "asks" for help, gets command list
-local BOOTSTRAP_ASSISTANT = [[
-I need to see what commands are available.
+-- Bootstrap: two exchanges showing (1) exploration (2) reasoning + conclusion
+local BOOTSTRAP = {
+    -- Exchange 1: ask for help
+    {
+        role = "assistant",
+        content = "I'm unfamiliar with this codebase. Let me see what commands I have available.\n\n$(help)"
+    },
+    -- Exchange 2: reasoning + conclusion example
+    {
+        role = "assistant",
+        content = "I can see the answer in the results. There are 3 items: A, B, and C.\n\n$(done 3)"
+    },
+    {
+        role = "user",
+        content = "Correct!"
+    }
+}
 
-$(help)
-]]
+-- For backwards compat, keep the old format too
+local BOOTSTRAP_ASSISTANT = BOOTSTRAP[1].content
 
 local BOOTSTRAP_USER = [[
 Available commands:
@@ -474,39 +488,34 @@ end
 -- working_memory: list of {type="output"|"note", cmd?, content, id}
 -- error_state: optional {cmd, retries, rolled_back, last_error}
 function M.build_context(task, working_memory, current_outputs, error_state)
-    local parts = {"Task: " .. task}
+    local parts = {"**Task:** " .. task}
 
     -- Add error recovery context if in error state
     if error_state then
         table.insert(parts, M.build_error_context(error_state))
     end
 
-    -- Add working memory (kept outputs and notes) - stable IDs for $(drop ID)
+    -- Add working memory (kept outputs and notes) - markdown format
     if #working_memory > 0 then
-        table.insert(parts, "\n[working memory]")
+        table.insert(parts, "\n**Saved:**")
         for _, item in ipairs(working_memory) do
             if item.type == "note" then
-                table.insert(parts, string.format("[%s] note: %s", item.id, item.content))
+                table.insert(parts, string.format("- [%s] %s", item.id, item.content))
             else
-                local header = string.format("[%s] $ %s", item.id, item.cmd)
-                if not item.success then header = header .. " (failed)" end
-                table.insert(parts, header .. "\n" .. item.content)
+                local status = item.success and "" or " (failed)"
+                table.insert(parts, string.format("\n`[%s] %s`%s\n```\n%s\n```", item.id, item.cmd, status, item.content))
             end
         end
-        table.insert(parts, "[/working memory]")
     end
 
-    -- Add current turn outputs (ephemeral, indexed)
+    -- Add current turn outputs (ephemeral) - markdown format
     if current_outputs and #current_outputs > 0 then
-        table.insert(parts, "\n[outputs]")
+        table.insert(parts, "\n**Results:**")
         for i, out in ipairs(current_outputs) do
-            local header = string.format("[%d] $ %s", i, out.cmd)
-            if not out.success then header = header .. " (failed)" end
-            table.insert(parts, header .. "\n" .. out.content)
+            local status = out.success and "" or " (failed)"
+            table.insert(parts, string.format("\n`[%d] %s`%s\n```\n%s\n```", i, out.cmd, status, out.content))
         end
-        table.insert(parts, "[/outputs]")
-        -- Post-history reminder: encourage keep+note+done
-        table.insert(parts, "\nOutputs disappear next turn. $(keep) to save, $(note) findings, $(done ANSWER) when ready.")
+        table.insert(parts, "\n*Results disappear next turn.* Use $(keep), $(note), or $(done ANSWER).")
     end
 
     return table.concat(parts, "\n")
@@ -650,9 +659,12 @@ function M.run(opts)
         -- Retry logic with exponential backoff
         -- Bootstrap: inject a fake exchange where the model "asked" for help
         -- This establishes $(cmd) syntax through example rather than instruction
+        -- Bootstrap history: teach $(cmd) syntax + reasoning + conclusion
         local bootstrap_history = {
-            {"assistant", BOOTSTRAP_ASSISTANT},
-            {"user", BOOTSTRAP_USER}
+            {"assistant", BOOTSTRAP[1].content},  -- "Let me see what commands..."
+            {"user", BOOTSTRAP_USER},              -- Command list
+            {"assistant", BOOTSTRAP[2].content},  -- "I can see the answer... $(done 3)"
+            {"user", BOOTSTRAP[3].content}        -- "Correct!"
         }
 
         local response

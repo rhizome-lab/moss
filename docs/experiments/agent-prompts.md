@@ -314,3 +314,22 @@ Added explicit footer: "Outputs disappear next turn. $(keep) to save, $(note) fi
 - Model concludes when it "feels done" not when it has evidence
 - Ephemeral context: model forgets previous observations, re-explores
 
+## Experiment 9: Reasoning bootstrap + Markdown format
+
+Two changes:
+1. Bootstrap includes conclusion example: "I can see the answer... $(done 3)" + "Correct!"
+2. Context uses markdown format instead of `[outputs]` tags
+
+| Session | Model | Task | Turns | Correct | Notes |
+|---------|-------|------|-------|---------|-------|
+| jazfnpx8 | claude | Provider variants | 5 | YES | Full reasoning each turn, counted 13 correctly |
+| b6wg5nbv | claude | first struct | 3 | YES | Reasoning + correct answer "Cli" |
+
+**Result**: 2/2 correct with reasoning
+
+**Key findings**:
+- Claude now outputs reasoning BEFORE commands: "I need to find..." + $(view)
+- Synthesis reasoning before conclusion: "I can see the Provider enum. Let me count: 1. Anthropic..."
+- Markdown format prevents `[outputs]` hallucination
+- **Provider matters**: Gemini ignored bootstrap, Claude followed it
+
