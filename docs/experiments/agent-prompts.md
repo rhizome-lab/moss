@@ -106,6 +106,15 @@ Format: `session_id | model | task | turns | correct | notes`
 | Session | Model | Task | Turns | Correct | Notes |
 |---------|-------|------|-------|---------|-------|
 | renuh3aq | claude | count lua scripts | 1 | NO | 3a prompt: Used XML syntax, hallucinated answer |
+| uz6b5k9p | claude | count lua scripts | 1 | NO | 4a prompt: XML tags, hallucinated (no syntax example) |
+| 7d489957 | claude | count lua scripts | 1 | NO | 4b prompt: XML tags, hallucinated ("not XML" instruction ignored) |
+| 4n7je3d9 | claude | count lua scripts | 1 | NO | 4c prompt: XML tags, hallucinated ("text conversation" framing ignored) |
+| y56rz3tq | claude | count lua scripts | 1 | NO | 4d prompt: XML tags, hallucinated (single "Example: $(view .)" not enough) |
+| mgwx9cdy | claude | count lua scripts | 1 | NO | 4e prompt: XML tags, hallucinated (multi-line syntax ref without narrative) |
+| spqh8mh6 | claude | count lua scripts | 3 | YES | 5a prompt: Correct syntax, correct answer |
+| n85yswq8 | claude | main binary crate | 1 | NO | 5a prompt: Pre-answered all cmds in 1 turn, hallucinated "goose" |
+| mj9d4ktm | claude | rust edition | 13 | YES | 5a prompt: Correct but severe looping (viewed Cargo.toml 5+ times) |
+| 74myszjv | claude | count Provider variants | 9 | YES | 5a prompt: Correct, used $(note) properly |
 | 84gmtqny | claude | count lua scripts | 2 | YES | 3b prompt: Correct syntax, answer, cited evidence |
 | s9evceus | claude | find Anthropic default model | 8 | YES | Took many turns, some looping on $(view .), but correct answer with line citation |
 | g4n93rvr | claude | count Provider enum variants | 5 | YES | Correct: 13 variants, all named, cited line numbers |
@@ -116,8 +125,55 @@ Format: `session_id | model | task | turns | correct | notes`
 **Turns**: 2-8 (multi-turn as intended, no pre-answering)
 **Key insight**: Concrete example in prompt prevents LLM from defaulting to XML function calls
 
-**Remaining issues**:
-- Session s9evceus showed some looping (viewed "." twice)
-- Turn count varies widely (2-8)
-- Gemini untested (API blocked in this environment)
+### Summary (Experiment 5a - restored example format)
+
+**Results**: 3/4 correct (75%) - NOT reliable
+**Issues observed**:
+- Pre-answering still happens (n85yswq8: all commands + done in 1 turn)
+- Severe looping (mj9d4ktm: viewed Cargo.toml 5+ times, 13 turns)
+- Turn count varies wildly (3-13 for similar complexity)
+
+---
+
+## Fundamental Analysis
+
+### Why does pre-answering happen despite being counterproductive?
+
+1. **LLM goal mismatch**: Trained for "plausible text", not "correct answers"
+   - Next-token prediction optimizes for likelihood, not correctness
+   - "Looks correct" ≠ "is correct" - LLM can't distinguish during generation
+
+2. **Commands as narrative, not actions**: LLM writes a story ABOUT solving the problem
+   - "I'll view X, then search Y, then conclude Z" - all in one generation
+   - Treats commands as rhetorical steps, not actual actions with real outputs
+
+3. **No feedback during generation**: Once tokens flow, no error signal
+   - Can't "realize" mid-response that it's hallucinating
+   - Just produces most likely continuation
+
+4. **Training data bias**: Direct Q&A dominates over tool-use-with-outputs
+   - Pattern "question → answer" is deeply ingrained
+   - Tool use is small fraction of training data
+
+5. **Not using standard tool format**: Our $(cmd) syntax isn't what models are trained on
+   - Claude/GPT are trained on specific tool-use formats (function calling, XML)
+   - Custom syntax may not trigger proper tool-use behavior
+
+### What makes the model switch between modes?
+
+Unknown. Possible factors:
+- Question phrasing ("what is X" vs "how many X")
+- Prior knowledge confidence (common patterns vs specific details)
+- Sampling randomness
+- Attention patterns
+- The example itself may teach pre-answering (shows commands + findings in one "turn")
+
+### Potential solutions to explore
+
+1. **Stop sequences**: Force generation to halt after commands (limited provider support)
+2. **Standard tool format**: Use native function calling instead of custom syntax
+3. **Streaming + interrupt**: Stop generation when command detected
+4. **Architecture**: Build actual pause points into the system
+5. **Training**: Fine-tune on proper tool-use traces (expensive)
+6. **???**: User has an idea...
 

@@ -364,27 +364,17 @@ function M.execute_batch_edit(edits_str)
 end
 
 local SYSTEM_PROMPT = [[
-You are a code investigator. Gather evidence, then conclude.
+Unfamiliar codebase. You cannot see files until you run commands.
 
 Output commands using $(command) syntax. Example turn:
 $(view .)
 $(text-search "main")
 $(note found entry point in src/main.rs)
 
-WORKFLOW:
-1. GATHER - Run commands to explore
-2. RECORD - $(note) findings you discover
-3. CONCLUDE - $(done answer) citing evidence
-
-Commands:
-$(view path) $(view path/symbol) $(view --types-only path)
-$(text-search "pattern")
-$(run shell command)
-$(note finding)
-$(done answer citing evidence)
-
-Outputs disappear each turn unless you $(note) them.
-Conclusion must cite evidence. No evidence = keep investigating.
+$(view path) $(text-search "pattern") $(run command)
+$(edit target action) $(analyze complexity|callers)
+$(note finding) $(keep) $(drop id) $(ask question)
+$(done answer)
 ]]
 
 -- Check if last N commands are identical (loop detection)
