@@ -365,6 +365,7 @@ end
 
 local SYSTEM_PROMPT = [[
 Respond with commands to accomplish the task.
+Conclude with $(done ANSWER) as soon as you have enough evidence.
 ]]
 
 -- Bootstrap exchange: model "asks" for help, gets command list

@@ -269,11 +269,48 @@ Added explicit footer: "Outputs disappear next turn. $(keep) to save, $(note) fi
 | 8rwrak6r | gemini | Rust edition | 4 | YES | Same pattern as Claude, correct answer |
 | m2ycghvv | claude | lua scripts + subdirs | 3 | YES | $(run find) → $(done 12) - used shell instead of view |
 
-**Result**: 4/4 correct (100%)
+**Result**: 4/4 correct (100%) on initial tests
+
+### 8c: Extended testing reveals inconsistency
+
+| Session | Model | Task | Turns | Correct | Notes |
+|---------|-------|------|-------|---------|-------|
+| b53g4ytq | claude | list dependencies | 5 | NO | Looped, never concluded |
+| kb94ce9r | claude | main crate name | 4 | NO | Looped, never concluded |
+| q8yd228m | claude | struct at line 18 | 4 | NO | Saw answer, kept exploring |
+| 934e29em | claude | first struct | 2 | YES* | Hallucinated [outputs] section, then $(done Cli) |
 
 **Analysis**:
-- Bootstrap injection + keep/note/done reminder = reliable multi-turn behavior
-- Models use $(cmd) format consistently
-- No pre-answering, no XML hallucination
-- Reasonable turn counts (3-4 turns for simple questions)
+- Simple counting questions (Provider variants, lua scripts, Rust edition): work well
+- Questions requiring synthesis or judgment: models loop without concluding
+- Model sometimes hallucinates [outputs] block in response (a variant of pre-answering)
+- Bootstrap prevents XML format but doesn't guarantee proper conclusion behavior
+
+**Key insight**: The ephemeral context makes models uncertain about whether they have "enough" evidence. They keep gathering more rather than synthesizing what they have.
+
+## Open Questions
+
+1. **Memory format impact**: Does the `[outputs]` / `[working memory]` format confuse models? They sometimes hallucinate these tags in responses.
+
+2. **Conclusion trigger**: What makes a model decide to $(done)? Simple numeric answers work; judgment calls fail.
+
+3. **Provider differences**: Gemini uses $(checkpoint) when stuck; Claude loops. Different training?
+
+4. **Evidence threshold**: How do we signal "you have enough, conclude now"? Current approach (footer reminder) works ~50%.
+
+5. **Hallucination detection**: Model hallucinating [outputs] is a form of pre-answering. How to prevent?
+
+## What Works
+
+- Bootstrap injection: establishes $(cmd) syntax reliably (vs XML hallucination before)
+- Simple counting questions: "how many X", "what is the value of Y"
+- $(checkpoint) when genuinely stuck (Gemini does this)
+- Multi-turn exploration without pre-answering (for certain question types)
+
+## What Doesn't Work
+
+- Questions requiring judgment: "what is the first/main/important X"
+- Synthesis questions: "list all the X"
+- Model concludes when it "feels done" not when it has evidence
+- Ephemeral context: model forgets previous observations, re-explores
 
