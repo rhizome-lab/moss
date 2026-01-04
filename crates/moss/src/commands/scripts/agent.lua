@@ -364,18 +364,65 @@ function M.execute_batch_edit(edits_str)
 end
 
 local SYSTEM_PROMPT = [[
-Respond with your next command.
+Respond with commands to accomplish the task.
+]]
 
-$(view <path>) $(view <path/Symbol>) $(view --types-only <path>) $(view --deps <path>)
-$(text-search "<pattern>") $(text-search "<pattern>" --only <glob>)
-$(analyze complexity) $(analyze callers <symbol>) $(analyze callees <symbol>)
-$(package list) $(package tree) $(package outdated) $(package audit)
-$(edit <target> delete|replace|insert <code>)
-$(run <shell command>)
-$(note <finding>) $(keep) $(keep 1 3) $(drop <id>)
-$(checkpoint <progress> | <questions>)
-$(ask <question>)
-$(done <answer>)
+-- Bootstrap exchange: model "asks" for help, gets command list
+local BOOTSTRAP_ASSISTANT = [[
+I need to see what commands are available.
+
+$(help)
+]]
+
+local BOOTSTRAP_USER = [[
+Available commands:
+
+Exploration:
+$(view .) - view current directory
+$(view <path>) - view file or directory
+$(view <path/Symbol>) - view specific symbol
+$(view --types-only <path>) - only type definitions
+$(view --deps <path>) - show dependencies/imports
+$(view <path>:<start>-<end>) - view line range
+$(text-search "<pattern>") - search for text
+$(text-search "<pattern>" --only <glob>) - search in specific files
+
+Analysis:
+$(analyze complexity) - find complex functions
+$(analyze callers <symbol>) - show what calls this
+$(analyze callees <symbol>) - show what this calls
+$(analyze hotspots) - git history hotspots
+
+Package:
+$(package list) - list dependencies
+$(package tree) - dependency tree
+$(package outdated) - outdated packages
+$(package audit) - check vulnerabilities
+
+Editing:
+$(edit <path/Symbol> delete) - delete symbol
+$(edit <path/Symbol> replace <code>) - replace symbol
+$(edit <path/Symbol> insert --before <code>) - insert before
+$(edit <path/Symbol> insert --after <code>) - insert after
+$(batch-edit <t1> <a1> <c1> | <t2> <a2> <c2>) - multiple edits
+
+Shell:
+$(run <shell command>) - execute shell command
+
+Memory:
+$(note <finding>) - record finding for session
+$(keep) - keep all outputs in working memory
+$(keep 1 3) - keep specific outputs by index
+$(drop <id>) - remove from working memory
+$(memorize <fact>) - save to long-term memory
+$(forget <pattern>) - remove notes matching pattern
+
+Session:
+$(checkpoint <progress> | <questions>) - save for later
+$(ask <question>) - ask user for input
+$(done <answer>) - end session with answer
+
+Outputs disappear each turn unless you $(keep) or $(note) them.
 ]]
 
 -- Check if last N commands are identical (loop detection)
@@ -457,8 +504,8 @@ function M.build_context(task, working_memory, current_outputs, error_state)
             table.insert(parts, header .. "\n" .. out.content)
         end
         table.insert(parts, "[/outputs]")
-        -- Post-history reminder
-        table.insert(parts, "\n$(done ANSWER) if ready, otherwise $(note) what you learned and continue.")
+        -- Post-history reminder: encourage keep+note+done
+        table.insert(parts, "\nOutputs disappear next turn. $(keep) to save, $(note) findings, $(done ANSWER) when ready.")
     end
 
     return table.concat(parts, "\n")
@@ -600,11 +647,18 @@ function M.run(opts)
         io.flush()
 
         -- Retry logic with exponential backoff
+        -- Bootstrap: inject a fake exchange where the model "asked" for help
+        -- This establishes $(cmd) syntax through example rather than instruction
+        local bootstrap_history = {
+            {"assistant", BOOTSTRAP_ASSISTANT},
+            {"user", BOOTSTRAP_USER}
+        }
+
         local response
         local max_retries = 3
         for attempt = 1, max_retries do
             local ok, result = pcall(function()
-                return llm.chat(provider, model, SYSTEM_PROMPT, prompt, {})
+                return llm.chat(provider, model, SYSTEM_PROMPT, prompt, bootstrap_history)
             end)
             if ok then
                 response = result
@@ -641,86 +695,45 @@ function M.run(opts)
             })
         end
 
-        -- Extract prose commands from response
+        -- Extract commands from response
         local commands = {}
-        local has_next_turn = response:match("next turn:") ~= nil
 
-        -- Parse "I want to view X" -> "view X"
-        for target in response:gmatch("I want to view ([^\n]+)") do
-            target = target:gsub("^%s+", ""):gsub("%s+$", "")
-            if target:match("^only types in") then
-                table.insert(commands, "view --types-only " .. target:match("^only types in (.+)"))
-            elseif target:match("^dependencies of") then
-                table.insert(commands, "view --deps " .. target:match("^dependencies of (.+)"))
-            else
-                table.insert(commands, "view " .. target)
+        -- Parse $(cmd args) format - the primary format we teach via bootstrap
+        for cmd_content in response:gmatch('%$%(([^%)]+)%)') do
+            local cmd_name, args = cmd_content:match('^(%S+)%s*(.*)$')
+            if cmd_name then
+                args = args or ""
+                if cmd_name == "view" or cmd_name == "text-search" or cmd_name == "run" or
+                   cmd_name == "note" or cmd_name == "done" or cmd_name == "keep" or
+                   cmd_name == "drop" or cmd_name == "memorize" or cmd_name == "forget" or
+                   cmd_name == "analyze" or cmd_name == "package" or cmd_name == "edit" or
+                   cmd_name == "batch-edit" or cmd_name == "checkpoint" or cmd_name == "ask" or
+                   cmd_name == "wait" or cmd_name == "help" then
+                    table.insert(commands, cmd_name .. " " .. args)
+                end
             end
         end
 
-        -- Parse "I want to search for "X"" or "I want to search for "X" only in Y"
-        for pattern, rest in response:gmatch('I want to search for "([^"]+)"([^\n]*)') do
-            local only = rest:match("only in ([^\n]+)")
-            if only then
-                table.insert(commands, "text-search \"" .. pattern .. "\" --only " .. only:gsub("^%s+", ""):gsub("%s+$", ""))
-            else
+        -- Fallback: Python-style syntax for models that use it
+        if #commands == 0 then
+            for path in response:gmatch('view%s*%(%s*["\']([^"\']+)["\']%s*%)') do
+                table.insert(commands, "view " .. path)
+            end
+            for path in response:gmatch('view%s*%(%s*["\']([^"\']+)["\']%s*,%s*types_only%s*=%s*True%s*%)') do
+                table.insert(commands, "view --types-only " .. path)
+            end
+            for pattern in response:gmatch('text_search%s*%(%s*["\']([^"\']+)["\']%s*%)') do
                 table.insert(commands, "text-search \"" .. pattern .. "\"")
             end
-        end
-
-        -- Parse "I want to analyze X"
-        for what in response:gmatch("I want to analyze ([^\n]+)") do
-            what = what:gsub("^%s+", ""):gsub("%s+$", "")
-            if what:match("^callers of") then
-                table.insert(commands, "analyze callers " .. what:match("^callers of (.+)"))
-            elseif what:match("^callees of") then
-                table.insert(commands, "analyze callees " .. what:match("^callees of (.+)"))
-            else
-                table.insert(commands, "analyze " .. what)
+            for cmd in response:gmatch('run%s*%(%s*["\']([^"\']+)["\']%s*%)') do
+                table.insert(commands, "run " .. cmd)
             end
-        end
-
-        -- Parse "I want to list packages" / "I want to see outdated packages"
-        if response:match("I want to list packages") then
-            table.insert(commands, "package list")
-        end
-        if response:match("I want to see outdated packages") then
-            table.insert(commands, "package outdated")
-        end
-
-        -- Parse "I want to run X"
-        for cmd in response:gmatch("I want to run ([^\n]+)") do
-            table.insert(commands, "run " .. cmd:gsub("^%s+", ""):gsub("%s+$", ""))
-        end
-
-        -- Parse "I want to delete/replace/insert"
-        for target in response:gmatch("I want to delete ([^\n]+)") do
-            table.insert(commands, "edit " .. target:gsub("^%s+", ""):gsub("%s+$", "") .. " delete")
-        end
-        for target, code in response:gmatch("I want to replace ([^%s]+) with (.+)") do
-            table.insert(commands, "edit " .. target .. " replace " .. code)
-        end
-        for code, target in response:gmatch("I want to insert (.+) before ([^\n]+)") do
-            table.insert(commands, "edit " .. target:gsub("^%s+", ""):gsub("%s+$", "") .. " insert --before " .. code)
-        end
-
-        -- Parse "I note: X"
-        for finding in response:gmatch("I note: ([^\n]+)") do
-            table.insert(commands, "note " .. finding:gsub("^%s+", ""):gsub("%s+$", ""))
-        end
-
-        -- Parse "I want to ask the user: X"
-        for question in response:gmatch("I want to ask the user: ([^\n]+)") do
-            table.insert(commands, "ask " .. question:gsub("^%s+", ""):gsub("%s+$", ""))
-        end
-
-        -- Parse "My conclusion is: X"
-        for answer in response:gmatch("My conclusion is: ([^\n]+)") do
-            table.insert(commands, "done " .. answer:gsub("^%s+", ""):gsub("%s+$", ""))
-        end
-
-        -- Fallback: also check for $(cmd) syntax for backwards compat
-        for cmd in response:gmatch("%$%((.-)%)") do
-            table.insert(commands, cmd)
+            for finding in response:gmatch('note%s*%(%s*["\']([^"\']+)["\']%s*%)') do
+                table.insert(commands, "note " .. finding)
+            end
+            for answer in response:gmatch('done%s*%(%s*["\']([^"\']+)["\']%s*%)') do
+                table.insert(commands, "done " .. answer)
+            end
         end
 
         if #commands == 0 then

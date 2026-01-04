@@ -229,3 +229,51 @@ Variations tried:
 
 The model treats every prompt as "write a complete story about solving this task."
 
+## Experiment 8: Bootstrap Injection
+
+**Hypothesis**: Inject a fake conversation history where the model "asked" for help and received the command list. This establishes $(cmd) syntax through example rather than instruction.
+
+```
+SYSTEM: "Respond with commands to accomplish the task."
+
+BOOTSTRAP_ASSISTANT (injected): "I need to see what commands are available.\n\n$(help)"
+
+BOOTSTRAP_USER (injected): "Available commands:\n$(view <path>) - view...\n$(text-search...) - ...\n$(done <answer>) - ..."
+```
+
+| Session | Model | Task | Turns | Correct | Notes |
+|---------|-------|------|-------|---------|-------|
+| 9spcy828 | gemini | count lua scripts | 1 | N/A | Used $(view) correctly! But parser didn't recognize $() format |
+| zs2nfwtx | gemini | count lua scripts | 5 | NO | $(view) format works, noted "8 scripts", looped without $(done) |
+| prb7ynnz | claude | count lua scripts | 5 | PARTIAL | Used $(run ls) instead of $(view), answered "8" (top-level only, actual is 12) |
+
+**Result**:
+- **Major breakthrough**: Models now use $(cmd) format instead of XML! Bootstrap injection works.
+- **New issue**: Models loop excessively without concluding (especially Gemini)
+- **Minor issue**: Claude prefers $(run shell) over $(view) - ignores our command set
+
+**Analysis**:
+- Bootstrap injection successfully establishes $(cmd) syntax
+- Pre-answering is NOT happening - models wait for outputs
+- But models struggle to conclude - they keep exploring even when they have the answer
+- This is the opposite problem: instead of answering too fast, they don't answer at all
+
+### 8b: With keep+note+done reminder
+
+Added explicit footer: "Outputs disappear next turn. $(keep) to save, $(note) findings, $(done ANSWER) when ready."
+
+| Session | Model | Task | Turns | Correct | Notes |
+|---------|-------|------|-------|---------|-------|
+| 68vu34td | claude | Rust edition | 4 | YES | $(view .) → $(view Cargo.toml) → view lines → $(done 2024) |
+| c78t3hn9 | claude | Provider enum count | 3 | YES | $(text-search) → $(view lines) → $(done 13) |
+| 8rwrak6r | gemini | Rust edition | 4 | YES | Same pattern as Claude, correct answer |
+| m2ycghvv | claude | lua scripts + subdirs | 3 | YES | $(run find) → $(done 12) - used shell instead of view |
+
+**Result**: 4/4 correct (100%)
+
+**Analysis**:
+- Bootstrap injection + keep/note/done reminder = reliable multi-turn behavior
+- Models use $(cmd) format consistently
+- No pre-answering, no XML hallucination
+- Reasonable turn counts (3-4 turns for simple questions)
+
