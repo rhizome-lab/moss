@@ -145,6 +145,10 @@ After testing validates the core:
   - Possible fixes: better prompting, richer view output, or guide agent to use text-search for specific patterns
   - Contrast: text-search task succeeded in 1 turn (session 6ruc3djn) - tool output contained answer directly
   - Pattern: agent succeeds when tool output = answer, struggles when output requires interpretation/assembly
+- **Hallucination**: Claude can hallucinate command outputs (session 2x6yejkh: `find | wc -l` returned "245" but agent reported "134")
+  - Not just Gemini - Claude also hallucinates despite "working reliably"
+  - Agent received correct data but gave wrong answer confidently
+  - Mitigation: validation layer, show raw outputs to user, or confidence scoring
 
 ### Session Analysis
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs
