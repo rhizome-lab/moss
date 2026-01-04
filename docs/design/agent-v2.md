@@ -145,6 +145,8 @@ Memory storage: `.moss/memory/` directory, checked into git
 - `preferences.md` - user/team preferences
 - `decisions.md` - past design decisions and rationale
 
+Note: `moss init` gitignore must NOT exclude `.moss/memory/` (unlike other `.moss/` contents)
+
 Organization: both manual and LLM-assisted
 - User can edit `.moss/memory/*.md` directly
 - Agent can reorganize/consolidate via LLM when prompted
