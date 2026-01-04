@@ -2839,6 +2839,7 @@ dependencies = [
  "nucleo-matcher",
  "rayon",
  "regex",
+ "reqwest",
  "rig-core",
  "rmcp",
  "rusqlite",

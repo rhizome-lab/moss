@@ -9,6 +9,30 @@ use rig::{
     providers,
 };
 
+#[cfg(feature = "llm")]
+use reqwest;
+
+#[cfg(feature = "llm")]
+/// Check if SSL certificate validation should be bypassed
+fn should_bypass_ssl() -> bool {
+    std::env::var("MOSS_INSECURE_SSL")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false)
+}
+
+#[cfg(feature = "llm")]
+/// Create a reqwest client, optionally with SSL verification disabled
+fn create_http_client() -> Result<reqwest::Client, String> {
+    let mut builder = reqwest::Client::builder();
+
+    if should_bypass_ssl() {
+        eprintln!("WARNING: SSL certificate validation disabled (MOSS_INSECURE_SSL=1)");
+        builder = builder.danger_accept_invalid_certs(true);
+    }
+
+    builder.build().map_err(|e| format!("Failed to create HTTP client: {}", e))
+}
+
 /// Supported LLM providers.
 #[cfg(feature = "llm")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -232,7 +256,21 @@ impl LlmClient {
             }
             Provider::OpenAI => run_provider!(providers::openai::Client::from_env()),
             Provider::Azure => run_provider!(providers::azure::Client::from_env()),
-            Provider::Gemini => run_provider!(providers::gemini::Client::from_env()),
+            Provider::Gemini => {
+                // Create custom HTTP client for SSL bypass if needed
+                if should_bypass_ssl() {
+                    let http_client = create_http_client()?;
+                    let api_key = std::env::var("GEMINI_API_KEY").map_err(|_| "GEMINI_API_KEY not set")?;
+                    let client: providers::gemini::Client<reqwest::Client> = providers::gemini::Client::<reqwest::Client>::builder()
+                        .api_key(&api_key)
+                        .http_client(http_client)
+                        .build()
+                        .map_err(|e| format!("Failed to create Gemini client: {:?}", e))?;
+                    run_provider!(client)
+                } else {
+                    run_provider!(providers::gemini::Client::from_env())
+                }
+            }
             Provider::Cohere => run_provider!(providers::cohere::Client::from_env()),
             Provider::DeepSeek => run_provider!(providers::deepseek::Client::from_env()),
             Provider::Groq => run_provider!(providers::groq::Client::from_env()),
