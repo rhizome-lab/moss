@@ -155,9 +155,14 @@ After testing validates the core:
   - Pattern: agent succeeds when tool output = answer, struggles when output requires interpretation/assembly
 - **Pre-answering**: Claude outputs commands and `done` in same response, answering before seeing results (session 2x6yejkh: wrote 4 commands + `done "134"` in one turn, actual answer was "245")
   - Agent can't have seen command output when it wrote the done statement - they're in the same LLM response
-  - "Works reliably" is misleading - both Claude and Gemini pre-answer instead of waiting for data
-  - Root cause: LLM training data encourages immediate answers, not waiting for data
-  - Fix: $(wait) command in prompt to fight training data, warns if $(wait) and $(done) in same turn
+  - Root cause: task framing makes single-turn look like correct completion
+  - LLM training rewards completing tasks correctly - if task looks complete in 1 turn, LLM does 1 turn
+  - **Key insight**: older prompt (commit 8e33340) took 4-5 turns and worked reliably
+  - Fix direction: reframe task so multi-turn IS correct completion, not fight training
+  - Ideas: "you are an investigator" role, explicit steps (gather → wait → answer), evidence-based answers
+  - $(wait) is a band-aid (postprocessing), not a real fix
+  - **Verify**: is ephemeral context (drop by default) actually better? 4-turn success needs validation
+  - **Hypothesis**: identical context between any two LLM calls (pairwise) = error/loop - should never happen
 - **CRITICAL: Using grep patterns with text-search** - Claude Code used `\|` (grep OR syntax) with text-search
   - text-search was specifically renamed from grep to avoid regex escaping confusion
   - Agent failed to use tool correctly despite it being in the command list

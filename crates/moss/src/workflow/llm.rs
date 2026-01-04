@@ -30,7 +30,9 @@ fn create_http_client() -> Result<reqwest::Client, String> {
         builder = builder.danger_accept_invalid_certs(true);
     }
 
-    builder.build().map_err(|e| format!("Failed to create HTTP client: {}", e))
+    builder
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))
 }
 
 /// Supported LLM providers.
@@ -260,12 +262,14 @@ impl LlmClient {
                 // Create custom HTTP client for SSL bypass if needed
                 if should_bypass_ssl() {
                     let http_client = create_http_client()?;
-                    let api_key = std::env::var("GEMINI_API_KEY").map_err(|_| "GEMINI_API_KEY not set")?;
-                    let client: providers::gemini::Client<reqwest::Client> = providers::gemini::Client::<reqwest::Client>::builder()
-                        .api_key(&api_key)
-                        .http_client(http_client)
-                        .build()
-                        .map_err(|e| format!("Failed to create Gemini client: {:?}", e))?;
+                    let api_key =
+                        std::env::var("GEMINI_API_KEY").map_err(|_| "GEMINI_API_KEY not set")?;
+                    let client: providers::gemini::Client<reqwest::Client> =
+                        providers::gemini::Client::<reqwest::Client>::builder()
+                            .api_key(&api_key)
+                            .http_client(http_client)
+                            .build()
+                            .map_err(|e| format!("Failed to create Gemini client: {:?}", e))?;
                     run_provider!(client)
                 } else {
                     run_provider!(providers::gemini::Client::from_env())
@@ -280,12 +284,14 @@ impl LlmClient {
                 // Create custom HTTP client for SSL bypass if needed
                 if should_bypass_ssl() {
                     let http_client = create_http_client()?;
-                    let api_key = std::env::var("OPENROUTER_API_KEY").map_err(|_| "OPENROUTER_API_KEY not set")?;
-                    let client: providers::openrouter::Client<reqwest::Client> = providers::openrouter::Client::<reqwest::Client>::builder()
-                        .api_key(&api_key)
-                        .http_client(http_client)
-                        .build()
-                        .map_err(|e| format!("Failed to create OpenRouter client: {:?}", e))?;
+                    let api_key = std::env::var("OPENROUTER_API_KEY")
+                        .map_err(|_| "OPENROUTER_API_KEY not set")?;
+                    let client: providers::openrouter::Client<reqwest::Client> =
+                        providers::openrouter::Client::<reqwest::Client>::builder()
+                            .api_key(&api_key)
+                            .http_client(http_client)
+                            .build()
+                            .map_err(|e| format!("Failed to create OpenRouter client: {:?}", e))?;
                     run_provider!(client)
                 } else {
                     run_provider!(providers::openrouter::Client::from_env())
