@@ -333,3 +333,15 @@ Two changes:
 - Markdown format prevents `[outputs]` hallucination
 - **Provider matters**: Gemini ignored bootstrap, Claude followed it
 
+### 9b: System prompt as user message (for Gemini)
+
+Gemini ignores system prompts. Fix: prepend SYSTEM_PROMPT as first user message.
+
+| Session | Model | Task | Turns | Correct | Notes |
+|---------|-------|------|-------|---------|-------|
+| 25yahvxh | gemini | Provider variants | 5 | YES | Reasoning on conclusion turn, counted 13 |
+| cszzcwhu | gemini | first struct | 4 | NO | Looped, saw answer but didn't conclude |
+| r5zu79un | gemini | first struct | 6 | NO | Looped between same ranges |
+
+**Finding**: Gemini follows bootstrap when system prompt is user message, but still struggles with judgment questions ("first", "name of"). Counting questions work.
+

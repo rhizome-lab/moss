@@ -667,11 +667,23 @@ function M.run(opts)
             {"user", BOOTSTRAP[3].content}        -- "Correct!"
         }
 
+        -- Gemini ignores system prompts - prepend to first user message instead
+        local effective_system = SYSTEM_PROMPT
+        local effective_history = bootstrap_history
+        if provider == "gemini" then
+            effective_system = ""
+            -- Prepend system prompt as user message
+            effective_history = {{"user", SYSTEM_PROMPT}}
+            for _, msg in ipairs(bootstrap_history) do
+                table.insert(effective_history, msg)
+            end
+        end
+
         local response
         local max_retries = 3
         for attempt = 1, max_retries do
             local ok, result = pcall(function()
-                return llm.chat(provider, model, SYSTEM_PROMPT, prompt, bootstrap_history)
+                return llm.chat(provider, model, effective_system, prompt, effective_history)
             end)
             if ok then
                 response = result
