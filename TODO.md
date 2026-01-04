@@ -126,6 +126,12 @@ Core v2 is implemented. Now: validate through real use before adding more featur
 - SSL certificate validation failures in some environments (`InvalidCertificate(UnknownIssuer)` - missing CA certs or SSL inspection proxy)
 - **Google blocks Claude Code cloud environments**: 403 Forbidden on all Gemini API requests from Claude Code cloud infrastructure (even with valid API key and SSL bypass)
 
+**OpenRouter in cloud environments**:
+- SSL bypass works (connects to OpenRouter successfully)
+- Gemini models via OpenRouter: 503 with upstream SSL error (unclear root cause, likely environment-specific)
+- Claude models via OpenRouter: JSON parsing error (API response format mismatch with rig)
+- Not worth debugging further in this environment - likely network/proxy/environment issues
+
 ### Agent Future
 
 After testing validates the core:
