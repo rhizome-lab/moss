@@ -1073,3 +1073,123 @@ pub fn cmd_undo_redo(
         1
     }
 }
+
+/// Apply batch edits from a JSON file
+pub fn cmd_batch_edit(
+    batch_file: &str,
+    root: Option<&Path>,
+    dry_run: bool,
+    message: Option<&str>,
+    json: bool,
+) -> i32 {
+    let root = root
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    // Read JSON from file or stdin
+    let json_content = if batch_file == "-" {
+        use std::io::Read;
+        let mut buf = String::new();
+        if std::io::stdin().read_to_string(&mut buf).is_err() {
+            eprintln!("Failed to read from stdin");
+            return 1;
+        }
+        buf
+    } else {
+        match std::fs::read_to_string(batch_file) {
+            Ok(content) => content,
+            Err(e) => {
+                eprintln!("Failed to read {}: {}", batch_file, e);
+                return 1;
+            }
+        }
+    };
+
+    // Parse batch edits
+    let batch = match edit::BatchEdit::from_json(&json_content) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("Failed to parse batch edits: {}", e);
+            return 1;
+        }
+    };
+
+    let batch = if let Some(msg) = message {
+        batch.with_message(msg)
+    } else {
+        batch
+    };
+
+    if dry_run {
+        // For dry run, just validate and show what would happen
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "dry_run": true,
+                    "message": "Batch edit validation passed"
+                })
+            );
+        } else {
+            println!("Dry run: batch edit would be applied");
+        }
+        return 0;
+    }
+
+    // Apply the batch
+    match batch.apply(&root) {
+        Ok(result) => {
+            // Create shadow snapshot for batch edit
+            let config = MossConfig::load(&root);
+            if config.shadow.enabled() {
+                let shadow = Shadow::new(&root);
+                if shadow.exists() {
+                    // Convert PathBufs to Path refs for before_edit
+                    let file_refs: Vec<&Path> =
+                        result.files_modified.iter().map(|p| p.as_path()).collect();
+                    let _ = shadow.before_edit(&file_refs);
+
+                    let edit_info = EditInfo {
+                        operation: "batch".to_string(),
+                        target: format!("{} files", result.files_modified.len()),
+                        files: result.files_modified.clone(),
+                        message: message.map(|s| s.to_string()),
+                        workflow: None,
+                    };
+                    let _ = shadow.after_edit(&edit_info);
+                }
+            }
+
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "success": true,
+                        "files_modified": result.files_modified.iter().map(|p| p.to_string_lossy()).collect::<Vec<_>>(),
+                        "edits_applied": result.edits_applied
+                    })
+                );
+            } else {
+                println!(
+                    "Applied {} edit(s) to {} file(s)",
+                    result.edits_applied,
+                    result.files_modified.len()
+                );
+            }
+            0
+        }
+        Err(e) => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "error": e
+                    })
+                );
+            } else {
+                eprintln!("Batch edit failed: {}", e);
+            }
+            1
+        }
+    }
+}

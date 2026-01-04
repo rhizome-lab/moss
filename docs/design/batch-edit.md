@@ -158,7 +158,8 @@ Before applying:
 
 - Real-time collaborative editing (not a code editor)
 - Conflict resolution (fail fast, let user fix)
-- Undo individual edits within batch (undo whole batch)
+
+Note: Partial undo (undo individual edits within batch) is trivial once hunk-level undo exists.
 
 ## Migration Path
 

@@ -482,6 +482,79 @@ impl LuaRuntime {
         )
         .exec()?;
 
+        // edit table for batch editing
+        let edit_table = lua.create_table()?;
+        let root_clone = root_path.clone();
+        edit_table.set(
+            "batch",
+            lua.create_function(move |lua, (edits, opts): (Table, Option<Table>)| {
+                use crate::edit::{BatchAction, BatchEdit, BatchEditOp};
+
+                let mut batch = BatchEdit::new();
+
+                // Parse edits table
+                for pair in edits.pairs::<usize, Table>() {
+                    let (_, edit) = pair.map_err(mlua::Error::external)?;
+                    let target: String = edit.get("target").map_err(mlua::Error::external)?;
+                    let action: String = edit.get("action").map_err(mlua::Error::external)?;
+
+                    let action = match action.as_str() {
+                        "delete" => BatchAction::Delete,
+                        "replace" => {
+                            let content: String =
+                                edit.get("content").map_err(mlua::Error::external)?;
+                            BatchAction::Replace { content }
+                        }
+                        "insert" => {
+                            let content: String =
+                                edit.get("content").map_err(mlua::Error::external)?;
+                            let position: String =
+                                edit.get("position").unwrap_or_else(|_| "after".to_string());
+                            BatchAction::Insert { content, position }
+                        }
+                        other => {
+                            return Err(mlua::Error::external(format!(
+                                "Unknown action: {}",
+                                other
+                            )));
+                        }
+                    };
+
+                    batch.add(BatchEditOp { target, action });
+                }
+
+                // Apply message from opts if provided
+                if let Some(opts) = opts {
+                    if let Ok(msg) = opts.get::<String>("message") {
+                        batch = batch.with_message(&msg);
+                    }
+                }
+
+                // Apply the batch
+                match batch.apply(&root_clone) {
+                    Ok(result) => {
+                        let result_table = lua.create_table()?;
+                        result_table.set("success", true)?;
+                        result_table.set("edits_applied", result.edits_applied)?;
+                        let files: Vec<String> = result
+                            .files_modified
+                            .iter()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .collect();
+                        result_table.set("files_modified", files)?;
+                        Ok(result_table)
+                    }
+                    Err(e) => {
+                        let result_table = lua.create_table()?;
+                        result_table.set("success", false)?;
+                        result_table.set("error", e)?;
+                        Ok(result_table)
+                    }
+                }
+            })?,
+        )?;
+        globals.set("edit", edit_table)?;
+
         Ok(())
     }
 

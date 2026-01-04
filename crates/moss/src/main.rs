@@ -103,6 +103,10 @@ enum Commands {
         /// Case-insensitive symbol matching
         #[arg(short = 'i', long)]
         case_insensitive: bool,
+
+        /// Apply batch edits from JSON file (or - for stdin)
+        #[arg(long, value_name = "FILE")]
+        batch: Option<String>,
     },
 
     /// View shadow git edit history
@@ -487,6 +491,7 @@ fn main() {
             cross_checkpoint,
             yes,
             case_insensitive,
+            batch,
         } => {
             // Handle undo/redo/goto operations
             if undo.is_some() || redo || goto.is_some() {
@@ -499,6 +504,15 @@ fn main() {
                     cross_checkpoint,
                     dry_run,
                     force,
+                    cli.json,
+                )
+            } else if let Some(batch_file) = batch {
+                // Batch edit mode
+                commands::edit::cmd_batch_edit(
+                    &batch_file,
+                    root.as_deref(),
+                    dry_run,
+                    message.as_deref(),
                     cli.json,
                 )
             } else {
