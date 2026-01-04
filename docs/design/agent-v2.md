@@ -121,7 +121,10 @@ Conflict avoidance:
 - **Pause** - parent can pause children, siblings can request pause
 - **Queue** - edits to locked paths queue until lock released
 
-Open: exact locking granularity (file? directory? symbol?)
+Lock granularity: configurable per-lock (agent decides based on task)
+- `agent.lock("src/auth/")` - directory
+- `agent.lock("src/auth/jwt.rs")` - file
+- `agent.lock("src/auth/jwt.rs/verify")` - symbol
 
 ## Long-Term Memory
 
@@ -142,14 +145,17 @@ Memory storage: `.moss/memory/` directory, checked into git
 - `preferences.md` - user/team preferences
 - `decisions.md` - past design decisions and rationale
 
-Open: automatic organization vs manual curation vs LLM-assisted
+Organization: both manual and LLM-assisted
+- User can edit `.moss/memory/*.md` directly
+- Agent can reorganize/consolidate via LLM when prompted
+- `moss memory organize` - LLM pass to dedupe/categorize
 
 ## Open Questions
 
 1. **Batch edit integration** - agent should use `edit.batch()` for multi-file changes
-2. **Parallel validation** - shadow worktree for testing while user continues working?
+2. **Parallel validation** - shadow worktree configurable, default OFF (complexity vs benefit)
 3. **Memory heuristics** - what to auto-memorize vs explicit `memorize` only?
-4. **Lock granularity** - file? directory? symbol?
+4. **Sub-agent error attribution** - when validation fails, which sub-agent caused it? Need tracing/blame mechanism
 
 ## Success Criteria
 
