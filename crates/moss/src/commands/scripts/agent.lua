@@ -373,12 +373,17 @@ Command outputs disappear after each turn. To manage context:
 - $(drop xk7f) removes item from working memory by ID
 - $(forget pattern) removes notes matching pattern
 - $(checkpoint progress summary | open questions) saves session for later resumption
+- $(wait) waits for command results before answering (use before $(done) if you issued commands)
 - $(done YOUR FINAL ANSWER) ends the session
+
+IMPORTANT: If you issue commands that produce the answer, use $(wait) to see results first.
+DO NOT call $(done) in same turn as commands that contain the answer. Use $(wait) between them.
 
 $(done The answer is X because Y)
 $(checkpoint Implemented auth module | Need to add tests)
 $(keep)
 $(note uses clap for CLI)
+$(wait)
 $(view .)
 $(view --types-only .)
 $(view --deps .)
@@ -693,9 +698,12 @@ function M.run(opts)
         local checkpoint_cmd = nil
         local done_summary = nil
 
+        local wait_flag = false
         for _, cmd in ipairs(commands) do
             if cmd:match("^done") then
                 done_summary = cmd:match("^done%s*(.*)") or ""
+            elseif cmd:match("^wait") then
+                wait_flag = true
             elseif cmd:match("^checkpoint") then
                 checkpoint_cmd = cmd
             elseif cmd:match("^keep") then
@@ -711,6 +719,12 @@ function M.run(opts)
             else
                 table.insert(exec_commands, cmd)
             end
+        end
+
+        -- If $(wait) present, treat $(done) as invalid (prevent pre-answering)
+        if wait_flag and done_summary then
+            print("[agent] WARNING: $(wait) and $(done) in same turn - ignoring $(done)")
+            done_summary = nil
         end
 
         -- If ONLY done (no exec commands), return immediately

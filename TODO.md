@@ -149,8 +149,13 @@ After testing validates the core:
 - **Pre-answering**: Claude outputs commands and `done` in same response, answering before seeing results (session 2x6yejkh: wrote 4 commands + `done "134"` in one turn, actual answer was "245")
   - Agent can't have seen command output when it wrote the done statement - they're in the same LLM response
   - "Works reliably" is misleading - both Claude and Gemini pre-answer instead of waiting for data
-  - Root cause: agent protocol allows `done` in same response as commands that produce the answer
-  - Fix: enforce wait-for-results (commands in turn N, done only allowed in turn N+1 after seeing outputs)
+  - Root cause: LLM training data encourages immediate answers, not waiting for data
+  - Fix: $(wait) command in prompt to fight training data, warns if $(wait) and $(done) in same turn
+- **CRITICAL: Using grep patterns with text-search** - Claude Code used `\|` (grep OR syntax) with text-search
+  - text-search was specifically renamed from grep to avoid regex escaping confusion
+  - Agent failed to use tool correctly despite it being in the command list
+  - This shows agents don't understand tool semantics, just syntax
+  - Need better tool descriptions or examples in prompt
 
 ### Session Analysis
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs
