@@ -8,7 +8,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 - [x] Expose batch edit to agent: `$(batch-edit)` command integrated
 - PR/diff analysis: `moss analyze --pr` for changed code focus
-- Session format: save/replay agent sessions for debugging and analysis
+- [x] Session format: JSONL logs for debugging/analysis, --list-logs
 - Streaming output for workflow engine `auto{}` driver
 
 ## Remaining Work
