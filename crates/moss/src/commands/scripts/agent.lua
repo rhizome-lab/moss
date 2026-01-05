@@ -1181,6 +1181,7 @@ function M.run(opts)
     local session_id = opts.resume or M.gen_session_id()
     local start_turn = 1
     local non_interactive = opts.non_interactive or false
+    local validate_cmd = opts.validate_cmd  -- Auto-validate after edits
 
     -- Resume from checkpoint if specified
     local working_memory = {}
@@ -1213,6 +1214,9 @@ function M.run(opts)
     end
 
     print("[agent] Session: " .. session_id)
+    if validate_cmd then
+        print("[agent] Auto-validation enabled: " .. validate_cmd)
+    end
 
     -- Start session logging (always enabled for analysis)
     local session_log = M.start_session_log(session_id)
@@ -1223,7 +1227,8 @@ function M.run(opts)
             provider = provider,
             model = model or "default",
             max_turns = max_turns,
-            resumed = opts.resume ~= nil
+            resumed = opts.resume ~= nil,
+            validate_cmd = validate_cmd
         })
     end
 
@@ -1624,6 +1629,31 @@ function M.run(opts)
                 result = shell("./target/debug/moss " .. cmd)
             end
 
+            -- Auto-validation after successful edits
+            if validate_cmd and result.success and (cmd:match("^edit") or cmd:match("^batch%-edit")) then
+                print("[agent] Validating: " .. validate_cmd)
+                local validation = shell(validate_cmd)
+                if not validation.success then
+                    print("[agent] Validation FAILED - rolling back")
+                    -- Rollback to last snapshot
+                    if shadow_ok then
+                        local snapshots = shadow.list()
+                        if #snapshots > 1 then
+                            shadow.restore(snapshots[#snapshots - 1].id)
+                            print("[agent] Rolled back to previous state")
+                        end
+                    end
+                    -- Override result to show validation failure
+                    result = {
+                        success = false,
+                        output = "Edit applied but validation failed (auto-rollback):\n" .. (validation.output or "")
+                    }
+                else
+                    print("[agent] Validation passed ✓")
+                    result.output = (result.output or "") .. "\nValidation passed: " .. validate_cmd
+                end
+            end
+
             -- Log to file if debug mode
             if log_file then
                 log_file:write("\n--- " .. cmd .. " ---\n")
@@ -1803,6 +1833,9 @@ function M.parse_args(args)
             opts.v2 = true  -- refactorer requires v2
             opts.plan = true  -- refactorer should always plan first
             i = i + 1
+        elseif arg == "--validate" and args[i+1] then
+            opts.validate_cmd = args[i+1]
+            i = i + 2
         elseif arg == "--auto" then
             opts.auto_dispatch = true
             opts.v2 = true
