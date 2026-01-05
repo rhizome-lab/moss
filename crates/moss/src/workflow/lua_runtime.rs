@@ -163,6 +163,13 @@ impl LuaRuntime {
 
             globals.set("_moss_root", root.to_string_lossy().to_string())?;
 
+            // Expose the moss binary path for subprocess calls
+            let moss_bin = std::env::current_exe()
+                .ok()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|| "moss".to_string());
+            globals.set("_moss_bin", moss_bin)?;
+
             Self::register_commands(&lua, &globals)?;
             Self::register_helpers(&lua, &globals, &root)?;
             Self::register_llm(&lua, &globals)?;

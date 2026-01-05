@@ -75,8 +75,8 @@ function M.run_task(task, opts)
 
     -- Build agent command
     local cmd = string.format(
-        './target/debug/moss @agent --v2 --non-interactive --max-turns %d',
-        opts.max_turns or 10
+        '%s @agent --v2 --non-interactive --max-turns %d',
+        _moss_bin, opts.max_turns or 10
     )
     if opts.provider then
         cmd = cmd .. ' --provider ' .. opts.provider

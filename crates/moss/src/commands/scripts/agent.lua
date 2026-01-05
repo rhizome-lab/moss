@@ -359,7 +359,7 @@ function M.execute_batch_edit(edits_str)
     local json = '{"edits": [' .. table.concat(json_edits, ", ") .. ']}'
 
     -- Execute via moss CLI
-    local cmd = string.format("echo '%s' | ./target/debug/moss edit --batch -", json:gsub("'", "'\\''"))
+    local cmd = string.format("echo '%s' | %s edit --batch -", json:gsub("'", "'\\''"), _moss_bin)
     return shell(cmd)
 end
 
@@ -979,7 +979,7 @@ function M.run_state_machine(opts)
                            cmd.name == "analyze" or cmd.name == "package" or
                            cmd.name == "edit" then
                         print("[agent-v2] Running: " .. cmd.full)
-                        result = shell("./target/debug/moss " .. cmd.full)
+                        result = shell(_moss_bin .. " " .. cmd.full)
                     else
                         -- Unknown command, skip
                         print("[agent-v2] Skipping unknown: " .. cmd.name)
@@ -1694,7 +1694,7 @@ function M.run(opts)
             else
                 -- Execute command via moss
                 print("[agent] Running: " .. cmd)
-                result = shell("./target/debug/moss " .. cmd)
+                result = shell(_moss_bin .. " " .. cmd)
             end
 
             -- Auto-validation after successful edits
