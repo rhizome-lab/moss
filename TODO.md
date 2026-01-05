@@ -317,7 +317,7 @@ Remaining: task decomposition, cross-file refactoring, human escalation (complex
   - Extracted treesitter bindings to lua_runtime/treesitter.rs (259 lines)
   - Extracted shadow bindings to lua_runtime/shadow.rs (361 lines)
   - mod.rs reduced from 1857 to 1260 lines (-32%)
-- [ ] Document stable interfaces vs implementation details
+- [x] Document stable interfaces vs implementation details (docs/lua-api.md)
 
 ### Agent Observations
 
