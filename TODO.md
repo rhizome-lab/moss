@@ -121,11 +121,16 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 - See `docs/experiments/agent-state-machine.md` for design and test results
 
 **Immediate** (dogfooding):
-- Run agent on real moss tasks, analyze session logs
+- [x] Run agent on real moss tasks, analyze session logs
 - Document friction points: where does the agent get stuck?
 - Prompt tuning: adjust based on observed Gemini/Claude behavior
 - Compare providers: Claude works reliably, Gemini has quirks (see below)
 - [x] **v2 vs v1**: compare state machine vs freeform loop (see agent-state-machine.md)
+- [x] **Complex task testing**: Agent successfully handles multi-file analysis tasks:
+  - DRY violation detection (found real issue, fixed 88 files)
+  - Security audit (traced input→shell execution paths)
+  - Test coverage analysis (identified untested modules)
+  - Error handling audit (found `let _ =` swallowing patterns)
 
 **Log analysis** (74 sessions analyzed):
 - **Success rates**: Anthropic 58% (19/33), Gemini 44% (18/41)
