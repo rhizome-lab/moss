@@ -442,23 +442,18 @@ Outputs disappear each turn unless you $(keep) or $(note) them.
 
 -- State machine configuration
 -- Three specialized states: planner (optional), explorer, evaluator
-local MACHINE = {
-    start = "explorer",  -- default; can be overridden to "planner"
+-- Role-specific prompts swap out while keeping the same state machine
 
-    states = {
-        planner = {
-            prompt = [[
+-- ROLE: investigator (default) - answers questions about the codebase
+local INVESTIGATOR_PROMPTS = {
+    planner = [[
 Create a brief plan to accomplish this task.
 List 2-4 concrete steps, then say "Ready to explore."
 Do not execute commands - just plan the approach.
 ]],
-            context = "task_only",
-            next = "explorer",
-        },
 
-        explorer = {
-            prompt = [[
-You are an EXPLORER. Suggest commands to gather information.
+    explorer = [[
+You are an INVESTIGATOR exploring a codebase. Suggest commands to gather information.
 
 Commands:
 $(view path) - file structure/symbols
@@ -469,12 +464,8 @@ $(run cmd) - shell command
 Output commands directly. Do NOT answer the question - that's the evaluator's job.
 Example: $(view src/main.rs) $(text-search "config")
 ]],
-            context = "last_outputs",  -- ephemeral: only most recent
-            next = "evaluator",
-        },
 
-        evaluator = {
-            prompt = [[
+    evaluator = [[
 You are an EVALUATOR, not an explorer. Your ONLY job is to judge what we found.
 
 RULES:
@@ -496,11 +487,111 @@ $(answer moss detects language by file extension via support_for_extension() in 
 Example BAD response (DO NOT DO THIS):
 "I need to understand more. Let me look at `view registry.rs`" ← WRONG, you're exploring!
 ]],
-            context = "working_memory",
-            next = "explorer",
-        },
-    },
 }
+
+-- ROLE: auditor - finds issues (security, quality, patterns)
+local AUDITOR_PROMPTS = {
+    planner = [[
+You are a code AUDITOR. Plan your audit strategy.
+
+Given the audit scope, list 2-4 specific things to check:
+- What patterns indicate the issue type?
+- Which files/modules are most likely affected?
+- What commands will reveal the issues?
+
+Then say "Ready to audit."
+Do not execute commands yet - just plan.
+]],
+
+    explorer = [[
+You are an AUDITOR systematically checking for issues. Run commands to find problems.
+
+Commands:
+$(view path) - examine code structure
+$(view path:start-end) - inspect specific lines
+$(text-search "pattern") - find problematic patterns
+$(run cmd) - run analysis tools
+
+Focus on finding concrete issues with file:line locations.
+Do NOT conclude yet - that's the evaluator's job.
+Example: $(text-search "unwrap()") $(text-search "panic!")
+]],
+
+    evaluator = [[
+You are an AUDIT EVALUATOR. Assess the findings from exploration.
+
+RULES:
+1. NEVER output commands - you evaluate, you don't explore
+2. NEVER say "I need to check" or "Let me look" - those are auditor phrases
+3. You MUST either $(answer) with findings or explain what areas remain unchecked
+
+For each issue found, note:
+- Location (file:line)
+- Issue type (security/quality/pattern)
+- Severity (critical/high/medium/low)
+- Brief description
+
+If audit is complete: $(answer with formatted findings)
+If more areas to check: $(note findings so far) then explain what's left
+
+Memory commands: $(keep 1 3), $(keep), $(drop 2), $(note finding)
+
+Example finding format:
+$(note SECURITY:HIGH commands/run.rs:45 - unsanitized shell input)
+$(note QUALITY:MED lib/parse.rs:120 - unwrap() on user input)
+
+When done:
+$(answer
+## Audit Findings
+
+### Critical
+- None found
+
+### High
+- commands/run.rs:45 - SECURITY: unsanitized shell input passed to Command::new()
+
+### Medium
+- lib/parse.rs:120 - QUALITY: unwrap() on Result from user-provided data
+)
+]],
+}
+
+-- Role registry
+local ROLE_PROMPTS = {
+    investigator = INVESTIGATOR_PROMPTS,
+    auditor = AUDITOR_PROMPTS,
+}
+
+-- Build machine config for a given role
+local function build_machine(role)
+    local prompts = ROLE_PROMPTS[role] or ROLE_PROMPTS.investigator
+    return {
+        start = "explorer",  -- can be overridden to "planner"
+
+        states = {
+            planner = {
+                prompt = prompts.planner,
+                context = "task_only",
+                next = "explorer",
+            },
+
+            explorer = {
+                prompt = prompts.explorer,
+                context = "last_outputs",
+                next = "evaluator",
+            },
+
+            evaluator = {
+                prompt = prompts.evaluator,
+                context = "working_memory",
+                next = "explorer",
+            },
+        },
+    }
+end
+
+-- Default machine (for backwards compat)
+local MACHINE = build_machine("investigator")
 
 -- Build context for planner state (task only)
 function M.build_planner_context(task)
@@ -585,9 +676,13 @@ function M.run_state_machine(opts)
     local provider = opts.provider or "gemini"
     local model = opts.model  -- nil means use provider default
     local use_planner = opts.plan or false
+    local role = opts.role or "investigator"
+
+    -- Build machine config for this role
+    local machine = build_machine(role)
 
     local session_id = M.gen_session_id()
-    print("[agent-v2] Session: " .. session_id)
+    print(string.format("[agent-v2:%s] Session: %s", role, session_id))
 
     -- Start session logging
     local session_log = M.start_session_log(session_id)
@@ -600,7 +695,8 @@ function M.run_state_machine(opts)
             model = model or "default",
             max_turns = max_turns,
             machine_start = start_state,
-            use_planner = use_planner
+            use_planner = use_planner,
+            role = role
         })
     end
 
@@ -614,7 +710,7 @@ function M.run_state_machine(opts)
 
     while turn < max_turns do
         turn = turn + 1
-        local state_config = MACHINE.states[state]
+        local state_config = machine.states[state]
 
         -- Build context based on state
         local context
@@ -1536,6 +1632,16 @@ function M.parse_args(args)
         elseif arg == "--plan" then
             opts.plan = true
             i = i + 1
+        elseif arg == "--role" and args[i+1] then
+            opts.role = args[i+1]
+            i = i + 2
+        elseif arg == "--audit" then
+            opts.role = "auditor"
+            opts.v2 = true  -- auditor requires v2
+            i = i + 1
+        elseif arg == "--roles" then
+            opts.list_roles = true
+            i = i + 1
         else
             table.insert(task_parts, arg)
             i = i + 1
@@ -1588,6 +1694,18 @@ if args and #args >= 0 then
             end
             print("\nView with: cat .moss/agent/logs/<session-id>.jsonl | jq")
         end
+        os.exit(0)
+    end
+
+    -- Handle --roles
+    if opts.list_roles then
+        print("Available roles:")
+        print("  investigator  (default) Answer questions about the codebase")
+        print("  auditor       Find issues: security, quality, patterns")
+        print("")
+        print("Usage:")
+        print("  moss @agent --v2 --role auditor 'find security issues'")
+        print("  moss @agent --audit 'check for unwrap on user input'")
         os.exit(0)
     end
 
