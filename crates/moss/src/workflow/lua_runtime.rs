@@ -360,7 +360,6 @@ impl LuaRuntime {
             }};
         }
 
-        simple_command!("edit");
         simple_command!("index");
         simple_command!("lint");
         simple_command!("plans");
@@ -560,6 +559,28 @@ impl LuaRuntime {
                 }
             })?,
         )?;
+
+        // edit.run(args) - run edit command, routes through shadow when enabled
+        edit_table.set(
+            "run",
+            lua.create_function(|lua, arg: Option<String>| {
+                let mut args = vec!["edit".to_string()];
+
+                // Check if shadow edit mode is enabled
+                let shadow_path: Option<String> =
+                    lua.named_registry_value("_shadow_edit_path").ok();
+                if let Some(path) = shadow_path {
+                    args.push("--root".to_string());
+                    args.push(path);
+                }
+
+                if let Some(a) = arg {
+                    args.push(a);
+                }
+                run_subprocess(&args)
+            })?,
+        )?;
+
         globals.set("edit", edit_table)?;
 
         Ok(())
@@ -990,6 +1011,41 @@ impl LuaRuntime {
                     .reset()
                     .map_err(mlua::Error::external)?;
                 Ok(())
+            })?,
+        )?;
+
+        // shadow.worktree.enable() -> route edit() through shadow worktree
+        // Must call open() first
+        worktree_table.set(
+            "enable",
+            lua.create_function(|lua, ()| {
+                let wt: LuaShadowWorktree = lua.named_registry_value("_shadow_worktree")?;
+                let path =
+                    wt.0.lock()
+                        .map_err(|_| mlua::Error::external("lock poisoned"))?
+                        .path()
+                        .to_string_lossy()
+                        .to_string();
+                lua.set_named_registry_value("_shadow_edit_path", path)?;
+                Ok(())
+            })?,
+        )?;
+
+        // shadow.worktree.disable() -> stop routing edit() through shadow
+        worktree_table.set(
+            "disable",
+            lua.create_function(|lua, ()| {
+                lua.set_named_registry_value("_shadow_edit_path", mlua::Value::Nil)?;
+                Ok(())
+            })?,
+        )?;
+
+        // shadow.worktree.enabled() -> check if shadow edit mode is active
+        worktree_table.set(
+            "enabled",
+            lua.create_function(|lua, ()| {
+                let path: Option<String> = lua.named_registry_value("_shadow_edit_path").ok();
+                Ok(path.is_some())
             })?,
         )?;
 
