@@ -122,7 +122,11 @@ pub fn analyze_docs(root: &Path, limit: usize, exclude_interface_impls: bool) ->
     use crate::path_resolve;
 
     let all_files = path_resolve::all_files(root);
-    let files: Vec<_> = all_files.iter().filter(|f| f.kind == "file").collect();
+    let files: Vec<_> = all_files
+        .iter()
+        .filter(|f| f.kind == "file")
+        .filter(|f| !is_test_file(&f.path))
+        .collect();
 
     // Try to load index for cross-file resolution, fall back to on-demand parsing
     let index = FileIndex::open(root).ok();
@@ -198,7 +202,9 @@ fn process_file(
     };
 
     let skeleton_extractor = SkeletonExtractor::new();
-    let skeleton = skeleton_extractor.extract_with_resolver(&path, &content, Some(resolver));
+    let skeleton = skeleton_extractor
+        .extract_with_resolver(&path, &content, Some(resolver))
+        .filter_tests();
 
     let mut documented = 0;
     let mut total = 0;
@@ -247,4 +253,30 @@ fn process_file(
             total,
         });
     }
+}
+
+/// Check if a file is a test file (should be excluded from doc coverage)
+fn is_test_file(path: &str) -> bool {
+    let path_lower = path.to_lowercase();
+
+    // Check path components for test directories
+    if path_lower.contains("/tests/")
+        || path_lower.contains("/test/")
+        || path_lower.contains("/__tests__/")
+    {
+        return true;
+    }
+
+    // Get filename
+    let filename = path.rsplit('/').next().unwrap_or(path);
+    let name_lower = filename.to_lowercase();
+
+    // Common test file patterns
+    name_lower.ends_with("_test.rs")
+        || name_lower.ends_with("_tests.rs")
+        || name_lower.starts_with("test_")
+        || name_lower.ends_with(".test.ts")
+        || name_lower.ends_with(".test.js")
+        || name_lower.ends_with(".spec.ts")
+        || name_lower.ends_with(".spec.js")
 }
