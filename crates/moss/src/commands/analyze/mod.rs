@@ -133,6 +133,12 @@ fn load_allow_file(root: &Path, filename: &str) -> Vec<String> {
 
 /// Append a pattern to a .moss allow file
 fn append_to_allow_file(root: &Path, filename: &str, pattern: &str, reason: Option<&str>) -> i32 {
+    // Validate filename to prevent path traversal
+    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
+        eprintln!("Invalid filename: {}", filename);
+        return 1;
+    }
+
     let path = root.join(".moss").join(filename);
 
     // Ensure .moss directory exists

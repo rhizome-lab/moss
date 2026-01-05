@@ -13,8 +13,8 @@ After agent validation:
 - [x] Agent --diff: `moss @agent --diff [BASE]` for PR/changed file focus
 
 ## Remaining Work
-- [ ] claude_code.rs: cache regex patterns instead of recompiling on every call
-- [ ] agent.lua: replace hardcoded ./target/debug/moss with proper binary detection
+- [x] claude_code.rs: cache regex patterns instead of recompiling on every call
+- [x] agent.lua: replace hardcoded ./target/debug/moss with proper binary detection
 - Unified tree: semantic entry points already work (`moss view SymbolName` finds it)
   - Consider: namespace-qualified lookups (`moss view std::vector`, `moss view com.example.Foo`)
   - Requires language-specific namespace semantics - low priority
