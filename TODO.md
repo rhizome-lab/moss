@@ -75,6 +75,13 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Lua test framework: test discovery for `.moss/tests/` (test + test.property modules done)
   - Command naming: must clearly indicate "moss Lua scripts" not general testing (avoid `@test`, `@spec`, `@check`)
   - Alternative: no special command, just run test files directly via `moss <file>`
+- Agent module refactoring (partial): extracted 5 submodules (parser, session, context, risk, commands)
+  - [x] agent.parser: CLI args, command parsing, JSON encode/decode
+  - [x] agent.session: checkpoints, logs, session management
+  - [x] agent.context: build_*_context functions
+  - [x] agent.risk: risk assessment, validators
+  - [x] agent.commands: execute_batch_edit
+  - Remaining: state_machine.lua (~400 lines), M.run (~350 lines) - large but self-contained
 - Type system uses beyond validation
   - Done: `T.describe(schema)` for introspection, `type.generate` for property testing
   - Future: extract descriptions from comments (LuaDoc-style) instead of `description` field
