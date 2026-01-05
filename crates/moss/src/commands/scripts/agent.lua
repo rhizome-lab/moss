@@ -790,6 +790,36 @@ function M.run_state_machine(opts)
         use_planner = true
     end
 
+    -- Handle --diff: get changed files and add to task context
+    if opts.diff_base ~= nil then
+        local base = opts.diff_base
+        if base == "" then
+            local detect = shell("git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || git rev-parse --verify origin/main 2>/dev/null || git rev-parse --verify origin/master 2>/dev/null || git rev-parse --verify main 2>/dev/null || git rev-parse --verify master 2>/dev/null")
+            if detect.success and detect.output and detect.output ~= "" then
+                base = detect.output:match("refs/remotes/(.+)") or detect.output:gsub("%s+", "")
+            else
+                base = "HEAD~10"
+            end
+        end
+
+        local merge_base_result = shell("git merge-base " .. base .. " HEAD 2>/dev/null")
+        local effective_base = merge_base_result.success and merge_base_result.output:gsub("%s+", "") or base
+
+        local diff_result = shell("git diff --name-only " .. effective_base)
+        if diff_result.success and diff_result.output and diff_result.output ~= "" then
+            local diff_files = {}
+            for file in diff_result.output:gmatch("[^\n]+") do
+                table.insert(diff_files, file)
+            end
+            print("[agent-v2] Focusing on " .. #diff_files .. " changed files (vs " .. base .. ")")
+            task = task .. "\n\nFOCUS: Only analyze these changed files:\n"
+            for _, f in ipairs(diff_files) do
+                task = task .. "  - " .. f .. "\n"
+            end
+            task = task .. "\nIgnore unchanged files unless directly relevant to changes."
+        end
+    end
+
     -- Build machine config for this role
     local machine = build_machine(role)
 
@@ -1238,6 +1268,44 @@ function M.run(opts)
         task_desc = task_desc .. "\nIMPORTANT: Your final answer MUST end with '## Steps' listing each command you ran and why it was needed."
     end
     task_desc = task_desc .. "\nDirectory: " .. _moss_root
+
+    -- Add diff context if --diff specified
+    local diff_files = nil
+    if opts.diff_base ~= nil then
+        local base = opts.diff_base
+        if base == "" then
+            -- Auto-detect default branch
+            local detect = shell("git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || git rev-parse --verify origin/main 2>/dev/null || git rev-parse --verify origin/master 2>/dev/null || git rev-parse --verify main 2>/dev/null || git rev-parse --verify master 2>/dev/null")
+            if detect.success and detect.output and detect.output ~= "" then
+                base = detect.output:match("refs/remotes/(.+)") or detect.output:gsub("%s+", "")
+            else
+                print("[agent] Warning: Could not detect default branch, using HEAD~10")
+                base = "HEAD~10"
+            end
+        end
+
+        -- Get merge-base for proper comparison
+        local merge_base_result = shell("git merge-base " .. base .. " HEAD 2>/dev/null")
+        local effective_base = merge_base_result.success and merge_base_result.output:gsub("%s+", "") or base
+
+        -- Get changed files
+        local diff_result = shell("git diff --name-only " .. effective_base)
+        if diff_result.success and diff_result.output and diff_result.output ~= "" then
+            diff_files = {}
+            for file in diff_result.output:gmatch("[^\n]+") do
+                table.insert(diff_files, file)
+            end
+
+            print("[agent] Focusing on " .. #diff_files .. " changed files (vs " .. base .. ")")
+            task_desc = task_desc .. "\n\nFOCUS: Only analyze these changed files:\n"
+            for _, f in ipairs(diff_files) do
+                task_desc = task_desc .. "  - " .. f .. "\n"
+            end
+            task_desc = task_desc .. "\nIgnore unchanged files unless directly relevant to changes."
+        else
+            print("[agent] No changed files found relative to " .. base)
+        end
+    end
 
     -- Initialize shadow git for rollback capability
     local shadow_ok = pcall(function()
@@ -1836,6 +1904,15 @@ function M.parse_args(args)
         elseif arg == "--validate" and args[i+1] then
             opts.validate_cmd = args[i+1]
             i = i + 2
+        elseif arg == "--diff" then
+            -- Optional base ref, default to auto-detect
+            if args[i+1] and not args[i+1]:match("^%-") then
+                opts.diff_base = args[i+1]
+                i = i + 2
+            else
+                opts.diff_base = ""  -- empty means auto-detect
+                i = i + 1
+            end
         elseif arg == "--auto" then
             opts.auto_dispatch = true
             opts.v2 = true
