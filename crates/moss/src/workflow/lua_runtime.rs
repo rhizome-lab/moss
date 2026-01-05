@@ -1203,6 +1203,7 @@ impl LuaRuntime {
             "agent.session",
             "agent.context",
             "agent.commands",
+            "agent.roles",
             "cli",
             "type",
             "type.describe",

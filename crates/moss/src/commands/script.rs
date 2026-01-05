@@ -49,6 +49,7 @@ pub mod modules {
     pub const AGENT_SESSION: &str = include_str!("scripts/agent/session.lua");
     pub const AGENT_CONTEXT: &str = include_str!("scripts/agent/context.lua");
     pub const AGENT_COMMANDS: &str = include_str!("scripts/agent/commands.lua");
+    pub const AGENT_ROLES: &str = include_str!("scripts/agent/roles.lua");
 
     /// Get builtin module by name.
     pub fn get(name: &str) -> Option<&'static str> {
@@ -59,6 +60,7 @@ pub mod modules {
             "agent.session" => Some(AGENT_SESSION),
             "agent.context" => Some(AGENT_CONTEXT),
             "agent.commands" => Some(AGENT_COMMANDS),
+            "agent.roles" => Some(AGENT_ROLES),
             "cli" => Some(CLI),
             "type" => Some(TYPE),
             "type.describe" => Some(TYPE_DESCRIBE),
