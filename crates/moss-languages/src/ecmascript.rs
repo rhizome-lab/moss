@@ -13,7 +13,8 @@ use tree_sitter::Node;
 // Node kind constants
 // ============================================================================
 
-pub const CONTAINER_KINDS: &[&str] = &["class_declaration", "class", "interface_declaration"];
+pub const JS_CONTAINER_KINDS: &[&str] = &["class_declaration", "class"];
+pub const TS_CONTAINER_KINDS: &[&str] = &["class_declaration", "class", "interface_declaration"];
 
 pub const JS_FUNCTION_KINDS: &[&str] = &[
     "function_declaration",

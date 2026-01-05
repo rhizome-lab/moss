@@ -517,6 +517,25 @@ impl Language for Rust {
         Visibility::Private
     }
 
+    fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
+        let in_attrs = symbol
+            .attributes
+            .iter()
+            .any(|a| a.contains("#[test]") || a.contains("#[cfg(test)]"));
+        let in_sig =
+            symbol.signature.contains("#[test]") || symbol.signature.contains("#[cfg(test)]");
+        if in_attrs || in_sig {
+            return true;
+        }
+        match symbol.kind {
+            crate::SymbolKind::Function | crate::SymbolKind::Method => {
+                symbol.name.starts_with("test_")
+            }
+            crate::SymbolKind::Module => symbol.name == "tests",
+            _ => false,
+        }
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

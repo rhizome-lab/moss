@@ -120,37 +120,25 @@ impl SkeletonResult {
     }
 
     /// Filter out test functions and test modules.
-    /// Removes: functions with #[test]/#[cfg(test)], modules named tests/test/__tests__
+    /// Uses Language::is_test_symbol() for language-specific detection.
     pub fn filter_tests(&self) -> SkeletonResult {
-        fn is_test_symbol(sym: &Symbol) -> bool {
-            // Check attributes for test markers
-            let has_test_attr = sym.attributes.iter().any(|attr| {
-                attr.contains("#[test]") || attr.contains("#[cfg(test)]") || attr.contains("@Test")
-            });
-            if has_test_attr {
-                return true;
-            }
+        use moss_languages::{Language, support_for_path};
+        use std::path::Path;
 
-            let name = sym.name.as_str();
-            match sym.kind {
-                SymbolKind::Function | SymbolKind::Method => {
-                    name.starts_with("test_") || name.starts_with("Test")
-                }
-                SymbolKind::Module | SymbolKind::Class => {
-                    name == "tests" || name == "test" || name == "__tests__"
-                }
-                _ => false,
-            }
-        }
+        let lang = support_for_path(Path::new(&self.file_path));
 
-        fn filter_symbol(sym: &Symbol) -> Option<Symbol> {
-            if is_test_symbol(sym) {
+        fn filter_symbol(sym: &Symbol, lang: Option<&dyn Language>) -> Option<Symbol> {
+            let is_test = match lang {
+                Some(l) => l.is_test_symbol(sym),
+                None => false, // Unknown language: keep everything
+            };
+            if is_test {
                 return None;
             }
             let filtered_children: Vec<_> = sym
                 .children
                 .iter()
-                .filter_map(|c| filter_symbol(c))
+                .filter_map(|c| filter_symbol(c, lang))
                 .collect();
             Some(Symbol {
                 name: sym.name.clone(),
@@ -167,10 +155,11 @@ impl SkeletonResult {
             })
         }
 
+        let lang_ref: Option<&dyn Language> = lang.map(|l| l as &dyn Language);
         let filtered_symbols: Vec<_> = self
             .symbols
             .iter()
-            .filter_map(|s| filter_symbol(s))
+            .filter_map(|s| filter_symbol(s, lang_ref))
             .collect();
 
         SkeletonResult {

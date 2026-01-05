@@ -539,6 +539,18 @@ impl Language for Go {
         }
     }
 
+    fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
+        match symbol.kind {
+            crate::SymbolKind::Function => {
+                let name = symbol.name.as_str();
+                name.starts_with("Test")
+                    || name.starts_with("Benchmark")
+                    || name.starts_with("Example")
+            }
+            _ => false,
+        }
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

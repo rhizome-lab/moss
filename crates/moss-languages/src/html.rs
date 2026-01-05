@@ -101,6 +101,10 @@ impl Language for Html {
         Visibility::Public
     }
 
+    fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
+        false
+    }
+
     fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {
         match node.kind() {
             "script_element" => {

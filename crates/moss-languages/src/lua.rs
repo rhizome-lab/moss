@@ -244,6 +244,15 @@ impl Language for Lua {
         }
     }
 
+    fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
+        let name = symbol.name.as_str();
+        match symbol.kind {
+            crate::SymbolKind::Function | crate::SymbolKind::Method => name.starts_with("test_"),
+            crate::SymbolKind::Module => name == "tests" || name == "test",
+            _ => false,
+        }
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

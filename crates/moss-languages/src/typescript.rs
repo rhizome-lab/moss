@@ -28,7 +28,7 @@ impl Language for TypeScript {
     }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        ecmascript::CONTAINER_KINDS
+        ecmascript::TS_CONTAINER_KINDS
     }
     fn function_kinds(&self) -> &'static [&'static str] {
         ecmascript::TS_FUNCTION_KINDS
@@ -108,6 +108,21 @@ impl Language for TypeScript {
 
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
+    }
+
+    fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
+        let name = symbol.name.as_str();
+        match symbol.kind {
+            crate::SymbolKind::Function | crate::SymbolKind::Method => {
+                name.starts_with("test_")
+                    || name.starts_with("Test")
+                    || name == "describe"
+                    || name == "it"
+                    || name == "test"
+            }
+            crate::SymbolKind::Module => name == "tests" || name == "test" || name == "__tests__",
+            _ => false,
+        }
     }
 
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
@@ -263,7 +278,7 @@ impl Language for Tsx {
     }
 
     fn container_kinds(&self) -> &'static [&'static str] {
-        ecmascript::CONTAINER_KINDS
+        ecmascript::TS_CONTAINER_KINDS
     }
     fn function_kinds(&self) -> &'static [&'static str] {
         ecmascript::TS_FUNCTION_KINDS
@@ -343,6 +358,21 @@ impl Language for Tsx {
 
     fn get_visibility(&self, _node: &Node, _content: &str) -> Visibility {
         Visibility::Public
+    }
+
+    fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
+        let name = symbol.name.as_str();
+        match symbol.kind {
+            crate::SymbolKind::Function | crate::SymbolKind::Method => {
+                name.starts_with("test_")
+                    || name.starts_with("Test")
+                    || name == "describe"
+                    || name == "it"
+                    || name == "test"
+            }
+            crate::SymbolKind::Module => name == "tests" || name == "test" || name == "__tests__",
+            _ => false,
+        }
     }
 
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
@@ -602,7 +632,6 @@ mod tests {
             "internal_module",         // namespace/module
             "labeled_statement",       // label: stmt
             "lexical_declaration",     // let/const
-            "method_signature",        // method sig
             "module",                  // module keyword
             "using_declaration",       // using x = ...
             "variable_declaration",    // var x

@@ -119,6 +119,10 @@ impl Language for Json {
         Visibility::Public
     }
 
+    fn is_test_symbol(&self, _symbol: &crate::Symbol) -> bool {
+        false
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

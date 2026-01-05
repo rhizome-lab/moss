@@ -574,6 +574,19 @@ impl Language for Java {
         self.get_visibility(node, content) == Visibility::Public
     }
 
+    fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
+        let has_test_attr = symbol.attributes.iter().any(|a| a.contains("@Test"));
+        if has_test_attr {
+            return true;
+        }
+        match symbol.kind {
+            crate::SymbolKind::Class => {
+                symbol.name.starts_with("Test") || symbol.name.ends_with("Test")
+            }
+            _ => false,
+        }
+    }
+
     fn embedded_content(&self, _node: &Node, _content: &str) -> Option<crate::EmbeddedBlock> {
         None
     }

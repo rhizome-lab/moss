@@ -260,31 +260,8 @@ pub trait Language: Send + Sync {
     fn get_visibility(&self, node: &Node, content: &str) -> Visibility;
 
     /// Check if a symbol is a test (for filtering).
-    /// Default covers common patterns: test_* prefix, Test* class, #[test]/#[cfg(test)] in signature.
-    /// Languages can override for specific conventions.
-    fn is_test_symbol(&self, symbol: &Symbol) -> bool {
-        let name = symbol.name.as_str();
-        let sig = symbol.signature.as_str();
-
-        match symbol.kind {
-            SymbolKind::Function | SymbolKind::Method => {
-                // Common conventions: test_ prefix, #[test] attribute
-                name.starts_with("test_") || sig.contains("#[test]") || sig.contains("#[cfg(test)]")
-            }
-            SymbolKind::Class => {
-                // Test classes often start with Test
-                name.starts_with("Test") && name.len() > 4
-            }
-            SymbolKind::Module => {
-                // Test modules: tests, test, __tests__, or cfg(test)
-                name == "tests"
-                    || name == "test"
-                    || name == "__tests__"
-                    || sig.contains("#[cfg(test)]")
-            }
-            _ => false,
-        }
-    }
+    /// Each language must implement this - test conventions are language-specific.
+    fn is_test_symbol(&self, symbol: &Symbol) -> bool;
 
     // === Embedded Languages ===
 

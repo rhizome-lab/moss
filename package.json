@@ -12,7 +12,8 @@
   "scripts": {
     "lint": "oxlint",
     "format": "oxfmt",
-    "check:types": "bun --filter '*' check:types"
+    "check:types": "bun --filter '*' check:types",
+    "docs:dev": "pnpm --dir docs dev"
   },
   "workspaces": [
     "web/*"

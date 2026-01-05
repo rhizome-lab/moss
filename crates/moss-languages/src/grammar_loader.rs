@@ -282,7 +282,10 @@ mod tests {
             return;
         }
 
-        std::env::set_var("MOSS_GRAMMAR_PATH", grammar_path.to_str().unwrap());
+        // SAFETY: This is a test that runs single-threaded
+        unsafe {
+            std::env::set_var("MOSS_GRAMMAR_PATH", grammar_path.to_str().unwrap());
+        }
 
         let loader = GrammarLoader::new();
 
@@ -294,6 +297,9 @@ mod tests {
         }
 
         // Clean up
-        std::env::remove_var("MOSS_GRAMMAR_PATH");
+        // SAFETY: This is a test that runs single-threaded
+        unsafe {
+            std::env::remove_var("MOSS_GRAMMAR_PATH");
+        }
     }
 }

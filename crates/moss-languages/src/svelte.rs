@@ -250,6 +250,21 @@ impl Language for Svelte {
         }
     }
 
+    fn is_test_symbol(&self, symbol: &crate::Symbol) -> bool {
+        let name = symbol.name.as_str();
+        match symbol.kind {
+            crate::SymbolKind::Function | crate::SymbolKind::Method => {
+                name.starts_with("test_")
+                    || name.starts_with("Test")
+                    || name == "describe"
+                    || name == "it"
+                    || name == "test"
+            }
+            crate::SymbolKind::Module => name == "tests" || name == "test" || name == "__tests__",
+            _ => false,
+        }
+    }
+
     fn embedded_content(&self, node: &Node, content: &str) -> Option<crate::EmbeddedBlock> {
         match node.kind() {
             "script_element" => {
