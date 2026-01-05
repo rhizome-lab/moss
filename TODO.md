@@ -187,12 +187,11 @@ After testing validates the core:
     - Use cases: subagent spawning, dynamic role switching mid-task
   - PR/diff analysis agent: `moss @agent --audit --diff main` for focused review
     - Agent sees only changed files, audits for issues in the diff
-- Benchmark suite: systematic agent evaluation
-  - Task library: curated set of tasks with known answers/outcomes
-  - Per-run metrics: reliability (pass/fail), LLM calls (cost proxy, latency), tokens (in/out)
-  - Additional metrics: time-to-answer, tool usage patterns, error recovery rate
-  - Comparison: v1 vs v2, different providers, prompt variations
-  - Output: summary table, regression detection, cost/quality tradeoffs
+- [x] Benchmark suite: `moss @benchmark` for systematic agent evaluation
+  - Task library: curated set of tasks with verification functions
+  - Per-run metrics: pass/fail, duration, turns used
+  - Results saved to .moss/benchmark-results.txt
+  - Future: token tracking, provider comparison, regression detection
 
 ### Agent Observations
 
