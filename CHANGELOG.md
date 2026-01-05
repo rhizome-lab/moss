@@ -25,12 +25,19 @@ See `docs/` for design docs and `README.md` for usage.
   - `--list-logs` - show available session logs
 - `--non-interactive` / `-n` - CI mode ($(ask) returns error instead of blocking)
 - Loop detection: warns when same command repeated 3+ times
+- Output truncation: limits command output to 10KB to prevent context bloat
 - Shadow git integration for automatic rollback on failed edits
 - Memory integration via `recall()` for cross-session context
 - `$(ask <question>)` - clarifying questions (reads stdin, errors in non-interactive mode)
 - Progress indicator ("Thinking...") while waiting for LLM
 - `llm.complete(provider?, model?, system?, prompt)` exposed to Lua scripts
-- See `docs/design/agent.md` and `docs/design/agent-v2.md` for design rationale
+- State machine agent (`--v2`): explorer/evaluator separation
+  - Explorer: suggests commands, ephemeral context (last outputs only)
+  - Evaluator: judges progress, curates working memory, decides when done
+  - `--plan` flag: optional planning phase before exploration
+  - Prevents pre-answering: only evaluator can conclude
+  - Strong role framing in prompts for reliable behavior
+- See `docs/design/agent.md` and `docs/experiments/agent-state-machine.md` for design rationale
 
 ### View Command
 - Smart Header: `--context` flag shows referenced type definitions when viewing a symbol
