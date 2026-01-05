@@ -152,6 +152,18 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 - Claude models via OpenRouter: JSON parsing error (API response format mismatch with rig)
 - Not worth debugging further in this environment - likely network/proxy/environment issues
 
+**Roles implemented**:
+- [x] Investigator (default): answers questions about the codebase
+- [x] Auditor: finds issues (security, quality, patterns)
+  - Usage: `moss @agent --audit "find unwrap on user input"`
+  - Structured output: `$(note SECURITY:HIGH file:line - description)`
+  - Planner creates systematic audit strategy
+
+**Prompt tuning observations**:
+- Claude sometimes uses bash-style `view ...` instead of `$(view ...)`
+- Evaluator occasionally outputs commands in backticks
+- text-search regex with backslash fails (e.g., `\.unwrap(`)
+
 ### Agent Future
 
 After testing validates the core:
