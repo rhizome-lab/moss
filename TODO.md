@@ -75,13 +75,9 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Lua test framework: test discovery for `.moss/tests/` (test + test.property modules done)
   - Command naming: must clearly indicate "moss Lua scripts" not general testing (avoid `@test`, `@spec`, `@check`)
   - Alternative: no special command, just run test files directly via `moss <file>`
-- Agent module refactoring (partial): extracted 5 submodules (parser, session, context, risk, commands)
-  - [x] agent.parser: CLI args, command parsing, JSON encode/decode
-  - [x] agent.session: checkpoints, logs, session management
-  - [x] agent.context: build_*_context functions
-  - [x] agent.risk: risk assessment, validators
-  - [x] agent.commands: execute_batch_edit
-  - Remaining: state_machine.lua (~400 lines), M.run (~350 lines) - large but self-contained
+- [x] Agent module refactoring: extracted 6 submodules (parser, session, context, risk, commands, roles)
+  - agent.lua reduced from ~2300 to ~1240 lines (46% reduction)
+  - Remaining: run_state_machine (~400 lines), M.run (~650 lines) - core agent logic, self-contained
 - Type system uses beyond validation
   - Done: `T.describe(schema)` for introspection, `type.generate` for property testing
   - Future: extract descriptions from comments (LuaDoc-style) instead of `description` field
@@ -158,12 +154,10 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 - Report which succeeded, which failed, why
 - Consider: Is this actually desirable? Atomic may be better.
 
-**Refactor agent.lua** - reduce complexity
-- Current: M.run 172 complexity (critical), M.run_state_machine 74 (critical)
-- Total: ~2100 lines, 30 functions, avg complexity 14.1
-- Split into modules: parser.lua, state_machine.lua, roles.lua, commands.lua
-- Extract duplicate logic across roles
-- Document stable interfaces vs implementation details
+**Refactor agent.lua** - [DONE] reduced complexity
+- Split into 6 modules: parser, session, context, risk, commands, roles
+- agent.lua reduced from ~2300 to ~1240 lines (46% reduction)
+- Remaining: core runner functions (run, run_state_machine) - self-contained, no further extraction needed
 
 ### Agent Testing (Current Focus)
 
@@ -311,13 +305,14 @@ Remaining: task decomposition, cross-file refactoring, human escalation (complex
 - [x] --diff flag: focus on changed files
 
 **After full agency**: evaluate agent code quality
-- [ ] Refactor agent.lua - current complexity is critical:
-  - M.run: 172 (critical - needs splitting)
-  - M.run_state_machine: 74 (critical)
-  - M.parse_args: 30 (high)
-  - Total: 2013 lines, 30 functions, avg complexity 14.1
-- [ ] Check for duplicate logic across roles (investigator/auditor/refactorer prompts)
-- [ ] Consider splitting agent.lua into modules (parser, state machine, roles, commands)
+- [x] Refactor agent.lua - extracted 6 submodules:
+  - agent.parser (CLI args, command parsing, JSON encode/decode)
+  - agent.session (checkpoints, logs, session management, memorize)
+  - agent.context (build_*_context functions)
+  - agent.risk (risk assessment, validators)
+  - agent.commands (execute_batch_edit)
+  - agent.roles (prompts, build_machine, classify_task, v1 prompts)
+  - agent.lua reduced from ~2300 to ~1240 lines (46% reduction)
 - [ ] Review Rust-side agent support code in lua_runtime.rs
 - [ ] Document stable interfaces vs implementation details
 
