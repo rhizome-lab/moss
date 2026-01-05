@@ -184,6 +184,7 @@ pub enum AnalyzeCommand {
         min_lines: usize,
 
         /// Allow a duplicate function group (add to .moss/duplicate-functions-allow)
+        /// Accepts file:symbol (e.g., src/foo.rs:my_func) or file:start-end (e.g., src/foo.rs:10-20)
         #[arg(long, value_name = "LOCATION")]
         allow: Option<String>,
 

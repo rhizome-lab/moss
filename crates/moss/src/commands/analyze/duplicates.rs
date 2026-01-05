@@ -159,10 +159,19 @@ pub fn cmd_allow_duplicate_function(
         detect_duplicate_function_groups(root, elide_identifiers, elide_literals, min_lines);
 
     // Find the group containing this location
+    // Support both formats:
+    //   file:symbol (e.g., src/foo.rs:my_func)
+    //   file:start-end (e.g., src/foo.rs:10-20) - matches line range from output
     let target_group = all_groups.iter().find(|g| {
         g.locations.iter().any(|loc| {
+            // Try file:symbol format first
             let entry = format!("{}:{}", loc.file, loc.symbol);
-            entry == location
+            if entry == location {
+                return true;
+            }
+            // Try file:start-end format (copy-paste from output)
+            let range_entry = format!("{}:{}-{}", loc.file, loc.start_line, loc.end_line);
+            range_entry == location
         })
     });
 
