@@ -148,6 +148,7 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 After testing validates the core:
 - Automatic validation: shadow worktree for testing changes before commit
 - More states: planning, recovery, refinement (see `agent-state-machine.md`)
+- Working memory for v2: $(keep), $(drop), $(note) - evaluator curates what persists
 - Prompt optimization tooling: A/B testing, codebase-specific tuning
 - Session log format: proper design (events, timing, token counts, diffs, replayability)
 - Box-thinking mitigation: counteract LLMs' tendency to stay in familiar patterns
