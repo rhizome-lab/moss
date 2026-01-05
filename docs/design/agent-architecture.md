@@ -89,7 +89,8 @@ moss @agent --refactor "rename foo to bar"  # refactorer
 
 Future: LLM-based classifier (keyword matching rejected as too blunt/English-only):
 - Lightweight LLM call to classify intent
-- Or: stick with explicit flags, they work well
+- Needed for: subagent spawning, dynamic role switching mid-task
+- Explicit flags remain for direct user invocation
 
 ## Context Flow
 

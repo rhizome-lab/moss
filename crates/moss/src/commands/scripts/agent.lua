@@ -625,10 +625,10 @@ local ROLE_PROMPTS = {
     refactorer = REFACTORER_PROMPTS,
 }
 
--- Note: Auto-dispatch via keyword matching was considered but rejected:
+-- Note: Auto-dispatch via keyword matching was rejected:
 -- - Too blunt (can't distinguish "fix the bug" from "how was this fixed?")
 -- - English-only (doesn't work for other languages)
--- - Better approach: lightweight LLM classifier call, or just use explicit flags
+-- Future: LLM classifier for subagent spawning and dynamic role switching
 
 -- Build machine config for a given role
 local function build_machine(role)
