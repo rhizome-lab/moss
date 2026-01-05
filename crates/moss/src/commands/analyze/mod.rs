@@ -303,7 +303,9 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             print_report(&report, json, pretty)
         }
 
-        Some(AnalyzeCommand::Docs { limit }) => docs::cmd_docs(&effective_root, limit, json),
+        Some(AnalyzeCommand::Docs { limit }) => {
+            docs::cmd_docs(&effective_root, limit, json, filter.as_ref())
+        }
 
         Some(AnalyzeCommand::Files {
             limit,

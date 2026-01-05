@@ -1,6 +1,7 @@
 //! Documentation coverage analysis
 
 use super::overview::FileDocCoverage;
+use crate::filter::Filter;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -98,10 +99,10 @@ impl DocCoverageReport {
 }
 
 /// Run documentation coverage analysis
-pub fn cmd_docs(root: &Path, limit: usize, json: bool) -> i32 {
+pub fn cmd_docs(root: &Path, limit: usize, json: bool, filter: Option<&Filter>) -> i32 {
     let config = crate::config::MossConfig::load(root);
     let exclude_interface_impls = config.analyze.exclude_interface_impls();
-    let report = analyze_docs(root, limit, exclude_interface_impls);
+    let report = analyze_docs(root, limit, exclude_interface_impls, filter);
 
     if json {
         println!(
@@ -116,7 +117,12 @@ pub fn cmd_docs(root: &Path, limit: usize, json: bool) -> i32 {
 }
 
 /// Analyze documentation coverage
-pub fn analyze_docs(root: &Path, limit: usize, exclude_interface_impls: bool) -> DocCoverageReport {
+pub fn analyze_docs(
+    root: &Path,
+    limit: usize,
+    exclude_interface_impls: bool,
+    filter: Option<&Filter>,
+) -> DocCoverageReport {
     use crate::extract::{IndexedResolver, InterfaceResolver, OnDemandResolver};
     use crate::index::FileIndex;
     use crate::path_resolve;
@@ -126,6 +132,13 @@ pub fn analyze_docs(root: &Path, limit: usize, exclude_interface_impls: bool) ->
         .iter()
         .filter(|f| f.kind == "file")
         .filter(|f| !is_test_file(&f.path))
+        .filter(|f| {
+            if let Some(flt) = filter {
+                flt.matches(Path::new(&f.path))
+            } else {
+                true
+            }
+        })
         .collect();
 
     // Try to load index for cross-file resolution, fall back to on-demand parsing
