@@ -345,3 +345,53 @@ Gemini ignores system prompts. Fix: prepend SYSTEM_PROMPT as first user message.
 
 **Finding**: Gemini follows bootstrap when system prompt is user message, but still struggles with judgment questions ("first", "name of"). Counting questions work.
 
+---
+
+## Prior Art: "How Vibe Coding Killed Cursor"
+
+Source: https://ischemist.com/writings/long-form/how-vibe-coding-killed-cursor
+
+### Key Claims
+
+1. **Tool-calling loop is fundamentally inefficient**: prompt → tool call → execute → read → repeat creates sequential dependencies worse than just providing context upfront.
+
+2. **Tunnel vision kills agents**: ripgrep-style search "excludes semantically relevant code that lacks matching keywords." Agent-driven discovery misses context that a human would include.
+
+3. **Context window solution**: Gemini 2.5 Pro at 128k context achieves 90% on LongCodeEdit by receiving 80-120k tokens of pre-collected files. No agent search needed.
+
+4. **Human as retrieval system**: Manual context curation (bash scripts collecting relevant files) beats agent-driven discovery.
+
+### Implications for Moss Agent
+
+**Our approach has the same fundamental problems:**
+
+| Problem | Article's Critique | Moss Agent |
+|---------|-------------------|------------|
+| Tunnel vision | ripgrep misses semantic context | $(text-search) has same limitation |
+| Context loss | Tool loop forgets previous context | Ephemeral model *actively discards* context each turn |
+| Sequential inefficiency | Each tool call adds latency | Multi-turn design maximizes round-trips |
+| Discovery failure | Agent can't find what it doesn't know to look for | Same - model guesses what to search |
+
+**Is our approach doomed?**
+
+Arguments YES:
+- Ephemeral context = *extreme* tunnel vision (we throw away outputs each turn!)
+- Article shows context windows beat tool loops
+- Human curation beats agent discovery
+- We're optimizing the wrong thing (prompt format vs architecture)
+
+Arguments MAYBE NOT:
+- We target *investigation*, not code generation (different task)
+- Moss has structural awareness ($(view symbol), $(view --types-only)) beyond raw ripgrep
+- Memory commands ($(note), $(keep)) attempt to address context loss
+- Small questions ("how many X") work fine - complex synthesis doesn't
+
+**Core issue**: The ephemeral context model fights against the model's ability to reason. Each turn, we delete evidence the model just gathered. The model re-explores because it literally can't remember what it saw.
+
+### Potential Pivots
+
+1. **Accumulating context**: Keep ALL outputs in context, use summarization only when hitting limits
+2. **Upfront collection**: Like the article suggests - collect relevant files first, then ask question
+3. **Hybrid**: Moss collects context (using its structural awareness), dumps it all to LLM in one shot
+4. **Index-first**: Use Moss's index to pre-select relevant files, skip the agent loop entirely
+
