@@ -369,6 +369,86 @@ Not a dependency graph, but semantic understanding through:
    - Different: Moss emphasizes synthesis (creating code from specs) over repair (fixing bugs)
    - Different: Moss's structural views vs their text-based approaches
 
+## Critical Analysis: Agent Architecture Limitations
+
+### "How Vibe Coding Killed Cursor" (Jan 2025)
+
+**Source**: https://ischemist.com/writings/long-form/how-vibe-coding-killed-cursor
+
+**Core Argument**: Tool-calling loops are fundamentally inferior to large context windows with pre-collected files.
+
+**Key Claims:**
+
+1. **Tool loops are inefficient**: The sequential dependency of prompt → tool call → execute → read creates latency and failure modes that don't exist when context is provided upfront.
+
+2. **Tunnel vision kills agents**: ripgrep-style search "excludes semantically relevant code that lacks matching keywords." The agent can't find what it doesn't know to look for.
+
+3. **Context windows win**: Gemini 2.5 Pro at 128k context achieves 90% on LongCodeEdit by receiving 80-120k tokens of pre-collected files. No agent search needed.
+
+4. **Human as retrieval system**: Manual context curation (bash scripts collecting relevant files) beats agent-driven discovery.
+
+**The Fundamental Problem:**
+
+Agents can't know what context they need before they see it:
+- To know what to search for → you need to understand the problem
+- To understand the problem → you need to see the relevant code
+- To see the relevant code → you need to know what to search for
+
+This chicken-and-egg problem causes agents to guess, miss relevant context, and loop.
+
+### Implications for Moss Agent Design
+
+**Current agent approach has the same problems:**
+
+| Problem | Article's Critique | Moss Agent |
+|---------|-------------------|------------|
+| Tunnel vision | ripgrep misses semantic context | $(text-search) has same limitation |
+| Context loss | Tool loop forgets previous context | Ephemeral model discards outputs each turn |
+| Sequential inefficiency | Each tool call adds latency | Multi-turn design maximizes round-trips |
+| Discovery failure | Agent can't find what it doesn't know to look for | Same problem |
+
+**But Moss has something bash scripts don't: structural knowledge.**
+
+The index knows:
+- What symbols exist and where
+- What calls what (callers/callees graph)
+- What imports what (dependency graph)
+- Type hierarchies and definitions
+
+### Hypothesis: Moss as Context Collector, Not Agent
+
+Instead of LLM-driven discovery:
+```
+LLM: "I need to find Provider"
+  → $(text-search "Provider")
+  → misses semantic context
+  → loops
+```
+
+Use index-driven collection:
+```
+User: "How many Provider variants?"
+Moss: *uses index*
+  → Provider is enum at llm.rs:38
+  → collect: definition + all usages + related types
+LLM: *sees everything in one shot*
+  → "13"
+```
+
+The agent loop solves the wrong problem. Moss already knows the codebase structure. The LLM should reason over pre-collected context, not discover it.
+
+### Proposed Architecture Pivot
+
+1. **Query understanding**: LLM interprets user question (what are they asking about?)
+2. **Structural collection**: Moss uses index to gather relevant symbols, callers, dependencies
+3. **Single-shot reasoning**: LLM receives full context, produces answer
+
+This inverts the current design:
+- Current: LLM drives discovery, Moss executes commands
+- Proposed: Moss drives collection, LLM reasons over result
+
+The LLM's strength is synthesis and reasoning. The index's strength is structural navigation. Use each for what it's good at.
+
 ## Additional IDE/Tool Research (Dec 2025)
 
 ### Warp (AI-Native Terminal)
