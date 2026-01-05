@@ -313,7 +313,10 @@ Remaining: task decomposition, cross-file refactoring, human escalation (complex
   - agent.commands (execute_batch_edit)
   - agent.roles (prompts, build_machine, classify_task, v1 prompts)
   - agent.lua reduced from ~2300 to ~1240 lines (46% reduction)
-- [ ] Review Rust-side agent support code in lua_runtime.rs
+- [x] Review Rust-side agent support code in lua_runtime.rs
+  - Extracted treesitter bindings to lua_runtime/treesitter.rs (259 lines)
+  - Extracted shadow bindings to lua_runtime/shadow.rs (361 lines)
+  - mod.rs reduced from 1857 to 1260 lines (-32%)
 - [ ] Document stable interfaces vs implementation details
 
 ### Agent Observations
