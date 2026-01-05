@@ -180,32 +180,67 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 - Evaluator occasionally outputs commands in backticks
 - [x] Command parser now handles parens inside quotes: `$(text-search "unwrap()")`
 
-### Agent Future
+### Agent Future: Roadmap to Full Agency
 
-After testing validates the core:
-- Automatic validation: shadow.validate() and apply_to_real() methods added
-  - Integration with refactorer: edit in shadow, validate, then apply (not yet done)
-- [x] Planning state: --plan flag for v2, creates plan before exploring
-- [x] Error awareness: evaluator sees WARNING when commands fail
-- [x] Loop detection: bail out if same command 3x in a row
-- Refinement state: verify answer before concluding (maybe overkill)
-- [x] Working memory for v2: $(keep), $(drop), $(note) - evaluator curates what persists
-- Prompt optimization tooling: A/B testing, codebase-specific tuning
-- Session log format: proper design (events, timing, token counts, diffs, replayability)
-- Box-thinking mitigation: counteract LLMs' tendency to stay in familiar patterns
-- Agent architecture:
-  - [x] Role-based prompts: investigator, auditor, refactorer implemented
-  - [x] Prompt tuning: explicit CORRECT/WRONG format, FORBIDDEN/ALLOWED sections
-  - [x] Command parser: handles parens inside quotes
-  - [x] Auto-dispatch: LLM classifier (`--auto` flag)
-    - Use cases: subagent spawning, dynamic role switching mid-task
-  - PR/diff analysis agent: `moss @agent --audit --diff main` for focused review
-    - Agent sees only changed files, audits for issues in the diff
-- [x] Benchmark suite: `moss @benchmark` for systematic agent evaluation
-  - Task library: curated set of tasks with verification functions
-  - Per-run metrics: pass/fail, duration, turns used
-  - Results saved to .moss/benchmark-results.txt
-  - Future: token tracking, provider comparison, regression detection
+**Current state**: Investigator/Auditor work well. Refactorer has edit commands but needs safety rails.
+
+**Phase 1: Safe Editing** (foundation)
+- [ ] Shadow-first mode: all edits go to `.moss/shadow/`, validate, then apply
+  - Route $(edit ...) through shadow.edit() instead of direct file writes
+  - Validation runs in shadow (cargo check, tests) before touching real files
+  - On success: shadow.apply_to_real() merges changes
+  - On failure: shadow.reset(), agent sees error and can retry
+- [ ] Atomic multi-edit: batch-edit should be all-or-nothing
+  - Currently individual edits can partially apply
+  - Need transaction semantics: success = all apply, failure = none apply
+- [ ] Edit preview: show diff before applying (--dry-run for edits)
+
+**Phase 2: Validation Integration**
+- [x] --validate flag runs command after each edit (done)
+- [ ] Built-in validators: auto-detect cargo check, go build, tsc, etc.
+  - Don't require user to specify --validate "cargo check"
+  - Detect from project structure, run appropriate checks
+- [ ] Test selection: run only tests affected by changes
+  - Use call graph to find test coverage for modified functions
+  - Faster feedback loop than running full test suite
+
+**Phase 3: User Approval Gates**
+- [ ] Risk assessment: classify edits by risk level
+  - Low: add comment, rename local variable
+  - Medium: modify function body, add new function
+  - High: delete code, change public API, modify config
+- [ ] Approval checkpoints: pause for user review at risk thresholds
+  - `--auto-approve low` - auto-apply low-risk, pause for medium+
+  - Show diff, ask user to approve/reject/modify
+- [ ] Undo stack: `moss undo` to revert last agent change
+
+**Phase 4: Multi-Step Workflows**
+- [ ] Task decomposition: break large tasks into subtasks
+  - Agent creates plan, executes step-by-step
+  - Each step validated before proceeding
+- [ ] Cross-file refactoring: rename symbol across codebase
+  - Find all usages (analyze callers), edit each
+  - Validate after all changes applied
+- [ ] Commit integration: --commit flag auto-commits after success
+  - Generate commit message from changes made
+  - Only commit if validation passes
+
+**Phase 5: Error Recovery**
+- [ ] Retry with context: when validation fails, agent sees error and retries
+  - Currently: rollback and stop
+  - Future: rollback, show error to agent, let it try different approach
+- [ ] Partial success: if 3/5 edits work, apply those, report failures
+- [ ] Human-in-the-loop escalation: if agent stuck, ask user for guidance
+
+**Completed foundations**:
+- [x] Role-based prompts: investigator, auditor, refactorer
+- [x] Working memory: $(keep), $(drop), $(note)
+- [x] Planning state: --plan flag
+- [x] Error awareness: evaluator sees command failures
+- [x] Loop detection: bail after 3x same command
+- [x] Auto-dispatch: LLM classifier for role selection
+- [x] Benchmark suite: systematic evaluation
+- [x] --diff flag: focus on changed files
 
 ### Agent Observations
 
