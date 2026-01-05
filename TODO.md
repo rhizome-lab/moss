@@ -182,7 +182,14 @@ Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
 
 ### Agent Future: Roadmap to Full Agency
 
-**Current state**: Investigator/Auditor work well. Refactorer has edit commands but needs safety rails.
+**Current state**: Core agency features complete. Refactorer now has full safety rails:
+- Shadow-first editing with validation
+- Auto-detection of validators
+- Risk assessment and approval gates
+- Retry on failure with error context
+- Auto-commit on success
+
+Remaining: task decomposition, cross-file refactoring, human escalation (complex features).
 
 **Phase 1: Safe Editing** (foundation)
 - [x] Shadow worktree infrastructure (can be used manually in Lua scripts now)
