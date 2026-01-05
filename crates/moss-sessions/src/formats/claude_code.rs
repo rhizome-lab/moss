@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use std::sync::OnceLock;
 
 /// Claude Code session log format (JSONL).
 pub struct ClaudeCodeFormat;
@@ -364,17 +365,22 @@ struct RequestData {
 }
 
 fn extract_symbol_paths_from_bash(command: &str) -> Vec<String> {
-    let mut paths = Vec::new();
+    static MOSS_CMD_RE: OnceLock<regex::Regex> = OnceLock::new();
+    static SYMBOL_PATH_RE: OnceLock<regex::Regex> = OnceLock::new();
 
-    // Match: moss view <path> or uv run moss view <path>
-    let re = regex::Regex::new(r"(?:uv run )?moss (?:view|analyze)\s+([^\s]+)").unwrap();
-    for cap in re.captures_iter(command) {
+    let moss_cmd_re = MOSS_CMD_RE.get_or_init(|| {
+        regex::Regex::new(r"(?:uv run )?moss (?:view|analyze)\s+([^\s]+)").unwrap()
+    });
+    let symbol_path_re = SYMBOL_PATH_RE.get_or_init(|| regex::Regex::new(r"\.\w+/\w").unwrap());
+
+    let mut paths = Vec::new();
+    for cap in moss_cmd_re.captures_iter(command) {
         let path = &cap[1];
         if path.starts_with('-') {
             continue;
         }
         // Check if it looks like a symbol path (has / after file extension)
-        if regex::Regex::new(r"\.\w+/\w").unwrap().is_match(path) {
+        if symbol_path_re.is_match(path) {
             paths.push(path.to_string());
         }
     }
