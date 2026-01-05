@@ -7,7 +7,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 **Agent testing/dogfooding** - see "Agent Testing" in Backlog for details.
 
 After agent validation:
-- PR/diff analysis: `moss analyze --pr` for changed code focus
+- [x] PR/diff analysis: `moss analyze --diff <base>` for changed code focus
+  - Works for: complexity, length, security
+  - TODO: extend to duplicates, health, docs
 - Streaming output for workflow engine `auto{}` driver
 
 ## Remaining Work
