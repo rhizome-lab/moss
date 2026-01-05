@@ -440,6 +440,210 @@ $(done <answer>) - end session with answer
 Outputs disappear each turn unless you $(keep) or $(note) them.
 ]]
 
+-- State machine configuration
+-- Two specialized states: explorer (suggests commands) and evaluator (judges progress)
+local MACHINE = {
+    start = "explorer",
+
+    states = {
+        explorer = {
+            prompt = [[
+Suggest commands to explore. Available:
+$(view path) - file structure/symbols
+$(view path:start-end) - specific lines
+$(text-search pattern) - search codebase
+$(run cmd) - shell command
+
+Output commands directly. Example: $(view src/main.rs)
+]],
+            context = "last_outputs",  -- ephemeral: only most recent
+            next = "evaluator",
+        },
+
+        evaluator = {
+            prompt = [[
+Review the information above. Do NOT explore more - only evaluate what's here.
+- If you can answer: $(answer The complete answer)
+- If more info needed: just say what's missing (explorer will gather it)
+
+Example: $(answer Cli is the first struct at line 13)
+]],
+            context = "all_outputs",  -- accumulated: full history
+            next = "explorer",
+        },
+    },
+}
+
+-- Build context for explorer state (ephemeral - last outputs only)
+function M.build_explorer_context(task, last_outputs, notes)
+    local parts = {"**Task:** " .. task}
+
+    if #notes > 0 then
+        table.insert(parts, "\n**Notes so far:**")
+        for _, note in ipairs(notes) do
+            table.insert(parts, "- " .. note)
+        end
+    end
+
+    if last_outputs and #last_outputs > 0 then
+        table.insert(parts, "\n**Last results:**")
+        for _, out in ipairs(last_outputs) do
+            local status = out.success and "" or " (failed)"
+            table.insert(parts, string.format("\n`%s`%s\n```\n%s\n```", out.cmd, status, out.content))
+        end
+    end
+
+    table.insert(parts, "\nSuggest commands to explore. Do not conclude yet.")
+    return table.concat(parts, "\n")
+end
+
+-- Build context for evaluator state (accumulated - all outputs)
+function M.build_evaluator_context(task, all_outputs, notes)
+    local parts = {"**Task:** " .. task}
+
+    if #notes > 0 then
+        table.insert(parts, "\n**Notes recorded:**")
+        for _, note in ipairs(notes) do
+            table.insert(parts, "- " .. note)
+        end
+    end
+
+    if #all_outputs > 0 then
+        table.insert(parts, "\n**All gathered information:**")
+        for i, turn in ipairs(all_outputs) do
+            table.insert(parts, string.format("\n*Turn %d:*", i))
+            for _, out in ipairs(turn) do
+                local status = out.success and "" or " (failed)"
+                table.insert(parts, string.format("\n`%s`%s\n```\n%s\n```", out.cmd, status, out.content))
+            end
+        end
+    end
+
+    table.insert(parts, "\n**Your job:** $(note) findings, then $(done ANSWER) or explain what's missing.")
+    return table.concat(parts, "\n")
+end
+
+-- State machine agent runner (v2)
+function M.run_state_machine(opts)
+    opts = opts or {}
+    local task = opts.prompt or opts.task or "Help with this codebase"
+    local max_turns = opts.max_turns or 10
+    local provider = opts.provider or "gemini"
+    local model = opts.model  -- nil means use provider default
+
+    local session_id = M.gen_session_id()
+    print("[agent-v2] Session: " .. session_id)
+
+    local state = MACHINE.start
+    local notes = {}           -- accumulated notes
+    local all_outputs = {}     -- all outputs by turn: {{out1, out2}, {out3}, ...}
+    local last_outputs = {}    -- most recent turn's outputs
+    local turn = 0
+
+    while turn < max_turns do
+        turn = turn + 1
+        local state_config = MACHINE.states[state]
+
+        -- Build context based on state
+        local context
+        if state == "explorer" then
+            context = M.build_explorer_context(task, last_outputs, notes)
+        else
+            context = M.build_evaluator_context(task, all_outputs, notes)
+        end
+
+        print(string.format("[agent-v2] Turn %d/%d (%s)", turn, max_turns, state))
+        io.write("[agent-v2] Thinking... ")
+        io.flush()
+
+        -- LLM call with optional bootstrap
+        local history = {}
+        if state_config.bootstrap then
+            -- Inject bootstrap as fake assistant turn
+            table.insert(history, {role = "assistant", content = state_config.bootstrap})
+        end
+        local response = llm.chat(provider, model, state_config.prompt, context, history)
+        io.write("done\n")
+        print(response)
+
+        -- Parse commands from response
+        local commands = {}
+        for cmd_content in response:gmatch('%$%(([^%)]+)%)') do
+            local cmd_name, args = cmd_content:match('^(%S+)%s*(.*)$')
+            if cmd_name then
+                table.insert(commands, {name = cmd_name, args = args or "", full = cmd_name .. " " .. (args or "")})
+            end
+        end
+
+        -- Handle $(done) or $(answer) - only valid in evaluator state
+        for _, cmd in ipairs(commands) do
+            if cmd.name == "done" or cmd.name == "answer" then
+                if state == "evaluator" then
+                    local final_answer = cmd.args
+                    -- Models often output "$(done ANSWER) - actual answer"
+                    -- If args is just "ANSWER", look for text after the $(done ...) in response
+                    if final_answer == "ANSWER" then
+                        local after = response:match('%$%(done%s+ANSWER%)%s*[-:]?%s*(.+)')
+                        if after then
+                            final_answer = after:gsub('\n.*', '')  -- first line only
+                        end
+                    end
+                    print("[agent-v2] Answer: " .. final_answer)
+                    return {success = true, answer = final_answer, turns = turn}
+                else
+                    print("[agent-v2] Warning: $(" .. cmd.name .. ") ignored in explorer state")
+                end
+            end
+        end
+
+        -- Handle $(note) commands
+        for _, cmd in ipairs(commands) do
+            if cmd.name == "note" then
+                table.insert(notes, cmd.args)
+                print("[agent-v2] Noted: " .. cmd.args)
+            end
+        end
+
+        -- Execute exploration commands (only in explorer state)
+        if state == "explorer" then
+            last_outputs = {}
+            for _, cmd in ipairs(commands) do
+                if cmd.name ~= "note" and cmd.name ~= "done" then
+                    local result
+                    if cmd.name == "run" then
+                        print("[agent-v2] Running: " .. cmd.args)
+                        result = shell(cmd.args)
+                    elseif cmd.name == "view" or cmd.name == "text-search" or
+                           cmd.name == "analyze" or cmd.name == "package" then
+                        print("[agent-v2] Running: " .. cmd.full)
+                        result = shell("./target/debug/moss " .. cmd.full)
+                    else
+                        -- Unknown command, skip
+                        print("[agent-v2] Skipping unknown: " .. cmd.name)
+                        result = nil
+                    end
+                    if result then
+                        table.insert(last_outputs, {
+                            cmd = cmd.full,
+                            content = result.output or "",
+                            success = result.success
+                        })
+                    end
+                end
+            end
+            if #last_outputs > 0 then
+                table.insert(all_outputs, last_outputs)
+            end
+        end
+
+        -- Transition to next state
+        state = state_config.next
+    end
+
+    print("[agent-v2] Max turns reached")
+    return {success = false, reason = "max_turns", turns = turn}
+end
+
 -- Check if last N commands are identical (loop detection)
 -- recent_cmds is a list of recent command strings
 function M.is_looping(recent_cmds, n)
@@ -1154,6 +1358,9 @@ function M.parse_args(args)
         elseif arg == "--non-interactive" or arg == "-n" then
             opts.non_interactive = true
             i = i + 1
+        elseif arg == "--v2" or arg == "--state-machine" then
+            opts.v2 = true
+            i = i + 1
         else
             table.insert(task_parts, arg)
             i = i + 1
@@ -1209,7 +1416,12 @@ if args and #args >= 0 then
         os.exit(0)
     end
 
-    local result = M.run(opts)
+    local result
+    if opts.v2 then
+        result = M.run_state_machine(opts)
+    else
+        result = M.run(opts)
+    end
     if not result.success then
         os.exit(1)
     end

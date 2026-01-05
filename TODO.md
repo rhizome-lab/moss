@@ -109,13 +109,20 @@ Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
 
 ### Agent Testing (Current Focus)
 
-Core v2 is implemented. Now: validate through real use before adding more features.
+Core v1 + v2 state machine implemented. Use `--v2` flag for state machine agent.
+
+**State machine agent (--v2)**:
+- Explorer/Evaluator separation prevents premature answering
+- Explorer: ephemeral context (last results), suggests commands
+- Evaluator: accumulated context (all results), decides continue/conclude
+- See `docs/experiments/agent-state-machine.md` for design and test results
 
 **Immediate** (dogfooding):
 - Run agent on real moss tasks, analyze session logs
 - Document friction points: where does the agent get stuck?
 - Prompt tuning: adjust based on observed Gemini/Claude behavior
 - Compare providers: Claude works reliably, Gemini has quirks (see below)
+- **v2 vs v1**: compare state machine vs freeform loop on same tasks
 
 **Log analysis**:
 - Review `.moss/agent/logs/*.jsonl` for patterns
@@ -140,7 +147,7 @@ Core v2 is implemented. Now: validate through real use before adding more featur
 
 After testing validates the core:
 - Automatic validation: shadow worktree for testing changes before commit
-- Planning/subtasks: break complex tasks into steps
+- More states: planning, recovery, refinement (see `agent-state-machine.md`)
 - Prompt optimization tooling: A/B testing, codebase-specific tuning
 - Session log format: proper design (events, timing, token counts, diffs, replayability)
 - Box-thinking mitigation: counteract LLMs' tendency to stay in familiar patterns
