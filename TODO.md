@@ -180,7 +180,7 @@ After testing validates the core:
   - [x] Role-based prompts: investigator, auditor, refactorer implemented
   - [x] Prompt tuning: explicit CORRECT/WRONG format, FORBIDDEN/ALLOWED sections
   - [x] Command parser: handles parens inside quotes
-  - Auto-dispatch: LLM classifier needed (keyword matching too blunt/English-only)
+  - [x] Auto-dispatch: LLM classifier (`--auto` flag)
     - Use cases: subagent spawning, dynamic role switching mid-task
 - Benchmark suite: systematic agent evaluation
   - Task library: curated set of tasks with known answers/outcomes

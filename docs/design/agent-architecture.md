@@ -87,10 +87,16 @@ moss @agent --audit "find security issues"  # auditor
 moss @agent --refactor "rename foo to bar"  # refactorer
 ```
 
-Future: LLM-based classifier (keyword matching rejected as too blunt/English-only):
-- Lightweight LLM call to classify intent
-- Needed for: subagent spawning, dynamic role switching mid-task
-- Explicit flags remain for direct user invocation
+Auto-dispatch via LLM classifier:
+```
+moss @agent --auto "find security vulnerabilities"  # → auditor
+moss @agent --auto "how does X work?"               # → investigator
+moss @agent --auto "rename foo to bar"              # → refactorer
+```
+
+Uses lightweight LLM call to classify intent. Enables:
+- Subagent spawning (parent picks role for child)
+- Dynamic role switching mid-task
 
 ## Context Flow
 
