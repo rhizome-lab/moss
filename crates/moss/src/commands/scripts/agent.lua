@@ -35,110 +35,17 @@ M.list_sessions = session.list_sessions
 M.json_encode_string = parser.json_encode_string
 M.json_decode_string = parser.json_decode_string
 
--- Memorize a fact to long-term memory (.moss/memory/facts.md)
--- Returns: true on success, false + error message on failure
-function M.memorize(fact)
-    local memory_dir = _moss_root .. "/.moss/memory"
-    local facts_file = memory_dir .. "/facts.md"
-
-    -- Ensure directory exists
-    os.execute("mkdir -p " .. memory_dir)
-
-    -- Append fact with timestamp
-    local file, err = io.open(facts_file, "a")
-    if not file then
-        return false, err
-    end
-
-    local timestamp = os.date("%Y-%m-%d %H:%M")
-    file:write("- " .. fact .. " (" .. timestamp .. ")\n")
-    file:close()
-
-    return true
-end
+-- Long-term memory (delegated to agent.session module)
+M.memorize = session.memorize
 
 -- Batch edit execution (delegated to agent.commands module)
 M.execute_batch_edit = commands.execute_batch_edit
 
-local SYSTEM_PROMPT = [[
-Respond with commands to accomplish the task.
-Conclude with $(done ANSWER) as soon as you have enough evidence.
-]]
-
--- Bootstrap: two exchanges showing (1) exploration (2) reasoning + conclusion
-local BOOTSTRAP = {
-    -- Exchange 1: ask for help
-    {
-        role = "assistant",
-        content = "I'm unfamiliar with this codebase. Let me see what commands I have available.\n\n$(help)"
-    },
-    -- Exchange 2: reasoning + conclusion example
-    {
-        role = "assistant",
-        content = "I can see the answer in the results. There are 3 items: A, B, and C.\n\n$(done 3)"
-    },
-    {
-        role = "user",
-        content = "Correct!"
-    }
-}
-
--- For backwards compat, keep the old format too
-local BOOTSTRAP_ASSISTANT = BOOTSTRAP[1].content
-
-local BOOTSTRAP_USER = [[
-Available commands:
-
-Exploration:
-$(view .) - view current directory
-$(view <path>) - view file or directory
-$(view <path/Symbol>) - view specific symbol
-$(view --types-only <path>) - only type definitions
-$(view --deps <path>) - show dependencies/imports
-$(view <path>:<start>-<end>) - view line range
-$(text-search "<pattern>") - search for text
-$(text-search "<pattern>" --only <glob>) - search in specific files
-
-Analysis:
-$(analyze complexity) - find complex functions
-$(analyze length) - find long functions
-$(analyze security) - find security issues
-$(analyze duplicate-functions) - find code clones
-$(analyze callers <symbol>) - show what calls this
-$(analyze callees <symbol>) - show what this calls
-$(analyze hotspots) - git history hotspots
-
-Package:
-$(package list) - list dependencies
-$(package tree) - dependency tree
-$(package outdated) - outdated packages
-$(package audit) - check vulnerabilities
-
-Editing:
-$(edit <path/Symbol> delete) - delete symbol
-$(edit <path/Symbol> replace <code>) - replace symbol
-$(edit <path/Symbol> insert --before <code>) - insert before
-$(edit <path/Symbol> insert --after <code>) - insert after
-$(batch-edit <t1> <a1> <c1> | <t2> <a2> <c2>) - multiple edits
-
-Shell:
-$(run <shell command>) - execute shell command
-
-Memory:
-$(note <finding>) - record finding for session
-$(keep) - keep all outputs in working memory
-$(keep 1 3) - keep specific outputs by index
-$(drop <id>) - remove from working memory
-$(memorize <fact>) - save to long-term memory
-$(forget <pattern>) - remove notes matching pattern
-
-Session:
-$(checkpoint <progress> | <questions>) - save for later
-$(ask <question>) - ask user for input
-$(done <answer>) - end session with answer
-
-Outputs disappear each turn unless you $(keep) or $(note) them.
-]]
+-- V1 prompts (delegated to agent.roles module)
+local SYSTEM_PROMPT = roles.V1_SYSTEM_PROMPT
+local BOOTSTRAP = roles.V1_BOOTSTRAP
+local BOOTSTRAP_ASSISTANT = roles.V1_BOOTSTRAP_ASSISTANT
+local BOOTSTRAP_USER = roles.V1_BOOTSTRAP_USER
 
 -- Role prompts and state machine config (delegated to agent.roles module)
 M.classify_task = roles.classify_task

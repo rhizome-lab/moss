@@ -262,4 +262,83 @@ function M.list_roles()
     }
 end
 
+-- V1 agent prompts (for backwards compat)
+M.V1_SYSTEM_PROMPT = [[
+Respond with commands to accomplish the task.
+Conclude with $(done ANSWER) as soon as you have enough evidence.
+]]
+
+M.V1_BOOTSTRAP = {
+    -- Exchange 1: ask for help
+    {
+        role = "assistant",
+        content = "I'm unfamiliar with this codebase. Let me see what commands I have available.\n\n$(help)"
+    },
+    -- Exchange 2: reasoning + conclusion example
+    {
+        role = "assistant",
+        content = "I can see the answer in the results. There are 3 items: A, B, and C.\n\n$(done 3)"
+    },
+    {
+        role = "user",
+        content = "Correct!"
+    }
+}
+
+M.V1_BOOTSTRAP_ASSISTANT = M.V1_BOOTSTRAP[1].content
+
+M.V1_BOOTSTRAP_USER = [[
+Available commands:
+
+Exploration:
+$(view .) - view current directory
+$(view <path>) - view file or directory
+$(view <path/Symbol>) - view specific symbol
+$(view --types-only <path>) - only type definitions
+$(view --deps <path>) - show dependencies/imports
+$(view <path>:<start>-<end>) - view line range
+$(text-search "<pattern>") - search for text
+$(text-search "<pattern>" --only <glob>) - search in specific files
+
+Analysis:
+$(analyze complexity) - find complex functions
+$(analyze length) - find long functions
+$(analyze security) - find security issues
+$(analyze duplicate-functions) - find code clones
+$(analyze callers <symbol>) - show what calls this
+$(analyze callees <symbol>) - show what this calls
+$(analyze hotspots) - git history hotspots
+
+Package:
+$(package list) - list dependencies
+$(package tree) - dependency tree
+$(package outdated) - outdated packages
+$(package audit) - check vulnerabilities
+
+Editing:
+$(edit <path/Symbol> delete) - delete symbol
+$(edit <path/Symbol> replace <code>) - replace symbol
+$(edit <path/Symbol> insert --before <code>) - insert before
+$(edit <path/Symbol> insert --after <code>) - insert after
+$(batch-edit <t1> <a1> <c1> | <t2> <a2> <c2>) - multiple edits
+
+Shell:
+$(run <shell command>) - execute shell command
+
+Memory:
+$(note <finding>) - record finding for session
+$(keep) - keep all outputs in working memory
+$(keep 1 3) - keep specific outputs by index
+$(drop <id>) - remove from working memory
+$(memorize <fact>) - save to long-term memory
+$(forget <pattern>) - remove notes matching pattern
+
+Session:
+$(checkpoint <progress> | <questions>) - save for later
+$(ask <question>) - ask user for input
+$(done <answer>) - end session with answer
+
+Outputs disappear each turn unless you $(keep) or $(note) them.
+]]
+
 return M

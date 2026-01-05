@@ -244,4 +244,26 @@ function M.list_sessions()
     return sessions
 end
 
+-- Memorize a fact to long-term memory (.moss/memory/facts.md)
+-- Returns: true on success, false + error message on failure
+function M.memorize(fact)
+    local memory_dir = _moss_root .. "/.moss/memory"
+    local facts_file = memory_dir .. "/facts.md"
+
+    -- Ensure directory exists
+    os.execute("mkdir -p " .. memory_dir)
+
+    -- Append fact with timestamp
+    local file, err = io.open(facts_file, "a")
+    if not file then
+        return false, err
+    end
+
+    local timestamp = os.date("%Y-%m-%d %H:%M")
+    file:write("- " .. fact .. " (" .. timestamp .. ")\n")
+    file:close()
+
+    return true
+end
+
 return M
