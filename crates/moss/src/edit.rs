@@ -942,7 +942,7 @@ def foo():
 def bar():
     return 42
 "#;
-        let loc = editor.find_symbol(&PathBuf::from("test.py"), content, "bar");
+        let loc = editor.find_symbol(&PathBuf::from("test.py"), content, "bar", false);
         assert!(loc.is_some());
         let loc = loc.unwrap();
         assert_eq!(loc.name, "bar");
@@ -954,7 +954,7 @@ def bar():
         let editor = Editor::new();
         let content = "def foo():\n    pass\n\ndef bar():\n    return 42\n";
         let loc = editor
-            .find_symbol(&PathBuf::from("test.py"), content, "bar")
+            .find_symbol(&PathBuf::from("test.py"), content, "bar", false)
             .unwrap();
         let result = editor.delete_symbol(content, &loc);
         assert!(!result.contains("bar"));
@@ -966,7 +966,7 @@ def bar():
         let editor = Editor::new();
         let content = "def foo():\n    pass\n\ndef bar():\n    return 42\n";
         let loc = editor
-            .find_symbol(&PathBuf::from("test.py"), content, "bar")
+            .find_symbol(&PathBuf::from("test.py"), content, "bar", false)
             .unwrap();
         let result = editor.insert_before(content, &loc, "def baz():\n    pass");
         assert!(result.contains("baz"));

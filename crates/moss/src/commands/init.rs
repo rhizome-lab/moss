@@ -133,8 +133,9 @@ fn detect_todo_files(root: &Path) -> Vec<String> {
 }
 
 /// Entries we want in .gitignore
+/// Note: .moss/* ignores contents, allowing !.moss/... to un-ignore specific files.
+/// Don't use .moss/ or **/.moss/ - those ignore the directory itself, blocking un-ignore.
 const GITIGNORE_ENTRIES: &[&str] = &[
-    "**/.moss/",
     ".moss/*",
     "!.moss/config.toml",
     "!.moss/duplicate-functions-allow",
