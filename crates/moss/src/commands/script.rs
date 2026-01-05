@@ -44,11 +44,21 @@ pub mod modules {
     pub const TYPE_GENERATE: &str = include_str!("scripts/type/generate.lua");
     pub const TEST: &str = include_str!("scripts/test.lua");
     pub const TEST_PROPERTY: &str = include_str!("scripts/test/property.lua");
+    pub const AGENT_RISK: &str = include_str!("scripts/agent/risk.lua");
+    pub const AGENT_PARSER: &str = include_str!("scripts/agent/parser.lua");
+    pub const AGENT_SESSION: &str = include_str!("scripts/agent/session.lua");
+    pub const AGENT_CONTEXT: &str = include_str!("scripts/agent/context.lua");
+    pub const AGENT_COMMANDS: &str = include_str!("scripts/agent/commands.lua");
 
     /// Get builtin module by name.
     pub fn get(name: &str) -> Option<&'static str> {
         match name {
             "agent" => Some(super::builtins::AGENT),
+            "agent.risk" => Some(AGENT_RISK),
+            "agent.parser" => Some(AGENT_PARSER),
+            "agent.session" => Some(AGENT_SESSION),
+            "agent.context" => Some(AGENT_CONTEXT),
+            "agent.commands" => Some(AGENT_COMMANDS),
             "cli" => Some(CLI),
             "type" => Some(TYPE),
             "type.describe" => Some(TYPE_DESCRIBE),

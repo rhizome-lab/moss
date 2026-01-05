@@ -1198,6 +1198,11 @@ impl LuaRuntime {
         // Register each builtin module
         for name in &[
             "agent",
+            "agent.risk",
+            "agent.parser",
+            "agent.session",
+            "agent.context",
+            "agent.commands",
             "cli",
             "type",
             "type.describe",
