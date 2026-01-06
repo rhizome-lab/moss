@@ -13,29 +13,13 @@ pub struct AnalyzeArgs {
     #[arg(short, long, global = true)]
     pub root: Option<PathBuf>,
 
-    /// Output as JSON
-    #[arg(long, global = true)]
-    pub json: bool,
-
-    /// Filter JSON output with jq expression (implies --json)
-    #[arg(long, global = true)]
-    pub jq: Option<String>,
-
-    /// Human-friendly output with colors and formatting
-    #[arg(long, global = true)]
-    pub pretty: bool,
-
     /// Exclude paths matching pattern or @alias
-    #[arg(long, value_name = "PATTERN", global = true)]
+    #[arg(long, value_name = "PATTERN", value_delimiter = ',', global = true)]
     pub exclude: Vec<String>,
 
     /// Include only paths matching pattern or @alias
-    #[arg(long, value_name = "PATTERN", global = true)]
+    #[arg(long, value_name = "PATTERN", value_delimiter = ',', global = true)]
     pub only: Vec<String>,
-
-    /// Compact output without colors (overrides TTY detection)
-    #[arg(long, global = true)]
-    pub compact: bool,
 
     /// Analyze only files changed since base ref (e.g., main, HEAD~1)
     /// If no BASE given, defaults to origin's default branch
@@ -87,14 +71,14 @@ pub enum AnalyzeCommand {
     /// Analyze documentation coverage
     Docs {
         /// Number of worst-covered files to show
-        #[arg(short = 'n', long, default_value = "10")]
+        #[arg(short = 'l', long, default_value = "10")]
         limit: usize,
     },
 
     /// Show longest files in codebase
     Files {
         /// Number of files to show
-        #[arg(short = 'n', long, default_value = "20")]
+        #[arg(short = 'l', long, default_value = "20")]
         limit: usize,
 
         /// Add pattern to .moss/large-files-allow

@@ -166,9 +166,9 @@ enum Commands {
         /// Session ID or path (optional - lists sessions if omitted)
         session: Option<String>,
 
-        /// Project path to find sessions for (defaults to current directory)
+        /// Root directory (defaults to current directory)
         #[arg(short, long)]
-        project: Option<PathBuf>,
+        root: Option<PathBuf>,
 
         /// Apply jq filter to each JSONL line
         #[arg(long)]
@@ -558,7 +558,7 @@ fn main() {
         Commands::TextSearch(args) => commands::text_search::run(args, format),
         Commands::Sessions {
             session,
-            project,
+            root,
             jq,
             format,
             grep,
@@ -571,12 +571,12 @@ fn main() {
             if serve {
                 let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
                 rt.block_on(commands::sessions::cmd_sessions_serve(
-                    project.as_deref(),
+                    root.as_deref(),
                     port,
                 ))
             } else if stats {
                 commands::sessions::cmd_sessions_stats(
-                    project.as_deref(),
+                    root.as_deref(),
                     limit,
                     format.as_deref(),
                     grep.as_deref(),
@@ -586,7 +586,7 @@ fn main() {
             } else if let Some(session_id) = session {
                 commands::sessions::cmd_sessions_show(
                     &session_id,
-                    project.as_deref(),
+                    root.as_deref(),
                     jq.as_deref(),
                     format.as_deref(),
                     analyze,
@@ -595,7 +595,7 @@ fn main() {
                 )
             } else {
                 commands::sessions::cmd_sessions_list(
-                    project.as_deref(),
+                    root.as_deref(),
                     limit,
                     format.as_deref(),
                     grep.as_deref(),

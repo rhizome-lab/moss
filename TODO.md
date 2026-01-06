@@ -40,6 +40,21 @@ Crates with registries:
 
 Pattern: traits are the extensibility mechanism. Users implement traits in their own code, register at runtime. moss CLI can add Lua bindings at application layer for scripting.
 
+### CLI API Consistency
+Audit found fragmentation across commands. Fix for consistent UX:
+
+**High priority:** (DONE)
+- [x] `--exclude`/`--only` parsing: unified to comma-delimited across all commands
+- [x] Output flags in `analyze`: removed local flags, uses root-level `--json`/`--jq`/`--pretty`/`--compact`
+- [x] Short flag `-n` collision: changed to `-l` for `--limit` (consistent with sessions)
+- [x] `--root` vs `--project`: sessions now uses `--root` like other commands
+- [x] `--jq` semantics: documented - root filters whole JSON, sessions filters per-line (JSONL) - intentional
+
+**Medium priority:**
+- [x] Subcommand defaults: reviewed - intentional design (commands with clear primary action default to it, e.g., lint→run, test→run, analyze→health; commands with no clear primary require explicit, e.g., package, index)
+- [x] `--allow` semantics: reviewed - intentional (different analysis types need different allowlist formats: patterns for files/hotspots, locations for duplicate-functions, pairs for duplicate-types; help text documents each)
+- [x] `--type` vs `--kind`: standardized to `--kind` (view now uses `--kind` like analyze complexity)
+
 ### Rust Redesign Candidates
 - Rules engine: consider semgrep/ruff integration instead of custom
 - Plugin system: Rust trait-based plugins or external tool orchestration

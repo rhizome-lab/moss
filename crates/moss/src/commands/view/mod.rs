@@ -79,8 +79,8 @@ pub struct ViewArgs {
     #[arg(long)]
     pub deps: bool,
 
-    /// Filter by symbol type: class, function, method
-    #[arg(short = 't', long = "type")]
+    /// Filter by symbol kind: class, function, method
+    #[arg(short = 'k', long = "kind")]
     pub kind: Option<String>,
 
     /// Show only type definitions (class, struct, enum, interface, type alias)
@@ -120,11 +120,11 @@ pub struct ViewArgs {
     pub context: bool,
 
     /// Exclude paths matching pattern or @alias
-    #[arg(long, value_name = "PATTERN")]
+    #[arg(long, value_name = "PATTERN", value_delimiter = ',')]
     pub exclude: Vec<String>,
 
     /// Include only paths matching pattern or @alias
-    #[arg(long, value_name = "PATTERN")]
+    #[arg(long, value_name = "PATTERN", value_delimiter = ',')]
     pub only: Vec<String>,
 
     /// Case-insensitive symbol matching

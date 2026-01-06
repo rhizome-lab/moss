@@ -194,8 +194,8 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
         .clone()
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = MossConfig::load(&effective_root);
-    let json = args.json || args.jq.is_some() || format.is_json();
-    let pretty = args.pretty || format.is_pretty();
+    let json = format.is_json();
+    let pretty = format.is_pretty();
 
     // Ensure daemon is running if configured
     daemon::maybe_start_daemon(&effective_root);
