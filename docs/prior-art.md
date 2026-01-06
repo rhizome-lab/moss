@@ -116,12 +116,52 @@ See `docs/synthesis-generators.md` for how these map to moss generator plugins.
 - The infrastructure powering Claude Code is now available as "Claude Agent SDK"
 - Enables building custom agents with same capabilities
 
+**Boris Cherny's Workflow (Creator of Claude Code, Jan 2025):**
+
+Sources: [VentureBeat](https://venturebeat.com/technology/the-creator-of-claude-code-just-revealed-his-workflow-and-developers-are), [paddo.dev](https://paddo.dev/blog/how-boris-uses-claude-code/), [Vibe Sparking](https://www.vibesparking.com/en/blog/ai/claude-code/2026-01-04-boris-cheny-claude-code-workflow-revealed/)
+
+- **Parallelization**: 5 iTerm2 tabs with Claude Code + 5-10 browser tabs on claude.ai/code. Uses system notifications to know when input needed. Can "teleport" sessions between terminal and web.
+- **Model Choice**: Opus 4.5 with thinking exclusively. "Even though it's bigger & slower, since you have to steer it less and it's better at tool use, it is almost always faster in the end."
+- **Plan Mode**: Shift+Tab twice for all non-trivial work. Iterates on plan before switching to auto-accept for execution. "A good plan is really important."
+- **CLAUDE.md**: Team maintains shared file in git. When Claude makes mistakes, corrections added to prevent recurrence. Code review includes tagging @claude to update guidelines.
+- **Slash Commands**: Custom shortcuts in `.claude/commands/`. `/commit-push-pr` runs dozens of times daily. Commands pre-compute context using inline bash to minimize model back-and-forth.
+- **Subagents**: Task-specific automation: code-simplifier, verify-app, build-validator, code-architect, oncall-guide.
+- **PostToolUse Hooks**: Auto-formatting via deterministic hook on Write|Edit.
+- **Permission Management**: Pre-allow safe commands via `/permissions` rather than `--dangerously-skip-permissions`.
+- **Verification as Force Multiplier**: "Will 2-3x the quality of the final result." Tests changes in browsers, test suites, phone simulators.
+
+**Parallelization Analysis (Jan 2025):**
+
+Does 5-20x parallelization help? Depends on task independence.
+
+| Factor | Boris (Claude Code team) | Solo developer |
+|--------|--------------------------|----------------|
+| Task independence | High (many surfaces) | Lower (coherent system) |
+| Codebase maturity | Mature, stable interfaces | Rapid development |
+| Coordination cost | Spread across team | Single person bottleneck |
+| Merge conflicts | Independent areas | Changes ripple through |
+
+**When parallelization helps:**
+- Many truly independent tasks (different features, different bugs)
+- Mature codebase with stable interfaces
+- Multiple humans can monitor multiple streams
+
+**When it doesn't:**
+- Rapidly evolving architecture (changes conflict)
+- Coherent system where changes ripple through
+- Single developer attention is the real bottleneck
+
+**Key insight**: Parallelization ROI correlates with codebase maturity and task independence, not just team size.
+
 **Moss Observations:**
 - Claude Code's design validates moss's "library is the API" approach
 - Their hooks system is similar to moss's policy engine concept
 - Checkpoints map to moss's Shadow Git approach
 - MCP integration shows importance of protocol interoperability
 - The SDK release confirms: agent infrastructure is becoming a platform play
+- Boris's Plan Mode + auto-accept pattern could inform moss agent UX
+- CLAUDE.md as institutional memory is similar to moss's approach
+- Verification loops are critical - moss already runs tests unprompted
 
 ### Cursor IDE
 - **Site**: https://cursor.com
