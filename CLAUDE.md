@@ -6,6 +6,8 @@ Architecture: `docs/architecture-decisions.md`. Pure Rust, dynamic grammar loadi
 
 **Index-first architecture:** Core data extraction (symbols, imports, calls) goes in the Rust index. When adding language support: first add extraction to the indexer (deps.rs, skeleton.rs), then expose via commands. All commands should work without the index (graceful degradation via filesystem fallbacks).
 
+**Balance agent vs tooling work.** Agent features (prompts, roles, session handling) and tooling features (CLI commands, analysis, sessions) should progress in parallel. Don't let one dominate. Agent work is exciting but tooling is the foundation. Rough heuristic: after significant agent work, pivot to tooling; after tooling sprint, check if agent could benefit.
+
 ## Core Rule
 
 ALWAYS NOTE THINGS DOWN. When you discover something important, write it immediately:

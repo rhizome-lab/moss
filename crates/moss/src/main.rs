@@ -186,6 +186,10 @@ enum Commands {
         #[arg(short, long)]
         analyze: bool,
 
+        /// Show aggregate statistics across all sessions
+        #[arg(long)]
+        stats: bool,
+
         /// Start web server for viewing sessions
         #[arg(long)]
         serve: bool,
@@ -559,6 +563,7 @@ fn main() {
             format,
             grep,
             analyze,
+            stats,
             serve,
             port,
             limit,
@@ -569,6 +574,14 @@ fn main() {
                     project.as_deref(),
                     port,
                 ))
+            } else if stats {
+                commands::sessions::cmd_sessions_stats(
+                    project.as_deref(),
+                    limit,
+                    format.as_deref(),
+                    grep.as_deref(),
+                    cli.json,
+                )
             } else if let Some(session_id) = session {
                 commands::sessions::cmd_sessions_show(
                     &session_id,
