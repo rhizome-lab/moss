@@ -7,7 +7,8 @@
 # This provides:
 #   - Rust/Cargo for clap fixtures
 #   - Python with argparse (stdlib) and click
-#   - Node.js with npm for commander.js
+#   - Node.js with npm for commander.js and yargs
+#   - Go for cobra
 { pkgs ? import <nixpkgs> {} }:
 
 pkgs.mkShell {
@@ -23,6 +24,9 @@ pkgs.mkShell {
 
     # Node.js ecosystem
     nodejs
+
+    # Go ecosystem
+    go
   ];
 
   shellHook = ''
@@ -32,7 +36,9 @@ pkgs.mkShell {
     echo "  - Rust/clap: cargo build --release (in clap/)"
     echo "  - Python/argparse: python argparse/example.py --help"
     echo "  - Python/click: python click/example.py --help"
-    echo "  - Node/commander: node commander/example.js --help"
+    echo "  - Node/commander: (cd commander && npm install && node example.js --help)"
+    echo "  - Node/yargs: (cd yargs && npm install && node example.js --help)"
+    echo "  - Go/cobra: (cd cobra && go build && ./example --help)"
     echo ""
     echo "Run ./generate.sh to regenerate all fixtures"
   '';

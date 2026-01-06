@@ -1,0 +1,16 @@
+Usage: example [options] [command]
+
+An example CLI tool for testing
+
+Options:
+  -V, --version        output the version number
+  -v, --verbose        Enable verbose output
+  -c, --config <FILE>  Config file path
+  -p, --port <PORT>    Port number (default: "8080")
+  -h, --help           display help for command
+
+Commands:
+  build [options]      Build the project
+  run [args...]        Run the project
+  clean                Clean build artifacts
+  help [command]       display help for command

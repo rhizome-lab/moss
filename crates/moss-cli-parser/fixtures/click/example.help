@@ -1,0 +1,15 @@
+Usage: example.py [OPTIONS] COMMAND [ARGS]...
+
+  An example CLI tool for testing.
+
+Options:
+  -v, --verbose       Enable verbose output
+  -c, --config FILE   Config file path
+  -p, --port INTEGER  Port number
+  --version           Show the version and exit.
+  --help              Show this message and exit.
+
+Commands:
+  build  Build the project.
+  clean  Clean build artifacts.
+  run    Run the project.

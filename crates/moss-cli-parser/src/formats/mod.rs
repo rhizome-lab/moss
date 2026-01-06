@@ -2,9 +2,17 @@
 
 mod argparse;
 mod clap;
+mod click;
+mod cobra;
+mod commander;
+mod yargs;
 
 pub use self::argparse::ArgparseFormat;
 pub use self::clap::ClapFormat;
+pub use self::click::ClickFormat;
+pub use self::cobra::CobraFormat;
+pub use self::commander::CommanderFormat;
+pub use self::yargs::YargsFormat;
 
 use crate::CliSpec;
 
@@ -29,7 +37,14 @@ impl FormatRegistry {
     /// Create a new registry with all built-in formats.
     pub fn new() -> Self {
         Self {
-            formats: vec![Box::new(ClapFormat), Box::new(ArgparseFormat)],
+            formats: vec![
+                Box::new(ClapFormat),
+                Box::new(ArgparseFormat),
+                Box::new(ClickFormat),
+                Box::new(CommanderFormat),
+                Box::new(YargsFormat),
+                Box::new(CobraFormat),
+            ],
         }
     }
 

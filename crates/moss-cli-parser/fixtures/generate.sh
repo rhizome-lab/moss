@@ -15,23 +15,28 @@ echo "  clap/example.help"
 echo "  clap/example-build.help"
 echo "  clap/example-run.help"
 
-if [ -d argparse ]; then
-    echo "=== Generating argparse fixtures ==="
-    python argparse/example.py --help > argparse/example.help
-    echo "  argparse/example.help"
-fi
+echo "=== Generating argparse fixtures ==="
+python argparse/example.py --help > argparse/example.help
+echo "  argparse/example.help"
 
-if [ -d click ]; then
-    echo "=== Generating click fixtures ==="
-    python click/example.py --help > click/example.help
-    echo "  click/example.help"
-fi
+echo "=== Generating click fixtures ==="
+python click/example.py --help > click/example.help
+echo "  click/example.help"
 
-if [ -d commander ]; then
-    echo "=== Generating commander fixtures ==="
-    node commander/example.js --help > commander/example.help
-    echo "  commander/example.help"
-fi
+echo "=== Generating commander fixtures ==="
+(cd commander && npm install --silent 2>/dev/null)
+node commander/example.js --help > commander/example.help
+echo "  commander/example.help"
+
+echo "=== Generating yargs fixtures ==="
+(cd yargs && npm install --silent 2>/dev/null)
+node yargs/example.js --help > yargs/example.help
+echo "  yargs/example.help"
+
+echo "=== Generating cobra fixtures ==="
+(cd cobra && go build -o example 2>/dev/null)
+./cobra/example --help > cobra/example.help
+echo "  cobra/example.help"
 
 echo ""
 echo "Done! All fixtures regenerated."

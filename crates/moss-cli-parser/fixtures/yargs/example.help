@@ -1,0 +1,13 @@
+example <command> [options]
+
+Commands:
+  example build         Build the project
+  example run [args..]  Run the project
+  example clean         Clean build artifacts
+
+Options:
+  -v, --verbose  Enable verbose output                                 [boolean]
+  -c, --config   Config file path                                       [string]
+  -p, --port     Port number                            [number] [default: 8080]
+      --help     Show help                                             [boolean]
+      --version  Show version number                                   [boolean]

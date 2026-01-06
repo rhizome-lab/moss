@@ -1,0 +1,8 @@
+{
+  "name": "example-yargs",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "yargs": "^17.0.0"
+  }
+}

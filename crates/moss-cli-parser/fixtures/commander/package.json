@@ -1,0 +1,8 @@
+{
+  "name": "example-commander",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "commander": "^12.0.0"
+  }
+}
