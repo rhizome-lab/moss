@@ -1,32 +1,63 @@
 # moss sessions
 
-Analyze Claude Code and other agent session logs.
+Analyze Claude Code, Codex, Gemini CLI, and Moss agent session logs.
 
-## Subcommands
+## Usage
 
-| Subcommand | Description |
-|------------|-------------|
-| `list` | List sessions |
-| `show <ID>` | Show session details |
-| `stats` | Session statistics |
+```bash
+moss sessions [OPTIONS] [SESSION_ID]
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--format <FORMAT>` | Log format: `claude` (default), `codex`, `gemini`, `moss` |
+| `--grep <PATTERN>` | Filter sessions by regex pattern (searches content) |
+| `--project <PATH>` | Project directory |
+| `--limit <N>` | Maximum sessions to list (default: 10) |
+| `--analyze` | Run full analysis instead of raw log dump |
+| `--jq <EXPR>` | Apply jq expression to output |
+| `--json` | Output as JSON |
+| `--serve` | Start web UI server |
+| `--port <PORT>` | Server port (default: 3131) |
+
+## Formats
+
+| Format | Directory | File Pattern |
+|--------|-----------|--------------|
+| `claude` | `~/.claude/projects/<encoded-path>/` | `*.jsonl` |
+| `codex` | `~/.codex/sessions/YYYY/MM/DD/` | `*.jsonl` |
+| `gemini` | `~/.gemini/tmp/<hash>/` | `logs.json` |
+| `moss` | `.moss/agent/logs/` | `*.jsonl` |
 
 ## Examples
 
 ```bash
-# List recent sessions
-moss sessions list
+# List Claude Code sessions (default)
+moss sessions
 
-# Show specific session
-moss sessions show abc123
+# List Moss agent sessions
+moss sessions --format moss
 
-# Statistics
-moss sessions stats
+# Filter sessions by content
+moss sessions --format moss --grep "benchmark"
+
+# Show specific session with analysis
+moss sessions abc123 --analyze
+
+# Show session with jq filtering
+moss sessions abc123 --jq '.tool_stats'
+
+# JSON output for scripting
+moss sessions --json
 ```
 
-## Session Data
+## Session Analysis
 
-Analyzes session logs from `~/.claude/` including:
-- Tool usage patterns
-- Token consumption
-- Success/failure rates
-- Duration metrics
+When using `--analyze`, reports include:
+- Tool usage patterns (calls, errors per tool)
+- Token consumption (input, output, cache)
+- Message type counts
+- Turn counts
+- File token attribution (which files consumed tokens)

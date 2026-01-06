@@ -33,6 +33,7 @@ export default withMermaid(
           items: [
             { text: 'Overview', link: '/index' },
             { text: 'Primitives Spec', link: '/primitives-spec' },
+            { text: 'Lua API', link: '/lua-api' },
             { text: 'Workflow Format', link: '/workflow-format' },
             { text: 'Language Support', link: '/language-support' },
           ]
@@ -41,6 +42,11 @@ export default withMermaid(
           text: 'CLI Reference',
           items: [
             { text: 'Commands', link: '/cli/commands' },
+            { text: 'view', link: '/cli/view' },
+            { text: 'edit', link: '/cli/edit' },
+            { text: 'analyze', link: '/cli/analyze' },
+            { text: 'text-search', link: '/cli/text-search' },
+            { text: 'sessions', link: '/cli/sessions' },
             { text: 'Tools', link: '/tools' },
           ]
         },
@@ -51,6 +57,8 @@ export default withMermaid(
             { text: 'Architecture Decisions', link: '/architecture-decisions' },
             { text: 'Unification', link: '/unification' },
             { text: 'View Filtering', link: '/view-filtering' },
+            { text: 'Agent', link: '/design/agent' },
+            { text: 'Shadow Git', link: '/design/shadow-git' },
           ]
         },
         {
@@ -58,6 +66,7 @@ export default withMermaid(
           collapsed: true,
           items: [
             { text: 'Dogfooding', link: '/dogfooding' },
+            { text: 'Agent Commands', link: '/agent-commands' },
             { text: 'Session Modes', link: '/session-modes' },
             { text: 'Documentation Strategy', link: '/documentation' },
           ]

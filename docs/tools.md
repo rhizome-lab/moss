@@ -53,26 +53,33 @@ moss analyze [target] [options]
 - `--complexity` — cyclomatic complexity per function
 - `--security` — vulnerability scanning
 
-## Legacy Commands
+## Search & Sessions
 
-These commands still work but are deprecated in favor of the 3 primitives:
+### text-search
 
-- `skeleton` → use `view`
-- `anchors` → use `view --type`
-- `query` → use `view` with filters
-- `deps` → use `view --deps`
-- `cfg` → still available for control flow graphs
-- `context` → use `view --deps`
-- `health` → use `analyze --health`
-- `complexity` → use `analyze --complexity`
-- `security` → use `analyze --security`
+Regex search with structural awareness.
+
+```
+moss text-search <pattern> [options]
+```
+
+- `--only <glob>` — filter by filename/path
+- `--context N` — lines of context
+- `--json` — structured output
+
+### sessions
+
+Analyze agent session logs (Claude Code, Codex, Gemini, Moss).
+
+```
+moss sessions [session_id] [options]
+```
+
+- `--format <fmt>` — `claude` (default), `codex`, `gemini`, `moss`
+- `--grep <pattern>` — filter sessions by content
+- `--analyze` — full session analysis
+- `--jq <expr>` — apply jq expression
 
 ## DWIM Resolution
 
-Tool names are resolved with fuzzy matching:
-
-- `view`, `show`, `skeleton`, `tree` → view primitive
-- `edit`, `modify`, `change`, `patch` → edit primitive
-- `analyze`, `check`, `health`, `lint` → analyze primitive
-
-Fuzzy path resolution also works: `dwim.py` → `src/moss/dwim.py`
+Tool names are resolved with fuzzy matching. Fuzzy path resolution also works: `dwim.py` → `src/moss/dwim.py`
