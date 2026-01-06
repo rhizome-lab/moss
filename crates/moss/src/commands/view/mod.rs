@@ -275,7 +275,11 @@ pub fn cmd_view(
         .next()
         .map(|last| last.contains('.'))
         .unwrap_or(false);
-    let is_symbol_query = !target.starts_with('@')
+    // Trailing slash means "directory only" - skip symbol search
+    let dir_only = target.ends_with('/');
+
+    let is_symbol_query = !dir_only  // Trailing slash = directory, not symbol
+        && !target.starts_with('@')
         && target.contains('/')
         && !target.starts_with('/')
         && !has_file_extension
@@ -289,7 +293,8 @@ pub fn cmd_view(
         (Vec::new(), search::search_symbols(target, &root))
     } else {
         let matches = path_resolve::resolve_unified_all(target, &root);
-        let symbol_matches = if matches.is_empty() {
+        // Don't fall back to symbol search if query ends with /
+        let symbol_matches = if matches.is_empty() && !dir_only {
             search::search_symbols(target, &root)
         } else {
             Vec::new()

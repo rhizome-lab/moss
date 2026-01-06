@@ -45,6 +45,7 @@ See `docs/` for design docs and `README.md` for usage.
 - See `docs/design/agent.md` and `docs/experiments/agent-state-machine.md` for design rationale
 
 ### View Command
+- Trailing slash now means "directory only": `view agent/` matches directories, not symbols with "/" in name
 - Smart Header: `--context` flag shows referenced type definitions when viewing a symbol
   - Extracts type identifiers from symbol source using tree-sitter
   - Looks up types defined in the same file (struct, enum, type, trait, interface, class)

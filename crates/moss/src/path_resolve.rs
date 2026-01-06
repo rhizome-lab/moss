@@ -239,6 +239,9 @@ pub fn resolve_unified_all(query: &str, root: &Path) -> Vec<UnifiedPath> {
 
     let normalized = normalize_separators(query);
 
+    // Trailing slash means "directory only" for fuzzy matching
+    let dir_only = normalized.ends_with('/');
+
     // Absolute paths: single result or none
     if normalized.starts_with('/') {
         return resolve_unified(query, root).into_iter().collect();
@@ -292,17 +295,29 @@ pub fn resolve_unified_all(query: &str, root: &Path) -> Vec<UnifiedPath> {
         let matches = resolve(&file_query, root);
 
         if !matches.is_empty() {
-            return matches
-                .into_iter()
-                .map(|m| UnifiedPath {
-                    file_path: m.path,
-                    symbol_path: segments[split_point..]
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect(),
-                    is_directory: m.kind == "directory",
-                })
-                .collect();
+            // Filter to directories only if query ended with /
+            let filtered: Vec<_> = if dir_only {
+                matches
+                    .into_iter()
+                    .filter(|m| m.kind == "directory")
+                    .collect()
+            } else {
+                matches
+            };
+
+            if !filtered.is_empty() {
+                return filtered
+                    .into_iter()
+                    .map(|m| UnifiedPath {
+                        file_path: m.path,
+                        symbol_path: segments[split_point..]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                        is_directory: m.kind == "directory",
+                    })
+                    .collect();
+            }
         }
     }
 
