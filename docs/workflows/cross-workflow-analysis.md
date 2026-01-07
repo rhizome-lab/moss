@@ -253,20 +253,24 @@ Check: [categories]
 Output: [format]
 ```
 
-## Failure Mode Documentation
+## Failure Mode Prevention
 
-Every workflow documents failures in the same structure:
+Every workflow documents failures, but documentation alone is unreliable. Prevention hierarchy (most to least reliable):
 
-```markdown
-| Failure | Detection | Recovery |
-|---------|-----------|----------|
-| [What goes wrong] | [How to notice] | [What to do] |
-```
+| Method | Reliability | Example |
+|--------|-------------|---------|
+| **Tooling** | High | Linter catches pattern, CI blocks merge |
+| **Type system** | High | Invalid states unrepresentable |
+| **Tests** | Medium-High | Regression test encodes invariant |
+| **Process** | Medium | Workflow step forces check |
+| **Documentation** | Low | Requires someone to read and remember |
 
-This pattern enables:
-1. Pattern matching ("I've seen this before")
-2. Proactive detection
-3. Known recovery paths
+The failure mode tables (`| Failure | Detection | Recovery |`) are useful for:
+- Human pattern matching after failure occurs
+- Knowing what to do when tooling doesn't exist yet
+- Identifying what tooling to build
+
+But the real fix is encoding the failure mode in tooling so it can't happen silently.
 
 ## Open Questions
 
