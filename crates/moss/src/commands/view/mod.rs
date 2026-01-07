@@ -1,6 +1,7 @@
 //! View command - unified view of files, directories, and symbols.
 
 mod file;
+mod history;
 mod lines;
 mod search;
 mod symbol;
@@ -130,6 +131,10 @@ pub struct ViewArgs {
     /// Case-insensitive symbol matching
     #[arg(short = 'i', long)]
     pub case_insensitive: bool,
+
+    /// Show git history for symbol (last N changes)
+    #[arg(long, value_name = "N", default_missing_value = "5", num_args = 0..=1)]
+    pub history: Option<usize>,
 }
 
 /// Run view command with args.
@@ -139,6 +144,17 @@ pub fn run(args: ViewArgs, format: crate::output::OutputFormat) -> i32 {
         .clone()
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     let config = MossConfig::load(&effective_root);
+
+    // Handle --history mode
+    if let Some(limit) = args.history {
+        return history::cmd_history(
+            args.target.as_deref(),
+            &effective_root,
+            limit,
+            args.case_insensitive,
+            format.is_json(),
+        );
+    }
 
     cmd_view(
         args.target.as_deref(),

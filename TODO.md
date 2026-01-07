@@ -4,8 +4,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Symbol history: `moss view path/Symbol --history` (show last N changes via git)
-- Case-insensitive matching: add `-i` flag to `view`/`edit` symbol matching
+- [x] Symbol history: `moss view path/Symbol --history` (show last N changes via git)
+- [x] Case-insensitive matching: `-i` flag in `view`/`edit` symbol matching
 - Validate node kinds against grammars: audit function in each language file
 - Directory context: hierarchical CLAUDE.md-style context files
 
@@ -118,15 +118,14 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - Read .git directly instead of spawning git commands where possible
   - Default branch detection, diff file listing, etc.
   - Trade-off: faster but more fragile (worktrees, packed refs, submodules)
-- Symbol history: `moss view path/Symbol --history` or `moss history path/Symbol`
-  - Show last N changes to a symbol via git blame
-  - Extract symbol boundaries, then trace through git history
-  - Useful for understanding evolution of a function/class
+- [x] Symbol history: `moss view path/Symbol --history [N]`
+  - Shows last N changes to a symbol via git log -L (default: 5)
+  - Works for both symbols and files
 - Documentation freshness: tooling to keep docs in sync with code
   - For moss itself: keep docs/cli/*.md in sync with CLI behavior (lint? generate from --help?)
   - For user projects: detect stale docs in fresh projects (full moss assistance) and legacy codebases (missing/outdated docs)
   - Consider boy scout rule: when touching code, improve nearby docs
-- Case-insensitive matching (`-i` flag): `text-search` ✓ has it, optionally add to `view`/`edit`/`analyze` path/symbol targets
+- [x] Case-insensitive matching (`-i` flag): `text-search` ✓, `view` ✓, `edit` ✓ all have it
 - `moss fetch`: web content retrieval for LLM context (needs design: chunking, streaming, headless browser?)
 - [x] Multi-file batch edit: `moss edit --batch edits.json` (see docs/design/batch-edit.md)
 - Semantic refactoring: `moss edit <glob> --before 'fn extract_attributes' 'fn extract_attributes(...) { ... }'`
