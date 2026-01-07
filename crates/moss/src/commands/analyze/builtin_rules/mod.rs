@@ -24,7 +24,40 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "rust/dbg-macro",
         content: include_str!("rust_dbg_macro.scm"),
     },
+    BuiltinRule {
+        id: "rust/expect-empty",
+        content: include_str!("rust_expect_empty.scm"),
+    },
+    BuiltinRule {
+        id: "rust/unwrap-in-impl",
+        content: include_str!("rust_unwrap_in_impl.scm"),
+    },
+    BuiltinRule {
+        id: "rust/unnecessary-let",
+        content: include_str!("rust_unnecessary_let.scm"),
+    },
+    BuiltinRule {
+        id: "rust/unnecessary-type-alias",
+        content: include_str!("rust_unnecessary_type_alias.scm"),
+    },
+    BuiltinRule {
+        id: "hardcoded-secret",
+        content: include_str!("hardcoded_secret.scm"),
+    },
+    // JavaScript/TypeScript rules
+    BuiltinRule {
+        id: "js/console-log",
+        content: include_str!("js_console_log.scm"),
+    },
+    BuiltinRule {
+        id: "ts/unnecessary-const",
+        content: include_str!("ts_unnecessary_const.scm"),
+    },
     // Cross-language rules
+    BuiltinRule {
+        id: "no-todo-comment",
+        content: include_str!("no_todo_comment.scm"),
+    },
     BuiltinRule {
         id: "no-fixme-comment",
         content: include_str!("no_fixme_comment.scm"),
