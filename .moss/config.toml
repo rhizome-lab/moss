@@ -10,10 +10,9 @@ clones = true
 # hotspots_exclude = ["*.md", "*.json"]  # example: exclude markdown and JSON
 
 # Per-rule configuration: { "rule-id" = { severity = "...", enabled = true/false } }
-# [analyze.rules."rust/unnecessary-let"]
-# severity = "warning"
-# [analyze.rules."js/console-log"]
-# enabled = false
+# Disable println-debug for CLI tools (we use println for output)
+[analyze.rules."rust/println-debug"]
+enabled = false
 
 [aliases]
 todo = ["TODO.md"]

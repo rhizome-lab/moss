@@ -3,7 +3,7 @@
 # severity = "info"
 # message = ".unwrap() found - consider using ? or .expect() with context"
 # languages = ["rust"]
-# allow = ["**/tests/**", "**/test_*.rs", "**/*_test.rs", "**/examples/**"]
+# allow = ["**/tests/**", "**/test_*.rs", "**/*_test.rs", "**/*_tests.rs", "**/examples/**", "**/benches/**"]
 # ---
 
 ; Detects: .unwrap() calls
