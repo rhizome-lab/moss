@@ -130,18 +130,16 @@ pub fn load_all_rules(project_root: &Path, config: &RulesConfig) -> Vec<Rule> {
     }
 
     // 4. Apply config overrides
-    for (rule_id, severity_str) in &config.severity {
+    for (rule_id, override_cfg) in &config.0 {
         if let Some(rule) = rules_by_id.get_mut(rule_id) {
-            if let Ok(severity) = severity_str.parse() {
-                rule.severity = severity;
+            if let Some(ref severity_str) = override_cfg.severity {
+                if let Ok(severity) = severity_str.parse() {
+                    rule.severity = severity;
+                }
             }
-        }
-    }
-
-    // 5. Disable rules from config
-    for rule_id in &config.disable {
-        if let Some(rule) = rules_by_id.get_mut(rule_id) {
-            rule.enabled = false;
+            if let Some(enabled) = override_cfg.enabled {
+                rule.enabled = enabled;
+            }
         }
     }
 

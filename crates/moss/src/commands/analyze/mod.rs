@@ -60,16 +60,27 @@ pub struct AnalyzeConfig {
 }
 
 /// Configuration for syntax rules analysis.
-#[derive(Debug, Clone, Deserialize, Default, Merge)]
+/// Maps rule ID to per-rule configuration.
+/// e.g., { "rust/unnecessary-let" = { severity = "warning" } }
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(transparent)]
+pub struct RulesConfig(pub HashMap<String, RuleOverride>);
+
+impl Merge for RulesConfig {
+    fn merge(mut self, other: Self) -> Self {
+        self.0.extend(other.0);
+        self
+    }
+}
+
+/// Per-rule configuration override.
+#[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
-pub struct RulesConfig {
-    /// Override rule severities by rule ID.
-    /// e.g., { "rust/unnecessary-let" = "warning" }
-    #[serde(default)]
-    pub severity: HashMap<String, String>,
-    /// Disable specific rules by ID.
-    #[serde(default)]
-    pub disable: Vec<String>,
+pub struct RuleOverride {
+    /// Override the rule's severity.
+    pub severity: Option<String>,
+    /// Enable or disable the rule.
+    pub enabled: Option<bool>,
 }
 
 /// Weights for each analysis pass (higher = more impact on grade).

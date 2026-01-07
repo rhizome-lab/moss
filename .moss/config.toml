@@ -9,13 +9,11 @@
 clones = true
 # hotspots_exclude = ["*.md", "*.json"]  # example: exclude markdown and JSON
 
-# Override rule severities: { "rule-id" = "error"|"warning"|"info" }
-# [analyze.rules.severity]
-# "rust/unnecessary-let" = "warning"
-
-# Disable specific rules by ID
-# [analyze.rules]
-# disable = ["js/console-log"]
+# Per-rule configuration: { "rule-id" = { severity = "...", enabled = true/false } }
+# [analyze.rules."rust/unnecessary-let"]
+# severity = "warning"
+# [analyze.rules."js/console-log"]
+# enabled = false
 
 [aliases]
 todo = ["TODO.md"]
