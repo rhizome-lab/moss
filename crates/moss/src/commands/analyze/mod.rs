@@ -2,6 +2,7 @@
 
 mod args;
 mod ast;
+mod builtin_rules;
 mod call_graph;
 mod check_examples;
 mod check_refs;
