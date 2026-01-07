@@ -1,6 +1,6 @@
 # Builtin Syntax Rules
 
-Design for built-in syntax linting rules shipped with moss.
+Design and guidance for built-in syntax linting rules shipped with moss.
 
 ## Rule Loading Order
 
@@ -10,197 +10,269 @@ Rules are loaded in this order (later overrides earlier by `id`):
 2. **User global** - `~/.config/moss/rules/*.scm`
 3. **Project** - `.moss/rules/*.scm`
 
-To disable a builtin, create a rule with same `id` and `enabled = false`:
+To disable a builtin, add to `.moss/config.toml`:
 
-```scm
-# ---
-# id = "no-todo-comment"
-# enabled = false
-# ---
+```toml
+[analyze.rules."rust/println-debug"]
+enabled = false
 ```
 
-## Proposed Builtin Rules
+Or create a rule file with same `id` and `enabled = false`.
 
-### Rust-specific
+## Project Type Guidance
 
-#### `rust/todo-macro` (warning)
-Detects `todo!()` and `unimplemented!()` macros in non-test code.
+Not all rules are appropriate for all project types:
 
-```scheme
-((macro_invocation
-  macro: (identifier) @_name
-  (#any-of? @_name "todo" "unimplemented")) @match)
+| Rule | Library | CLI Tool | Web App | Notes |
+|------|---------|----------|---------|-------|
+| `rust/println-debug` | ✓ Use | ❌ Disable | ✓ Use | CLI tools use println for output |
+| `rust/dbg-macro` | ✓ Use | ✓ Use | ✓ Use | Never commit dbg! |
+| `rust/unwrap-in-impl` | ✓ Use | ⚠️ Noisy | ⚠️ Noisy | Many in test code |
+| `js/console-log` | ✓ Use | N/A | ✓ Use | Production should use logging |
+
+**Library code** should avoid stdout/stderr side effects - use logging crates instead.
+
+**CLI tools** legitimately use `println!` for output - disable `rust/println-debug`:
+
+```toml
+[analyze.rules."rust/println-debug"]
+enabled = false
 ```
 
-Allow: `**/tests/**`, `**/*_test.rs`, `**/test_*.rs`
+## Severity Recommendations
 
-#### `rust/println-debug` (info)
-Detects `println!`, `print!`, `dbg!` - prefer tracing/log crate.
+| Severity | Rules | When to use |
+|----------|-------|-------------|
+| `error` | `hardcoded-secret` | Must fix before commit |
+| `warning` | `rust/dbg-macro`, `rust/todo-macro`, `no-fixme-comment` | Fix before merge |
+| `info` | `rust/unnecessary-let`, `rust/println-debug`, `rust/unwrap-in-impl` | Consider fixing |
 
-```scheme
-((macro_invocation
-  macro: (identifier) @_name
-  (#any-of? @_name "println" "print" "dbg" "eprint" "eprintln")) @match)
+## Builtin Rules Reference
+
+### Rust Rules
+
+#### `rust/println-debug`
+**Severity:** info | **Languages:** rust
+
+Flags `println!`, `print!`, `eprintln!`, `eprint!` macros.
+
+**Default allow:** `**/tests/**`, `**/examples/**`, `**/bin/**`, `**/main.rs`
+
+**When to use:** Library code where stdout/stderr side effects are bugs.
+**When to disable:** CLI tools, where println is the correct output mechanism.
+
+#### `rust/dbg-macro`
+**Severity:** warning | **Languages:** rust
+
+Flags `dbg!()` macro calls - these should never be committed.
+
+**Default allow:** `**/tests/**`
+
+**Always use.** The dbg! macro is for temporary debugging only.
+
+#### `rust/todo-macro`
+**Severity:** warning | **Languages:** rust
+
+Flags `todo!()` macro calls - unfinished code paths.
+
+**Always use.** Helps track incomplete implementations.
+
+#### `rust/unwrap-in-impl`
+**Severity:** info | **Languages:** rust
+
+Flags `.unwrap()` calls - suggests using `?` or `.expect()` with context.
+
+**Default allow:** `**/tests/**`, `**/test_*.rs`, `**/*_test.rs`, `**/*_tests.rs`, `**/examples/**`, `**/benches/**`
+
+**Legitimate unwrap uses:**
+- Lock poisoning: `mutex.lock().unwrap()` - panic is correct if lock poisoned
+- Known-safe conversions: after validation that guarantees success
+- Test code: tests should panic on unexpected failures
+
+```rust
+// moss-allow: rust/unwrap-in-impl - panic correct if lock poisoned
+let guard = CACHE.lock().unwrap();
 ```
 
-Allow: `**/tests/**`, `**/examples/**`, `**/bin/**`
+#### `rust/expect-empty`
+**Severity:** warning | **Languages:** rust
 
-#### `rust/expect-empty` (warning)
-Detects `.expect("")` with empty string - provide context.
+Flags `.expect("")` with empty string - provide meaningful context.
 
+**Always use.** Empty expect messages waste the opportunity to explain failures.
+
+#### `rust/unnecessary-let`
+**Severity:** info | **Languages:** rust
+
+Flags `let x = y;` where both are simple identifiers - the binding adds no value.
+
+**Exclusions:** `let mut`, underscore-prefixed names, `None` value.
+
+#### `rust/unnecessary-type-alias`
+**Severity:** info | **Languages:** rust
+
+Flags `type Foo = Bar;` where Bar is a simple type - adds indirection without value.
+
+**Legitimate uses:** Generic bounds, documentation, API stability.
+
+### JavaScript/TypeScript Rules
+
+#### `js/console-log`
+**Severity:** info | **Languages:** javascript, typescript, tsx, jsx
+
+Flags `console.log`, `console.debug`, `console.info` calls.
+
+**Default allow:** `**/tests/**`, `**/*.test.*`, `**/*.spec.*`
+
+#### `js/unnecessary-const`
+**Severity:** info | **Languages:** javascript, typescript, tsx, jsx
+
+Flags `const x = y;` where both are simple identifiers.
+
+**Exclusions:** `undefined`, `Infinity`, `NaN` (global constants).
+
+### Cross-Language Rules
+
+#### `hardcoded-secret`
+**Severity:** error | **Languages:** all
+
+Flags potential hardcoded secrets (API keys, passwords, tokens).
+
+**Default allow:** `**/tests/**`, `**/*.test.*`
+
+#### `no-todo-comment`
+**Severity:** info | **Languages:** all with line comments
+
+Flags `// TODO` comments in code.
+
+#### `no-fixme-comment`
+**Severity:** warning | **Languages:** all with line comments
+
+Flags `// FIXME` comments - known bugs that need fixing.
+
+## Configuration Examples
+
+### Library Project
+```toml
+# Default rules are appropriate
+# Optionally upgrade severity
+[analyze.rules."rust/unwrap-in-impl"]
+severity = "warning"
+```
+
+### CLI Tool Project
+```toml
+# Disable println-debug
+[analyze.rules."rust/println-debug"]
+enabled = false
+```
+
+### Per-Directory Exclusions
+```toml
+[analyze.rules."rust/unwrap-in-impl"]
+allow = ["**/generated/**", "**/proto/**"]
+```
+
+## Known Limitations
+
+### In-File Test Detection (`#[cfg(test)]`)
+
+Rust commonly places tests in `#[cfg(test)]` modules within source files:
+
+```rust
+// src/lib.rs
+pub fn add(a: i32, b: i32) -> i32 { a + b }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_add() {
+        assert_eq!(add(1, 2).unwrap(), 3);  // Flagged but legitimate
+    }
+}
+```
+
+**Current state:** Glob patterns cannot detect `#[cfg(test)]` structure. These are flagged.
+
+**Workarounds:**
+1. Use inline `// moss-allow: rule-id` comments
+2. Move tests to separate `tests/` directory or `*_test.rs` files
+3. Accept some false positives for rules like `rust/unwrap-in-impl`
+
+**Future work:** See "Design: `#[cfg(test)]` Detection" below.
+
+### Query Predicate Limitations
+
+Tree-sitter predicates have limitations:
+- No access to type information (can't distinguish `Result::unwrap` from `Option::unwrap`)
+- No cross-file analysis
+- Limited to syntactic patterns
+
+## Design: `#[cfg(test)]` Detection
+
+**Problem:** Many false positives come from test code in `#[cfg(test)]` modules within source files.
+
+**Options considered:**
+
+1. **Global config flag:** `skip_test_code = true`
+   - Pros: Simple
+   - Cons: All-or-nothing, affects all rules
+
+2. **Per-rule option:** `skip_cfg_test = true` in rule frontmatter
+   - Pros: Fine-grained control
+   - Cons: Config complexity, must add to each rule
+
+3. **Query-level predicate:** `(#not-in-cfg-test?)` implemented in evaluator
+   - Pros: Opt-in per query, reusable
+   - Cons: Rust-specific, implementation complexity
+
+4. **Automatic by category:** Rules tagged "code-quality" skip test code by default
+   - Pros: Sensible defaults
+   - Cons: Hidden behavior, may surprise users
+
+**Proposed design:** Option 3 with category defaults from option 4.
+
+Add a `(#not-in-test?)` predicate that:
+- For Rust: walks up tree looking for `#[cfg(test)]` attribute on ancestor module/item
+- For JS/TS: checks if inside `describe()`, `it()`, `test()` calls
+- Returns true if NOT in test context
+
+Rules like `rust/unwrap-in-impl` would use:
 ```scheme
 ((call_expression
   function: (field_expression field: (field_identifier) @_method)
-  arguments: (arguments (string_literal) @_msg)
-  (#eq? @_method "expect")
-  (#eq? @_msg "\"\"")) @match)
+  (#eq? @_method "unwrap")
+  (#not-in-test?)) @match)
 ```
 
-#### `rust/unwrap-in-impl` (info)
-Detects `.unwrap()` outside tests - consider `?` or `.expect()`.
-
-```scheme
-((call_expression
-  function: (field_expression field: (field_identifier) @_method)
-  (#eq? @_method "unwrap")) @match)
-```
-
-Allow: `**/tests/**`, `**/examples/**`
-
-### JavaScript/TypeScript
-
-#### `js/console-log` (info)
-Detects `console.log`, `console.debug` - remove before commit.
-
-```scheme
-((call_expression
-  function: (member_expression
-    object: (identifier) @_obj
-    property: (property_identifier) @_prop)
-  (#eq? @_obj "console")
-  (#any-of? @_prop "log" "debug" "info")) @match)
-```
-
-Allow: `**/tests/**`, `**/*.test.*`, `**/*.spec.*`
-
-### Cross-language
-
-#### `no-todo-comment` (info)
-Detects TODO/FIXME/XXX/HACK comments.
-
-```scheme
-; Rust
-((line_comment) @match (#match? @match "TODO|FIXME|XXX|HACK"))
-
-; JavaScript/TypeScript (same pattern works)
-((comment) @match (#match? @match "TODO|FIXME|XXX|HACK"))
-```
-
-#### `no-fixme-comment` (warning)
-Specifically FIXME - higher severity as it indicates known bugs.
-
-```scheme
-((line_comment) @match (#match? @match "FIXME"))
-```
-
-### Code Quality
-
-#### `rust/unnecessary-let` (info)
-Detects `let x = y;` where `x` is an identifier binding to another identifier, and binding is immutable.
-
-```scheme
-((let_declaration
-  pattern: (identifier) @_alias
-  value: (identifier) @_value
-  (#not-match? @_alias "^_")) @match)
-```
-
-Caveats:
-- May flag legitimate renamings for clarity
-- Severity `info` - informational only
-- Users can allowlist specific patterns
-
-#### `rust/unnecessary-type-alias` (info)
-Detects `type X = Y;` where both are simple type identifiers.
-
-```scheme
-(type_alias_declaration
-  name: (type_identifier) @_alias
-  type: (type_identifier) @_target) @match
-```
-
-Caveats:
-- Legitimate uses: re-exports, shortening long paths
-- Severity `info`
-
-#### `ts/unnecessary-const` (info)
-Detects `const x = y;` where both are identifiers.
-
-```scheme
-((lexical_declaration
-  kind: "const"
-  (variable_declarator
-    name: (identifier) @_alias
-    value: (identifier) @_value)) @match)
-```
-
-### Security
-
-#### `hardcoded-secret` (error)
-Detects potential hardcoded secrets in string assignments.
-
-```scheme
-; Rust
-((let_declaration
-  pattern: (identifier) @_name
-  value: (string_literal) @_value
-  (#match? @_name "(?i)password|secret|api.?key|token")
-  (#not-match? @_value "^\"\"$")) @match)
-```
-
-Note: High false positive rate expected. Severity `error` but heavily allowlisted.
+**Status:** Not implemented. Use inline allows or accept false positives for now.
 
 ## Implementation Notes
 
 ### Embedding Rules
 
-Rules are embedded using `include_str!`:
+Rules are in `crates/moss/src/commands/analyze/builtin_rules/`:
 
 ```rust
-const BUILTIN_RULES: &[(&str, &str)] = &[
-    ("rust/todo-macro", include_str!("rules/rust/todo-macro.scm")),
-    ("rust/println-debug", include_str!("rules/rust/println-debug.scm")),
+pub const BUILTIN_RULES: &[BuiltinRule] = &[
+    BuiltinRule {
+        id: "rust/todo-macro",
+        content: include_str!("rust_todo_macro.scm"),
+    },
     // ...
 ];
 ```
 
-### Language Inference
+### Testing Rules
 
-Rules in `rust/` subdirectory automatically get `languages = ["rust"]`.
-Rules in `js/` get `languages = ["javascript", "typescript", "tsx", "jsx"]`.
-Root-level rules try all grammars.
+To test a rule against the moss codebase:
 
-### Testing
+```bash
+moss analyze rules --rule "rust/unnecessary-let"
+```
 
-Each builtin rule needs test cases:
-- Positive cases (should match)
-- Negative cases (should not match)
-- Edge cases (comments, strings, etc.)
+To get SARIF output for IDE integration:
 
-## Open Questions
-
-1. Should builtins be opt-in or opt-out?
-   - Opt-out (enabled by default) catches more issues
-   - Opt-in (disabled by default) is less noisy for new users
-   - Proposal: opt-out with easy global disable
-
-2. Naming convention for rule IDs?
-   - `rust/rule-name` - language-prefixed
-   - `rule-name` - flat namespace
-   - Proposal: language-prefixed for clarity
-
-3. Where to store embedded rule files?
-   - `crates/moss/src/commands/analyze/rules/` - next to rules.rs
-   - `rules/` at crate root
-   - Inline as strings in code
-   - Proposal: `crates/moss/src/commands/analyze/builtin_rules/`
+```bash
+moss analyze rules --sarif > results.sarif
+```

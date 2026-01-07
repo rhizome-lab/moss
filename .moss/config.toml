@@ -14,5 +14,9 @@ clones = true
 [analyze.rules."rust/println-debug"]
 enabled = false
 
+# Allow console.log in test fixtures
+[analyze.rules."js/console-log"]
+allow = ["**/fixtures/**"]
+
 [aliases]
 todo = ["TODO.md"]
