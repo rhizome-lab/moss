@@ -50,8 +50,8 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         content: include_str!("js_console_log.scm"),
     },
     BuiltinRule {
-        id: "ts/unnecessary-const",
-        content: include_str!("ts_unnecessary_const.scm"),
+        id: "js/unnecessary-const",
+        content: include_str!("js_unnecessary_const.scm"),
     },
     // Cross-language rules
     BuiltinRule {
