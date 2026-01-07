@@ -43,6 +43,7 @@ See `docs/` for design docs and `README.md` for usage.
 - Risk assessment: `--auto-approve [low|medium|high]`
 - Auto-commit: `--commit` commits after successful validation
 - See `docs/design/agent.md` and `docs/experiments/agent-state-machine.md` for design rationale
+- Prompt tuning: explicit preference for moss tools over shell commands (prevents `$(run ls)` when `$(view .)` works)
 
 ### View Command
 - Trailing slash now means "directory only": `view agent/` matches directories, not symbols with "/" in name

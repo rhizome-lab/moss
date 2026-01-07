@@ -4,8 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [x] Agent dogfooding: run on real tasks, document friction points (done 2026-01-07)
-- [x] Fix agent preferring shell commands over moss tools (prompt updated in roles.lua)
+- Add `[serve]` config section (port, host settings)
+- Documentation freshness: check docs/cli/*.md against --help output
+- More agent dogfooding on different task types (refactoring, complex investigation)
 
 ## Remaining Work
 - Namespace-qualified lookups: `moss view std::vector`, `moss view com.example.Foo`
