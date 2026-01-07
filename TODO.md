@@ -4,7 +4,8 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Agent dogfooding: run on real tasks, document friction points
+- [x] Agent dogfooding: run on real tasks, document friction points (done 2026-01-07)
+- [x] Fix agent preferring shell commands over moss tools (prompt updated in roles.lua)
 
 ## Remaining Work
 - Namespace-qualified lookups: `moss view std::vector`, `moss view com.example.Foo`
@@ -274,6 +275,12 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
   - Fix: strong role framing ("You are an EVALUATOR"), banned phrases ("NEVER say 'I need to'"), good/bad examples
   - Results: 4 turns vs 12 turns (no answer) for same query
   - Key insight: role assertion + explicit prohibitions + concrete examples beats instruction-only prompts
+- **Dogfooding session (2026-01-07)**:
+  - Gemini 500 errors remain intermittent (hit on first task, next 3 succeeded)
+  - Agent occasionally uses `$(run ls -R)` instead of `$(view .)` - prefers shell over moss tools
+  - Investigator: 4 turns for config structure query, correct answer, good line-range viewing
+  - Auditor: 2 turns for unwrap() audit, parallel search commands, accurate file:line findings
+  - Pattern: auditor role executes parallel searches efficiently (5 commands turn 1, synthesized turn 2)
 
 ### Session Analysis
 - Web syntax highlighting: share tree-sitter grammars between native and web SPAs

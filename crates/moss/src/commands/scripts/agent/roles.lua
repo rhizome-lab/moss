@@ -19,15 +19,15 @@ FORMAT: Use $(cmd args) syntax. Example response:
 $(view src/)
 $(text-search "main")"
 
-Commands:
+Commands (prefer these over shell):
 $(view path) - file/dir structure, or fuzzy-match name
 $(view path:start-end) - specific lines
 $(text-search "pattern") - search codebase
 $(analyze subcommand) - code analysis
 $(package subcommand) - dependency analysis
-$(run cmd) - shell command
+$(run cmd) - shell command (last resort, prefer above commands)
 
-WRONG formats (will fail): <function_calls>, ```$(cmd)```, bare cmd without $()
+WRONG: <function_calls>, ```$(cmd)```, bare cmd without $(), shell when moss command works
 
 Do NOT answer - that's the evaluator's job. Just output commands.
 ]],
@@ -75,14 +75,15 @@ FORMAT: Commands MUST use $(cmd args) syntax exactly. No markdown, no backticks.
 CORRECT: $(analyze security) $(view file.rs:10-20)
 WRONG: ```$(analyze ...)``` or `analyze security`
 
-Commands:
+Commands (prefer these over shell):
 $(view path) - examine code structure
 $(view path:start-end) - inspect specific lines
 $(text-search "pattern") - find specific patterns
 $(analyze subcommand) - analysis tools (security, length, complexity, duplicate-functions)
-$(run cmd) - shell command (use sparingly)
+$(run cmd) - shell command (last resort)
 
 Prefer $(analyze ...) over text-search for structured analysis.
+Prefer moss commands over shell - $(view .) not $(run ls).
 Focus on file:line locations. Do NOT conclude - that's the evaluator's job.
 ]],
 
@@ -128,13 +129,13 @@ FORMAT: Commands MUST use $(cmd args) syntax exactly. No markdown.
 CORRECT: $(view file.rs) $(edit file.rs/function_name replace new_code)
 WRONG: ```$(edit ...)``` or `edit ...`
 
-Exploration:
+Exploration (prefer over shell):
 $(view path) - examine code structure
 $(text-search "pattern") - find specific patterns
 $(analyze callers symbol) - find callers before changing
 $(analyze callees symbol) - find callees
 
-Editing:
+Editing (moss tools):
 $(edit path/Symbol delete) - delete symbol
 $(edit path/Symbol replace new_code) - replace symbol
 $(edit path/Symbol insert --before code) - insert before
