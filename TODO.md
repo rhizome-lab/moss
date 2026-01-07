@@ -96,17 +96,17 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 **Synthesis:**
 - [x] High-quality code synthesis - D×C verification for low-data domains
 - [x] Binding generation - FFI/bindings for libraries
-- [ ] Grammar/parser generation - parsers from examples + informal specs
+- [x] Grammar/parser generation - parsers from examples + informal specs
 
 **Meta:**
 - [x] Onboarding to unfamiliar codebase - systematic exploration
-- [ ] Documentation synthesis - generating docs from code
+- [x] Documentation synthesis - generating docs from code
 - [ ] Cross-workflow analysis - extract shared insights, patterns, principles after all workflows documented
 
 **Security/Forensic:**
-- [ ] Cryptanalysis - analyzing crypto implementations
-- [ ] Steganography detection - finding hidden data
-- [ ] Malware analysis - understanding malicious code (read-only)
+- [x] Cryptanalysis - analyzing crypto implementations
+- [x] Steganography detection - finding hidden data
+- [x] Malware analysis - understanding malicious code (read-only)
 
 **Example codebases for workflow testing:**
 - viwo: DSL/framework/scripting language with insufficient testing, numerous bugs
