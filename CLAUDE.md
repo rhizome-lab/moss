@@ -31,6 +31,9 @@ ALWAYS NOTE THINGS DOWN. When you discover something important, write it immedia
 **Don't say these phrases, instead edit first:**
 - "Fair point" / "Good point" / "You're right" → edit TODO.md/CLAUDE.md BEFORE responding
 - "Should have" / "I forgot to" → you're admitting failure, edit docs to prevent recurrence
+- "That should go in X" → then put it in X, don't just say it
+
+**Do the work properly when it matters.** Don't rush synthesis/analysis tasks. When asked to analyze X, actually read X - don't just synthesize recent conversation. When asked to summarize Y, read all of Y. The cost of doing it right is lower than redoing it.
 
 ## Dogfooding
 
