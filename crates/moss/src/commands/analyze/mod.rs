@@ -522,11 +522,13 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             list,
             sarif,
             target,
+            debug,
         }) => {
             let target_root = target
                 .as_ref()
                 .map(PathBuf::from)
                 .unwrap_or_else(|| effective_root.clone());
+            let debug_flags = rules::DebugFlags::from_args(&debug);
             rules::cmd_rules(
                 &target_root,
                 rule.as_deref(),
@@ -534,6 +536,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                 json,
                 sarif,
                 &config.analyze.rules,
+                &debug_flags,
             )
         }
 

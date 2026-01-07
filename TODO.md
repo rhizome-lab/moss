@@ -77,6 +77,49 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] Streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)
 
+### Workflow Documentation (see `docs/workflows/`)
+Document edge-case workflows - unusual scenarios that don't fit standard patterns:
+
+**Investigation:**
+- [x] Reverse engineering code - undocumented/legacy code with no context
+- [x] Reverse engineering binary formats - file formats, protocols without docs
+- [x] Debugging production issues - logs/traces without local reproduction
+- [x] Performance regression hunting - finding what made things slow
+- [x] Flaky test debugging - non-deterministic failures, timing issues
+
+**Modification:**
+- [x] Merge conflict resolution - understanding both sides, correct resolution
+- [x] Cross-language migration - porting code (Python→Rust, JS→TS)
+- [x] Breaking API changes - upstream dependency changes that break your code
+- [x] Dead code elimination - safely removing unused code paths
+
+**Synthesis:**
+- [x] High-quality code synthesis - D×C verification for low-data domains
+- [x] Binding generation - FFI/bindings for libraries
+- [ ] Grammar/parser generation - parsers from examples + informal specs
+
+**Meta:**
+- [x] Onboarding to unfamiliar codebase - systematic exploration
+- [ ] Documentation synthesis - generating docs from code
+- [ ] Cross-workflow analysis - extract shared insights, patterns, principles after all workflows documented
+
+**Security/Forensic:**
+- [ ] Cryptanalysis - analyzing crypto implementations
+- [ ] Steganography detection - finding hidden data
+- [ ] Malware analysis - understanding malicious code (read-only)
+
+**Example codebases for workflow testing:**
+- viwo: DSL/framework/scripting language with insufficient testing, numerous bugs
+  - Good for: debugging legacy code, reverse engineering code workflows
+  - Details available on request when tackling this
+
+**Research:**
+- https://github.com/ChrisWiles/claude-code-showcase - Claude Code configuration patterns
+  - Skills (domain-specific knowledge docs), Agents (specialized assistants), Hooks (automation)
+  - MCP integrations (JIRA, GitHub, Slack, databases), scheduled maintenance via GitHub Actions
+  - Intelligent skill evaluation: auto-suggest skills based on prompt keywords/patterns
+  - Ticket-to-code workflow: read requirements → implement → update ticket status
+
 ### Package Management
 - `moss package install/uninstall`: proxy to ecosystem tools (cargo add, npm install, etc.)
   - Very low priority - needs concrete use case showing value beyond direct tool usage
@@ -97,12 +140,11 @@ Audit found fragmentation across commands. Fix for consistent UX:
   - [x] Phase 3a: builtin rules infrastructure (embedded + override + disable)
   - [x] Phase 2: severity config override, SARIF output
   - Phase 3b: more builtin rules, sharing, auto-fix (see `docs/design/builtin-rules.md`)
-  - Phase 4 (low priority): tree automata for multi-rule matching
-    - Potential gain: single tree traversal instead of N (one per rule)
-    - Current: ~0.4s/rule, so 13 rules = 5s. Tree automata could reduce to ~1s
-    - Cost: complex implementation (tree automata vs linear DFA), maintenance burden
-    - Worth it when: 50+ rules, or real-time/incremental use cases
-    - Alternative: parallel rule execution (simpler, good enough for batch)
+  - [x] Phase 4: combined query optimization (single-traversal multi-rule matching)
+    - Achieved via tree-sitter combined queries (simpler than full tree automata)
+    - Performance: 4.3s → 0.75s (5.7x faster) for 13 rules, ~550 findings
+    - Implementation: concatenate all rule queries per grammar, use pattern_index to map matches
+    - Key insight: predicates scope per-pattern even with shared capture names
 
 ### Script System
 - TOML workflow format: structured definition (steps, actions) - **deferred until use cases are clearer**
@@ -242,6 +284,13 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 - [ ] Cross-file refactoring: rename symbol across codebase
 - [ ] Partial success: apply working edits, report failures
 - [ ] Human-in-the-loop escalation: ask user when stuck
+
+**RLM-inspired** (see `docs/research/recursive-language-models.md`):
+- [ ] Recursive investigation: agent self-invokes on subsets (e.g., `view --types-only` → pick symbols → `view symbol` → recurse if large)
+- [ ] Decomposition prompting: system prompt guides "search before answering" strategy
+- [ ] Chunked viewing: `view path --chunk N` or `view path --around "pattern"` for large files
+- [ ] REPL-style persistence: extend ephemeral context beyond 1 turn for iterative refinement
+- [ ] Depth/cost limits: cap recursion depth, token budgets per investigation
 
 ### Agent Observations
 

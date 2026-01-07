@@ -240,5 +240,9 @@ pub enum AnalyzeCommand {
 
         /// Target directory to scan
         target: Option<String>,
+
+        /// Enable debug output (comma-delimited: timing, all)
+        #[arg(long, value_delimiter = ',')]
+        debug: Vec<String>,
     },
 }

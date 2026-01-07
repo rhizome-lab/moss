@@ -342,16 +342,23 @@ fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> Opti
     })
 }
 
-/// Pre-compiled query with metadata for efficient matching.
-struct CompiledRule<'a> {
-    rule: &'a Rule,
+/// Combined query for a grammar with pattern-to-rule mapping.
+struct CombinedQuery<'a> {
     query: tree_sitter::Query,
-    match_idx: usize,
+    /// Maps pattern_index to (rule, match_capture_index_in_combined_query)
+    pattern_to_rule: Vec<(&'a Rule, usize)>,
 }
 
 /// Run rules against files in a directory.
-/// Optimized: files are read and parsed once, then all applicable rules run against them.
-pub fn run_rules(rules: &[Rule], root: &Path, filter_rule: Option<&str>) -> Vec<Finding> {
+/// Optimized: combines all rules into single query per grammar for single-traversal matching.
+pub fn run_rules(
+    rules: &[Rule],
+    root: &Path,
+    filter_rule: Option<&str>,
+    debug: &DebugFlags,
+) -> Vec<Finding> {
+    let start = std::time::Instant::now();
+
     let mut findings = Vec::new();
     let loader = grammar_loader();
 
@@ -375,50 +382,95 @@ pub fn run_rules(rules: &[Rule], root: &Path, filter_rule: Option<&str>) -> Vec<
         }
     }
 
-    // Pre-compile queries: grammar -> list of compiled rules
-    let mut compiled_by_grammar: HashMap<String, Vec<CompiledRule>> = HashMap::new();
+    if debug.timing {
+        eprintln!("[timing] file collection: {:?}", start.elapsed());
+    }
+    let compile_start = std::time::Instant::now();
+
+    // Separate rules: language-specific vs cross-language (need per-grammar validation)
+    let (specific_rules, global_rules): (Vec<&&Rule>, Vec<&&Rule>) =
+        active_rules.iter().partition(|r| !r.languages.is_empty());
+
+    // Build combined queries: one per grammar
+    let mut combined_by_grammar: HashMap<String, CombinedQuery> = HashMap::new();
 
     for grammar_name in files_by_grammar.keys() {
         let Some(grammar) = loader.get(grammar_name) else {
             continue;
         };
 
-        let mut compiled = Vec::new();
-        for rule in &active_rules {
-            // Check if rule applies to this grammar
-            let applies =
-                rule.languages.is_empty() || rule.languages.iter().any(|l| l == grammar_name);
-            if !applies {
+        let mut compiled_rules: Vec<(&Rule, tree_sitter::Query)> = Vec::new();
+
+        // Pass 1: Language-specific rules - compile directly (trust the author)
+        for rule in &specific_rules {
+            if rule.languages.iter().any(|l| l == grammar_name) {
+                if let Ok(q) = tree_sitter::Query::new(&grammar, &rule.query_str) {
+                    compiled_rules.push((rule, q));
+                }
+            }
+        }
+
+        // Pass 2: Cross-language rules - validate each one
+        for rule in &global_rules {
+            if let Ok(q) = tree_sitter::Query::new(&grammar, &rule.query_str) {
+                compiled_rules.push((rule, q));
+            }
+        }
+
+        if compiled_rules.is_empty() {
+            continue;
+        }
+
+        // Combine all into one query
+        let combined_str = compiled_rules
+            .iter()
+            .map(|(r, _)| r.query_str.as_str())
+            .collect::<Vec<_>>()
+            .join("\n\n");
+
+        let query = match tree_sitter::Query::new(&grammar, &combined_str) {
+            Ok(q) => q,
+            Err(e) => {
+                eprintln!("Warning: combined query failed for {}: {}", grammar_name, e);
                 continue;
             }
+        };
 
-            // Compile query
-            let query = match tree_sitter::Query::new(&grammar, &rule.query_str) {
-                Ok(q) => q,
-                Err(_) => continue,
-            };
+        // Map pattern indices to rules
+        let mut pattern_to_rule: Vec<(&Rule, usize)> = Vec::new();
+        let combined_match_idx = query
+            .capture_names()
+            .iter()
+            .position(|n| *n == "match")
+            .unwrap_or(0);
 
-            let match_idx = query
-                .capture_names()
-                .iter()
-                .position(|n| *n == "match")
-                .unwrap_or(0);
+        for (rule, individual_query) in &compiled_rules {
+            for _ in 0..individual_query.pattern_count() {
+                pattern_to_rule.push((*rule, combined_match_idx));
+            }
+        }
 
-            compiled.push(CompiledRule {
-                rule,
+        combined_by_grammar.insert(
+            grammar_name.clone(),
+            CombinedQuery {
                 query,
-                match_idx,
-            });
-        }
-
-        if !compiled.is_empty() {
-            compiled_by_grammar.insert(grammar_name.clone(), compiled);
-        }
+                pattern_to_rule,
+            },
+        );
     }
 
-    // Process files: read once, parse once, run all applicable rules
+    if debug.timing {
+        eprintln!(
+            "[timing] query compilation: {:?} ({} grammars)",
+            compile_start.elapsed(),
+            combined_by_grammar.len()
+        );
+    }
+    let process_start = std::time::Instant::now();
+
+    // Process files: single query execution per file
     for (grammar_name, files) in &files_by_grammar {
-        let Some(compiled_rules) = compiled_by_grammar.get(grammar_name) else {
+        let Some(combined) = combined_by_grammar.get(grammar_name) else {
             continue;
         };
 
@@ -426,7 +478,6 @@ pub fn run_rules(rules: &[Rule], root: &Path, filter_rule: Option<&str>) -> Vec<
             continue;
         };
 
-        // Reuse parser for all files with same grammar
         let mut parser = tree_sitter::Parser::new();
         if parser.set_language(&grammar).is_err() {
             continue;
@@ -436,64 +487,70 @@ pub fn run_rules(rules: &[Rule], root: &Path, filter_rule: Option<&str>) -> Vec<
             let rel_path = file.strip_prefix(root).unwrap_or(file);
             let rel_path_str = rel_path.to_string_lossy();
 
-            // Read file once
             let content = match std::fs::read_to_string(file) {
                 Ok(c) => c,
                 Err(_) => continue,
             };
 
-            // Parse once
             let tree = match parser.parse(&content, None) {
                 Some(t) => t,
                 None => continue,
             };
 
-            // Run all applicable rules against this parsed tree
-            for compiled in compiled_rules {
-                // Check allow patterns
-                if compiled.rule.allow.iter().any(|p| p.matches(&rel_path_str)) {
+            // Single query execution - one traversal for all rules
+            let mut cursor = tree_sitter::QueryCursor::new();
+            let mut matches = cursor.matches(&combined.query, tree.root_node(), content.as_bytes());
+
+            while let Some(m) = matches.next() {
+                // Look up which rule this pattern belongs to
+                let Some((rule, match_idx)) = combined.pattern_to_rule.get(m.pattern_index) else {
+                    continue;
+                };
+
+                // Check allow patterns for this specific rule
+                if rule.allow.iter().any(|p| p.matches(&rel_path_str)) {
                     continue;
                 }
 
-                let mut cursor = tree_sitter::QueryCursor::new();
-                let mut matches =
-                    cursor.matches(&compiled.query, tree.root_node(), content.as_bytes());
+                if !evaluate_predicates(&combined.query, m, content.as_bytes()) {
+                    continue;
+                }
 
-                while let Some(m) = matches.next() {
-                    if !evaluate_predicates(&compiled.query, m, content.as_bytes()) {
+                let capture = m.captures.iter().find(|c| c.index as usize == *match_idx);
+
+                if let Some(cap) = capture {
+                    let node = cap.node;
+                    let start_line = node.start_position().row + 1;
+
+                    if is_allowed_by_comment(&content, start_line, &rule.id) {
                         continue;
                     }
 
-                    let capture = m
-                        .captures
-                        .iter()
-                        .find(|c| c.index as usize == compiled.match_idx);
+                    let text = node.utf8_text(content.as_bytes()).unwrap_or("");
 
-                    if let Some(cap) = capture {
-                        let node = cap.node;
-                        let start_line = node.start_position().row + 1;
-
-                        if is_allowed_by_comment(&content, start_line, &compiled.rule.id) {
-                            continue;
-                        }
-
-                        let text = node.utf8_text(content.as_bytes()).unwrap_or("");
-
-                        findings.push(Finding {
-                            rule_id: compiled.rule.id.clone(),
-                            file: file.clone(),
-                            start_line,
-                            start_col: node.start_position().column + 1,
-                            end_line: node.end_position().row + 1,
-                            end_col: node.end_position().column + 1,
-                            message: compiled.rule.message.clone(),
-                            severity: compiled.rule.severity,
-                            matched_text: text.lines().next().unwrap_or("").to_string(),
-                        });
-                    }
+                    findings.push(Finding {
+                        rule_id: rule.id.clone(),
+                        file: file.clone(),
+                        start_line,
+                        start_col: node.start_position().column + 1,
+                        end_line: node.end_position().row + 1,
+                        end_col: node.end_position().column + 1,
+                        message: rule.message.clone(),
+                        severity: rule.severity,
+                        matched_text: text.lines().next().unwrap_or("").to_string(),
+                    });
                 }
             }
         }
+    }
+
+    if debug.timing {
+        eprintln!(
+            "[timing] file processing: {:?} ({} findings)",
+            process_start.elapsed(),
+            findings.len()
+        );
+        eprintln!("[timing] total: {:?}", start.elapsed());
     }
 
     findings
@@ -636,6 +693,21 @@ fn collect_source_files(root: &Path) -> Vec<PathBuf> {
     files
 }
 
+/// Debug output categories.
+#[derive(Default)]
+pub struct DebugFlags {
+    pub timing: bool,
+}
+
+impl DebugFlags {
+    pub fn from_args(args: &[String]) -> Self {
+        let all = args.iter().any(|s| s == "all");
+        Self {
+            timing: all || args.iter().any(|s| s == "timing"),
+        }
+    }
+}
+
 /// Run the rules command.
 pub fn cmd_rules(
     root: &Path,
@@ -644,6 +716,7 @@ pub fn cmd_rules(
     json: bool,
     sarif: bool,
     config: &RulesConfig,
+    debug: &DebugFlags,
 ) -> i32 {
     // Load rules from all sources (builtins + user global + project)
     let rules = load_all_rules(root, config);
@@ -691,7 +764,7 @@ pub fn cmd_rules(
     }
 
     // Run rules
-    let findings = run_rules(&rules, root, filter_rule);
+    let findings = run_rules(&rules, root, filter_rule, debug);
 
     if sarif {
         print_sarif(&rules, &findings, root);
@@ -824,5 +897,149 @@ fn severity_to_sarif_level(severity: Severity) -> &'static str {
         Severity::Error => "error",
         Severity::Warning => "warning",
         Severity::Info => "note",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use streaming_iterator::StreamingIterator;
+
+    /// Test that combined queries correctly scope predicates per-pattern.
+    #[test]
+    fn test_combined_query_predicate_scoping() {
+        let loader = grammar_loader();
+        let grammar = loader.get("rust").expect("rust grammar");
+
+        // Two patterns with same capture name but different predicate values
+        let combined_query = r#"
+; Pattern 0: matches unwrap
+((call_expression
+  function: (field_expression field: (field_identifier) @_method)
+  (#eq? @_method "unwrap")) @match)
+
+; Pattern 1: matches expect
+((call_expression
+  function: (field_expression field: (field_identifier) @_method)
+  (#eq? @_method "expect")) @match)
+"#;
+
+        let query = tree_sitter::Query::new(&grammar, combined_query)
+            .expect("combined query should compile");
+
+        assert_eq!(query.pattern_count(), 2, "should have 2 patterns");
+
+        let test_code = r#"
+fn main() {
+    let x = Some(5);
+    x.unwrap();      // line 4 - should match pattern 0
+    x.expect("msg"); // line 5 - should match pattern 1
+    x.map(|v| v);    // line 6 - should NOT match
+}
+"#;
+
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&grammar).unwrap();
+        let tree = parser.parse(test_code, None).unwrap();
+
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), test_code.as_bytes());
+
+        let mut results: Vec<(usize, String)> = Vec::new();
+        while let Some(m) = matches.next() {
+            // Check predicates - this is what we're testing
+            if !evaluate_predicates(&query, m, test_code.as_bytes()) {
+                continue;
+            }
+
+            let match_capture = m
+                .captures
+                .iter()
+                .find(|c| query.capture_names()[c.index as usize] == "match");
+
+            if let Some(cap) = match_capture {
+                let text = cap.node.utf8_text(test_code.as_bytes()).unwrap();
+                results.push((m.pattern_index, text.to_string()));
+            }
+        }
+
+        // Should have exactly 2 matches
+        assert_eq!(results.len(), 2, "should have 2 matches, got {:?}", results);
+
+        // Pattern 0 should match unwrap
+        assert!(
+            results
+                .iter()
+                .any(|(idx, text)| *idx == 0 && text.contains("unwrap")),
+            "pattern 0 should match unwrap, got {:?}",
+            results
+        );
+
+        // Pattern 1 should match expect
+        assert!(
+            results
+                .iter()
+                .any(|(idx, text)| *idx == 1 && text.contains("expect")),
+            "pattern 1 should match expect, got {:?}",
+            results
+        );
+    }
+
+    /// Test that multiple rules can be combined into single query.
+    #[test]
+    fn test_combined_rules_single_traversal() {
+        let loader = grammar_loader();
+        let grammar = loader.get("rust").expect("rust grammar");
+
+        // Simulate combining multiple rule queries
+        let rules_queries = vec![
+            (
+                "unwrap-rule",
+                r#"((call_expression function: (field_expression field: (field_identifier) @_m) (#eq? @_m "unwrap")) @match)"#,
+            ),
+            (
+                "dbg-rule",
+                r#"((macro_invocation macro: (identifier) @_name (#eq? @_name "dbg")) @match)"#,
+            ),
+        ];
+
+        // Combine into single query
+        let combined = rules_queries
+            .iter()
+            .map(|(_, q)| *q)
+            .collect::<Vec<_>>()
+            .join("\n\n");
+
+        let query =
+            tree_sitter::Query::new(&grammar, &combined).expect("combined query should compile");
+
+        let test_code = r#"
+fn main() {
+    let x = Some(5);
+    dbg!(x);        // should match pattern 1 (dbg-rule)
+    x.unwrap();     // should match pattern 0 (unwrap-rule)
+}
+"#;
+
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&grammar).unwrap();
+        let tree = parser.parse(test_code, None).unwrap();
+
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), test_code.as_bytes());
+
+        let mut pattern_indices: Vec<usize> = Vec::new();
+        while let Some(m) = matches.next() {
+            if evaluate_predicates(&query, m, test_code.as_bytes()) {
+                pattern_indices.push(m.pattern_index);
+            }
+        }
+
+        // Should match both patterns
+        assert!(
+            pattern_indices.contains(&0),
+            "should match pattern 0 (unwrap)"
+        );
+        assert!(pattern_indices.contains(&1), "should match pattern 1 (dbg)");
     }
 }

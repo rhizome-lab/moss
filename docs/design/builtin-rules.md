@@ -249,6 +249,24 @@ Rules like `rust/unwrap-in-impl` would use:
 
 ## Implementation Notes
 
+### Combined Query Optimization
+
+All rules for a grammar are combined into a single tree-sitter query for single-traversal matching. This gives ~5-6x speedup over running each rule separately.
+
+**Key insight: Predicates scope per-pattern.** When combining queries like:
+
+```scheme
+; Pattern 0
+((call_expression ...) (#eq? @_method "unwrap")) @match)
+
+; Pattern 1
+((call_expression ...) (#eq? @_method "expect")) @match)
+```
+
+The `@_method` capture and `#eq?` predicate are evaluated independently for each pattern. Pattern 0 only matches "unwrap", Pattern 1 only matches "expect", even though they share the capture name. The `pattern_index` on each match identifies which rule matched.
+
+This means we can concatenate arbitrary rule queries without conflict, as long as each rule uses `@match` for the primary capture. Cross-language rules (like `no-todo-comment`) that use node types not present in all grammars are filtered out during query compilation.
+
 ### Embedding Rules
 
 Rules are in `crates/moss/src/commands/analyze/builtin_rules/`:
@@ -276,3 +294,17 @@ To get SARIF output for IDE integration:
 ```bash
 moss analyze rules --sarif > results.sarif
 ```
+
+### Debug Output
+
+Enable timing information with `--debug`:
+
+```bash
+moss analyze rules --debug timing
+# [timing] file collection: 6ms
+# [timing] query compilation: 90ms (4 grammars)
+# [timing] file processing: 500ms (554 findings)
+# [timing] total: 596ms
+```
+
+Available debug categories: `timing`, `all`
