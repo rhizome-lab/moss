@@ -223,4 +223,18 @@ pub enum AnalyzeCommand {
         #[arg(long)]
         show_source: bool,
     },
+
+    /// Run syntax rules from .moss/rules/*.scm
+    Rules {
+        /// Run only this specific rule
+        #[arg(long)]
+        rule: Option<String>,
+
+        /// List available rules without running them
+        #[arg(long)]
+        list: bool,
+
+        /// Target directory to scan
+        target: Option<String>,
+    },
 }

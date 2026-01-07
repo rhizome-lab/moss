@@ -13,6 +13,7 @@ mod hotspots;
 pub mod length;
 mod query;
 pub mod report;
+mod rules;
 pub mod security;
 mod stale_docs;
 mod trace;
@@ -483,6 +484,14 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             query,
             show_source,
         }) => query::cmd_query(&file, &query, show_source, json),
+
+        Some(AnalyzeCommand::Rules { rule, list, target }) => {
+            let target_root = target
+                .as_ref()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| effective_root.clone());
+            rules::cmd_rules(&target_root, rule.as_deref(), list, json)
+        }
 
         // No subcommand: default to health analysis
         None => {

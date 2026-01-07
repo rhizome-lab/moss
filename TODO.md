@@ -93,8 +93,8 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
 - Syntax-based linting: see `docs/design/syntax-linting.md`
   - [x] Phase 1: `moss analyze ast`, `moss analyze query` (authoring tools)
-  - Phase 1b: rule files (.moss/rules/*.scm)
-  - Phase 2: allow patterns, severity config, SARIF output
+  - [x] Phase 1b: `moss analyze rules` reads .moss/rules/*.scm with TOML frontmatter
+  - Phase 2: severity config override, SARIF output
   - Phase 3: builtin rules, sharing, auto-fix
 
 ### Script System

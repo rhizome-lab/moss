@@ -5,6 +5,8 @@ use moss_languages::support_for_path;
 use std::path::Path;
 use streaming_iterator::StreamingIterator;
 
+use super::rules::evaluate_predicates;
+
 /// Test a tree-sitter query against a file.
 pub fn cmd_query(file: &Path, query_str: &str, show_source: bool, json: bool) -> i32 {
     // Read file
@@ -69,6 +71,11 @@ pub fn cmd_query(file: &Path, query_str: &str, show_source: bool, json: bool) ->
 
     let mut matches: Vec<MatchData> = Vec::new();
     while let Some(m) = matches_iter.next() {
+        // Evaluate predicates
+        if !evaluate_predicates(&query, m, content.as_bytes()) {
+            continue;
+        }
+
         let captures: Vec<CaptureData> = m
             .captures
             .iter()
