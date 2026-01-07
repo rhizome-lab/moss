@@ -6,7 +6,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 - [x] Symbol history: `moss view path/Symbol --history` (show last N changes via git)
 - [x] Case-insensitive matching: `-i` flag in `view`/`edit` symbol matching
-- Validate node kinds against grammars: audit function in each language file
+- [x] Validate node kinds against grammars: `validate_unused_kinds_audit()` test in all 99 language files
 - Directory context: hierarchical CLAUDE.md-style context files
 
 ## Remaining Work
@@ -87,7 +87,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - Unnecessary aliases: `let x = Foo; x.bar()` → `Foo.bar()`. Lint for pointless intermediate bindings.
 - [x] Chained if-let: edition 2024 allows `if let Ok(x) = foo() && let Some(y) = bar(x)`. Audit complete.
 - PR/diff analysis: `moss analyze --pr` or `--diff` for changed code focus (needs broader analysis workflow design)
-- Validate node kinds against grammars: `validate_unused_kinds_audit()` in each language file ensures documented unused kinds stay in sync with grammar
+- [x] Validate node kinds against grammars: `validate_unused_kinds_audit()` in 99 language files, runs as test
 - Directory context: attach LLM-relevant context to directories (like CLAUDE.md but hierarchical)
 - Deduplicate SQL queries in moss: many ad-hoc queries could use shared prepared statements or query builders (needs design: queries use different execution contexts - Connection vs Transaction)
 - Detect reinvented wheels: hand-rolled JSON/escaping when serde exists, manual string building for structured formats, reimplemented stdlib. Heuristics unclear. Full codebase scan impractical. Maybe: (1) trigger on new code matching suspicious patterns, (2) index function signatures and flag known anti-patterns, (3) check unused crate features vs hand-rolled equivalents. Research problem.
