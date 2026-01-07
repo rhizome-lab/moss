@@ -1,12 +1,13 @@
-# moss filter
+# moss aliases
 
-Manage filter aliases for `--exclude` and `--only` flags.
+List filter aliases for `--exclude` and `--only` flags.
 
 ## Usage
 
 ```bash
-moss filter list
-moss filter show <ALIAS>
+moss aliases              # List all aliases
+moss aliases --json       # JSON output
+moss aliases --root <DIR> # Specify project root
 ```
 
 ## Builtin Aliases
@@ -30,10 +31,17 @@ config = ["*.toml", "*.yaml", "*.json"]
 todo = ["TODO.md", "TASKS.md"]
 ```
 
+Set patterns to empty array to disable a builtin alias:
+
+```toml
+[aliases]
+generated = []  # Disable @generated
+```
+
 ## Usage with Commands
 
 ```bash
 moss view . --exclude @tests
 moss analyze --only @config
-moss grep "TODO" --exclude @generated
+moss text-search "TODO" --exclude @generated
 ```

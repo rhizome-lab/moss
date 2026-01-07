@@ -6,7 +6,14 @@ Analyze Claude Code, Codex, Gemini CLI, and Moss agent session logs.
 
 ```bash
 moss sessions [OPTIONS] [SESSION_ID]
+moss sessions plans [NAME]
 ```
+
+## Subcommands
+
+| Subcommand | Description |
+|------------|-------------|
+| `plans` | List and view agent plans from `~/.claude/plans/` etc. |
 
 ## Options
 
@@ -14,7 +21,7 @@ moss sessions [OPTIONS] [SESSION_ID]
 |--------|-------------|
 | `--format <FORMAT>` | Log format: `claude` (default), `codex`, `gemini`, `moss` |
 | `--grep <PATTERN>` | Filter sessions by regex pattern (searches content) |
-| `--project <PATH>` | Project directory |
+| `--root <PATH>` | Project root directory |
 | `--limit <N>` | Maximum sessions to list (default: 20) |
 | `--analyze` | Run full analysis instead of raw log dump |
 | `--jq <EXPR>` | Apply jq expression to output |

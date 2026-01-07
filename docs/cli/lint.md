@@ -1,24 +1,38 @@
-# moss lint
+# moss tools lint
 
 Run linters, formatters, and type checkers.
 
 ## Usage
 
 ```bash
-moss lint [PATH]
+moss tools lint [PATH]       # Run linters (default)
+moss tools lint run [PATH]   # Explicit run
+moss tools lint list         # List available linters
 ```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--fix` | Auto-fix issues where supported |
+| `--json` | JSON output |
+| `--only <TOOLS>` | Run only specific tools |
+| `--exclude <TOOLS>` | Skip specific tools |
 
 ## Examples
 
 ```bash
 # Lint current directory
-moss lint
+moss tools lint
 
 # Lint specific path
-moss lint src/
+moss tools lint src/
 
-# With JSON output
-moss lint --json
+# With auto-fix
+moss tools lint --fix
+
+# List available tools
+moss tools lint list
 ```
 
 ## Detected Tools
@@ -32,12 +46,6 @@ Moss auto-detects and runs appropriate tools:
 | JavaScript/TypeScript | `eslint`, `oxlint`, `tsc` |
 | Go | `go vet`, `staticcheck` |
 
-## Config
+## See Also
 
-Configure in `.moss/config.toml`:
-
-```toml
-[lint]
-# enabled = ["clippy", "ruff"]
-# disabled = ["mypy"]
-```
+- [moss tools test](test.md) - Run test runners
