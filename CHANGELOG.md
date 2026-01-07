@@ -53,6 +53,16 @@ See `docs/` for design docs and `README.md` for usage.
   - Cross-file type resolution via index (shows file path for external types)
   - Works with both symbol paths (`file.rs/Symbol`) and line-based lookup (`file.rs:123`)
   - Shows signature and line number for each referenced type
+- `--dir-context`: prepend directory context files before view output
+  - Collects `.context.md` and `CONTEXT.md` files from directory hierarchy
+
+### Context Command
+- `moss context [path]`: show merged directory context for a path
+  - Collects `.context.md` and `CONTEXT.md` files from root to target
+  - Files merge in order: root → parent → target (most general to most specific)
+  - `.context.md` takes priority over `CONTEXT.md` in same directory
+  - `--list`: show file paths only without content
+  - Supports `--json` for structured output
 
 ### Analyze Command
 - Glob pattern support for target: `moss analyze 'src/**/*.rs'`
