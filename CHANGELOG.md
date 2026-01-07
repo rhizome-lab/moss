@@ -132,6 +132,9 @@ See `docs/` for design docs and `README.md` for usage.
 - Unified `[sigil]` and `[filter.aliases]` config sections into single `[aliases]`
   - Used for both path targets (`@todo`) and filter patterns (`--only @tests`)
   - Supports all path separators: `/`, `:`, `::`, `#` (e.g., `@todo/Section`, `@todo:Section`)
+- Added `[serve]` section for HTTP server configuration:
+  - `http_port` - default port for `moss serve http` (default: 8080)
+  - `http_host` - host to bind to (default: "127.0.0.1")
 
 ### Index Command
 - `index rebuild` now includes call graph by default (symbols needed for most features)

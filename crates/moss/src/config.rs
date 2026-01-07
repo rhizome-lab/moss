@@ -207,6 +207,7 @@ pub struct MossConfig {
     #[serde(rename = "text-search")]
     pub text_search: TextSearchConfig,
     pub pretty: PrettyConfig,
+    pub serve: crate::serve::ServeConfig,
 }
 
 impl MossConfig {

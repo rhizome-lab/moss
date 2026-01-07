@@ -3,11 +3,34 @@
 //! Servers expose moss functionality over various protocols.
 
 use clap::{Args, Subcommand};
+use serde::Deserialize;
 use std::path::PathBuf;
+
+use crate::merge::Merge;
 
 pub mod http;
 pub mod lsp;
 pub mod mcp;
+
+/// Serve configuration from config.toml.
+#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[serde(default)]
+pub struct ServeConfig {
+    /// Default HTTP port (overridden by --port).
+    pub http_port: Option<u16>,
+    /// HTTP host to bind to.
+    pub http_host: Option<String>,
+}
+
+impl ServeConfig {
+    pub fn http_port(&self) -> u16 {
+        self.http_port.unwrap_or(8080)
+    }
+
+    pub fn http_host(&self) -> &str {
+        self.http_host.as_deref().unwrap_or("127.0.0.1")
+    }
+}
 
 /// Serve command arguments
 #[derive(Args)]
@@ -42,6 +65,11 @@ pub enum ServeProtocol {
 
 /// Run the serve command
 pub fn run(args: ServeArgs, json: bool) -> i32 {
+    use crate::config::MossConfig;
+
+    let root = args.root.clone().unwrap_or_else(|| PathBuf::from("."));
+    let config = MossConfig::load(&root);
+
     match args.protocol {
         ServeProtocol::Mcp => mcp::cmd_serve_mcp(args.root.as_deref(), json),
         ServeProtocol::Http { port, openapi } => {
@@ -55,9 +83,14 @@ pub fn run(args: ServeArgs, json: bool) -> i32 {
                 );
                 0
             } else {
-                let root = args.root.unwrap_or_else(|| PathBuf::from("."));
+                // CLI port overrides config
+                let effective_port = if port != 8080 {
+                    port // Explicit CLI value
+                } else {
+                    config.serve.http_port()
+                };
                 let rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(http::run_http_server(&root, port))
+                rt.block_on(http::run_http_server(&root, effective_port))
             }
         }
         ServeProtocol::Lsp => {

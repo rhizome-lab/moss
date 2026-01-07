@@ -4,7 +4,7 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Add `[serve]` config section (port, host settings)
+- [x] Add `[serve]` config section (port, host settings)
 - Documentation freshness: check docs/cli/*.md against --help output
 - More agent dogfooding on different task types (refactoring, complex investigation)
 
@@ -16,14 +16,14 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
   - Zero user interruption (user can edit while agent tests in background)
 
 ### Configuration System
-Sections: `[daemon]`, `[index]`, `[aliases]`, `[todo]`, `[view]`, `[analyze]`, `[text-search]`, `[pretty]`
+Sections: `[daemon]`, `[index]`, `[aliases]`, `[todo]`, `[view]`, `[analyze]`, `[text-search]`, `[pretty]`, `[serve]`
 
 Adding a new section (3 places):
 1. Define `XxxConfig` struct with `#[derive(Merge)]` + `XxxArgs` with `#[derive(Args)]` in command module
 2. Add field to MossConfig
 3. Add `run(args, json)` function that loads config and merges
 
-Candidates: `[workflow]` (directory, auto-run), `[serve]` (port, host)
+Candidates: `[workflow]` (directory, auto-run)
 
 ### Trait-Based Extensibility
 All trait-based crates follow the moss-languages pattern for extensibility:
