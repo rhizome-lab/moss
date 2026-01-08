@@ -29,6 +29,10 @@ Not all rules are appropriate for all project types:
 | `rust/dbg-macro` | ✓ Use | ✓ Use | ✓ Use | Never commit dbg! |
 | `rust/unwrap-in-impl` | ✓ Use | ⚠️ Noisy | ⚠️ Noisy | Many in test code |
 | `js/console-log` | ✓ Use | N/A | ✓ Use | Production should use logging |
+| `python/print-debug` | ✓ Use | ❌ Disable | ✓ Use | CLI tools use print for output |
+| `python/breakpoint` | ✓ Use | ✓ Use | ✓ Use | Never commit breakpoint() |
+| `go/fmt-print` | ✓ Use | ❌ Disable | ✓ Use | CLI tools use fmt.Print |
+| `ruby/binding-pry` | ✓ Use | ✓ Use | ✓ Use | Never commit binding.pry |
 
 **Library code** should avoid stdout/stderr side effects - use logging crates instead.
 
@@ -130,6 +134,50 @@ Flags `console.log`, `console.debug`, `console.info` calls.
 Flags `const x = y;` where both are simple identifiers.
 
 **Exclusions:** `undefined`, `Infinity`, `NaN` (global constants).
+
+### Python Rules
+
+#### `python/print-debug`
+**Severity:** info | **Languages:** python
+
+Flags `print()` calls.
+
+**Default allow:** `**/tests/**`, `**/test_*.py`, `**/*_test.py`, `**/examples/**`, `**/__main__.py`
+
+**When to use:** Library code where stdout side effects are unexpected.
+**When to disable:** CLI tools, scripts where print is the output mechanism.
+
+#### `python/breakpoint`
+**Severity:** warning | **Languages:** python
+
+Flags `breakpoint()` calls - these should never be committed.
+
+**Default allow:** `**/tests/**`
+
+**Always use.** The breakpoint() function is for interactive debugging only.
+
+### Go Rules
+
+#### `go/fmt-print`
+**Severity:** info | **Languages:** go
+
+Flags `fmt.Print`, `fmt.Println`, `fmt.Printf` calls.
+
+**Default allow:** `**/tests/**`, `**/*_test.go`, `**/examples/**`, `**/cmd/**`
+
+**When to use:** Library code where structured logging is preferred.
+**When to disable:** CLI tools in `cmd/` directories.
+
+### Ruby Rules
+
+#### `ruby/binding-pry`
+**Severity:** warning | **Languages:** ruby
+
+Flags `binding.pry` and `binding.irb` calls - debugging breakpoints.
+
+**Default allow:** `**/tests/**`, `**/test/**`, `**/spec/**`
+
+**Always use.** Debug breakpoints should never be committed.
 
 ### Cross-Language Rules
 

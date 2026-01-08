@@ -53,6 +53,25 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "js/unnecessary-const",
         content: include_str!("js_unnecessary_const.scm"),
     },
+    // Python rules
+    BuiltinRule {
+        id: "python/print-debug",
+        content: include_str!("python_print_debug.scm"),
+    },
+    BuiltinRule {
+        id: "python/breakpoint",
+        content: include_str!("python_breakpoint.scm"),
+    },
+    // Go rules
+    BuiltinRule {
+        id: "go/fmt-print",
+        content: include_str!("go_fmt_print.scm"),
+    },
+    // Ruby rules
+    BuiltinRule {
+        id: "ruby/binding-pry",
+        content: include_str!("ruby_binding_pry.scm"),
+    },
     // Cross-language rules
     BuiltinRule {
         id: "no-todo-comment",

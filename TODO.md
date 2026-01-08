@@ -113,12 +113,17 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
   - Good for: debugging legacy code, reverse engineering code workflows
   - Details available on request when tackling this
 
-**Research:**
-- https://github.com/ChrisWiles/claude-code-showcase - Claude Code configuration patterns
-  - Skills (domain-specific knowledge docs), Agents (specialized assistants), Hooks (automation)
-  - MCP integrations (JIRA, GitHub, Slack, databases), scheduled maintenance via GitHub Actions
-  - Intelligent skill evaluation: auto-suggest skills based on prompt keywords/patterns
-  - Ticket-to-code workflow: read requirements → implement → update ticket status
+**Research (completed):**
+- [x] https://github.com/ChrisWiles/claude-code-showcase - Claude Code configuration patterns
+  - Skills: markdown docs with frontmatter, auto-triggered by scoring (keywords 2pts, regex 3, paths 4, directory 5, intent 4)
+  - Agents: specialized assistants with severity levels (Critical/Warning/Suggestion)
+  - Hooks: PreToolUse, PostToolUse, UserPromptSubmit, Stop lifecycle events
+  - GitHub Actions: scheduled maintenance (weekly quality, monthly docs sync, dependency audit)
+  - **Actionable for moss:**
+    - Script/workflow selection scoring (match prompts to relevant `.moss/scripts/`)
+    - Formalize auditor severity levels in output format
+    - Expand hook triggering beyond current implementation
+    - CI integration patterns for automated quality checks
 
 ### Package Management
 - `moss package install/uninstall`: proxy to ecosystem tools (cargo add, npm install, etc.)
@@ -140,6 +145,9 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
   - [x] Phase 3a: builtin rules infrastructure (embedded + override + disable)
   - [x] Phase 2: severity config override, SARIF output
   - Phase 3b: more builtin rules, sharing, auto-fix (see `docs/design/builtin-rules.md`)
+    - [x] Extended language coverage: Python (print-debug, breakpoint), Go (fmt-print), Ruby (binding-pry)
+    - Remaining: rule sharing/import mechanism, auto-fix support
+  - Semantic rules system: for rules needing cross-file analysis (import cycles, unused exports, type mismatches). Current syntax-based rules are single-file AST queries; semantic rules need index-backed analysis. Separate infrastructure, triggered differently (post-index vs per-file).
   - [x] Phase 4: combined query optimization (single-traversal multi-rule matching)
     - Achieved via tree-sitter combined queries (simpler than full tree automata)
     - Performance: 4.3s → 0.75s (5.7x faster) for 13 rules, ~550 findings

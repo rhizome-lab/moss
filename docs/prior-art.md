@@ -185,6 +185,15 @@ Within-project parallelization makes sense when you're *forced* to work on one c
 - CLAUDE.md as institutional memory is similar to moss's approach
 - Verification loops are critical - moss already runs tests unprompted
 
+**Community Resources:**
+
+- **[claude-code-showcase](https://github.com/ChrisWiles/claude-code-showcase)**: Curated collection of Claude Code configurations
+  - **Skills**: Markdown docs with frontmatter scoring (keywords 2pts, regex 3, paths 4, directory 5, intent 4)
+  - **Agents**: Specialized assistants with severity levels (Critical/Warning/Suggestion)
+  - **Hooks**: PreToolUse, PostToolUse, UserPromptSubmit, Stop lifecycle events
+  - **Maintenance**: GitHub Actions for scheduled quality checks
+  - **Patterns for moss**: Scoring-based script/workflow selection, formalized severity levels, expanded hook triggering
+
 ### Cursor IDE
 - **Site**: https://cursor.com
 - **What it is**: VS Code fork with deep AI integration
