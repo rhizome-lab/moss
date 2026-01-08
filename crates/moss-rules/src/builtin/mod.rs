@@ -41,6 +41,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         content: include_str!("rust_chained_if_let.scm"),
     },
     BuiltinRule {
+        id: "rust/numeric-type-annotation",
+        content: include_str!("rust_numeric_type_annotation.scm"),
+    },
+    BuiltinRule {
         id: "hardcoded-secret",
         content: include_str!("hardcoded_secret.scm"),
     },
