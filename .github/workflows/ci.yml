@@ -116,7 +116,9 @@ jobs:
         run: cargo build --release -p moss
 
       - name: Check for code clones
-        run: ./target/release/moss analyze --duplicate-functions
+        run: |
+          ./target/release/moss analyze duplicate-functions
+          ./target/release/moss analyze duplicate-types
         env:
           MOSS_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
 
