@@ -74,7 +74,13 @@ See `docs/` for design docs and `README.md` for usage.
   - Frontmatter fields: `id`, `severity`, `message`, `allow`, `languages`, `enabled`
   - Tree-sitter predicates supported: `#eq?`, `#match?`, `#any-of?`
   - `--rule <id>` runs a specific rule, `--list` shows available rules
-  - Builtin rules: `rust/todo-macro`, `rust/println-debug`, `rust/dbg-macro`, `no-fixme-comment`
+  - Builtin rules (14 total):
+    - Rust: `rust/todo-macro`, `rust/println-debug`, `rust/dbg-macro`, `rust/expect-empty`, `rust/unwrap-in-impl`, `rust/unnecessary-let`, `rust/unnecessary-type-alias`
+    - JavaScript: `js/console-log`, `js/unnecessary-const`
+    - Python: `python/print-debug`, `python/breakpoint`
+    - Go: `go/fmt-print`
+    - Ruby: `ruby/binding-pry`
+    - Cross-language: `hardcoded-secret`, `no-todo-comment`, `no-fixme-comment`
   - JSON output with `--json`
   - Shows file count in header: "src/**/*.rs (18 files)"
 - `-i/--case-insensitive` flag for trace, callers, callees subcommands

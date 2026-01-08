@@ -4,10 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- [x] Symbol history: `moss view path/Symbol --history` (show last N changes via git)
-- [x] Case-insensitive matching: `-i` flag in `view`/`edit` symbol matching
-- [x] Validate node kinds against grammars: `validate_unused_kinds_audit()` test in all 99 language files
-- [x] Directory context: `moss context`, `view --dir-context`
+- Rule sharing/import: import rules from URLs or shared packages
+- Auto-fix support: for simple patterns like removing `dbg!()` statements
+- Expand #[cfg(test)] detection for Rust rules
 
 ## Remaining Work
 - Namespace-qualified lookups: `moss view std::vector`, `moss view com.example.Foo`
