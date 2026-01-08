@@ -31,6 +31,7 @@ use std::path::{Path, PathBuf};
 // Embedded builtin rules
 use super::RulesConfig;
 use super::builtin_rules::BUILTIN_RULES;
+use super::rule_sources::{SourceContext, SourceRegistry, builtin_registry};
 use streaming_iterator::StreamingIterator;
 
 /// Severity level for rule findings.
@@ -86,6 +87,9 @@ pub struct Rule {
     pub enabled: bool,
     /// Whether this is a builtin rule.
     pub builtin: bool,
+    /// Conditions that must be met for this rule to apply.
+    /// Format: { "namespace.key" = "value" } or { "namespace.key" = ">=value" }
+    pub requires: HashMap<String, String>,
 }
 
 /// A finding from running a rule.
@@ -146,6 +150,43 @@ fn is_allowed_by_comment(content: &str, start_line: usize, rule_id: &str) -> boo
     }
 
     false
+}
+
+/// Check if a rule's requires conditions are met for a given file context.
+///
+/// Supports operators:
+/// - `value` - exact match
+/// - `>=value` - greater or equal (for versions/editions)
+/// - `<=value` - less or equal
+/// - `!value` - not equal
+fn check_requires(rule: &Rule, registry: &SourceRegistry, ctx: &SourceContext) -> bool {
+    if rule.requires.is_empty() {
+        return true;
+    }
+
+    for (key, expected) in &rule.requires {
+        let actual = match registry.get(ctx, key) {
+            Some(v) => v,
+            None => return false, // Required source not available
+        };
+
+        // Parse operator prefix
+        let matches = if let Some(rest) = expected.strip_prefix(">=") {
+            actual >= rest.to_string()
+        } else if let Some(rest) = expected.strip_prefix("<=") {
+            actual <= rest.to_string()
+        } else if let Some(rest) = expected.strip_prefix('!') {
+            actual != rest
+        } else {
+            actual == *expected
+        };
+
+        if !matches {
+            return false;
+        }
+    }
+
+    true
 }
 
 /// Load all rules from all sources, merged by ID.
@@ -329,6 +370,16 @@ fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> Opti
         .and_then(|v| v.as_bool())
         .unwrap_or(true);
 
+    let requires: HashMap<String, String> = frontmatter
+        .get("requires")
+        .and_then(|v| v.as_table())
+        .map(|tbl| {
+            tbl.iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect()
+        })
+        .unwrap_or_default();
+
     Some(Rule {
         id,
         query_str: query_str.trim().to_string(),
@@ -339,6 +390,7 @@ fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> Opti
         languages,
         enabled,
         builtin: is_builtin,
+        requires,
     })
 }
 
@@ -361,6 +413,7 @@ pub fn run_rules(
 
     let mut findings = Vec::new();
     let loader = grammar_loader();
+    let source_registry = builtin_registry();
 
     // Filter rules first
     let active_rules: Vec<&Rule> = rules
@@ -487,6 +540,13 @@ pub fn run_rules(
             let rel_path = file.strip_prefix(root).unwrap_or(file);
             let rel_path_str = rel_path.to_string_lossy();
 
+            // Build source context for this file (used for requires evaluation)
+            let source_ctx = SourceContext {
+                file_path: file,
+                rel_path: &rel_path_str,
+                project_root: root,
+            };
+
             let content = match std::fs::read_to_string(file) {
                 Ok(c) => c,
                 Err(_) => continue,
@@ -509,6 +569,11 @@ pub fn run_rules(
 
                 // Check allow patterns for this specific rule
                 if rule.allow.iter().any(|p| p.matches(&rel_path_str)) {
+                    continue;
+                }
+
+                // Check requires conditions
+                if !check_requires(rule, &source_registry, &source_ctx) {
                     continue;
                 }
 
