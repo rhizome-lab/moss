@@ -8,6 +8,14 @@ export default withMermaid(
       include: ['mermaid'],
     },
   },
+
+  markdown: {
+    languages: ['gitignore'],
+    languageAlias: {
+      scm: 'scheme',
+    },
+  },
+
   title: 'Moss',
   description: 'Code intelligence CLI with structural awareness',
 
@@ -21,7 +29,7 @@ export default withMermaid(
     logo: '/logo.svg',
 
     nav: [
-      { text: 'Guide', link: '/index' },
+      { text: 'Guide', link: '/introduction' },
       { text: 'CLI Reference', link: '/cli/commands' },
       { text: 'Design', link: '/philosophy' },
     ],
@@ -31,7 +39,7 @@ export default withMermaid(
         {
           text: 'Guide',
           items: [
-            { text: 'Overview', link: '/index' },
+            { text: 'Introduction', link: '/introduction' },
             { text: 'Primitives Spec', link: '/primitives-spec' },
             { text: 'Lua API', link: '/lua-api' },
             { text: 'Workflow Format', link: '/workflow-format' },
