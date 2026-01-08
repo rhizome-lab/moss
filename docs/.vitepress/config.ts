@@ -10,7 +10,6 @@ export default withMermaid(
   },
 
   markdown: {
-    languages: ['gitignore'],
     languageAlias: {
       scm: 'scheme',
     },
