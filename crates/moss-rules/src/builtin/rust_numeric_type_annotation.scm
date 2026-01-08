@@ -1,8 +1,9 @@
 # ---
 # id = "rust/numeric-type-annotation"
-# severity = "info"
-# message = "Prefer literal suffix over type annotation (e.g., 0.0_f32 instead of x: f32 = 0.0)"
+# severity = "error"
+# message = "Prefer literal suffix over type annotation (e.g., 0.0f32 instead of x: f32 = 0.0)"
 # languages = ["rust"]
+# enabled = false
 # ---
 
 ; f32 with type annotation - should use _f32 suffix instead
