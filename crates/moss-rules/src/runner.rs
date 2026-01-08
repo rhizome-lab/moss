@@ -16,9 +16,15 @@ pub struct Finding {
     pub start_col: usize,
     pub end_line: usize,
     pub end_col: usize,
+    pub start_byte: usize,
+    pub end_byte: usize,
     pub message: String,
     pub severity: Severity,
     pub matched_text: String,
+    /// Auto-fix template (None if no fix available).
+    pub fix: Option<String>,
+    /// Capture values from the query match (for fix substitution).
+    pub captures: HashMap<String, String>,
 }
 
 /// Debug output categories.
@@ -318,6 +324,15 @@ pub fn run_rules(
 
                     let text = node.utf8_text(content.as_bytes()).unwrap_or("");
 
+                    // Collect all captures for fix substitution
+                    let mut captures_map: HashMap<String, String> = HashMap::new();
+                    for cap in m.captures {
+                        let name = combined.query.capture_names()[cap.index as usize].to_string();
+                        if let Ok(cap_text) = cap.node.utf8_text(content.as_bytes()) {
+                            captures_map.insert(name, cap_text.to_string());
+                        }
+                    }
+
                     findings.push(Finding {
                         rule_id: rule.id.clone(),
                         file: file.clone(),
@@ -325,9 +340,13 @@ pub fn run_rules(
                         start_col: node.start_position().column + 1,
                         end_line: node.end_position().row + 1,
                         end_col: node.end_position().column + 1,
+                        start_byte: node.start_byte(),
+                        end_byte: node.end_byte(),
                         message: rule.message.clone(),
                         severity: rule.severity,
                         matched_text: text.lines().next().unwrap_or("").to_string(),
+                        fix: rule.fix.clone(),
+                        captures: captures_map,
                     });
                 }
             }
@@ -461,6 +480,53 @@ pub fn evaluate_predicates(
         }
     }
     true
+}
+
+/// Expand a fix template by substituting capture names with their values.
+/// Uses `$capture_name` syntax. `$match` is the full matched text.
+pub fn expand_fix_template(template: &str, captures: &HashMap<String, String>) -> String {
+    let mut result = template.to_string();
+    for (name, value) in captures {
+        let placeholder = format!("${}", name);
+        result = result.replace(&placeholder, value);
+    }
+    result
+}
+
+/// Apply fixes to findings, returning the number of files modified.
+/// Fixes are applied in reverse order within each file to preserve byte offsets.
+pub fn apply_fixes(findings: &[Finding]) -> std::io::Result<usize> {
+    // Group findings by file
+    let mut by_file: HashMap<&PathBuf, Vec<&Finding>> = HashMap::new();
+    for finding in findings {
+        if finding.fix.is_some() {
+            by_file.entry(&finding.file).or_default().push(finding);
+        }
+    }
+
+    let mut files_modified = 0;
+
+    for (file, mut file_findings) in by_file {
+        // Sort by start_byte descending so we can apply fixes without shifting offsets
+        file_findings.sort_by(|a, b| b.start_byte.cmp(&a.start_byte));
+
+        let mut content = std::fs::read_to_string(file)?;
+
+        for finding in file_findings {
+            let fix_template = finding.fix.as_ref().unwrap();
+            let replacement = expand_fix_template(fix_template, &finding.captures);
+
+            // Replace the matched region with the fix
+            let before = &content[..finding.start_byte];
+            let after = &content[finding.end_byte..];
+            content = format!("{}{}{}", before, replacement, after);
+        }
+
+        std::fs::write(file, &content)?;
+        files_modified += 1;
+    }
+
+    Ok(files_modified)
 }
 
 /// Collect source files from a directory.

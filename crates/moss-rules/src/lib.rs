@@ -15,6 +15,7 @@
 //! # allow = ["**/tests/**"]
 //! # requires = { "rust.edition" = ">=2024" }
 //! # enabled = true  # set to false to disable a builtin
+//! # fix = ""  # empty = delete match, or use "$capture" to substitute
 //! # ---
 //!
 //! (call_expression
@@ -30,7 +31,7 @@ mod sources;
 
 pub use builtin::BUILTIN_RULES;
 pub use loader::{RuleOverride, RulesConfig, load_all_rules, parse_rule_content};
-pub use runner::{DebugFlags, Finding, evaluate_predicates, run_rules};
+pub use runner::{DebugFlags, Finding, apply_fixes, evaluate_predicates, run_rules};
 pub use sources::{
     EnvSource, GitSource, GoSource, PathSource, PythonSource, RuleSource, RustSource,
     SourceContext, SourceRegistry, TypeScriptSource, builtin_registry,
@@ -96,6 +97,10 @@ pub struct Rule {
     /// Conditions that must be met for this rule to apply.
     /// Format: { "namespace.key" = "value" } or { "namespace.key" = ">=value" }
     pub requires: HashMap<String, String>,
+    /// Auto-fix template using capture names from the query.
+    /// Use `$capture_name` to reference captures, `$match` for the full match.
+    /// Empty string means "delete the match".
+    pub fix: Option<String>,
 }
 
 /// A builtin rule definition (id, content).

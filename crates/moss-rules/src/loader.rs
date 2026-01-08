@@ -224,6 +224,11 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         })
         .unwrap_or_default();
 
+    let fix = frontmatter
+        .get("fix")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
     Some(Rule {
         id,
         query_str: query_str.trim().to_string(),
@@ -235,5 +240,6 @@ pub fn parse_rule_content(content: &str, default_id: &str, is_builtin: bool) -> 
         enabled,
         builtin: is_builtin,
         requires,
+        fix,
     })
 }

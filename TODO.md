@@ -4,9 +4,9 @@ See `CHANGELOG.md` for completed work. See `docs/` for design docs.
 
 ## Next Up
 
-- Rule sharing/import: import rules from URLs or shared packages
+- [x] Rule sharing/import: `moss rules add/update/list/remove` (Phase 1 complete)
 - Auto-fix support: for simple patterns like removing `dbg!()` statements
-- Expand #[cfg(test)] detection for Rust rules
+- [x] Expand #[cfg(test)] detection for Rust rules (rust.is_test_file)
 
 ## Remaining Work
 - Namespace-qualified lookups: `moss view std::vector`, `moss view com.example.Foo`
@@ -146,7 +146,8 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
   - [x] Phase 2: severity config override, SARIF output
   - Phase 3b: more builtin rules, sharing, auto-fix (see `docs/design/builtin-rules.md`)
     - [x] Extended language coverage: Python (print-debug, breakpoint), Go (fmt-print), Ruby (binding-pry)
-    - Remaining: rule sharing/import mechanism, auto-fix support
+    - [x] Rule sharing/import mechanism (`moss rules add/update/list/remove`)
+    - Remaining: auto-fix support
   - [x] Project manifest parsing: extract version/config from project manifests
     - RustSource: Cargo.toml (edition, resolver, name, version)
     - TypeScriptSource: tsconfig.json + package.json (target, module, strict, node_version)

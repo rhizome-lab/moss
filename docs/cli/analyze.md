@@ -24,6 +24,9 @@ Analyze codebase quality: health, complexity, security, duplicates, hotspots.
 | `check-refs` | Check documentation for broken links |
 | `stale-docs` | Find docs with stale code references |
 | `check-examples` | Check example references in docs |
+| `rules` | Run syntax rules from .moss/rules/*.scm |
+| `ast` | Show AST for a file (for authoring rules) |
+| `query` | Test a tree-sitter query against a file |
 | `all` | Run all analysis passes with overall grade |
 
 ## Examples
@@ -53,6 +56,12 @@ moss analyze trace parse_config
 # Call graph
 moss analyze callers handle_request
 moss analyze callees main
+
+# Syntax rules
+moss analyze rules              # Run all rules
+moss analyze rules --list       # List available rules
+moss analyze rules --fix        # Auto-fix issues
+moss analyze rules --sarif      # SARIF output for IDEs
 ```
 
 ## Options
@@ -90,6 +99,13 @@ moss analyze callees main
 - `--target <FILE>` - Target file to search in
 - `--max-depth <N>` - Maximum trace depth (default: 10)
 - `--recursive` - Trace into called functions
+
+**rules:**
+- `--rule <ID>` - Run only this specific rule
+- `--list` - List available rules without running
+- `--fix` - Auto-fix issues that have fixes available
+- `--sarif` - Output in SARIF format for IDE integration
+- `--debug <FLAGS>` - Debug output (timing, all)
 
 ## Allow Files
 

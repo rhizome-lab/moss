@@ -4,6 +4,7 @@
 # message = "binding.pry found - remove debug statement before committing"
 # languages = ["ruby"]
 # allow = ["**/tests/**", "**/test/**", "**/spec/**"]
+# fix = ""
 # ---
 
 ((call

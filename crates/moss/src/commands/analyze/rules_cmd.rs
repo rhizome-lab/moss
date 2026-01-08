@@ -3,7 +3,9 @@
 //! Uses moss_rules for core functionality, handles CLI output.
 
 use crate::parsers::grammar_loader;
-use moss_rules::{DebugFlags, Finding, Rule, RulesConfig, Severity, load_all_rules, run_rules};
+use moss_rules::{
+    DebugFlags, Finding, Rule, RulesConfig, Severity, apply_fixes, load_all_rules, run_rules,
+};
 use std::path::Path;
 
 /// Run the rules command.
@@ -11,6 +13,7 @@ pub fn cmd_rules(
     root: &Path,
     filter_rule: Option<&str>,
     list_only: bool,
+    fix: bool,
     json: bool,
     sarif: bool,
     config: &RulesConfig,
@@ -64,6 +67,39 @@ pub fn cmd_rules(
     // Run rules with the global grammar loader
     let loader = grammar_loader();
     let findings = run_rules(&rules, root, &loader, filter_rule, debug);
+
+    // Apply fixes if requested
+    if fix {
+        let fixable: Vec<_> = findings.iter().filter(|f| f.fix.is_some()).collect();
+        if fixable.is_empty() {
+            eprintln!("No auto-fixable issues found.");
+        } else {
+            match apply_fixes(&findings) {
+                Ok(files_modified) => {
+                    if json {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "fixed": fixable.len(),
+                                "files_modified": files_modified
+                            })
+                        );
+                    } else {
+                        println!(
+                            "Fixed {} issue(s) in {} file(s).",
+                            fixable.len(),
+                            files_modified
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error applying fixes: {}", e);
+                    return 1;
+                }
+            }
+        }
+        return 0;
+    }
 
     if sarif {
         print_sarif(&rules, &findings, root);

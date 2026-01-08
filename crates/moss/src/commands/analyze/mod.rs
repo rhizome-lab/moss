@@ -492,6 +492,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
         Some(AnalyzeCommand::Rules {
             rule,
             list,
+            fix,
             sarif,
             target,
             debug,
@@ -505,6 +506,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                 &target_root,
                 rule.as_deref(),
                 list,
+                fix,
                 json,
                 sarif,
                 &config.analyze.rules,

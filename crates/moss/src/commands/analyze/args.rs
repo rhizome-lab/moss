@@ -234,6 +234,10 @@ pub enum AnalyzeCommand {
         #[arg(long)]
         list: bool,
 
+        /// Auto-fix issues that have fixes available
+        #[arg(long)]
+        fix: bool,
+
         /// Output in SARIF format for IDE integration
         #[arg(long)]
         sarif: bool,
