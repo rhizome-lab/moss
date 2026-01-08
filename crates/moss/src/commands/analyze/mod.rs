@@ -14,6 +14,7 @@ mod hotspots;
 pub mod length;
 mod query;
 pub mod report;
+mod rule_sources;
 mod rules;
 pub mod security;
 mod stale_docs;
