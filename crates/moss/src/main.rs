@@ -9,6 +9,7 @@ use moss::commands::context::ContextArgs;
 use moss::commands::edit::EditArgs;
 use moss::commands::generate::GenerateArgs;
 use moss::commands::history::HistoryArgs;
+use moss::commands::rules::RulesAction;
 use moss::commands::sessions::SessionsArgs;
 use moss::commands::text_search::TextSearchArgs;
 use moss::commands::tools::ToolsAction;
@@ -137,6 +138,12 @@ enum Commands {
 
     /// Generate code from API spec
     Generate(GenerateArgs),
+
+    /// Manage custom analysis rules
+    Rules {
+        #[command(subcommand)]
+        action: RulesAction,
+    },
 }
 
 /// Help output styling.
@@ -271,6 +278,7 @@ fn main() {
         }
         Commands::Serve(args) => serve::run(args, cli.json),
         Commands::Generate(args) => commands::generate::run(args),
+        Commands::Rules { action } => commands::rules::cmd_rules(action, cli.json),
     };
 
     std::process::exit(exit_code);

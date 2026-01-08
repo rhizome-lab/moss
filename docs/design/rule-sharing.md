@@ -137,8 +137,8 @@ Rejected: Adds git complexity, overkill for single files.
 ### npm-style registry
 Deferred: Requires infrastructure, not enough demand yet.
 
-## Open Questions
+## Decisions
 
-1. Should updates be automatic or require explicit `moss rules update`?
-2. Should we support private URLs with auth tokens?
-3. How to handle breaking changes in upstream rules?
+1. **Explicit updates** - `moss rules update` required, no auto-update
+2. **Private URLs** - Deferred. Auth token storage is tricky (env vars? keychain?)
+3. **Breaking changes** - Open. Options: show diff before applying, pin by hash, etc.

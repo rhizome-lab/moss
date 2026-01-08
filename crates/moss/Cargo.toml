@@ -73,6 +73,7 @@ git2 = { version = "0.19", default-features = false }
 glob = "0.3.3"
 nu-ansi-term = "0.50"
 dotenvy = "0.15.7"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
