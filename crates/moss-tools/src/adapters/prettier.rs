@@ -61,7 +61,7 @@ impl Tool for Prettier {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        let mut score: f32 = 0.0;
+        let mut score = 0.0f32;
 
         // Prettier config files - strong signal
         let prettier_configs = [

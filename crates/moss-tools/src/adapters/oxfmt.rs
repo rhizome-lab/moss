@@ -63,7 +63,7 @@ impl Tool for Oxfmt {
             return 0.0;
         }
 
-        let mut score: f32 = 0.3;
+        let mut score = 0.3f32;
 
         // Oxfmt-specific config - strong signal
         if crate::tools::has_config_file(root, &[".oxfmtrc.json", ".oxfmtrc.jsonc", "oxfmt.json"]) {

@@ -107,7 +107,7 @@ fn detect_biome(root: &Path, _extensions: &[&str]) -> f32 {
         return 0.0;
     }
 
-    let mut score: f32 = 0.0;
+    let mut score = 0.0f32;
 
     // Biome-specific config - strong signal
     if has_biome_config {

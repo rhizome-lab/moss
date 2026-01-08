@@ -1082,8 +1082,8 @@ mod tests {
 
         // Build external pointer: off=5, len=11, with high bit set
         // Raw u64 = (len << 32) | off | (1 << 63)
-        let off: u64 = 5;
-        let len: u64 = 11;
+        let off = 5u64;
+        let len = 11u64;
         let raw = off | (len << 32) | (1u64 << 63);
         let bytes: [u8; 8] = raw.to_le_bytes();
 

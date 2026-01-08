@@ -229,7 +229,7 @@ fn cmd_stats(root: Option<&Path>, json: bool, storage: bool) -> i32 {
     let stats = idx.call_graph_stats().unwrap_or_default();
 
     // Calculate codebase size
-    let mut codebase_size: u64 = 0;
+    let mut codebase_size = 0u64;
     for f in &files {
         if !f.is_dir {
             let full_path = root.join(&f.path);

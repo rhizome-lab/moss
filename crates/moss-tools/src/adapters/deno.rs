@@ -61,7 +61,7 @@ impl Tool for Deno {
     }
 
     fn detect(&self, root: &Path) -> f32 {
-        let mut score: f32 = 0.0;
+        let mut score = 0.0f32;
 
         // Deno config files
         let config_files = ["deno.json", "deno.jsonc"];

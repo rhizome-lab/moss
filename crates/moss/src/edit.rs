@@ -188,7 +188,7 @@ impl Editor {
 
     /// Count blank lines before a position
     fn count_blank_lines_before(&self, content: &str, pos: usize) -> usize {
-        let mut count: usize = 0;
+        let mut count = 0usize;
         let mut i = pos;
         while i > 0 {
             i -= 1;
