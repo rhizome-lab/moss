@@ -358,6 +358,12 @@ Core agency features complete (shadow editing, validation, risk gates, retry, au
 - `moss sessions stats`: cross-session aggregates (session count, token hotspots, total usage)
 - `moss sessions mark <id>`: mark as reviewed (store in `.moss/sessions-reviewed`)
 - Friction signal detection: correction patterns, tool chains, avoidance
+- Agent habit analysis: study session logs to identify builtin vs learned behaviors
+  - Example: "git status before commit" - is this hardcoded or from CLAUDE.md guidance?
+  - Test methodology: fresh/empty repo without project instructions
+  - Cross-agent comparison: Claude Code, Gemini CLI, OpenAI Codex, etc.
+  - Goal: understand what behaviors to encode in moss agent (model-agnostic reliability)
+  - Maybe: automated agent testing harness (run same tasks across assistants)
 
 ### Friction Signals (see `docs/research/agent-adaptation.md`)
 How do we know when tools aren't working? Implicit signals from agent behavior:
