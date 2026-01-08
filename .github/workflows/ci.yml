@@ -16,8 +16,11 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
       - name: Install sessions SPA deps
-        run: npm install
+        run: bun install
         working-directory: web/sessions
 
       - name: Cache cargo
@@ -53,8 +56,11 @@ jobs:
         with:
           components: clippy
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
       - name: Install sessions SPA deps
-        run: npm install
+        run: bun install
         working-directory: web/sessions
 
       - name: Cache cargo
@@ -75,8 +81,11 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
       - name: Install sessions SPA deps
-        run: npm install
+        run: bun install
         working-directory: web/sessions
 
       - name: Cache cargo
@@ -120,8 +129,11 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
       - name: Install sessions SPA deps
-        run: npm install
+        run: bun install
         working-directory: web/sessions
 
       - name: Cache cargo
