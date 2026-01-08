@@ -75,6 +75,7 @@ Audit found fragmentation across commands. Fix for consistent UX:
 ### Workflow Engine
 - [x] Streaming output for `auto{}` driver
 - JSON Schema for complex action parameters (currently string-only)
+- Workflow chaining: automatically trigger next workflow based on outcome (e.g., Investigation → Fix → Review)
 
 ### Workflow Documentation (see `docs/workflows/`)
 Document edge-case workflows - unusual scenarios that don't fit standard patterns:
