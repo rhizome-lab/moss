@@ -2,11 +2,11 @@
 
 use crate::output::OutputFormat;
 use clap::Subcommand;
+use nu_ansi_term::Color::Yellow;
 use rhizome_moss_packages::{
     AuditResult, PackageError, PackageInfo, VulnerabilitySeverity, all_ecosystems,
     detect_all_ecosystems,
 };
-use nu_ansi_term::Color::Yellow;
 use std::path::Path;
 
 #[derive(Subcommand)]

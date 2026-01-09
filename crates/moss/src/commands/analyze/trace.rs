@@ -84,7 +84,10 @@ pub fn cmd_trace(
     let extractor = crate::extract::Extractor::new();
     let extract_result = extractor.extract(&full_path, &content);
     let mut signature_map: HashMap<String, FunctionInfo> = HashMap::new();
-    fn collect_signatures(sym: &rhizome_moss_languages::Symbol, map: &mut HashMap<String, FunctionInfo>) {
+    fn collect_signatures(
+        sym: &rhizome_moss_languages::Symbol,
+        map: &mut HashMap<String, FunctionInfo>,
+    ) {
         if !sym.signature.is_empty() {
             map.insert(
                 sym.name.clone(),

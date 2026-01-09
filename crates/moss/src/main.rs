@@ -2,19 +2,19 @@ use clap::builder::styling::{AnsiColor, Styles};
 use clap::{ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand};
 use std::path::{Path, PathBuf};
 
-use moss::commands;
-use moss::commands::aliases::AliasesArgs;
-use moss::commands::analyze::AnalyzeArgs;
-use moss::commands::context::ContextArgs;
-use moss::commands::edit::EditArgs;
-use moss::commands::generate::GenerateArgs;
-use moss::commands::history::HistoryArgs;
-use moss::commands::rules::RulesAction;
-use moss::commands::sessions::SessionsArgs;
-use moss::commands::text_search::TextSearchArgs;
-use moss::commands::tools::ToolsAction;
-use moss::commands::view::ViewArgs;
-use moss::serve::{self, ServeArgs};
+use rhizome_moss::commands;
+use rhizome_moss::commands::aliases::AliasesArgs;
+use rhizome_moss::commands::analyze::AnalyzeArgs;
+use rhizome_moss::commands::context::ContextArgs;
+use rhizome_moss::commands::edit::EditArgs;
+use rhizome_moss::commands::generate::GenerateArgs;
+use rhizome_moss::commands::history::HistoryArgs;
+use rhizome_moss::commands::rules::RulesAction;
+use rhizome_moss::commands::sessions::SessionsArgs;
+use rhizome_moss::commands::text_search::TextSearchArgs;
+use rhizome_moss::commands::tools::ToolsAction;
+use rhizome_moss::commands::view::ViewArgs;
+use rhizome_moss::serve::{self, ServeArgs};
 
 #[derive(Parser)]
 #[command(name = "moss")]
@@ -174,10 +174,10 @@ fn help_color_choice() -> ColorChoice {
     }
 
     // Check config for color preference
-    let config = moss::config::MossConfig::load(Path::new("."));
+    let config = rhizome_moss::config::MossConfig::load(Path::new("."));
     match config.pretty.colors {
-        Some(moss::output::ColorMode::Always) => ColorChoice::Always,
-        Some(moss::output::ColorMode::Never) => ColorChoice::Never,
+        Some(rhizome_moss::output::ColorMode::Always) => ColorChoice::Always,
+        Some(rhizome_moss::output::ColorMode::Never) => ColorChoice::Never,
         _ => ColorChoice::Auto,
     }
 }
@@ -240,8 +240,8 @@ fn main() {
     let cli = Cli::from_arg_matches(&cli).expect("clap mismatch");
 
     // Resolve output format at top level - pretty config is TTY-based, not root-specific
-    let config = moss::config::MossConfig::load(Path::new("."));
-    let format = moss::output::OutputFormat::from_cli(
+    let config = rhizome_moss::config::MossConfig::load(Path::new("."));
+    let format = rhizome_moss::output::OutputFormat::from_cli(
         cli.json,
         cli.jq.as_deref(),
         cli.pretty,

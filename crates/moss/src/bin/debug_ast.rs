@@ -32,7 +32,7 @@
 //! Useful for understanding tree-sitter node kinds when implementing
 //! syntax highlighting or AST-based analysis.
 
-use moss::parsers;
+use rhizome_moss::parsers;
 use std::env;
 
 fn main() {

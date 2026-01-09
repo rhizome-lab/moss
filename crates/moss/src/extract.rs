@@ -138,7 +138,8 @@ impl InterfaceResolver for OnDemandResolver<'_> {
                 if sym.name == name
                     && matches!(
                         sym.kind,
-                        rhizome_moss_languages::SymbolKind::Interface | rhizome_moss_languages::SymbolKind::Class
+                        rhizome_moss_languages::SymbolKind::Interface
+                            | rhizome_moss_languages::SymbolKind::Class
                     )
                 {
                     let methods: Vec<String> = sym
@@ -368,7 +369,8 @@ impl Extractor {
         for sym in symbols.iter_mut() {
             if matches!(
                 sym.kind,
-                rhizome_moss_languages::SymbolKind::Struct | rhizome_moss_languages::SymbolKind::Enum
+                rhizome_moss_languages::SymbolKind::Struct
+                    | rhizome_moss_languages::SymbolKind::Enum
             ) {
                 if let Some(methods) = impl_methods.remove(&sym.name) {
                     sym.children.extend(methods);
@@ -420,7 +422,8 @@ impl Extractor {
             for sym in symbols {
                 if matches!(
                     sym.kind,
-                    rhizome_moss_languages::SymbolKind::Interface | rhizome_moss_languages::SymbolKind::Class
+                    rhizome_moss_languages::SymbolKind::Interface
+                        | rhizome_moss_languages::SymbolKind::Class
                 ) {
                     let methods: HashSet<String> = sym
                         .children

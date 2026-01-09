@@ -1,11 +1,11 @@
 //! Lint command - run linters, formatters, and type checkers.
 
 use crate::output::{OutputFormat, OutputFormatter};
-use rhizome_moss_tools::{SarifReport, ToolCategory, ToolRegistry, registry_with_custom};
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use nu_ansi_term::Color::{Blue, Red, Yellow};
 use nu_ansi_term::Style;
 use rayon::prelude::*;
+use rhizome_moss_tools::{SarifReport, ToolCategory, ToolRegistry, registry_with_custom};
 use serde::Serialize;
 use std::fmt::Write;
 use std::path::Path;

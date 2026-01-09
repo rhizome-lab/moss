@@ -1,8 +1,8 @@
 use crate::config::MossConfig;
 use crate::paths::get_moss_dir;
 use ignore::WalkBuilder;
-use rhizome_moss_languages::support_for_path;
 use rayon::prelude::*;
+use rhizome_moss_languages::support_for_path;
 use rusqlite::{Connection, params};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -1101,7 +1101,8 @@ impl FileIndex {
                 for sym in &extract_result.symbols {
                     if matches!(
                         sym.kind,
-                        rhizome_moss_languages::SymbolKind::Interface | rhizome_moss_languages::SymbolKind::Class
+                        rhizome_moss_languages::SymbolKind::Interface
+                            | rhizome_moss_languages::SymbolKind::Class
                     ) {
                         for child in &sym.children {
                             if matches!(

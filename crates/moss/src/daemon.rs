@@ -5,8 +5,8 @@
 
 use crate::config::MossConfig;
 use crate::index::FileIndex;
-use rhizome_moss_derive::Merge;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+use rhizome_moss_derive::Merge;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
