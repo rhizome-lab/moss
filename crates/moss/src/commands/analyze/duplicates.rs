@@ -3,7 +3,7 @@
 use crate::extract::Extractor;
 use crate::filter::Filter;
 use crate::parsers;
-use moss_languages::support_for_path;
+use rhizome_moss_languages::support_for_path;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -818,7 +818,7 @@ pub fn cmd_allow_duplicate_type(
 }
 
 /// Flatten nested symbols into a flat list
-fn flatten_symbols(sym: &moss_languages::Symbol) -> Vec<&moss_languages::Symbol> {
+fn flatten_symbols(sym: &rhizome_moss_languages::Symbol) -> Vec<&rhizome_moss_languages::Symbol> {
     let mut result = vec![sym];
     for child in &sym.children {
         result.extend(flatten_symbols(child));

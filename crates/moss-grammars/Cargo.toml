@@ -1,12 +1,12 @@
 [package]
-name = "moss-grammars"
+name = "rhizome-moss-grammars"
 version = "0.1.0"
 edition = "2024"
 publish = false
 description = "Arborium grammar dependencies for moss"
 
 # This crate exists solely to download arborium grammars.
-# Run `cargo fetch -p moss-grammars` to populate ~/.cargo/registry.
+# Run `cargo fetch -p rhizome-moss-grammars` to populate ~/.cargo/registry.
 # Then `cargo xtask build-grammars` can find and compile them.
 
 [dependencies]

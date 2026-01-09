@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use moss_tools::test_runners::{all_runners, detect_test_runner, get_runner};
+use rhizome_moss_tools::test_runners::{all_runners, detect_test_runner, get_runner};
 
 /// Run tests with auto-detected or specified runner.
 pub fn cmd_test_run(root: Option<&Path>, runner: Option<&str>, args: &[String]) -> i32 {

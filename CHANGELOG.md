@@ -243,9 +243,9 @@ See `docs/design/lua-cli.md`, `docs/design/lua-type.md`, and `docs/design/lua-te
 
 Reduced duplicate type definitions and singletons:
 - `parsers.rs`: Converted Parsers struct to free functions backed by global GrammarLoader singleton
-- `symbols.rs`: Symbol → FlatSymbol, Import → FlatImport, deleted SymbolKind (uses moss_languages::SymbolKind)
-- `deps.rs`: Uses moss_languages::Import/Export directly, removed conversion functions
-- `skeleton.rs`: SkeletonSymbol now type alias to moss_languages::Symbol (SymbolExt trait for to_view_node)
+- `symbols.rs`: Symbol → FlatSymbol, Import → FlatImport, deleted SymbolKind (uses rhizome_moss_languages::SymbolKind)
+- `deps.rs`: Uses rhizome_moss_languages::Import/Export directly, removed conversion functions
+- `skeleton.rs`: SkeletonSymbol now type alias to rhizome_moss_languages::Symbol (SymbolExt trait for to_view_node)
 - `analyze/mod.rs`: Generic `FileReport<T>` consolidates ComplexityReport/LengthReport
 - `skeleton.rs`: SkeletonResult is now type alias for ExtractResult
 
@@ -833,7 +833,7 @@ Removed Python subprocess calls and hardcoded language counters from moss-cli:
 - Deleted `run_python_test_coverage`, `run_python_scopes`, `run_python_test_health` functions
 - Removed `--test-coverage`, `--scopes`, `--test-health` CLI flags (shelled out to Python)
 - Replaced `python_files`/`rust_files`/`other_files` with dynamic `files_by_language: HashMap<String, usize>`
-- `HealthReport` and `OverviewReport` now use `moss_languages::support_for_extension()` for file classification
+- `HealthReport` and `OverviewReport` now use `rhizome_moss_languages::support_for_extension()` for file classification
 - Removed ~270 lines of dead code from complexity.rs (legacy `analyze_python`, `analyze_rust` methods)
 - Removed ~145 lines of dead code from edit.rs (legacy `find_symbol_in_node`, `check_node_is_container` methods)
 - Fixed unnecessary `&mut self` in Editor methods

@@ -7,7 +7,7 @@
 //! Users can register custom formats via [`register()`]:
 //!
 //! ```ignore
-//! use moss_sessions::{LogFormat, SessionAnalysis, SessionFile, register};
+//! use rhizome_moss_sessions::{LogFormat, SessionAnalysis, SessionFile, register};
 //! use std::path::{Path, PathBuf};
 //!
 //! struct MyAgentFormat;

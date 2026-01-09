@@ -5,7 +5,7 @@
 //! Users can register custom formats via [`register()`]:
 //!
 //! ```ignore
-//! use moss_cli_parser::{CliFormat, CliSpec, register};
+//! use rhizome_moss_cli_parser::{CliFormat, CliSpec, register};
 //!
 //! struct MyFormat;
 //!

@@ -1,5 +1,5 @@
 [package]
-name = "moss-tools"
+name = "rhizome-moss-tools"
 version = "0.1.0"
 edition = "2024"
 description = "Unified interface for external development tools (linters, formatters, type checkers)"

@@ -33,7 +33,7 @@ pub fn derive_merge(input: TokenStream) -> TokenStream {
                 let field_merges = fields.named.iter().map(|f| {
                     let field_name = &f.ident;
                     quote! {
-                        #field_name: ::moss_core::Merge::merge(self.#field_name, other.#field_name)
+                        #field_name: ::rhizome_moss_core::Merge::merge(self.#field_name, other.#field_name)
                     }
                 });
                 quote! {
@@ -46,7 +46,7 @@ pub fn derive_merge(input: TokenStream) -> TokenStream {
                 let field_merges = (0..fields.unnamed.len()).map(|i| {
                     let index = syn::Index::from(i);
                     quote! {
-                        ::moss_core::Merge::merge(self.#index, other.#index)
+                        ::rhizome_moss_core::Merge::merge(self.#index, other.#index)
                     }
                 });
                 quote! {
@@ -68,7 +68,7 @@ pub fn derive_merge(input: TokenStream) -> TokenStream {
     };
 
     let expanded = quote! {
-        impl #impl_generics ::moss_core::Merge for #name #ty_generics #where_clause {
+        impl #impl_generics ::rhizome_moss_core::Merge for #name #ty_generics #where_clause {
             fn merge(self, other: Self) -> Self {
                 #merge_impl
             }

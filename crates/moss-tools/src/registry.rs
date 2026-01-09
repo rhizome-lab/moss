@@ -5,7 +5,7 @@
 //! Users can register custom tools via [`register()`]:
 //!
 //! ```ignore
-//! use moss_tools::{Tool, ToolInfo, ToolCategory, ToolResult, ToolError, register_tool};
+//! use rhizome_moss_tools::{Tool, ToolInfo, ToolCategory, ToolResult, ToolError, register_tool};
 //! use std::path::Path;
 //!
 //! struct MyTool;

@@ -1,7 +1,7 @@
 //! AST inspection for syntax rule authoring.
 
 use crate::parsers::grammar_loader;
-use moss_languages::support_for_path;
+use rhizome_moss_languages::support_for_path;
 use std::path::Path;
 
 /// Show AST for a file.

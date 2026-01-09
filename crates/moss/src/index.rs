@@ -1,7 +1,7 @@
 use crate::config::MossConfig;
 use crate::paths::get_moss_dir;
 use ignore::WalkBuilder;
-use moss_languages::support_for_path;
+use rhizome_moss_languages::support_for_path;
 use rayon::prelude::*;
 use rusqlite::{Connection, params};
 use std::path::{Path, PathBuf};
@@ -27,13 +27,13 @@ const SCHEMA_VERSION: i64 = 1;
 
 /// Check if a file path has a supported source extension.
 fn is_source_file(path: &str) -> bool {
-    moss_languages::support_for_path(std::path::Path::new(path)).is_some()
+    rhizome_moss_languages::support_for_path(std::path::Path::new(path)).is_some()
 }
 
 /// Generate SQL WHERE clause for filtering source files.
 /// Returns: "path LIKE '%.py' OR path LIKE '%.rs' OR ..."
 fn source_extensions_sql_filter() -> String {
-    let mut extensions: Vec<&str> = moss_languages::supported_languages()
+    let mut extensions: Vec<&str> = rhizome_moss_languages::supported_languages()
         .iter()
         .flat_map(|lang| lang.extensions().iter().copied())
         .collect();
@@ -1101,13 +1101,13 @@ impl FileIndex {
                 for sym in &extract_result.symbols {
                     if matches!(
                         sym.kind,
-                        moss_languages::SymbolKind::Interface | moss_languages::SymbolKind::Class
+                        rhizome_moss_languages::SymbolKind::Interface | rhizome_moss_languages::SymbolKind::Class
                     ) {
                         for child in &sym.children {
                             if matches!(
                                 child.kind,
-                                moss_languages::SymbolKind::Method
-                                    | moss_languages::SymbolKind::Function
+                                rhizome_moss_languages::SymbolKind::Method
+                                    | rhizome_moss_languages::SymbolKind::Function
                             ) {
                                 type_methods.push((sym.name.clone(), child.name.clone()));
                             }

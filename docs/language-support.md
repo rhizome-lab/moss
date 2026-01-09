@@ -237,7 +237,7 @@ lang-scala = ["arborium/lang-scala"]
 ```rust
 // moss-languages/src/traits.rs
 
-use moss_core::{tree_sitter::Node, Language};
+use rhizome_moss_core::{tree_sitter::Node, Language};
 
 /// Unified language support trait
 pub trait LanguageSupport: Send + Sync {
@@ -349,7 +349,7 @@ pub struct Export {
 // moss-languages/src/python.rs
 
 use crate::traits::*;
-use moss_core::{tree_sitter::Node, Language};
+use rhizome_moss_core::{tree_sitter::Node, Language};
 
 pub struct PythonSupport;
 
@@ -496,7 +496,7 @@ impl LanguageSupport for PythonSupport {
 // moss-languages/src/registry.rs
 
 use crate::traits::LanguageSupport;
-use moss_core::Language;
+use rhizome_moss_core::Language;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
@@ -531,7 +531,7 @@ pub fn supported_languages() -> Vec<Language> {
 ```rust
 // moss-cli/src/skeleton.rs (after refactor)
 
-use moss_languages::{get_support, LanguageSupport, Symbol};
+use rhizome_moss_languages::{get_support, LanguageSupport, Symbol};
 
 pub fn extract_skeleton(path: &Path, content: &str) -> Vec<Symbol> {
     let lang = Language::from_path(path)?;

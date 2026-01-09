@@ -1,9 +1,9 @@
 //! CLI command handler for syntax rules.
 //!
-//! Uses moss_rules for core functionality, handles CLI output.
+//! Uses rhizome_moss_rules for core functionality, handles CLI output.
 
 use crate::parsers::grammar_loader;
-use moss_rules::{
+use rhizome_moss_rules::{
     DebugFlags, Finding, Rule, RulesConfig, Severity, apply_fixes, load_all_rules, run_rules,
 };
 use std::path::Path;

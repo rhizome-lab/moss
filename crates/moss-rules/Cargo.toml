@@ -1,5 +1,5 @@
 [package]
-name = "moss-rules"
+name = "rhizome-moss-rules"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -21,8 +21,8 @@ tree-sitter = "0.25"
 streaming-iterator = "0.1"
 
 # Language support
-moss-languages = { path = "../moss-languages" }
+rhizome-moss-languages = { path = "../moss-languages" }
 
 # Core traits
-moss-core = { path = "../moss-core" }
-moss-derive = { path = "../moss-derive" }
+rhizome-moss-core = { path = "../moss-core" }
+rhizome-moss-derive = { path = "../moss-derive" }

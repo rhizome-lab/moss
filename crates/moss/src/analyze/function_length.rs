@@ -2,7 +2,7 @@
 //!
 //! Identifies long functions that may be candidates for refactoring.
 use crate::parsers;
-use moss_languages::{Language, support_for_path};
+use rhizome_moss_languages::{Language, support_for_path};
 use std::path::Path;
 /// Length classification for functions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

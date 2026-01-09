@@ -9,7 +9,7 @@ use crate::filter::Filter;
 use crate::output::{OutputFormat, OutputFormatter};
 use crate::text_search;
 use clap::Args;
-use moss_derive::Merge;
+use rhizome_moss_derive::Merge;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 

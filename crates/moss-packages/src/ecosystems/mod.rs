@@ -5,7 +5,7 @@
 //! Users can register custom ecosystems via [`register()`]:
 //!
 //! ```ignore
-//! use moss_packages::{Ecosystem, LockfileManager, register_ecosystem};
+//! use rhizome_moss_packages::{Ecosystem, LockfileManager, register_ecosystem};
 //! use std::path::Path;
 //!
 //! struct MyEcosystem;

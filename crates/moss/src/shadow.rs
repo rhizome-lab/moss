@@ -3,7 +3,7 @@
 //! Maintains a hidden git repository (`.moss/shadow/`) that automatically
 //! commits after each `moss edit` operation, preserving full edit history.
 
-use moss_derive::Merge;
+use rhizome_moss_derive::Merge;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;

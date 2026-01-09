@@ -1,3 +1,3 @@
 //! Re-export session analysis from moss-sessions crate.
 
-pub use moss_sessions::*;
+pub use rhizome_moss_sessions::*;

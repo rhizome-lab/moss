@@ -1,7 +1,7 @@
 //! Lint command - run linters, formatters, and type checkers.
 
 use crate::output::{OutputFormat, OutputFormatter};
-use moss_tools::{SarifReport, ToolCategory, ToolRegistry, registry_with_custom};
+use rhizome_moss_tools::{SarifReport, ToolCategory, ToolRegistry, registry_with_custom};
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use nu_ansi_term::Color::{Blue, Red, Yellow};
 use nu_ansi_term::Style;
@@ -74,7 +74,7 @@ pub fn cmd_lint_run(
     });
 
     // Get tools to run
-    let tools_to_run: Vec<&dyn moss_tools::Tool> = if let Some(tool_names) = tools {
+    let tools_to_run: Vec<&dyn rhizome_moss_tools::Tool> = if let Some(tool_names) = tools {
         // Run specific tools by name
         let names: Vec<&str> = tool_names.split(',').map(|s| s.trim()).collect();
         registry
@@ -198,24 +198,24 @@ pub fn cmd_lint_run(
         for result in &all_results {
             for diag in &result.diagnostics {
                 let severity_str = match diag.severity {
-                    moss_tools::DiagnosticSeverity::Error => "error",
-                    moss_tools::DiagnosticSeverity::Warning => "warning",
-                    moss_tools::DiagnosticSeverity::Info => "info",
-                    moss_tools::DiagnosticSeverity::Hint => "hint",
+                    rhizome_moss_tools::DiagnosticSeverity::Error => "error",
+                    rhizome_moss_tools::DiagnosticSeverity::Warning => "warning",
+                    rhizome_moss_tools::DiagnosticSeverity::Info => "info",
+                    rhizome_moss_tools::DiagnosticSeverity::Hint => "hint",
                 };
 
                 let severity_display = if use_colors {
                     match diag.severity {
-                        moss_tools::DiagnosticSeverity::Error => {
+                        rhizome_moss_tools::DiagnosticSeverity::Error => {
                             Red.bold().paint(severity_str).to_string()
                         }
-                        moss_tools::DiagnosticSeverity::Warning => {
+                        rhizome_moss_tools::DiagnosticSeverity::Warning => {
                             Yellow.paint(severity_str).to_string()
                         }
-                        moss_tools::DiagnosticSeverity::Info => {
+                        rhizome_moss_tools::DiagnosticSeverity::Info => {
                             Blue.paint(severity_str).to_string()
                         }
-                        moss_tools::DiagnosticSeverity::Hint => {
+                        rhizome_moss_tools::DiagnosticSeverity::Hint => {
                             Style::new().dimmed().paint(severity_str).to_string()
                         }
                     }
@@ -385,7 +385,7 @@ fn run_lint_once(
     });
 
     // Get tools to run
-    let tools_to_run: Vec<&dyn moss_tools::Tool> = if let Some(tool_names) = tools {
+    let tools_to_run: Vec<&dyn rhizome_moss_tools::Tool> = if let Some(tool_names) = tools {
         let names: Vec<&str> = tool_names.split(',').map(|s| s.trim()).collect();
         registry
             .tools()
@@ -489,10 +489,10 @@ fn run_lint_once(
         for result in &all_results {
             for diag in &result.diagnostics {
                 let severity = match diag.severity {
-                    moss_tools::DiagnosticSeverity::Error => "error",
-                    moss_tools::DiagnosticSeverity::Warning => "warning",
-                    moss_tools::DiagnosticSeverity::Info => "info",
-                    moss_tools::DiagnosticSeverity::Hint => "hint",
+                    rhizome_moss_tools::DiagnosticSeverity::Error => "error",
+                    rhizome_moss_tools::DiagnosticSeverity::Warning => "warning",
+                    rhizome_moss_tools::DiagnosticSeverity::Info => "info",
+                    rhizome_moss_tools::DiagnosticSeverity::Hint => "hint",
                 };
 
                 println!(

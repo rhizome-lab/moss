@@ -1,7 +1,7 @@
 //! Line range viewing for view command.
 
 use crate::{parsers, path_resolve, tree};
-use moss_languages::support_for_path;
+use rhizome_moss_languages::support_for_path;
 use std::collections::HashSet;
 use std::path::Path;
 

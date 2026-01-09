@@ -7,7 +7,7 @@
 //! Users can register custom generators via [`register()`]:
 //!
 //! ```ignore
-//! use moss_jsonschema::{JsonSchemaGenerator, register};
+//! use rhizome_moss_jsonschema::{JsonSchemaGenerator, register};
 //! use serde_json::Value;
 //!
 //! struct MyGenerator;

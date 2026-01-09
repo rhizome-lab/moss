@@ -1,12 +1,12 @@
 [package]
-name = "moss"
+name = "rhizome-moss"
 version.workspace = true
 edition = "2024"
 license.workspace = true
 description = "Fast code intelligence CLI and library"
 
 [lib]
-name = "moss"
+name = "rhizome_moss"
 path = "src/lib.rs"
 
 [[bin]]
@@ -36,15 +36,15 @@ rusqlite.workspace = true
 tree-sitter = "0.25"
 streaming-iterator = "0.1"
 dirs = "5"
-moss-core = { path = "../moss-core" }
-moss-derive = { path = "../moss-derive" }
-moss-languages = { path = "../moss-languages" }
-moss-jsonschema = { path = "../moss-jsonschema" }
-moss-rules = { path = "../moss-rules" }
-moss-openapi = { path = "../moss-openapi" }
-moss-packages = { path = "../moss-packages" }
-moss-sessions = { path = "../moss-sessions" }
-moss-tools = { path = "../moss-tools" }
+rhizome-moss-core = { path = "../moss-core" }
+rhizome-moss-derive = { path = "../moss-derive" }
+rhizome-moss-languages = { path = "../moss-languages" }
+rhizome-moss-jsonschema = { path = "../moss-jsonschema" }
+rhizome-moss-rules = { path = "../moss-rules" }
+rhizome-moss-openapi = { path = "../moss-openapi" }
+rhizome-moss-packages = { path = "../moss-packages" }
+rhizome-moss-sessions = { path = "../moss-sessions" }
+rhizome-moss-tools = { path = "../moss-tools" }
 grep-matcher.workspace = true
 grep-regex.workspace = true
 grep-searcher.workspace = true

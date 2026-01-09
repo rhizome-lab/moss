@@ -2,7 +2,7 @@
 //!
 //! Provides free functions for parsing using a global singleton GrammarLoader.
 
-use moss_languages::GrammarLoader;
+use rhizome_moss_languages::GrammarLoader;
 use std::sync::{Arc, OnceLock};
 use tree_sitter::Parser;
 

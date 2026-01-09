@@ -25,7 +25,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use moss_tools::{ToolRegistry, OutputFormat};
+//! use rhizome_moss_tools::{ToolRegistry, OutputFormat};
 //!
 //! let registry = ToolRegistry::default();
 //! let results = registry.run_all(&["src/"], &["*.rs", "*.ts"])?;

@@ -1,5 +1,5 @@
 [package]
-name = "moss-packages"
+name = "rhizome-moss-packages"
 version = "0.1.0"
 edition = "2024"
 description = "Package registry queries for multiple ecosystems"

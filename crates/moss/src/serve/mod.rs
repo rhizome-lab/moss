@@ -6,7 +6,7 @@ use clap::{Args, Subcommand};
 use serde::Deserialize;
 use std::path::PathBuf;
 
-use moss_derive::Merge;
+use rhizome_moss_derive::Merge;
 
 pub mod http;
 pub mod lsp;

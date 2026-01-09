@@ -9,7 +9,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use moss_languages::{Python, Language, support_for_path, GrammarLoader};
+//! use rhizome_moss_languages::{Python, Language, support_for_path, GrammarLoader};
 //! use std::path::Path;
 //!
 //! // Load grammars

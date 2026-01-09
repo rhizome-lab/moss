@@ -1,6 +1,6 @@
 //! Integration tests using captured --help output from real CLIs.
 
-use moss_cli_parser::{parse_help, parse_help_with_format};
+use rhizome_moss_cli_parser::{parse_help, parse_help_with_format};
 
 const EXAMPLE_HELP: &str = include_str!("../fixtures/clap/example.help");
 const EXAMPLE_BUILD_HELP: &str = include_str!("../fixtures/clap/example-build.help");

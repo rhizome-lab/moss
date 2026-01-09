@@ -4,7 +4,7 @@
 //! skeleton.rs (for viewing) and symbols.rs (for indexing).
 
 use crate::parsers;
-use moss_languages::{Language, Symbol, Visibility, support_for_grammar, support_for_path};
+use rhizome_moss_languages::{Language, Symbol, Visibility, support_for_grammar, support_for_path};
 use std::path::Path;
 use tree_sitter;
 
@@ -96,7 +96,7 @@ impl<'a> OnDemandResolver<'a> {
 
 impl InterfaceResolver for OnDemandResolver<'_> {
     fn resolve_interface_methods(&self, name: &str, current_file: &str) -> Option<Vec<String>> {
-        use moss_languages::support_for_path;
+        use rhizome_moss_languages::support_for_path;
 
         let current_path = std::path::Path::new(current_file);
         let current_dir = current_path.parent()?;
@@ -138,7 +138,7 @@ impl InterfaceResolver for OnDemandResolver<'_> {
                 if sym.name == name
                     && matches!(
                         sym.kind,
-                        moss_languages::SymbolKind::Interface | moss_languages::SymbolKind::Class
+                        rhizome_moss_languages::SymbolKind::Interface | rhizome_moss_languages::SymbolKind::Class
                     )
                 {
                     let methods: Vec<String> = sym
@@ -147,8 +147,8 @@ impl InterfaceResolver for OnDemandResolver<'_> {
                         .filter(|c| {
                             matches!(
                                 c.kind,
-                                moss_languages::SymbolKind::Method
-                                    | moss_languages::SymbolKind::Function
+                                rhizome_moss_languages::SymbolKind::Method
+                                    | rhizome_moss_languages::SymbolKind::Function
                             )
                         })
                         .map(|c| c.name.clone())
@@ -368,7 +368,7 @@ impl Extractor {
         for sym in symbols.iter_mut() {
             if matches!(
                 sym.kind,
-                moss_languages::SymbolKind::Struct | moss_languages::SymbolKind::Enum
+                rhizome_moss_languages::SymbolKind::Struct | rhizome_moss_languages::SymbolKind::Enum
             ) {
                 if let Some(methods) = impl_methods.remove(&sym.name) {
                     sym.children.extend(methods);
@@ -381,7 +381,7 @@ impl Extractor {
             if !methods.is_empty() {
                 symbols.push(Symbol {
                     name: name.clone(),
-                    kind: moss_languages::SymbolKind::Module, // impl as module-like
+                    kind: rhizome_moss_languages::SymbolKind::Module, // impl as module-like
                     signature: format!("impl {}", name),
                     docstring: None,
                     attributes: Vec::new(),
@@ -420,7 +420,7 @@ impl Extractor {
             for sym in symbols {
                 if matches!(
                     sym.kind,
-                    moss_languages::SymbolKind::Interface | moss_languages::SymbolKind::Class
+                    rhizome_moss_languages::SymbolKind::Interface | rhizome_moss_languages::SymbolKind::Class
                 ) {
                     let methods: HashSet<String> = sym
                         .children
@@ -428,8 +428,8 @@ impl Extractor {
                         .filter(|c| {
                             matches!(
                                 c.kind,
-                                moss_languages::SymbolKind::Method
-                                    | moss_languages::SymbolKind::Function
+                                rhizome_moss_languages::SymbolKind::Method
+                                    | rhizome_moss_languages::SymbolKind::Function
                             )
                         })
                         .map(|c| c.name.clone())
@@ -484,8 +484,8 @@ impl Extractor {
                     for child in &mut sym.children {
                         if matches!(
                             child.kind,
-                            moss_languages::SymbolKind::Method
-                                | moss_languages::SymbolKind::Function
+                            rhizome_moss_languages::SymbolKind::Method
+                                | rhizome_moss_languages::SymbolKind::Function
                         ) && interface_methods.contains(&child.name)
                         {
                             child.is_interface_impl = true;

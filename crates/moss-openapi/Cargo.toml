@@ -1,5 +1,5 @@
 [package]
-name = "moss-openapi"
+name = "rhizome-moss-openapi"
 version.workspace = true
 edition = "2024"
 license.workspace = true

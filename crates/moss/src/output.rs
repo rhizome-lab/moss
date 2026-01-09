@@ -2,8 +2,8 @@
 //!
 //! Provides consistent JSON/text output across all commands via the `OutputFormatter` trait.
 
-use moss_core::Merge;
-use moss_derive::Merge;
+use rhizome_moss_core::Merge;
+use rhizome_moss_derive::Merge;
 use serde::{Deserialize, Serialize};
 use std::io::IsTerminal;
 

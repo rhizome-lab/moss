@@ -7,7 +7,7 @@
 //! Users can register custom generators via [`register()`]:
 //!
 //! ```ignore
-//! use moss_openapi::{OpenApiClientGenerator, register};
+//! use rhizome_moss_openapi::{OpenApiClientGenerator, register};
 //! use serde_json::Value;
 //!
 //! struct MyGenerator;

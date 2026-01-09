@@ -4,7 +4,7 @@ use crate::index;
 use crate::paths::get_moss_dir;
 use crate::skeleton;
 use clap::Subcommand;
-use moss_languages::external_packages;
+use rhizome_moss_languages::external_packages;
 use std::path::{Path, PathBuf};
 
 /// What to extract during indexing (files are always indexed).
@@ -368,7 +368,7 @@ fn cmd_packages(only: &[String], clear: bool, root: Option<&Path>, json: bool) -
     let mut results: std::collections::HashMap<&str, IndexedCounts> =
         std::collections::HashMap::new();
 
-    let available: Vec<&str> = moss_languages::supported_languages()
+    let available: Vec<&str> = rhizome_moss_languages::supported_languages()
         .iter()
         .map(|l| l.lang_key())
         .filter(|k| !k.is_empty())
@@ -393,7 +393,7 @@ fn cmd_packages(only: &[String], clear: bool, root: Option<&Path>, json: bool) -
         }
     }
 
-    for lang in moss_languages::supported_languages() {
+    for lang in rhizome_moss_languages::supported_languages() {
         let lang_key = lang.lang_key();
         if lang_key.is_empty() || !ecosystems.contains(&lang_key) {
             continue;
@@ -452,7 +452,7 @@ fn count_and_insert_symbols(
 }
 
 fn index_language_packages(
-    lang: &dyn moss_languages::Language,
+    lang: &dyn rhizome_moss_languages::Language,
     pkg_index: &external_packages::PackageIndex,
     project_root: &Path,
     json: bool,
@@ -534,7 +534,7 @@ fn index_language_packages(
 }
 
 fn index_package_symbols(
-    lang: &dyn moss_languages::Language,
+    lang: &dyn rhizome_moss_languages::Language,
     pkg_index: &external_packages::PackageIndex,
     extractor: &mut skeleton::SkeletonExtractor,
     pkg_id: i64,

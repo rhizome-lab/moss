@@ -222,10 +222,10 @@ fn process_file(
     file_coverages: &mut Vec<FileDocCoverage>,
 ) {
     use crate::skeleton::SkeletonExtractor;
-    use moss_languages::SymbolKind;
+    use rhizome_moss_languages::SymbolKind;
 
     let path = root.join(&file.path);
-    let lang = moss_languages::support_for_path(&path);
+    let lang = rhizome_moss_languages::support_for_path(&path);
 
     if lang.is_none() || !lang.unwrap().has_symbols() {
         return;

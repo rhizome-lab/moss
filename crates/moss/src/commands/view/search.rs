@@ -1,7 +1,7 @@
 //! Symbol search functionality for view command.
 
 use crate::{index, skeleton};
-use moss_languages::support_for_path;
+use rhizome_moss_languages::support_for_path;
 use std::path::Path;
 
 /// Check if a file has language support (symbols can be extracted)

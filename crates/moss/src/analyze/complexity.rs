@@ -4,7 +4,7 @@
 //! Complexity = number of decision points + 1
 
 use crate::parsers;
-use moss_languages::{Language, support_for_path};
+use rhizome_moss_languages::{Language, support_for_path};
 use std::path::Path;
 use tree_sitter;
 

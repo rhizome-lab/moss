@@ -13,7 +13,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use moss_sessions::{analyze_session, SessionAnalysis};
+//! use rhizome_moss_sessions::{analyze_session, SessionAnalysis};
 //!
 //! let analysis = analyze_session("~/.claude/projects/foo/session.jsonl")?;
 //! println!("{}", analysis.to_markdown());

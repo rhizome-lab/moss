@@ -8,7 +8,7 @@
 use crate::builtin::BUILTIN_RULES;
 use crate::{Rule, Severity};
 use glob::Pattern;
-use moss_derive::Merge;
+use rhizome_moss_derive::Merge;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

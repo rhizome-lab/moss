@@ -300,7 +300,7 @@ fn analyze_health_indexed(
             for path_result in rows.flatten() {
                 total_files += 1;
                 let path = std::path::Path::new(&path_result);
-                if let Some(lang) = moss_languages::support_for_path(path) {
+                if let Some(lang) = rhizome_moss_languages::support_for_path(path) {
                     *files_by_language
                         .entry(lang.name().to_string())
                         .or_insert(0) += 1;
@@ -395,7 +395,7 @@ fn analyze_health_unindexed(root: &Path, allow_patterns: &[Pattern]) -> HealthRe
 
         total_files += 1;
 
-        if let Some(lang) = moss_languages::support_for_path(path) {
+        if let Some(lang) = rhizome_moss_languages::support_for_path(path) {
             *files_by_language
                 .entry(lang.name().to_string())
                 .or_insert(0) += 1;

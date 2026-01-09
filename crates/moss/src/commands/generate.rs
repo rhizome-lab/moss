@@ -48,9 +48,9 @@ pub enum GenerateTarget {
 pub fn run(args: GenerateArgs) -> i32 {
     match args.target {
         GenerateTarget::Client { spec, lang, output } => {
-            let Some(generator) = moss_openapi::find_generator(&lang) else {
+            let Some(generator) = rhizome_moss_openapi::find_generator(&lang) else {
                 eprintln!("Unknown language: {}. Available:", lang);
-                for (lang, variant) in moss_openapi::list_generators() {
+                for (lang, variant) in rhizome_moss_openapi::list_generators() {
                     eprintln!("  {} ({})", lang, variant);
                 }
                 return 1;
@@ -90,9 +90,9 @@ pub fn run(args: GenerateArgs) -> i32 {
             lang,
             output,
         } => {
-            let Some(generator) = moss_jsonschema::find_generator(&lang) else {
+            let Some(generator) = rhizome_moss_jsonschema::find_generator(&lang) else {
                 eprintln!("Unknown language: {}. Available:", lang);
-                for l in moss_jsonschema::list_generators() {
+                for l in rhizome_moss_jsonschema::list_generators() {
                     eprintln!("  {}", l);
                 }
                 return 1;

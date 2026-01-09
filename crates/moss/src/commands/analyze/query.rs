@@ -1,11 +1,11 @@
 //! Tree-sitter query testing for syntax rule authoring.
 
 use crate::parsers::grammar_loader;
-use moss_languages::support_for_path;
+use rhizome_moss_languages::support_for_path;
 use std::path::Path;
 use streaming_iterator::StreamingIterator;
 
-use moss_rules::evaluate_predicates;
+use rhizome_moss_rules::evaluate_predicates;
 
 /// Test a tree-sitter query against a file.
 pub fn cmd_query(file: &Path, query_str: &str, show_source: bool, json: bool) -> i32 {

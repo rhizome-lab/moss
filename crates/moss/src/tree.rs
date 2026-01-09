@@ -5,7 +5,7 @@
 use crate::parsers::grammar_loader;
 use crate::skeleton::{SkeletonExtractor, SkeletonSymbol};
 use ignore::WalkBuilder;
-use moss_languages::{GrammarLoader, support_for_grammar, support_for_path};
+use rhizome_moss_languages::{GrammarLoader, support_for_grammar, support_for_path};
 use nu_ansi_term::Color::{LightCyan, LightGreen, LightMagenta, Red, White as LightGray, Yellow};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap, HashSet};

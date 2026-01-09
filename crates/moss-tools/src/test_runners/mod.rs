@@ -7,7 +7,7 @@
 //! Users can register custom test runners via [`register()`]:
 //!
 //! ```ignore
-//! use moss_tools::test_runners::{TestRunner, TestRunnerInfo, TestResult, register};
+//! use rhizome_moss_tools::test_runners::{TestRunner, TestRunnerInfo, TestResult, register};
 //! use std::path::Path;
 //!
 //! struct MyTestRunner;

@@ -60,7 +60,7 @@ pub fn cmd_trace(
     };
 
     // Parse the file
-    let lang = match moss_languages::support_for_path(&full_path) {
+    let lang = match rhizome_moss_languages::support_for_path(&full_path) {
         Some(l) => l,
         None => {
             eprintln!("No language support for file");
@@ -84,7 +84,7 @@ pub fn cmd_trace(
     let extractor = crate::extract::Extractor::new();
     let extract_result = extractor.extract(&full_path, &content);
     let mut signature_map: HashMap<String, FunctionInfo> = HashMap::new();
-    fn collect_signatures(sym: &moss_languages::Symbol, map: &mut HashMap<String, FunctionInfo>) {
+    fn collect_signatures(sym: &rhizome_moss_languages::Symbol, map: &mut HashMap<String, FunctionInfo>) {
         if !sym.signature.is_empty() {
             map.insert(
                 sym.name.clone(),
@@ -784,7 +784,7 @@ fn trace_cross_file_returns(call_name: &str, root: &std::path::Path) -> Option<C
     // Read and parse the file
     let full_path = root.join(&sym.file);
     let content = std::fs::read_to_string(&full_path).ok()?;
-    let lang = moss_languages::support_for_path(&full_path)?;
+    let lang = rhizome_moss_languages::support_for_path(&full_path)?;
     let tree = parsers::parse_with_grammar(lang.grammar_name(), &content)?;
 
     // Trace returns

@@ -12,7 +12,7 @@ use crate::config::MossConfig;
 use crate::filter::Filter;
 use crate::{daemon, path_resolve};
 use clap::Args;
-use moss_derive::Merge;
+use rhizome_moss_derive::Merge;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 

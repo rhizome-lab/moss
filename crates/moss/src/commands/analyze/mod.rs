@@ -23,8 +23,8 @@ use crate::config::MossConfig;
 use crate::daemon;
 use crate::filter::Filter;
 pub use args::{AnalyzeArgs, AnalyzeCommand};
-use moss_derive::Merge;
-pub use moss_rules::{RuleOverride, RulesConfig};
+use rhizome_moss_derive::Merge;
+pub use rhizome_moss_rules::{RuleOverride, RulesConfig};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -501,7 +501,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                 .as_ref()
                 .map(PathBuf::from)
                 .unwrap_or_else(|| effective_root.clone());
-            let debug_flags = moss_rules::DebugFlags::from_args(&debug);
+            let debug_flags = rhizome_moss_rules::DebugFlags::from_args(&debug);
             rules_cmd::cmd_rules(
                 &target_root,
                 rule.as_deref(),
@@ -845,5 +845,5 @@ fn run_all_passes(
 
 /// Check if a path is a source file we can analyze.
 pub(crate) fn is_source_file(path: &Path) -> bool {
-    moss_languages::support_for_path(path).is_some()
+    rhizome_moss_languages::support_for_path(path).is_some()
 }

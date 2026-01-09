@@ -1,5 +1,5 @@
 [package]
-name = "moss-cli-parser"
+name = "rhizome-moss-cli-parser"
 version = "0.1.0"
 edition = "2024"
 description = "Parse CLI --help output from various frameworks"

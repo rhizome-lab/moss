@@ -6,7 +6,7 @@
 //! # Example
 //!
 //! ```ignore
-//! use moss_packages::{detect_ecosystem, PackageInfo};
+//! use rhizome_moss_packages::{detect_ecosystem, PackageInfo};
 //! use std::path::Path;
 //!
 //! // Detect ecosystem from project files

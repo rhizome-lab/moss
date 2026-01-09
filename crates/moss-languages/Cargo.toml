@@ -1,5 +1,5 @@
 [package]
-name = "moss-languages"
+name = "rhizome-moss-languages"
 version = "0.1.0"
 edition = "2024"
 description = "Language support traits and implementations for moss"

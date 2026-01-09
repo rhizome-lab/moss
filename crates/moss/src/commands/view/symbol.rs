@@ -3,7 +3,7 @@
 use crate::skeleton::SymbolExt;
 use crate::tree::{DocstringDisplay, FormatOptions};
 use crate::{deps, parsers, path_resolve, skeleton, symbols, tree};
-use moss_languages::support_for_path;
+use rhizome_moss_languages::support_for_path;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -757,12 +757,12 @@ fn find_type_definitions<'a>(
         // Check if this is a type definition
         let is_type_def = matches!(
             sym.kind,
-            moss_languages::SymbolKind::Struct
-                | moss_languages::SymbolKind::Enum
-                | moss_languages::SymbolKind::Type
-                | moss_languages::SymbolKind::Trait
-                | moss_languages::SymbolKind::Interface
-                | moss_languages::SymbolKind::Class
+            rhizome_moss_languages::SymbolKind::Struct
+                | rhizome_moss_languages::SymbolKind::Enum
+                | rhizome_moss_languages::SymbolKind::Type
+                | rhizome_moss_languages::SymbolKind::Trait
+                | rhizome_moss_languages::SymbolKind::Interface
+                | rhizome_moss_languages::SymbolKind::Class
         );
 
         if is_type_def && type_names.contains(&sym.name) {
