@@ -45,6 +45,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         content: include_str!("rust_numeric_type_annotation.scm"),
     },
     BuiltinRule {
+        id: "rust/tuple-return",
+        content: include_str!("rust_tuple_return.scm"),
+    },
+    BuiltinRule {
         id: "hardcoded-secret",
         content: include_str!("hardcoded_secret.scm"),
     },
@@ -57,6 +61,10 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "js/unnecessary-const",
         content: include_str!("js_unnecessary_const.scm"),
     },
+    BuiltinRule {
+        id: "typescript/tuple-return",
+        content: include_str!("typescript_tuple_return.scm"),
+    },
     // Python rules
     BuiltinRule {
         id: "python/print-debug",
@@ -66,10 +74,18 @@ pub const BUILTIN_RULES: &[BuiltinRule] = &[
         id: "python/breakpoint",
         content: include_str!("python_breakpoint.scm"),
     },
+    BuiltinRule {
+        id: "python/tuple-return",
+        content: include_str!("python_tuple_return.scm"),
+    },
     // Go rules
     BuiltinRule {
         id: "go/fmt-print",
         content: include_str!("go_fmt_print.scm"),
+    },
+    BuiltinRule {
+        id: "go/many-returns",
+        content: include_str!("go_many_returns.scm"),
     },
     // Ruby rules
     BuiltinRule {
