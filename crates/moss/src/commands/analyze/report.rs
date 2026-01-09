@@ -15,6 +15,14 @@ use std::path::PathBuf;
 
 use super::{complexity, length, security};
 
+/// Weighted grade result from analysis.
+pub struct Grade {
+    /// Letter grade (A, B, C, D, F, or N/A)
+    pub letter: &'static str,
+    /// Percentage score (0-100)
+    pub percentage: f64,
+}
+
 /// Severity levels for security findings
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Severity {
@@ -876,20 +884,23 @@ pub fn analyze(
 
 /// Calculate weighted average grade from scores.
 /// Each score is (value, weight) where value is 0-100.
-pub fn calculate_grade(scores: &[(f64, f64)]) -> (&'static str, f64) {
+pub fn calculate_grade(scores: &[(f64, f64)]) -> Grade {
     let total_weight: f64 = scores.iter().map(|(_, w)| w).sum();
     if total_weight == 0.0 {
-        return ("N/A", 0.0);
+        return Grade {
+            letter: "N/A",
+            percentage: 0.0,
+        };
     }
     let weighted_sum: f64 = scores.iter().map(|(s, w)| s * w).sum();
     let percentage = weighted_sum / total_weight;
 
-    let grade = match percentage as u32 {
+    let letter = match percentage as u32 {
         90..=100 => "A",
         80..=89 => "B",
         70..=79 => "C",
         60..=69 => "D",
         _ => "F",
     };
-    (grade, percentage)
+    Grade { letter, percentage }
 }

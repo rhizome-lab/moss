@@ -6,6 +6,12 @@ use crate::tree::{FormatOptions, ViewNode, ViewNodeKind};
 use crate::{path_resolve, symbols, tree};
 use std::path::Path;
 
+/// Counts of files and directories in a tree.
+struct NodeCounts {
+    files: usize,
+    dirs: usize,
+}
+
 /// View a directory as a tree
 #[allow(clippy::too_many_arguments)]
 pub fn cmd_view_directory(
@@ -42,24 +48,24 @@ pub fn cmd_view_directory(
         view_node
     };
 
-    fn count_nodes(node: &ViewNode) -> (usize, usize) {
-        let mut files = 0;
-        let mut dirs = 0;
+    fn count_nodes(node: &ViewNode) -> NodeCounts {
+        let mut counts = NodeCounts { files: 0, dirs: 0 };
         for child in &node.children {
             match child.kind {
                 ViewNodeKind::Directory => {
-                    dirs += 1;
-                    let (sub_files, sub_dirs) = count_nodes(child);
-                    files += sub_files;
-                    dirs += sub_dirs;
+                    counts.dirs += 1;
+                    let sub = count_nodes(child);
+                    counts.files += sub.files;
+                    counts.dirs += sub.dirs;
                 }
-                ViewNodeKind::File => files += 1,
+                ViewNodeKind::File => counts.files += 1,
                 ViewNodeKind::Symbol(_) => {}
             }
         }
-        (files, dirs)
+        counts
     }
-    let (file_count, dir_count) = count_nodes(&view_node);
+    let counts = count_nodes(&view_node);
+    let (file_count, dir_count) = (counts.files, counts.dirs);
 
     if json {
         println!("{}", serde_json::to_string(&view_node).unwrap());

@@ -25,6 +25,14 @@ struct DuplicateFunctionLocation {
     end_line: usize,
 }
 
+/// Result from duplicate function detection.
+pub struct DuplicateFunctionResult {
+    /// Exit code (0 = success, non-zero = violations found)
+    pub exit_code: i32,
+    /// Number of duplicate groups found
+    pub group_count: usize,
+}
+
 /// Load allowed duplicate function locations from .moss/duplicate-functions-allow file
 fn load_duplicate_functions_allowlist(root: &Path) -> HashSet<String> {
     let path = root.join(".moss/duplicate-functions-allow");
@@ -264,7 +272,7 @@ pub fn cmd_allow_duplicate_function(
     0
 }
 
-/// Detect duplicate functions - returns (exit_code, group_count)
+/// Detect duplicate functions.
 pub fn cmd_duplicate_functions_with_count(
     root: &Path,
     elide_identifiers: bool,
@@ -273,7 +281,7 @@ pub fn cmd_duplicate_functions_with_count(
     min_lines: usize,
     json: bool,
     filter: Option<&Filter>,
-) -> (i32, usize) {
+) -> DuplicateFunctionResult {
     let extractor = Extractor::new();
 
     let allowlist = load_duplicate_functions_allowlist(root);
@@ -482,9 +490,12 @@ pub fn cmd_duplicate_functions_with_count(
         }
     }
 
-    let count = groups.len();
-    let exit_code = if count == 0 { 0 } else { 1 };
-    (exit_code, count)
+    let group_count = groups.len();
+    let exit_code = if group_count == 0 { 0 } else { 1 };
+    DuplicateFunctionResult {
+        exit_code,
+        group_count,
+    }
 }
 
 /// Detect duplicate type definitions (structs with similar fields)

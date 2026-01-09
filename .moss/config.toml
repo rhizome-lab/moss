@@ -22,5 +22,9 @@ allow = ["**/fixtures/**"]
 [analyze.rules."rust/numeric-type-annotation"]
 enabled = true
 
+# Enforce struct returns over tuples (dogfooding our own rule)
+[analyze.rules."rust/tuple-return"]
+severity = "error"
+
 [aliases]
 todo = ["TODO.md"]

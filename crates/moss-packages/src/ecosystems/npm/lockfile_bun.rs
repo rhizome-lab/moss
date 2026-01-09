@@ -20,6 +20,12 @@ use crate::{DependencyTree, PackageError, TreeNode};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
+/// Project name and version from package.json or lockfile.
+struct ProjectInfo {
+    name: String,
+    version: String,
+}
+
 /// Get installed version from bun.lock or bun.lockb
 pub fn installed_version(package: &str, project_root: &Path) -> Option<String> {
     // Try text format first (bun.lock)
@@ -655,7 +661,7 @@ impl<'a> BunLockb<'a> {
     }
 
     fn to_tree(&self, project_root: &Path) -> DependencyTree {
-        let (proj_name, proj_version) = get_project_info_from_package_json(project_root);
+        let proj_info = get_project_info_from_package_json(project_root);
 
         // Build logical dependency map from packages
         let deps_map = self.build_deps_map();
@@ -688,8 +694,8 @@ impl<'a> BunLockb<'a> {
 
         DependencyTree {
             roots: vec![TreeNode {
-                name: proj_name,
-                version: proj_version,
+                name: proj_info.name,
+                version: proj_info.version,
                 dependencies: root_deps,
             }],
         }
@@ -836,7 +842,7 @@ fn build_tree_text(
     parsed: &serde_json::Value,
     project_root: &Path,
 ) -> Result<DependencyTree, PackageError> {
-    let (name, version) = get_project_info(parsed, project_root);
+    let info = get_project_info(parsed, project_root);
 
     // Build the dependency map from packages
     let deps_map = build_deps_map_text(parsed);
@@ -882,8 +888,8 @@ fn build_tree_text(
     }
 
     let root = TreeNode {
-        name,
-        version,
+        name: info.name,
+        version: info.version,
         dependencies: root_deps,
     };
 
@@ -903,7 +909,7 @@ fn build_tree_binary(project_root: &Path) -> Result<DependencyTree, PackageError
     Ok(parsed.to_tree(project_root))
 }
 
-fn get_project_info(parsed: &serde_json::Value, project_root: &Path) -> (String, String) {
+fn get_project_info(parsed: &serde_json::Value, project_root: &Path) -> ProjectInfo {
     if let Some(workspaces) = parsed.get("workspaces").and_then(|w| w.as_object())
         && let Some(root_ws) = workspaces.get("")
     {
@@ -915,12 +921,15 @@ fn get_project_info(parsed: &serde_json::Value, project_root: &Path) -> (String,
             .get("version")
             .and_then(|v| v.as_str())
             .unwrap_or("0.0.0");
-        return (name.to_string(), version.to_string());
+        return ProjectInfo {
+            name: name.to_string(),
+            version: version.to_string(),
+        };
     }
     get_project_info_from_package_json(project_root)
 }
 
-fn get_project_info_from_package_json(project_root: &Path) -> (String, String) {
+fn get_project_info_from_package_json(project_root: &Path) -> ProjectInfo {
     let pkg_json = project_root.join("package.json");
     if let Ok(content) = std::fs::read_to_string(&pkg_json)
         && let Ok(pkg) = serde_json::from_str::<serde_json::Value>(&content)
@@ -935,9 +944,12 @@ fn get_project_info_from_package_json(project_root: &Path) -> (String, String) {
             .and_then(|v| v.as_str())
             .unwrap_or("0.0.0")
             .to_string();
-        return (name, version);
+        return ProjectInfo { name, version };
     }
-    ("root".to_string(), "0.0.0".to_string())
+    ProjectInfo {
+        name: "root".to_string(),
+        version: "0.0.0".to_string(),
+    }
 }
 
 #[cfg(test)]

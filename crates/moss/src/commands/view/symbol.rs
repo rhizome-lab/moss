@@ -261,6 +261,12 @@ struct AncestorInfo<'a> {
     sibling_count: usize,
 }
 
+/// Result from finding a symbol with its ancestors.
+struct SymbolWithAncestors<'a> {
+    symbol: Option<&'a skeleton::SkeletonSymbol>,
+    ancestors: Vec<AncestorInfo<'a>>,
+}
+
 /// Find a symbol by name along with all its ancestors (outermost first)
 fn find_symbol_with_ancestors<'a>(
     symbols: &'a [skeleton::SkeletonSymbol],
@@ -302,10 +308,10 @@ fn find_symbol_with_parent<'a>(
     symbols: &'a [skeleton::SkeletonSymbol],
     name: &str,
     case_insensitive: bool,
-) -> (Option<&'a skeleton::SkeletonSymbol>, Vec<AncestorInfo<'a>>) {
+) -> SymbolWithAncestors<'a> {
     let mut ancestors = Vec::new();
-    let found = find_symbol_with_ancestors(symbols, name, &mut ancestors, case_insensitive);
-    (found, ancestors)
+    let symbol = find_symbol_with_ancestors(symbols, name, &mut ancestors, case_insensitive);
+    SymbolWithAncestors { symbol, ancestors }
 }
 
 /// Find a symbol's signature in a skeleton
@@ -454,9 +460,10 @@ pub fn cmd_view_symbol(
 
             let ancestors: Vec<(String, usize)> = if show_parent {
                 if let Some(ref sr) = skeleton_result {
-                    let (_, ancestor_infos) =
+                    let result =
                         find_symbol_with_parent(&sr.symbols, symbol_name, case_insensitive);
-                    ancestor_infos
+                    result
+                        .ancestors
                         .into_iter()
                         .map(|a| (a.symbol.signature.clone(), a.sibling_count))
                         .collect()

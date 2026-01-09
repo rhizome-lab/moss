@@ -13,4 +13,18 @@ cargo clippy --all-targets --all-features -- -D warnings 2>/dev/null || {
     echo "  Warning: clippy check failed or not available (non-critical)"
 }
 
+# Run moss rules if binary exists
+if [ -x "./target/release/moss" ] || [ -x "./target/debug/moss" ]; then
+    MOSS="${MOSS:-./target/release/moss}"
+    [ -x "$MOSS" ] || MOSS="./target/debug/moss"
+
+    if [ -x "$MOSS" ]; then
+        echo "Running moss rules..."
+        $MOSS analyze rules --rule rust/tuple-return crates/ || {
+            echo "  Error: tuple return rule violations found"
+            exit 1
+        }
+    fi
+fi
+
 echo "Pre-commit checks passed!"

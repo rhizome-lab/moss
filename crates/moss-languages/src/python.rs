@@ -1054,12 +1054,21 @@ mod tests {
     use crate::GrammarLoader;
     use tree_sitter::Parser;
 
-    fn parse_python(content: &str) -> (tree_sitter::Tree, GrammarLoader) {
+    struct ParseResult {
+        tree: tree_sitter::Tree,
+        #[allow(dead_code)]
+        loader: GrammarLoader,
+    }
+
+    fn parse_python(content: &str) -> ParseResult {
         let loader = GrammarLoader::new();
         let language = loader.get("python").unwrap();
         let mut parser = Parser::new();
         parser.set_language(&language).unwrap();
-        (parser.parse(content, None).unwrap(), loader)
+        ParseResult {
+            tree: parser.parse(content, None).unwrap(),
+            loader,
+        }
     }
 
     #[test]
@@ -1076,8 +1085,8 @@ mod tests {
     """Convert to string."""
     return str(x)
 "#;
-        let (tree, _loader) = parse_python(content);
-        let root = tree.root_node();
+        let result = parse_python(content);
+        let root = result.tree.root_node();
 
         // Find function node
         let mut cursor = root.walk();
@@ -1100,8 +1109,8 @@ mod tests {
     """A foo class."""
     pass
 "#;
-        let (tree, _loader) = parse_python(content);
-        let root = tree.root_node();
+        let result = parse_python(content);
+        let root = result.tree.root_node();
 
         let mut cursor = root.walk();
         let class = root
@@ -1124,8 +1133,8 @@ def _protected(): pass
 def __private(): pass
 def __dunder__(): pass
 "#;
-        let (tree, _loader) = parse_python(content);
-        let root = tree.root_node();
+        let result = parse_python(content);
+        let root = result.tree.root_node();
 
         let mut cursor = root.walk();
         let funcs: Vec<_> = root

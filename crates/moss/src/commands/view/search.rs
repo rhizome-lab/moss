@@ -4,6 +4,13 @@ use crate::{index, skeleton};
 use rhizome_moss_languages::support_for_path;
 use std::path::Path;
 
+/// Parsed symbol query with optional file and parent hints.
+struct SymbolQuery {
+    file_hint: Option<String>,
+    parent_hint: Option<String>,
+    symbol_name: String,
+}
+
 /// Check if a file has language support (symbols can be extracted)
 pub fn has_language_support(path: &str) -> bool {
     support_for_path(Path::new(path))
@@ -14,7 +21,7 @@ pub fn has_language_support(path: &str) -> bool {
 /// Search for symbols in the index by name.
 /// Supports qualified names like "ClassName/method" or "file.rs/ClassName/method"
 pub fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
-    let (file_hint, parent_hint, symbol_name) = parse_symbol_query(query);
+    let parsed = parse_symbol_query(query);
 
     // Try index first - if enabled, use it (or build it if empty)
     if let Some(mut idx) = index::FileIndex::open_if_enabled(root) {
@@ -26,9 +33,9 @@ pub fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
                 return search_symbols_unindexed(query, root);
             }
         }
-        if let Ok(mut symbols) = idx.find_symbols(&symbol_name, None, true, 50) {
+        if let Ok(mut symbols) = idx.find_symbols(&parsed.symbol_name, None, true, 50) {
             // Filter by parent hint if provided
-            if let Some(ref parent) = parent_hint {
+            if let Some(ref parent) = parsed.parent_hint {
                 let parent_lower = parent.to_lowercase();
                 symbols.retain(|s| {
                     s.parent
@@ -38,7 +45,7 @@ pub fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
                 });
             }
             // Filter by file hint if provided
-            if let Some(ref file) = file_hint {
+            if let Some(ref file) = parsed.file_hint {
                 let file_lower = file.to_lowercase();
                 symbols.retain(|s| s.file.to_lowercase().contains(&file_lower));
             }
@@ -54,27 +61,42 @@ pub fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
 }
 
 /// Parse a symbol query like "Tsx/format_import" or "typescript.rs/Tsx/format_import"
-/// Returns (file_hint, parent_hint, symbol_name)
-fn parse_symbol_query(query: &str) -> (Option<String>, Option<String>, String) {
+fn parse_symbol_query(query: &str) -> SymbolQuery {
     let parts: Vec<&str> = query.split('/').collect();
     match parts.len() {
-        1 => (None, None, parts[0].to_string()),
+        1 => SymbolQuery {
+            file_hint: None,
+            parent_hint: None,
+            symbol_name: parts[0].to_string(),
+        },
         2 => {
             // Could be "Parent/method" or "file.rs/symbol"
             if parts[0].contains('.') && !parts[0].starts_with('.') {
-                (Some(parts[0].to_string()), None, parts[1].to_string())
+                SymbolQuery {
+                    file_hint: Some(parts[0].to_string()),
+                    parent_hint: None,
+                    symbol_name: parts[1].to_string(),
+                }
             } else {
-                (None, Some(parts[0].to_string()), parts[1].to_string())
+                SymbolQuery {
+                    file_hint: None,
+                    parent_hint: Some(parts[0].to_string()),
+                    symbol_name: parts[1].to_string(),
+                }
             }
         }
         _ => {
-            let symbol = parts.last().unwrap().to_string();
-            let parent = parts.get(parts.len() - 2).map(|s| s.to_string());
-            if parts.len() > 2 {
-                let file = parts[..parts.len() - 2].join("/");
-                (Some(file), parent, symbol)
+            let symbol_name = parts.last().unwrap().to_string();
+            let parent_hint = parts.get(parts.len() - 2).map(|s| s.to_string());
+            let file_hint = if parts.len() > 2 {
+                Some(parts[..parts.len() - 2].join("/"))
             } else {
-                (None, parent, symbol)
+                None
+            };
+            SymbolQuery {
+                file_hint,
+                parent_hint,
+                symbol_name,
             }
         }
     }

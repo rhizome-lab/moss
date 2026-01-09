@@ -130,6 +130,13 @@ jobs:
         env:
           MOSS_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
 
+      - name: Check syntax rules
+        run: |
+          # Dogfood our own rules - tuple returns should use named structs
+          ./target/release/moss analyze rules --rule rust/tuple-return crates/
+        env:
+          MOSS_GRAMMAR_PATH: ${{ github.workspace }}/target/grammars
+
   benchmark:
     name: Benchmark
     runs-on: ubuntu-latest

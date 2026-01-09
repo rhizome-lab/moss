@@ -455,7 +455,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                     min_lines,
                 )
             } else {
-                let (result, _) = duplicates::cmd_duplicate_functions_with_count(
+                let result = duplicates::cmd_duplicate_functions_with_count(
                     &effective_root,
                     elide_identifiers,
                     elide_literals,
@@ -464,7 +464,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                     json,
                     filter.as_ref(),
                 );
-                result
+                result.exit_code
             }
         }
 
@@ -772,7 +772,7 @@ fn run_all_passes(
     if !json {
         eprintln!("Running: duplicate-functions...");
     }
-    let (dup_result, dup_count) = duplicates::cmd_duplicate_functions_with_count(
+    let dup_result = duplicates::cmd_duplicate_functions_with_count(
         root, true,  // elide_identifiers
         false, // elide_literals
         false, // show_source
@@ -780,14 +780,14 @@ fn run_all_passes(
         json, filter,
     );
 
-    if dup_result != 0 {
-        exit_code = dup_result;
+    if dup_result.exit_code != 0 {
+        exit_code = dup_result.exit_code;
     }
 
-    let dup_score = if dup_count == 0 {
+    let dup_score = if dup_result.group_count == 0 {
         100.0
     } else {
-        (100.0 - (dup_count as f64 * 5.0)).max(0.0)
+        (100.0 - (dup_result.group_count as f64 * 5.0)).max(0.0)
     };
     scores.push((dup_score, weights.duplicate_functions()));
 
@@ -860,9 +860,9 @@ fn run_all_passes(
 
     // Print overall grade
     if !json && !scores.is_empty() {
-        let (grade, percentage) = report::calculate_grade(&scores);
+        let grade = report::calculate_grade(&scores);
         println!();
-        println!("Overall Grade: {} ({:.0}%)", grade, percentage);
+        println!("Overall Grade: {} ({:.0}%)", grade.letter, grade.percentage);
     }
 
     exit_code
