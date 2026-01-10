@@ -5,7 +5,7 @@
 use crate::index::FileIndex;
 use crate::skeleton::SkeletonExtractor;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
@@ -27,11 +27,11 @@ impl MossBackend {
     }
 
     /// Initialize index for the workspace root.
-    fn init_index(&self, root: PathBuf) {
-        if let Some(idx) = FileIndex::open_if_enabled(&root) {
-            *self.index.lock().unwrap() = Some(idx);
+    async fn init_index(&self, root: PathBuf) {
+        if let Some(idx) = FileIndex::open_if_enabled(&root).await {
+            *self.index.lock().await = Some(idx);
         }
-        *self.root.lock().unwrap() = Some(root);
+        *self.root.lock().await = Some(root);
     }
 
     /// Convert moss symbol kind to LSP SymbolKind.
@@ -60,12 +60,12 @@ impl LanguageServer for MossBackend {
         if let Some(root_uri) = params.root_uri
             && let Ok(path) = root_uri.to_file_path()
         {
-            self.init_index(path);
+            self.init_index(path).await;
         } else if let Some(folders) = params.workspace_folders
             && let Some(folder) = folders.first()
             && let Ok(path) = folder.uri.to_file_path()
         {
-            self.init_index(path);
+            self.init_index(path).await;
         }
 
         Ok(InitializeResult {
@@ -169,16 +169,16 @@ impl LanguageServer for MossBackend {
     ) -> Result<Option<Vec<SymbolInformation>>> {
         let query = &params.query;
 
-        let index = self.index.lock().unwrap();
-        let root = self.root.lock().unwrap();
+        let index = self.index.lock().await;
+        let root = self.root.lock().await;
 
         let (index, root) = match (index.as_ref(), root.as_ref()) {
-            (Some(i), Some(r)) => (i, r),
+            (Some(i), Some(r)) => (i, r.clone()),
             _ => return Ok(None),
         };
 
         // Search symbols in index
-        let matches = match index.find_symbols(query, None, false, 50) {
+        let matches = match index.find_symbols(query, None, false, 50).await {
             Ok(m) => m,
             Err(_) => return Ok(None),
         };
@@ -187,7 +187,7 @@ impl LanguageServer for MossBackend {
         let symbols: Vec<SymbolInformation> = matches
             .into_iter()
             .map(|sym| {
-                let file_path = root.join(&sym.file);
+                let file_path = root.clone().join(&sym.file);
                 let uri = Url::from_file_path(&file_path)
                     .unwrap_or_else(|_| Url::parse("file:///unknown").unwrap());
 
@@ -323,16 +323,16 @@ impl LanguageServer for MossBackend {
         }
 
         // Search for symbol definition in index
-        let index = self.index.lock().unwrap();
-        let root = self.root.lock().unwrap();
+        let index = self.index.lock().await;
+        let root = self.root.lock().await;
 
         let (index, root) = match (index.as_ref(), root.as_ref()) {
-            (Some(i), Some(r)) => (i, r),
+            (Some(i), Some(r)) => (i, r.clone()),
             _ => return Ok(None),
         };
 
         // Look up symbol in index
-        let matches = match index.find_symbol(&word) {
+        let matches = match index.find_symbol(&word).await {
             Ok(m) => m,
             Err(_) => return Ok(None),
         };
@@ -392,11 +392,11 @@ impl LanguageServer for MossBackend {
             return Ok(None);
         }
 
-        let index = self.index.lock().unwrap();
-        let root = self.root.lock().unwrap();
+        let index = self.index.lock().await;
+        let root = self.root.lock().await;
 
         let (index, root) = match (index.as_ref(), root.as_ref()) {
-            (Some(i), Some(r)) => (i, r),
+            (Some(i), Some(r)) => (i, r.clone()),
             _ => return Ok(None),
         };
 
@@ -404,7 +404,7 @@ impl LanguageServer for MossBackend {
 
         // Include definition if requested
         if params.context.include_declaration {
-            if let Ok(defs) = index.find_symbol(&word) {
+            if let Ok(defs) = index.find_symbol(&word).await {
                 for (file, _kind, start_line, _end_line) in defs {
                     let target_path = root.join(&file);
                     if let Ok(target_uri) = Url::from_file_path(&target_path) {
@@ -427,7 +427,7 @@ impl LanguageServer for MossBackend {
         }
 
         // Find callers (references)
-        if let Ok(callers) = index.find_callers(&word) {
+        if let Ok(callers) = index.find_callers(&word).await {
             for (file, _caller_name, line) in callers {
                 let target_path = root.join(&file);
                 if let Ok(target_uri) = Url::from_file_path(&target_path) {
@@ -487,7 +487,7 @@ impl LanguageServer for MossBackend {
         }
 
         // Verify this is a known symbol
-        let index = self.index.lock().unwrap();
+        let index = self.index.lock().await;
         let index = match index.as_ref() {
             Some(i) => i,
             None => return Ok(None),
@@ -496,12 +496,14 @@ impl LanguageServer for MossBackend {
         // Check if symbol exists in index
         if index
             .find_symbol(&word_info.word)
+            .await
             .map(|m| m.is_empty())
             .unwrap_or(true)
         {
             // Also check if it's a caller (referenced symbol)
             if index
                 .find_callers(&word_info.word)
+                .await
                 .map(|m| m.is_empty())
                 .unwrap_or(true)
             {
@@ -550,11 +552,11 @@ impl LanguageServer for MossBackend {
             return Ok(None);
         }
 
-        let index = self.index.lock().unwrap();
-        let root = self.root.lock().unwrap();
+        let index = self.index.lock().await;
+        let root = self.root.lock().await;
 
         let (index, root) = match (index.as_ref(), root.as_ref()) {
-            (Some(i), Some(r)) => (i, r),
+            (Some(i), Some(r)) => (i, r.clone()),
             _ => return Ok(None),
         };
 
@@ -563,7 +565,7 @@ impl LanguageServer for MossBackend {
             std::collections::HashMap::new();
 
         // Find definition sites
-        if let Ok(defs) = index.find_symbol(&old_name) {
+        if let Ok(defs) = index.find_symbol(&old_name).await {
             for (file, _kind, start_line, _end_line) in defs {
                 let target_path = root.join(&file);
                 if let Ok(target_uri) = Url::from_file_path(&target_path)
@@ -577,7 +579,7 @@ impl LanguageServer for MossBackend {
         }
 
         // Find reference sites (callers)
-        if let Ok(callers) = index.find_callers(&old_name) {
+        if let Ok(callers) = index.find_callers(&old_name).await {
             for (file, _caller_name, line) in callers {
                 let target_path = root.join(&file);
                 if let Ok(target_uri) = Url::from_file_path(&target_path)

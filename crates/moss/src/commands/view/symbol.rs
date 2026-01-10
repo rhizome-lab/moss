@@ -816,9 +816,10 @@ fn display_referenced_types(
     let mut external_types: Vec<(String, String, String, usize)> = Vec::new(); // (name, file, signature, line)
 
     if !remaining.is_empty() {
-        if let Some(idx) = FileIndex::open_if_enabled(root) {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        if let Some(idx) = rt.block_on(FileIndex::open_if_enabled(root)) {
             for type_name in &remaining {
-                if let Ok(matches) = idx.find_symbol(type_name) {
+                if let Ok(matches) = rt.block_on(idx.find_symbol(type_name)) {
                     // Find first match that's a type definition (not from current file)
                     for (file, kind, start_line, _end_line) in matches {
                         // Skip if from current file (already checked locally)

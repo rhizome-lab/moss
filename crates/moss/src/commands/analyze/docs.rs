@@ -165,7 +165,8 @@ pub fn analyze_docs(
         .collect();
 
     // Try to load index for cross-file resolution, fall back to on-demand parsing
-    let index = FileIndex::open(root).ok();
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let index = rt.block_on(FileIndex::open(root)).ok();
     let resolver: Box<dyn InterfaceResolver> = match &index {
         Some(idx) => Box::new(IndexedResolver::new(idx)),
         None => Box::new(OnDemandResolver::new(root)),

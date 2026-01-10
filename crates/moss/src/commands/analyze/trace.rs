@@ -14,6 +14,30 @@ pub fn cmd_trace(
     root: &Path,
     max_depth: usize,
     recursive: bool,
+    case_insensitive: bool,
+    json: bool,
+    pretty: bool,
+) -> i32 {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(cmd_trace_async(
+        symbol,
+        target,
+        root,
+        max_depth,
+        recursive,
+        case_insensitive,
+        json,
+        pretty,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn cmd_trace_async(
+    symbol: &str,
+    target: Option<&str>,
+    root: &Path,
+    max_depth: usize,
+    recursive: bool,
     _case_insensitive: bool, // Index find_symbols uses LOWER() by default
     json: bool,
     pretty: bool,
@@ -34,9 +58,9 @@ pub fn cmd_trace(
     };
 
     // Find the symbol - try index first, fall back to file parsing
-    let symbol_matches = if let Some(mut idx) = index::FileIndex::open_if_enabled(root) {
-        let _ = idx.incremental_refresh();
-        match idx.find_symbols(&symbol_name, None, false, 10) {
+    let symbol_matches = if let Some(mut idx) = index::FileIndex::open_if_enabled(root).await {
+        let _ = idx.incremental_refresh().await;
+        match idx.find_symbols(&symbol_name, None, false, 10).await {
             Ok(matches) if !matches.is_empty() => matches,
             _ => fallback_parse_symbol(&symbol_name, file_path.as_deref(), root),
         }
@@ -771,14 +795,23 @@ fn trace_returns(
 
 /// Look up a function in the index and trace its returns (cross-file).
 fn trace_cross_file_returns(call_name: &str, root: &std::path::Path) -> Option<CrossFileReturns> {
+    let rt = tokio::runtime::Runtime::new().ok()?;
+    rt.block_on(trace_cross_file_returns_async(call_name, root))
+}
+
+async fn trace_cross_file_returns_async(
+    call_name: &str,
+    root: &std::path::Path,
+) -> Option<CrossFileReturns> {
     // Extract simple function name (last segment of method chain)
     let simple_name = call_name.split(&['.', ':'][..]).last().unwrap_or(call_name);
 
     // Look up in index
-    let mut idx = index::FileIndex::open_if_enabled(root)?;
-    let _ = idx.incremental_refresh();
+    let mut idx = index::FileIndex::open_if_enabled(root).await?;
+    let _ = idx.incremental_refresh().await;
     let matches = idx
         .find_symbols(simple_name, Some("function"), false, 5)
+        .await
         .ok()?;
 
     // Find exact match

@@ -272,19 +272,20 @@ pub fn analyze_health(root: &Path) -> HealthReport {
     let allow_patterns = load_allow_patterns(root, "large-files-allow");
 
     // Try index first, fall back to filesystem walk
-    if let Some(mut index) = FileIndex::open_if_enabled(root) {
-        return analyze_health_indexed(root, &mut index, &allow_patterns);
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    if let Some(mut index) = rt.block_on(FileIndex::open_if_enabled(root)) {
+        return rt.block_on(analyze_health_indexed(root, &mut index, &allow_patterns));
     }
     analyze_health_unindexed(root, &allow_patterns)
 }
 
-fn analyze_health_indexed(
+async fn analyze_health_indexed(
     _root: &Path,
     index: &mut FileIndex,
     allow_patterns: &[Pattern],
 ) -> HealthReport {
     // Ensure file index is up to date (incremental - only changed files)
-    let _ = index.incremental_refresh();
+    let _ = index.incremental_refresh().await;
     // Note: We don't call refresh_call_graph() here - it's slow.
     // Complexity is computed during symbol indexing, which happens via other commands.
 
@@ -295,9 +296,12 @@ fn analyze_health_indexed(
     let mut files_by_language: HashMap<String, usize> = HashMap::new();
     let mut total_files = 0;
 
-    if let Ok(mut stmt) = conn.prepare("SELECT path FROM files WHERE is_dir = 0") {
-        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
-            for path_result in rows.flatten() {
+    if let Ok(mut rows) = conn
+        .query("SELECT path FROM files WHERE is_dir = 0", ())
+        .await
+    {
+        while let Ok(Some(row)) = rows.next().await {
+            if let Ok(path_result) = row.get::<String>(0) {
                 total_files += 1;
                 let path = std::path::Path::new(&path_result);
                 if let Some(lang) = rhizome_moss_languages::support_for_path(path) {
@@ -315,11 +319,15 @@ fn analyze_health_indexed(
     let mut max_complexity = 0usize;
     let mut high_risk_functions = 0usize;
 
-    if let Ok(mut stmt) =
-        conn.prepare("SELECT complexity FROM symbols WHERE complexity IS NOT NULL")
+    if let Ok(mut rows) = conn
+        .query(
+            "SELECT complexity FROM symbols WHERE complexity IS NOT NULL",
+            (),
+        )
+        .await
     {
-        if let Ok(rows) = stmt.query_map([], |row| row.get::<_, i64>(0)) {
-            for complexity_result in rows.flatten() {
+        while let Ok(Some(row)) = rows.next().await {
+            if let Ok(complexity_result) = row.get::<i64>(0) {
                 let complexity = complexity_result as usize;
                 total_functions += 1;
                 total_complexity += complexity;
@@ -337,7 +345,7 @@ fn analyze_health_indexed(
     let mut total_lines = 0usize;
     let mut large_files = Vec::new();
 
-    if let Ok(files) = index.all_files() {
+    if let Ok(files) = index.all_files().await {
         for file in files {
             if file.is_dir {
                 continue;

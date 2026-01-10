@@ -12,7 +12,8 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use utoipa::{OpenApi, ToSchema};
 
 /// OpenAPI documentation
@@ -47,7 +48,7 @@ struct AppState {
 /// Start the HTTP server.
 pub async fn run_http_server(root: &std::path::Path, port: u16) -> i32 {
     // Initialize index
-    let index = match FileIndex::open_if_enabled(root) {
+    let index = match FileIndex::open_if_enabled(root).await {
         Some(idx) => idx,
         None => {
             eprintln!("Indexing disabled or failed");
@@ -115,11 +116,7 @@ pub struct HealthResponse {
     tag = "health"
 )]
 async fn health(State(state): State<Arc<AppState>>) -> Json<HealthResponse> {
-    let files_indexed = state
-        .index
-        .lock()
-        .map(|i| i.count().unwrap_or(0))
-        .unwrap_or(0);
+    let files_indexed = state.index.lock().await.count().await.unwrap_or(0);
     Json(HealthResponse {
         status: "ok",
         files_indexed,
@@ -156,18 +153,19 @@ async fn list_files(
     State(state): State<Arc<AppState>>,
     Query(query): Query<FileListQuery>,
 ) -> Json<FileListResponse> {
+    let pattern = query.pattern.as_deref().unwrap_or("");
+    let limit = query.limit.unwrap_or(100);
+
     let files = state
         .index
         .lock()
-        .ok()
-        .and_then(|i| {
-            let pattern = query.pattern.as_deref().unwrap_or("");
-            i.find_like(pattern).ok()
-        })
+        .await
+        .find_like(pattern)
+        .await
         .unwrap_or_default()
         .into_iter()
         .map(|f| f.path)
-        .take(query.limit.unwrap_or(100))
+        .take(limit)
         .collect();
 
     Json(FileListResponse { files })
@@ -282,20 +280,15 @@ async fn list_symbols(
     State(state): State<Arc<AppState>>,
     Query(query): Query<SymbolQuery>,
 ) -> Json<SymbolListResponse> {
+    let name = query.name.as_deref().unwrap_or("");
+    let limit = query.limit.unwrap_or(100);
+
     let symbols = state
         .index
         .lock()
-        .ok()
-        .and_then(|i| {
-            let name = query.name.as_deref().unwrap_or("");
-            i.find_symbols(
-                name,
-                query.kind.as_deref(),
-                false,
-                query.limit.unwrap_or(100),
-            )
-            .ok()
-        })
+        .await
+        .find_symbols(name, query.kind.as_deref(), false, limit)
+        .await
         .unwrap_or_default()
         .into_iter()
         .map(|s| IndexedSymbol {
@@ -344,8 +337,9 @@ async fn get_symbol(
     let matches = state
         .index
         .lock()
-        .ok()
-        .and_then(|i| i.find_symbol(&name).ok())
+        .await
+        .find_symbol(&name)
+        .await
         .unwrap_or_default();
 
     if matches.is_empty() {
@@ -422,9 +416,11 @@ async fn search(
     let limit = query.limit.unwrap_or(20);
     let mut results = Vec::new();
 
+    let index = state.index.lock().await;
+
     if search_type == "all" || search_type == "file" {
         // Search files
-        if let Ok(files) = state.index.lock().unwrap().find_like(&query.q) {
+        if let Ok(files) = index.find_like(&query.q).await {
             for file in files.into_iter().take(limit) {
                 results.push(SearchResult {
                     path: file.path,
@@ -438,12 +434,7 @@ async fn search(
 
     if search_type == "all" || search_type == "symbol" {
         // Search symbols
-        if let Ok(symbols) = state
-            .index
-            .lock()
-            .unwrap()
-            .find_symbols(&query.q, None, false, limit)
-        {
+        if let Ok(symbols) = index.find_symbols(&query.q, None, false, limit).await {
             for sym in symbols {
                 results.push(SearchResult {
                     path: sym.file,

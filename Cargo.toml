@@ -35,7 +35,7 @@ tokio = { version = "1", features = ["full"] }
 axum = "0.8"
 
 # Database
-rusqlite = { version = "0.32", features = ["bundled"] }
+libsql = "0.9"
 
 # File system
 walkdir = "2"

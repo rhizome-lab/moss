@@ -14,10 +14,15 @@ struct BrokenRef {
 
 /// Check documentation references for broken links
 pub fn cmd_check_refs(root: &Path, json: bool) -> i32 {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(cmd_check_refs_async(root, json))
+}
+
+async fn cmd_check_refs_async(root: &Path, json: bool) -> i32 {
     use regex::Regex;
 
     // Open index to get known symbols
-    let idx = match index::FileIndex::open_if_enabled(root) {
+    let idx = match index::FileIndex::open_if_enabled(root).await {
         Some(i) => i,
         None => {
             eprintln!("Indexing disabled or failed. Run: moss index rebuild --call-graph");
@@ -26,7 +31,7 @@ pub fn cmd_check_refs(root: &Path, json: bool) -> i32 {
     };
 
     // Get all symbol names from index
-    let all_symbols = idx.all_symbol_names().unwrap_or_default();
+    let all_symbols = idx.all_symbol_names().await.unwrap_or_default();
 
     if all_symbols.is_empty() {
         eprintln!("No symbols indexed. Run: moss index rebuild --call-graph");

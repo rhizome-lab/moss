@@ -373,9 +373,10 @@ pub fn resolve(query: &str, root: &Path) -> Vec<PathMatch> {
 
     // Handle extension patterns (e.g., ".rs", ".py") - return all matches directly
     if query.starts_with('.') && !query.contains('/') {
-        if let Some(mut index) = FileIndex::open_if_enabled(root) {
-            let _ = index.incremental_refresh();
-            if let Ok(files) = index.find_like(query) {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        if let Some(mut index) = rt.block_on(FileIndex::open_if_enabled(root)) {
+            let _ = rt.block_on(index.incremental_refresh());
+            if let Ok(files) = rt.block_on(index.find_like(query)) {
                 return files
                     .into_iter()
                     .map(|f| PathMatch {
@@ -422,18 +423,19 @@ pub fn resolve(query: &str, root: &Path) -> Vec<PathMatch> {
 
 /// Get paths matching query using LIKE, fallback to all files
 fn get_paths_for_query(root: &Path, query: &str) -> Vec<(String, bool)> {
-    if let Some(mut index) = FileIndex::open_if_enabled(root) {
-        let _ = index.incremental_refresh();
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    if let Some(mut index) = rt.block_on(FileIndex::open_if_enabled(root)) {
+        let _ = rt.block_on(index.incremental_refresh());
         // Try LIKE first for faster queries
         if !query.is_empty() {
-            if let Ok(files) = index.find_like(query) {
+            if let Ok(files) = rt.block_on(index.find_like(query)) {
                 if !files.is_empty() {
                     return files.into_iter().map(|f| (f.path, f.is_dir)).collect();
                 }
             }
         }
         // Fall back to all files for empty query or no LIKE matches
-        if let Ok(files) = index.all_files() {
+        if let Ok(files) = rt.block_on(index.all_files()) {
             return files.into_iter().map(|f| (f.path, f.is_dir)).collect();
         }
     }

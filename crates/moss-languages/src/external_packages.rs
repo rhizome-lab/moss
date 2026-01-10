@@ -78,7 +78,7 @@ pub fn version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
 // Global Package Index Database
 // =============================================================================
 
-use rusqlite::{Connection, params};
+use libsql::{Connection, Database, params};
 
 /// Parsed version as (major, minor).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -168,33 +168,38 @@ pub struct SymbolRecord {
     pub line: u32,
 }
 
-/// Global package index backed by SQLite.
+/// Global package index backed by libSQL.
 pub struct PackageIndex {
     conn: Connection,
+    #[allow(dead_code)]
+    db: Database,
 }
 
 impl PackageIndex {
-    pub fn open() -> Result<Self, rusqlite::Error> {
+    pub async fn open() -> Result<Self, libsql::Error> {
         let db_path = get_global_packages_db().ok_or_else(|| {
-            rusqlite::Error::InvalidPath("Cannot determine cache directory".into())
+            libsql::Error::SqliteFailure(1, "Cannot determine cache directory".into())
         })?;
 
-        let conn = Connection::open(&db_path)?;
-        let index = PackageIndex { conn };
-        index.init_schema()?;
+        let db = libsql::Builder::new_local(db_path).build().await?;
+        let conn = db.connect()?;
+        let index = PackageIndex { conn, db };
+        index.init_schema().await?;
         Ok(index)
     }
 
-    pub fn open_in_memory() -> Result<Self, rusqlite::Error> {
-        let conn = Connection::open_in_memory()?;
-        let index = PackageIndex { conn };
-        index.init_schema()?;
+    pub async fn open_in_memory() -> Result<Self, libsql::Error> {
+        let db = libsql::Builder::new_local(":memory:").build().await?;
+        let conn = db.connect()?;
+        let index = PackageIndex { conn, db };
+        index.init_schema().await?;
         Ok(index)
     }
 
-    fn init_schema(&self) -> Result<(), rusqlite::Error> {
-        self.conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS packages (
+    async fn init_schema(&self) -> Result<(), libsql::Error> {
+        self.conn
+            .execute(
+                "CREATE TABLE IF NOT EXISTS packages (
                 id INTEGER PRIMARY KEY,
                 language TEXT NOT NULL,
                 name TEXT NOT NULL,
@@ -204,11 +209,21 @@ impl PackageIndex {
                 max_major INTEGER,
                 max_minor INTEGER,
                 indexed_at INTEGER NOT NULL
-            );
+            )",
+                (),
+            )
+            .await?;
 
-            CREATE INDEX IF NOT EXISTS idx_packages_lang_name ON packages(language, name);
+        self.conn
+            .execute(
+                "CREATE INDEX IF NOT EXISTS idx_packages_lang_name ON packages(language, name)",
+                (),
+            )
+            .await?;
 
-            CREATE TABLE IF NOT EXISTS symbols (
+        self.conn
+            .execute(
+                "CREATE TABLE IF NOT EXISTS symbols (
                 id INTEGER PRIMARY KEY,
                 package_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
@@ -216,23 +231,35 @@ impl PackageIndex {
                 signature TEXT NOT NULL,
                 line INTEGER NOT NULL,
                 FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE
-            );
+            )",
+                (),
+            )
+            .await?;
 
-            CREATE INDEX IF NOT EXISTS idx_symbols_package ON symbols(package_id);
-            CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
-            ",
-        )?;
+        self.conn
+            .execute(
+                "CREATE INDEX IF NOT EXISTS idx_symbols_package ON symbols(package_id)",
+                (),
+            )
+            .await?;
+        self.conn
+            .execute(
+                "CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name)",
+                (),
+            )
+            .await?;
+
         Ok(())
     }
 
-    pub fn insert_package(
+    pub async fn insert_package(
         &self,
         language: &str,
         name: &str,
         path: &str,
         min_version: Version,
         max_version: Option<Version>,
-    ) -> Result<i64, rusqlite::Error> {
+    ) -> Result<i64, libsql::Error> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -251,51 +278,56 @@ impl PackageIndex {
                 max_version.map(|v| v.minor),
                 now,
             ],
-        )?;
+        ).await?;
         Ok(self.conn.last_insert_rowid())
     }
 
-    pub fn insert_symbol(
+    pub async fn insert_symbol(
         &self,
         package_id: i64,
         name: &str,
         kind: &str,
         signature: &str,
         line: u32,
-    ) -> Result<i64, rusqlite::Error> {
-        self.conn.execute(
-            "INSERT INTO symbols (package_id, name, kind, signature, line)
+    ) -> Result<i64, libsql::Error> {
+        self.conn
+            .execute(
+                "INSERT INTO symbols (package_id, name, kind, signature, line)
              VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![package_id, name, kind, signature, line],
-        )?;
+                params![package_id, name, kind, signature, line],
+            )
+            .await?;
         Ok(self.conn.last_insert_rowid())
     }
 
-    pub fn find_package(
+    pub async fn find_package(
         &self,
         language: &str,
         name: &str,
         version: Option<Version>,
-    ) -> Result<Option<PackageRecord>, rusqlite::Error> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, language, name, path, min_major, min_minor, max_major, max_minor
+    ) -> Result<Option<PackageRecord>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT id, language, name, path, min_major, min_minor, max_major, max_minor
              FROM packages WHERE language = ?1 AND name = ?2",
-        )?;
+                params![language, name],
+            )
+            .await?;
 
-        let packages: Vec<PackageRecord> = stmt
-            .query_map(params![language, name], |row| {
-                Ok(PackageRecord {
-                    id: row.get(0)?,
-                    language: row.get(1)?,
-                    name: row.get(2)?,
-                    path: row.get(3)?,
-                    min_major: row.get(4)?,
-                    min_minor: row.get(5)?,
-                    max_major: row.get(6)?,
-                    max_minor: row.get(7)?,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut packages = Vec::new();
+        while let Some(row) = rows.next().await? {
+            packages.push(PackageRecord {
+                id: row.get(0)?,
+                language: row.get(1)?,
+                name: row.get(2)?,
+                path: row.get(3)?,
+                min_major: row.get(4)?,
+                min_minor: row.get(5)?,
+                max_major: row.get(6)?,
+                max_minor: row.get(7)?,
+            });
+        }
 
         if let Some(ver) = version {
             for pkg in packages {
@@ -309,66 +341,69 @@ impl PackageIndex {
         }
     }
 
-    pub fn get_symbols(&self, package_id: i64) -> Result<Vec<SymbolRecord>, rusqlite::Error> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, package_id, name, kind, signature, line
+    pub async fn get_symbols(&self, package_id: i64) -> Result<Vec<SymbolRecord>, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT id, package_id, name, kind, signature, line
              FROM symbols WHERE package_id = ?1 ORDER BY line",
-        )?;
+                params![package_id],
+            )
+            .await?;
 
-        let symbols = stmt
-            .query_map(params![package_id], |row| {
-                Ok(SymbolRecord {
-                    id: row.get(0)?,
-                    package_id: row.get(1)?,
-                    name: row.get(2)?,
-                    kind: row.get(3)?,
-                    signature: row.get(4)?,
-                    line: row.get(5)?,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut symbols = Vec::new();
+        while let Some(row) = rows.next().await? {
+            symbols.push(SymbolRecord {
+                id: row.get(0)?,
+                package_id: row.get(1)?,
+                name: row.get(2)?,
+                kind: row.get(3)?,
+                signature: row.get(4)?,
+                line: row.get(5)?,
+            });
+        }
 
         Ok(symbols)
     }
 
-    pub fn find_symbol(
+    pub async fn find_symbol(
         &self,
         language: &str,
         symbol_name: &str,
         version: Option<Version>,
-    ) -> Result<Vec<(PackageRecord, SymbolRecord)>, rusqlite::Error> {
-        let mut stmt = self.conn.prepare(
+    ) -> Result<Vec<(PackageRecord, SymbolRecord)>, libsql::Error> {
+        let mut rows = self.conn.query(
             "SELECT p.id, p.language, p.name, p.path, p.min_major, p.min_minor, p.max_major, p.max_minor,
                     s.id, s.package_id, s.name, s.kind, s.signature, s.line
              FROM symbols s
              JOIN packages p ON s.package_id = p.id
-             WHERE p.language = ?1 AND s.name = ?2"
-        )?;
+             WHERE p.language = ?1 AND s.name = ?2",
+            params![language, symbol_name],
+        ).await?;
 
-        let results: Vec<(PackageRecord, SymbolRecord)> = stmt
-            .query_map(params![language, symbol_name], |row| {
-                Ok((
-                    PackageRecord {
-                        id: row.get(0)?,
-                        language: row.get(1)?,
-                        name: row.get(2)?,
-                        path: row.get(3)?,
-                        min_major: row.get(4)?,
-                        min_minor: row.get(5)?,
-                        max_major: row.get(6)?,
-                        max_minor: row.get(7)?,
-                    },
-                    SymbolRecord {
-                        id: row.get(8)?,
-                        package_id: row.get(9)?,
-                        name: row.get(10)?,
-                        kind: row.get(11)?,
-                        signature: row.get(12)?,
-                        line: row.get(13)?,
-                    },
-                ))
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut results = Vec::new();
+        while let Some(row) = rows.next().await? {
+            results.push((
+                PackageRecord {
+                    id: row.get(0)?,
+                    language: row.get(1)?,
+                    name: row.get(2)?,
+                    path: row.get(3)?,
+                    min_major: row.get(4)?,
+                    min_minor: row.get(5)?,
+                    max_major: row.get(6)?,
+                    max_minor: row.get(7)?,
+                },
+                SymbolRecord {
+                    id: row.get(8)?,
+                    package_id: row.get(9)?,
+                    name: row.get(10)?,
+                    kind: row.get(11)?,
+                    signature: row.get(12)?,
+                    line: row.get(13)?,
+                },
+            ));
+        }
 
         if let Some(ver) = version {
             Ok(results
@@ -380,28 +415,39 @@ impl PackageIndex {
         }
     }
 
-    pub fn is_indexed(&self, language: &str, name: &str) -> Result<bool, rusqlite::Error> {
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM packages WHERE language = ?1 AND name = ?2",
-            params![language, name],
-            |row| row.get(0),
-        )?;
-        Ok(count > 0)
+    pub async fn is_indexed(&self, language: &str, name: &str) -> Result<bool, libsql::Error> {
+        let mut rows = self
+            .conn
+            .query(
+                "SELECT COUNT(*) FROM packages WHERE language = ?1 AND name = ?2",
+                params![language, name],
+            )
+            .await?;
+
+        if let Some(row) = rows.next().await? {
+            let count: i64 = row.get(0)?;
+            Ok(count > 0)
+        } else {
+            Ok(false)
+        }
     }
 
-    pub fn delete_package(&self, package_id: i64) -> Result<(), rusqlite::Error> {
-        self.conn.execute(
-            "DELETE FROM symbols WHERE package_id = ?1",
-            params![package_id],
-        )?;
+    pub async fn delete_package(&self, package_id: i64) -> Result<(), libsql::Error> {
         self.conn
-            .execute("DELETE FROM packages WHERE id = ?1", params![package_id])?;
+            .execute(
+                "DELETE FROM symbols WHERE package_id = ?1",
+                params![package_id],
+            )
+            .await?;
+        self.conn
+            .execute("DELETE FROM packages WHERE id = ?1", params![package_id])
+            .await?;
         Ok(())
     }
 
-    pub fn clear(&self) -> Result<(), rusqlite::Error> {
-        self.conn.execute("DELETE FROM symbols", [])?;
-        self.conn.execute("DELETE FROM packages", [])?;
+    pub async fn clear(&self) -> Result<(), libsql::Error> {
+        self.conn.execute("DELETE FROM symbols", ()).await?;
+        self.conn.execute("DELETE FROM packages", ()).await?;
         Ok(())
     }
 }
@@ -447,9 +493,9 @@ mod tests {
         assert!(!v3.in_range(v1, Some(v2)));
     }
 
-    #[test]
-    fn test_package_index() {
-        let index = PackageIndex::open_in_memory().unwrap();
+    #[tokio::test]
+    async fn test_package_index() {
+        let index = PackageIndex::open_in_memory().await.unwrap();
 
         // Insert a package
         let pkg_id = index
@@ -460,25 +506,30 @@ mod tests {
                 Version { major: 3, minor: 8 },
                 None,
             )
+            .await
             .unwrap();
 
         // Insert a symbol
         index
             .insert_symbol(pkg_id, "get", "function", "def get(url)", 10)
+            .await
             .unwrap();
 
         // Find the package
-        let found = index.find_package("python", "requests", None).unwrap();
+        let found = index
+            .find_package("python", "requests", None)
+            .await
+            .unwrap();
         assert!(found.is_some());
         assert_eq!(found.unwrap().name, "requests");
 
         // Find the symbol
-        let symbols = index.get_symbols(pkg_id).unwrap();
+        let symbols = index.get_symbols(pkg_id).await.unwrap();
         assert_eq!(symbols.len(), 1);
         assert_eq!(symbols[0].name, "get");
 
         // Check indexed
-        assert!(index.is_indexed("python", "requests").unwrap());
-        assert!(!index.is_indexed("python", "nonexistent").unwrap());
+        assert!(index.is_indexed("python", "requests").await.unwrap());
+        assert!(!index.is_indexed("python", "nonexistent").await.unwrap());
     }
 }

@@ -9,5 +9,8 @@ tree-sitter = "0.25"
 tree-sitter-language = "0.1"
 libloading.workspace = true
 dirs = "5"
-rusqlite = { workspace = true }
+libsql = { workspace = true }
 serde_json = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

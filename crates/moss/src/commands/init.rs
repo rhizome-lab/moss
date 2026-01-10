@@ -104,14 +104,15 @@ fn cmd_init(root: &Path, do_index: bool) -> i32 {
     // 5. Optionally index
     if do_index {
         println!("\nIndexing codebase...");
-        let mut idx = match crate::index::FileIndex::open(root) {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let mut idx = match rt.block_on(crate::index::FileIndex::open(root)) {
             Ok(idx) => idx,
             Err(e) => {
                 eprintln!("Failed to open index: {}", e);
                 return 1;
             }
         };
-        match idx.refresh() {
+        match rt.block_on(idx.refresh()) {
             Ok(count) => println!("Indexed {} files.", count),
             Err(e) => {
                 eprintln!("Failed to index: {}", e);

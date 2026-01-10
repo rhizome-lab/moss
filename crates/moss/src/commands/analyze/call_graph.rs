@@ -10,6 +10,25 @@ pub fn cmd_call_graph(
     target: &str,
     show_callers: bool,
     show_callees: bool,
+    case_insensitive: bool,
+    json: bool,
+) -> i32 {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(cmd_call_graph_async(
+        root,
+        target,
+        show_callers,
+        show_callees,
+        case_insensitive,
+        json,
+    ))
+}
+
+async fn cmd_call_graph_async(
+    root: &Path,
+    target: &str,
+    show_callers: bool,
+    show_callees: bool,
     _case_insensitive: bool, // Index methods already have case-insensitive fallbacks
     json: bool,
 ) -> i32 {
@@ -21,7 +40,7 @@ pub fn cmd_call_graph(
     };
 
     // Try index first
-    let idx = match index::FileIndex::open_if_enabled(root) {
+    let idx = match index::FileIndex::open_if_enabled(root).await {
         Some(i) => i,
         None => {
             eprintln!("Indexing disabled or failed. Run: moss index rebuild --call-graph");
@@ -29,7 +48,7 @@ pub fn cmd_call_graph(
         }
     };
 
-    let stats = idx.call_graph_stats().unwrap_or_default();
+    let stats = idx.call_graph_stats().await.unwrap_or_default();
     if stats.calls == 0 {
         eprintln!("Call graph not indexed. Run: moss reindex --call-graph");
         return 1;
@@ -39,7 +58,7 @@ pub fn cmd_call_graph(
 
     // Get callers if requested
     if show_callers {
-        match idx.find_callers(&symbol) {
+        match idx.find_callers(&symbol).await {
             Ok(callers) => {
                 for (file, sym, line) in callers {
                     results.push((file, sym, line, "caller"));
@@ -62,12 +81,13 @@ pub fn cmd_call_graph(
                 .map(|m| m.path.clone())
         } else {
             idx.find_symbol(&symbol)
+                .await
                 .ok()
                 .and_then(|syms| syms.first().map(|(f, _, _, _)| f.clone()))
         };
 
         if let Some(file_path) = file_path {
-            match idx.find_callees(&file_path, &symbol) {
+            match idx.find_callees(&file_path, &symbol).await {
                 Ok(callees) => {
                     for (name, line) in callees {
                         results.push((file_path.clone(), name, line, "callee"));

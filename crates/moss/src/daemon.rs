@@ -247,12 +247,13 @@ impl DaemonServer {
         }
 
         // Initial index refresh
-        match FileIndex::open(&root) {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        match rt.block_on(FileIndex::open(&root)) {
             Ok(mut idx) => {
-                if let Err(e) = idx.refresh() {
+                if let Err(e) = rt.block_on(idx.refresh()) {
                     return Response::err(&format!("Failed to index: {}", e));
                 }
-                if let Err(e) = idx.incremental_call_graph_refresh() {
+                if let Err(e) = rt.block_on(idx.incremental_call_graph_refresh()) {
                     eprintln!("Warning: call graph refresh failed: {}", e);
                 }
             }
@@ -345,9 +346,10 @@ impl DaemonServer {
     fn refresh_root(&self, root: &Path) {
         let mut roots = self.roots.lock().unwrap();
         if let Some(watched) = roots.get_mut(root) {
-            match FileIndex::open(root) {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            match rt.block_on(FileIndex::open(root)) {
                 Ok(mut idx) => {
-                    if let Err(e) = idx.incremental_refresh() {
+                    if let Err(e) = rt.block_on(idx.incremental_refresh()) {
                         eprintln!("Refresh error for {:?}: {}", root, e);
                     }
                     watched.last_refresh = Instant::now();

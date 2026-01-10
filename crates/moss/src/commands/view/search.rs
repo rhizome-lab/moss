@@ -21,19 +21,24 @@ pub fn has_language_support(path: &str) -> bool {
 /// Search for symbols in the index by name.
 /// Supports qualified names like "ClassName/method" or "file.rs/ClassName/method"
 pub fn search_symbols(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(search_symbols_async(query, root))
+}
+
+async fn search_symbols_async(query: &str, root: &Path) -> Vec<index::SymbolMatch> {
     let parsed = parse_symbol_query(query);
 
     // Try index first - if enabled, use it (or build it if empty)
-    if let Some(mut idx) = index::FileIndex::open_if_enabled(root) {
-        let stats = idx.call_graph_stats().unwrap_or_default();
+    if let Some(mut idx) = index::FileIndex::open_if_enabled(root).await {
+        let stats = idx.call_graph_stats().await.unwrap_or_default();
         if stats.symbols == 0 {
             eprintln!("Building symbol index...");
-            if let Err(e) = idx.refresh_call_graph() {
+            if let Err(e) = idx.refresh_call_graph().await {
                 eprintln!("Warning: failed to build index: {}", e);
                 return search_symbols_unindexed(query, root);
             }
         }
-        if let Ok(mut symbols) = idx.find_symbols(&parsed.symbol_name, None, true, 50) {
+        if let Ok(mut symbols) = idx.find_symbols(&parsed.symbol_name, None, true, 50).await {
             // Filter by parent hint if provided
             if let Some(ref parent) = parsed.parent_hint {
                 let parent_lower = parent.to_lowercase();

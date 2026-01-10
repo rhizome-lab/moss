@@ -71,13 +71,16 @@ pub enum IndexAction {
 
 /// Run an index management action
 pub fn cmd_index(action: IndexAction, root: Option<&Path>, json: bool) -> i32 {
+    let rt = tokio::runtime::Runtime::new().unwrap();
     match action {
-        IndexAction::Rebuild { include } => cmd_rebuild(root, &include),
-        IndexAction::Stats { storage } => cmd_stats(root, json, storage),
+        IndexAction::Rebuild { include } => rt.block_on(cmd_rebuild(root, &include)),
+        IndexAction::Stats { storage } => rt.block_on(cmd_stats(root, json, storage)),
         IndexAction::Files { prefix, limit } => {
-            cmd_list_files(prefix.as_deref(), root, limit, json)
+            rt.block_on(cmd_list_files(prefix.as_deref(), root, limit, json))
         }
-        IndexAction::Packages { only, clear } => cmd_packages(&only, clear, root, json),
+        IndexAction::Packages { only, clear } => {
+            rt.block_on(cmd_packages(&only, clear, root, json))
+        }
     }
 }
 
@@ -85,32 +88,32 @@ pub fn cmd_index(action: IndexAction, root: Option<&Path>, json: bool) -> i32 {
 // Rebuild
 // =============================================================================
 
-fn cmd_rebuild(root: Option<&Path>, include: &[IndexContent]) -> i32 {
+async fn cmd_rebuild(root: Option<&Path>, include: &[IndexContent]) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    match index::FileIndex::open(&root) {
-        Ok(mut idx) => match idx.refresh() {
+    match index::FileIndex::open(&root).await {
+        Ok(mut idx) => match idx.refresh().await {
             Ok(count) => {
                 println!("Indexed {} files", count);
 
                 // Any content type requires call graph extraction (parsed together)
                 // "none" means files only - skip call graph
                 if !include.is_empty() && !include.contains(&IndexContent::None) {
-                    match idx.refresh_call_graph() {
+                    match idx.refresh_call_graph().await {
                         Ok(mut stats) => {
                             // Delete content types that weren't requested
                             if !include.contains(&IndexContent::Symbols) {
-                                let _ = idx.execute("DELETE FROM symbols");
+                                let _ = idx.execute("DELETE FROM symbols").await;
                                 stats.symbols = 0;
                             }
                             if !include.contains(&IndexContent::Calls) {
-                                let _ = idx.execute("DELETE FROM calls");
+                                let _ = idx.execute("DELETE FROM calls").await;
                                 stats.calls = 0;
                             }
                             if !include.contains(&IndexContent::Imports) {
-                                let _ = idx.execute("DELETE FROM imports");
+                                let _ = idx.execute("DELETE FROM imports").await;
                                 stats.imports = 0;
                             }
 
@@ -168,7 +171,7 @@ fn is_binary_file(path: &Path) -> bool {
     buffer[..bytes_read].contains(&0)
 }
 
-fn cmd_stats(root: Option<&Path>, json: bool, storage: bool) -> i32 {
+async fn cmd_stats(root: Option<&Path>, json: bool, storage: bool) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
@@ -183,7 +186,7 @@ fn cmd_stats(root: Option<&Path>, json: bool, storage: bool) -> i32 {
 
     let db_size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
 
-    let idx = match index::FileIndex::open(&root) {
+    let idx = match index::FileIndex::open(&root).await {
         Ok(idx) => idx,
         Err(e) => {
             eprintln!("Failed to open index: {}", e);
@@ -191,7 +194,7 @@ fn cmd_stats(root: Option<&Path>, json: bool, storage: bool) -> i32 {
         }
     };
 
-    let files = match idx.all_files() {
+    let files = match idx.all_files().await {
         Ok(f) => f,
         Err(e) => {
             eprintln!("Failed to read files: {}", e);
@@ -226,7 +229,7 @@ fn cmd_stats(root: Option<&Path>, json: bool, storage: bool) -> i32 {
     let mut ext_list: Vec<_> = ext_counts.into_iter().collect();
     ext_list.sort_by(|a, b| b.1.cmp(&a.1));
 
-    let stats = idx.call_graph_stats().unwrap_or_default();
+    let stats = idx.call_graph_stats().await.unwrap_or_default();
 
     // Calculate codebase size
     let mut codebase_size = 0u64;
@@ -292,12 +295,17 @@ fn cmd_stats(root: Option<&Path>, json: bool, storage: bool) -> i32 {
 // List Files
 // =============================================================================
 
-fn cmd_list_files(prefix: Option<&str>, root: Option<&Path>, limit: usize, json: bool) -> i32 {
+async fn cmd_list_files(
+    prefix: Option<&str>,
+    root: Option<&Path>,
+    limit: usize,
+    json: bool,
+) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap());
 
-    let idx = match index::FileIndex::open(&root) {
+    let idx = match index::FileIndex::open(&root).await {
         Ok(idx) => idx,
         Err(e) => {
             eprintln!("Failed to open index: {}", e);
@@ -305,7 +313,7 @@ fn cmd_list_files(prefix: Option<&str>, root: Option<&Path>, limit: usize, json:
         }
     };
 
-    let files = match idx.all_files() {
+    let files = match idx.all_files().await {
         Ok(f) => f,
         Err(e) => {
             eprintln!("Failed to read files: {}", e);
@@ -342,12 +350,12 @@ struct IndexedCounts {
     symbols: usize,
 }
 
-fn cmd_packages(only: &[String], clear: bool, root: Option<&Path>, json: bool) -> i32 {
+async fn cmd_packages(only: &[String], clear: bool, root: Option<&Path>, json: bool) -> i32 {
     let root = root
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
-    let pkg_index = match external_packages::PackageIndex::open() {
+    let pkg_index = match external_packages::PackageIndex::open().await {
         Ok(idx) => idx,
         Err(e) => {
             eprintln!("Failed to open package index: {}", e);
@@ -356,7 +364,7 @@ fn cmd_packages(only: &[String], clear: bool, root: Option<&Path>, json: bool) -
     };
 
     if clear {
-        if let Err(e) = pkg_index.clear() {
+        if let Err(e) = pkg_index.clear().await {
             eprintln!("Failed to clear index: {}", e);
             return 1;
         }
@@ -401,7 +409,7 @@ fn cmd_packages(only: &[String], clear: bool, root: Option<&Path>, json: bool) -
         if results.contains_key(lang_key) {
             continue;
         }
-        let counts = index_language_packages(lang, &pkg_index, &root, json);
+        let counts = index_language_packages(lang, &pkg_index, &root, json).await;
         results.insert(lang_key, counts);
     }
 
@@ -431,27 +439,29 @@ fn cmd_packages(only: &[String], clear: bool, root: Option<&Path>, json: bool) -
     0
 }
 
-fn count_and_insert_symbols(
+async fn count_and_insert_symbols(
     pkg_index: &external_packages::PackageIndex,
     pkg_id: i64,
     symbols: &[skeleton::SkeletonSymbol],
 ) -> usize {
     let mut count = 0;
     for sym in symbols {
-        let _ = pkg_index.insert_symbol(
-            pkg_id,
-            &sym.name,
-            sym.kind.as_str(),
-            &sym.signature,
-            sym.start_line as u32,
-        );
+        let _ = pkg_index
+            .insert_symbol(
+                pkg_id,
+                &sym.name,
+                sym.kind.as_str(),
+                &sym.signature,
+                sym.start_line as u32,
+            )
+            .await;
         count += 1;
-        count += count_and_insert_symbols(pkg_index, pkg_id, &sym.children);
+        count += Box::pin(count_and_insert_symbols(pkg_index, pkg_id, &sym.children)).await;
     }
     count
 }
 
-fn index_language_packages(
+async fn index_language_packages(
     lang: &dyn rhizome_moss_languages::Language,
     pkg_index: &external_packages::PackageIndex,
     project_root: &Path,
@@ -506,24 +516,27 @@ fn index_language_packages(
         let discovered = lang.discover_packages(&source);
 
         for (pkg_name, pkg_path) in discovered {
-            if let Ok(true) = pkg_index.is_indexed(lang_key, &pkg_name) {
+            if let Ok(true) = pkg_index.is_indexed(lang_key, &pkg_name).await {
                 continue;
             }
 
-            let pkg_id = match pkg_index.insert_package(
-                lang_key,
-                &pkg_name,
-                &pkg_path.to_string_lossy(),
-                min_version,
-                max_version,
-            ) {
+            let pkg_id = match pkg_index
+                .insert_package(
+                    lang_key,
+                    &pkg_name,
+                    &pkg_path.to_string_lossy(),
+                    min_version,
+                    max_version,
+                )
+                .await
+            {
                 Ok(id) => id,
                 Err(_) => continue,
             };
 
             total_packages += 1;
             total_symbols +=
-                index_package_symbols(lang, pkg_index, &mut extractor, pkg_id, &pkg_path);
+                index_package_symbols(lang, pkg_index, &mut extractor, pkg_id, &pkg_path).await;
         }
     }
 
@@ -533,7 +546,7 @@ fn index_language_packages(
     }
 }
 
-fn index_package_symbols(
+async fn index_package_symbols(
     lang: &dyn rhizome_moss_languages::Language,
     pkg_index: &external_packages::PackageIndex,
     extractor: &mut skeleton::SkeletonExtractor,
@@ -547,7 +560,7 @@ fn index_package_symbols(
 
     if let Ok(content) = std::fs::read_to_string(&entry) {
         let result = extractor.extract(&entry, &content);
-        return count_and_insert_symbols(pkg_index, pkg_id, &result.symbols);
+        return count_and_insert_symbols(pkg_index, pkg_id, &result.symbols).await;
     }
 
     0

@@ -55,22 +55,26 @@ impl<'a> IndexedResolver<'a> {
 
 impl InterfaceResolver for IndexedResolver<'_> {
     fn resolve_interface_methods(&self, name: &str, current_file: &str) -> Option<Vec<String>> {
+        let rt = tokio::runtime::Runtime::new().ok()?;
+
         // First try to resolve the import to find the source file
         if let Ok(Some((source_module, _original_name))) =
-            self.index.resolve_import(current_file, name)
+            rt.block_on(self.index.resolve_import(current_file, name))
         {
             // Convert module to file path and query type_methods
             // For now, try the source_module as a relative path
-            let methods = self.index.get_type_methods(&source_module, name).ok()?;
+            let methods = rt
+                .block_on(self.index.get_type_methods(&source_module, name))
+                .ok()?;
             if !methods.is_empty() {
                 return Some(methods);
             }
         }
 
         // Also check if the type is defined in any indexed file
-        if let Ok(files) = self.index.find_type_definitions(name) {
+        if let Ok(files) = rt.block_on(self.index.find_type_definitions(name)) {
             for file in files {
-                if let Ok(methods) = self.index.get_type_methods(&file, name) {
+                if let Ok(methods) = rt.block_on(self.index.get_type_methods(&file, name)) {
                     if !methods.is_empty() {
                         return Some(methods);
                     }
