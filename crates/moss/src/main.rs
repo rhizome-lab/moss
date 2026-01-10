@@ -1,7 +1,5 @@
 use clap::builder::styling::{AnsiColor, Styles};
 use clap::{ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 use rhizome_moss::commands;
@@ -189,66 +187,17 @@ fn reset_sigpipe() {
 #[cfg(not(unix))]
 fn reset_sigpipe() {}
 
-/// Configuration for moss when run via Nursery.
-///
-/// This schema is returned by `moss --schema` for Nursery integration.
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct NurseryConfig {
-    /// Root directory for analysis (defaults to current directory)
-    #[serde(default)]
-    root: Option<String>,
-
-    /// Analysis types to run
-    #[serde(default)]
-    analyze: Option<AnalyzeConfig>,
-
-    /// Index configuration
-    #[serde(default)]
-    index: Option<IndexConfig>,
-}
-
-/// Analysis configuration for Nursery.
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct AnalyzeConfig {
-    /// Run health analysis (complexity, large files)
-    #[serde(default)]
-    health: bool,
-
-    /// Run security analysis
-    #[serde(default)]
-    security: bool,
-
-    /// Run documentation coverage analysis
-    #[serde(default)]
-    docs: bool,
-
-    /// Run duplicate code detection
-    #[serde(default)]
-    duplicates: bool,
-}
-
-/// Index configuration for Nursery.
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct IndexConfig {
-    /// Rebuild the index
-    #[serde(default)]
-    rebuild: bool,
-
-    /// Include call graph in index
-    #[serde(default)]
-    call_graph: bool,
-}
-
 /// Handle --schema flag for Nursery integration.
-/// Returns true if --schema was handled (program should exit).
+/// Returns JSON with config_path, format, and schema for MossConfig.
 fn handle_schema_flag() -> bool {
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(|s| s.as_str()) == Some("--schema") {
-        let schema = schemars::schema_for!(NurseryConfig);
-        println!("{}", serde_json::to_string_pretty(&schema).unwrap());
+        let response = serde_json::json!({
+            "config_path": ".moss/config.toml",
+            "format": "toml",
+            "schema": schemars::schema_for!(rhizome_moss::config::MossConfig)
+        });
+        println!("{}", serde_json::to_string_pretty(&response).unwrap());
         true
     } else {
         false

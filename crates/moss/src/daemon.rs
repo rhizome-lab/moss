@@ -27,7 +27,7 @@ pub fn global_socket_path() -> PathBuf {
 }
 
 /// Daemon configuration.
-#[derive(Debug, Clone, Deserialize, Merge, Default)]
+#[derive(Debug, Clone, Deserialize, serde::Serialize, Merge, Default, schemars::JsonSchema)]
 #[serde(default)]
 pub struct DaemonConfig {
     /// Whether to use the daemon. Default: true

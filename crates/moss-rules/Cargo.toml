@@ -23,6 +23,9 @@ streaming-iterator = "0.1"
 # Language support
 rhizome-moss-languages = { path = "../moss-languages" }
 
+# Schema generation
+schemars = "1"
+
 # Core traits
 rhizome-moss-core = { path = "../moss-core" }
 rhizome-moss-derive = { path = "../moss-derive" }

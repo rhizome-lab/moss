@@ -9,19 +9,19 @@ use crate::builtin::BUILTIN_RULES;
 use crate::{Rule, Severity};
 use glob::Pattern;
 use rhizome_moss_derive::Merge;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Configuration for syntax rules analysis.
 /// Maps rule ID to per-rule configuration.
 /// e.g., { "rust/unnecessary-let" = { severity = "warning" } }
-#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, schemars::JsonSchema)]
 #[serde(transparent)]
 pub struct RulesConfig(pub HashMap<String, RuleOverride>);
 
 /// Per-rule configuration override.
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
 #[serde(default)]
 pub struct RuleOverride {
     /// Override the rule's severity.

@@ -13,7 +13,7 @@ pub mod lsp;
 pub mod mcp;
 
 /// Serve configuration from config.toml.
-#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[derive(Debug, Clone, Deserialize, serde::Serialize, Default, Merge, schemars::JsonSchema)]
 #[serde(default)]
 pub struct ServeConfig {
     /// Default HTTP port (overridden by --port).

@@ -26,12 +26,12 @@ use crate::filter::Filter;
 pub use args::{AnalyzeArgs, AnalyzeCommand};
 use rhizome_moss_derive::Merge;
 pub use rhizome_moss_rules::{RuleOverride, RulesConfig};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Analyze command configuration.
-#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, schemars::JsonSchema)]
 #[serde(default)]
 pub struct AnalyzeConfig {
     /// Default complexity threshold for filtering
@@ -60,7 +60,7 @@ pub struct AnalyzeConfig {
 }
 
 /// Weights for each analysis pass (higher = more impact on grade).
-#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, schemars::JsonSchema)]
 #[serde(default)]
 pub struct AnalyzeWeights {
     pub health: Option<f64>,

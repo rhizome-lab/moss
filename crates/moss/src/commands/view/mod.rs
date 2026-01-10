@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 pub use search::search_symbols;
 
 /// View command configuration.
-#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[derive(Debug, Clone, Deserialize, serde::Serialize, Default, Merge, schemars::JsonSchema)]
 #[serde(default)]
 pub struct ViewConfig {
     /// Default depth for tree expansion (0=names, 1=signatures, 2=children, -1=all)

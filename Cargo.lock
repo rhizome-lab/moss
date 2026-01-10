@@ -3771,6 +3771,7 @@ dependencies = [
  "rhizome-moss-core",
  "rhizome-moss-derive",
  "rhizome-moss-languages",
+ "schemars",
  "serde",
  "streaming-iterator",
  "toml",

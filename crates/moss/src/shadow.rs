@@ -24,7 +24,7 @@ pub struct HistoryEntry {
 }
 
 /// Shadow git configuration.
-#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, schemars::JsonSchema)]
 #[serde(default)]
 pub struct ShadowConfig {
     /// Whether shadow git is enabled. Default: true

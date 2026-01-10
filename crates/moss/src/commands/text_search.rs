@@ -14,7 +14,7 @@ use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
 /// Text search command configuration.
-#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[derive(Debug, Clone, Deserialize, serde::Serialize, Default, Merge, schemars::JsonSchema)]
 #[serde(default)]
 pub struct TextSearchConfig {
     /// Default maximum number of matches

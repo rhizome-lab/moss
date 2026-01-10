@@ -8,7 +8,9 @@ use serde::{Deserialize, Serialize};
 use std::io::IsTerminal;
 
 /// Color output mode.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum ColorMode {
     /// Auto-detect based on TTY (default)
@@ -35,7 +37,7 @@ impl Merge for ColorMode {
 /// colors = "auto"      # "auto", "always", or "never"
 /// highlight = true     # syntax highlighting on signatures
 /// ```
-#[derive(Debug, Clone, Deserialize, Merge, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Merge, Default, schemars::JsonSchema)]
 #[serde(default)]
 pub struct PrettyConfig {
     /// Enable pretty mode. None = auto (true when stdout is TTY)

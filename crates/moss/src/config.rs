@@ -55,12 +55,13 @@ use crate::output::PrettyConfig;
 use crate::shadow::ShadowConfig;
 use rhizome_moss_core::Merge;
 use rhizome_moss_derive::Merge;
-use serde::Deserialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
 /// Index configuration.
-#[derive(Debug, Clone, Deserialize, Merge, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Merge, Default, JsonSchema)]
 #[serde(default)]
 pub struct IndexConfig {
     /// Whether to create and use the file index. Default: true
@@ -78,7 +79,7 @@ pub struct IndexConfig {
 /// vendor = ["vendor/**"]          # custom filter alias
 /// tests = []                      # disable built-in @tests
 /// ```
-#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, JsonSchema)]
 #[serde(default)]
 pub struct AliasConfig {
     /// Map alias names to paths/patterns. Empty array disables the alias.
@@ -194,7 +195,7 @@ impl IndexConfig {
 }
 
 /// Root configuration structure.
-#[derive(Debug, Clone, Deserialize, Default, Merge)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, Merge, JsonSchema)]
 #[serde(default)]
 pub struct MossConfig {
     pub daemon: DaemonConfig,
