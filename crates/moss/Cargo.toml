@@ -14,16 +14,10 @@ name = "moss"
 path = "src/main.rs"
 
 [features]
-default = ["lua", "llm"]
-
-# Optional LLM support for workflows
-llm = ["rig-core", "reqwest", "tokio-stream"]
+default = []
 
 # Optional MCP server support
 mcp = ["rmcp", "schemars"]
-
-# Optional Lua workflow engine
-lua = ["mlua"]
 
 [dependencies]
 clap.workspace = true
@@ -62,13 +56,9 @@ jaq-core = "2"
 jaq-std = "2"
 jaq-json = { version = "1", features = ["serde_json"] }
 toml = "0.8"
-rig-core = { version = "0.27", optional = true, default-features = false, features = ["reqwest-rustls"] }
-reqwest = { version = "0.12", optional = true, default-features = false, features = ["rustls-tls"] }
-tokio-stream = { version = "0.1", optional = true }
 rmcp = { version = "0.12", features = ["server", "macros", "schemars", "transport-io"], optional = true }
 schemars = { version = "1", optional = true }
 tower-lsp = "0.20"
-mlua = { version = "0.10", features = ["luajit52", "vendored", "serialize"], optional = true }
 git2 = { version = "0.19", default-features = false }
 glob = "0.3.3"
 nu-ansi-term = "0.50"

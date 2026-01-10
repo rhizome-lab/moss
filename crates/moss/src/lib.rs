@@ -38,7 +38,6 @@ pub mod skeleton;
 pub mod symbols;
 pub mod text_search;
 pub mod tree;
-pub mod workflow;
 
 #[cfg(test)]
 mod highlight_tests;
