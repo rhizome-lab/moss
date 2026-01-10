@@ -3,11 +3,13 @@
 mod analyze;
 mod list;
 mod plans;
+#[cfg(feature = "sessions-web")]
 mod serve;
 mod show;
 mod stats;
 
 pub use list::cmd_sessions_list;
+#[cfg(feature = "sessions-web")]
 pub use serve::cmd_sessions_serve;
 pub use show::cmd_sessions_show;
 pub use stats::cmd_sessions_stats;
@@ -85,8 +87,17 @@ pub fn run(args: SessionsArgs, json: bool, pretty: bool) -> i32 {
 
     // Existing flag-based dispatch
     if args.serve {
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
-        rt.block_on(cmd_sessions_serve(args.root.as_deref(), args.port))
+        #[cfg(feature = "sessions-web")]
+        {
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+            rt.block_on(cmd_sessions_serve(args.root.as_deref(), args.port))
+        }
+        #[cfg(not(feature = "sessions-web"))]
+        {
+            eprintln!("Sessions web server requires the 'sessions-web' feature");
+            eprintln!("Rebuild with: cargo build --features sessions-web");
+            1
+        }
     } else if args.stats {
         cmd_sessions_stats(
             args.root.as_deref(),
