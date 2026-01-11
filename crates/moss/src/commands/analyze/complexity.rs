@@ -19,6 +19,7 @@ pub fn analyze_codebase_complexity(
     limit: usize,
     threshold: Option<usize>,
     filter: Option<&Filter>,
+    allowlist: &[String],
 ) -> ComplexityReport {
     let all_files = path_resolve::all_files(root);
     let code_files: Vec<_> = all_files
@@ -60,6 +61,7 @@ pub fn analyze_codebase_complexity(
         .flatten()
         .collect();
 
+    // Filter by threshold
     let mut filtered: Vec<_> = if let Some(t) = threshold {
         all_functions
             .into_iter()
@@ -68,6 +70,14 @@ pub fn analyze_codebase_complexity(
     } else {
         all_functions
     };
+
+    // Filter by allowlist
+    if !allowlist.is_empty() {
+        filtered.retain(|f| {
+            let key = f.qualified_name();
+            !allowlist.iter().any(|a| key.contains(a))
+        });
+    }
 
     filtered.sort_by(|a, b| b.complexity.cmp(&a.complexity));
     filtered.truncate(limit);

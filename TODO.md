@@ -157,8 +157,11 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 - conan: Conan Center - CLI only (--format=json), no public REST API
 - slackware: SlackBuilds - HTML only, using GitHub raw .info files as workaround
 - swiftpm: Swift Package Index requires authentication for API access
+- stackage: No JSON API (endpoints redirect, snapshot URLs 404)
+- ghcr: GitHub Container Registry requires authentication (401)
+- gradle: Plugin portal API returning 404 (plugins.gradle.org/api/plugins)
 
-**Implemented fetchers** (50 total: 16 distro, 4 Windows, 3 macOS, 2 cross-platform, 1 container, 1 mobile, 23 language):
+**Implemented fetchers** (52 total: 17 distro, 5 Windows, 3 macOS, 2 cross-platform, 1 container, 1 mobile, 23 language):
 - [x] APK (Alpine): APKINDEX.tar.gz with checksums, deps, archive URLs
 - [x] Artix Linux: Arch-based, shares arch_common logic with pacman
 - [x] NixOS/Nix: search.nixos.org Elasticsearch API
@@ -179,6 +182,8 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 - [x] Clojars: clojars.org API (Clojure packages)
 - [x] Docker: hub.docker.com API (container images)
 - [x] F-Droid: f-droid.org API (Android FOSS apps)
+- [x] vcpkg: GitHub baseline.json + port manifests (C++ packages)
+- [x] Termux: GitHub build.sh parsing (Android terminal packages)
 
 **Note**: Debian-derivatives (Ubuntu, Mint, elementary) use apt fetcher.
 Arch-derivatives (Manjaro, etc.) can use pacman fetcher.

@@ -20,6 +20,7 @@ mod stale_docs;
 mod trace;
 
 use crate::analyze::complexity::{ComplexityReport, RiskLevel};
+use crate::analyze::function_length::LengthReport;
 use crate::commands::aliases::detect_project_languages;
 use crate::config::MossConfig;
 use crate::daemon;
@@ -129,11 +130,16 @@ fn load_allow_file(root: &Path, filename: &str) -> Vec<String> {
 
     content
         .lines()
-        .filter(|line| {
-            let trimmed = line.trim();
-            !trimmed.is_empty() && !trimmed.starts_with('#')
+        .filter_map(|line| {
+            // Strip trailing comments
+            let without_comment = line.split('#').next().unwrap_or(line);
+            let trimmed = without_comment.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
         })
-        .map(|line| line.trim().to_string())
         .collect()
 }
 
@@ -153,10 +159,11 @@ fn append_to_allow_file(root: &Path, filename: &str, pattern: &str, reason: Opti
         return 1;
     }
 
-    // Check if pattern already exists
+    // Check if pattern already exists (strip comments when comparing)
     let existing = std::fs::read_to_string(&path).unwrap_or_default();
     for line in existing.lines() {
-        let trimmed = line.trim();
+        let without_comment = line.split('#').next().unwrap_or(line);
+        let trimmed = without_comment.trim();
         if trimmed == pattern {
             println!("Pattern already in {}: {}", filename, pattern);
             return 0;
@@ -285,7 +292,22 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             limit,
             kind,
             sarif,
+            allow,
+            reason,
         }) => {
+            // Handle --allow: append to allowlist and exit
+            if let Some(pattern) = &allow {
+                return append_to_allow_file(
+                    &effective_root,
+                    "complexity-allow",
+                    pattern,
+                    reason.as_deref(),
+                );
+            }
+
+            // Load allowlist for filtering
+            let allowlist = load_allow_file(&effective_root, "complexity-allow");
+
             // Use 0 to mean "no limit"
             let effective_limit = if limit == 0 { usize::MAX } else { limit };
             let effective_threshold = threshold.or(config.analyze.threshold());
@@ -297,6 +319,7 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                     effective_limit,
                     effective_threshold,
                     filter.as_ref(),
+                    &allowlist,
                 );
                 sarif::print_complexity_sarif(&report.functions, &effective_root);
                 0
@@ -307,11 +330,12 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
                     .map(|t| effective_root.join(t))
                     .unwrap_or_else(|| effective_root.clone());
 
-                let mut report = complexity::analyze_codebase_complexity(
+                let report = complexity::analyze_codebase_complexity(
                     &analysis_root,
                     effective_limit,
                     effective_threshold,
                     filter.as_ref(),
+                    &allowlist,
                 );
 
                 // Note: kind filter not applicable to complexity (no kind field)
@@ -328,29 +352,57 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
             }
         }
 
-        Some(AnalyzeCommand::Length { target, sarif }) => {
+        Some(AnalyzeCommand::Length {
+            target,
+            sarif,
+            allow,
+            reason,
+        }) => {
+            // Handle --allow: append to allowlist and exit
+            if let Some(pattern) = &allow {
+                return append_to_allow_file(
+                    &effective_root,
+                    "length-allow",
+                    pattern,
+                    reason.as_deref(),
+                );
+            }
+
+            // Load allowlist for filtering
+            let allowlist = load_allow_file(&effective_root, "length-allow");
+
             if sarif {
                 // Run length analysis and output in SARIF format
                 let report = length::analyze_codebase_length(
                     &effective_root,
                     usize::MAX, // no limit for SARIF
                     filter.as_ref(),
+                    &allowlist,
                 );
                 sarif::print_length_sarif(&report.functions, &effective_root);
                 0
             } else {
-                let report = report::analyze(
-                    target.as_deref(),
-                    &effective_root,
-                    false, // health
-                    false, // complexity
-                    true,  // length
-                    false, // security
-                    None,
-                    None,
+                // Use direct length analysis instead of report to support allowlist
+                let analysis_root = target
+                    .as_ref()
+                    .map(|t| effective_root.join(t))
+                    .unwrap_or_else(|| effective_root.clone());
+
+                let report = length::analyze_codebase_length(
+                    &analysis_root,
+                    20, // default limit for length
                     filter.as_ref(),
+                    &allowlist,
                 );
-                print_report(&report, json, pretty)
+
+                if json {
+                    println!("{}", serde_json::to_string(&report).unwrap_or_default());
+                } else if pretty {
+                    print_length_report_pretty(&report);
+                } else {
+                    print_length_report(&report);
+                }
+                0
             }
         }
 
@@ -980,6 +1032,102 @@ fn print_complexity_report_pretty(report: &ComplexityReport) {
                 RiskLevel::Low => Color::Green.paint(&complexity_str),
             };
             println!("  {} {}", colored_complexity, display_name);
+        }
+    }
+}
+
+/// Print length report in plain format
+fn print_length_report(report: &LengthReport) {
+    use crate::analyze::function_length::LengthCategory;
+
+    println!("# Function Length Analysis");
+    println!();
+    println!("Functions: {}", report.functions.len());
+    println!("Average: {:.1} lines", report.avg_length());
+    println!("Maximum: {} lines", report.max_length());
+
+    let too_long = report.too_long_count();
+    let long = report.long_count();
+    if too_long > 0 {
+        println!("Too Long (>100): {}", too_long);
+    }
+    if long > 0 || too_long == 0 {
+        println!("Long (51-100): {}", long);
+    }
+
+    if !report.functions.is_empty() {
+        println!();
+        println!("## Longest Functions");
+
+        let mut current_cat: Option<LengthCategory> = None;
+        for func in &report.functions {
+            let cat = func.category();
+            if Some(cat) != current_cat {
+                println!("### {}", cat.as_title());
+                current_cat = Some(cat);
+            }
+            let display_name = if let Some(ref fp) = func.file_path {
+                format!("{}:{}", fp, func.short_name())
+            } else {
+                func.short_name()
+            };
+            println!("{} lines  {}", func.lines, display_name);
+        }
+    }
+}
+
+/// Print length report in pretty format with colors
+fn print_length_report_pretty(report: &LengthReport) {
+    use crate::analyze::function_length::LengthCategory;
+    use nu_ansi_term::{Color, Style};
+
+    println!("{}", Style::new().bold().paint("Function Length Analysis"));
+    println!();
+    println!("Functions: {}", report.functions.len());
+    println!("Average: {:.1} lines", report.avg_length());
+    println!("Maximum: {} lines", report.max_length());
+
+    let too_long = report.too_long_count();
+    let long = report.long_count();
+    if too_long > 0 {
+        println!("{}: {}", Color::Red.paint("Too Long (>100)"), too_long);
+    }
+    if long > 0 || too_long == 0 {
+        println!("{}: {}", Color::Yellow.paint("Long (51-100)"), long);
+    }
+
+    if !report.functions.is_empty() {
+        println!();
+        println!("{}", Style::new().bold().paint("Longest Functions"));
+
+        let mut current_cat: Option<LengthCategory> = None;
+        for func in &report.functions {
+            let cat = func.category();
+            if Some(cat) != current_cat {
+                let title = cat.as_title();
+                let colored_title = match cat {
+                    LengthCategory::TooLong => Color::Red.paint(title),
+                    LengthCategory::Long => Color::Yellow.paint(title),
+                    LengthCategory::Medium => Color::Cyan.paint(title),
+                    LengthCategory::Short => Color::Green.paint(title),
+                };
+                println!();
+                println!("{}", colored_title);
+                current_cat = Some(cat);
+            }
+            let display_name = if let Some(ref fp) = func.file_path {
+                format!("{}:{}", fp, func.short_name())
+            } else {
+                func.short_name()
+            };
+            let lines_str = format!("{:4} lines", func.lines);
+            let colored_lines = match cat {
+                LengthCategory::TooLong => Color::Red.paint(&lines_str),
+                LengthCategory::Long => Color::Yellow.paint(&lines_str),
+                LengthCategory::Medium => Color::Cyan.paint(&lines_str),
+                LengthCategory::Short => Color::Green.paint(&lines_str),
+            };
+            println!("  {} {}", colored_lines, display_name);
         }
     }
 }

@@ -55,6 +55,14 @@ pub enum AnalyzeCommand {
         /// Output in SARIF format for IDE integration
         #[arg(long)]
         sarif: bool,
+
+        /// Add function to .moss/complexity-allow
+        #[arg(long, value_name = "SYMBOL")]
+        allow: Option<String>,
+
+        /// Reason for allowing
+        #[arg(long)]
+        reason: Option<String>,
     },
 
     /// Run function length analysis
@@ -65,6 +73,14 @@ pub enum AnalyzeCommand {
         /// Output in SARIF format for IDE integration
         #[arg(long)]
         sarif: bool,
+
+        /// Add function to .moss/length-allow
+        #[arg(long, value_name = "SYMBOL")]
+        allow: Option<String>,
+
+        /// Reason for allowing
+        #[arg(long)]
+        reason: Option<String>,
     },
 
     /// Run security analysis

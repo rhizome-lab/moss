@@ -782,6 +782,7 @@ pub fn analyze(
                     10,
                     complexity_threshold,
                     filter,
+                    &[], // No allowlist for report mode
                 ))
             } else {
                 None
@@ -846,7 +847,12 @@ pub fn analyze(
                 root.to_path_buf()
             };
             if analysis_root.is_dir() {
-                Some(length::analyze_codebase_length(&analysis_root, 10, filter))
+                Some(length::analyze_codebase_length(
+                    &analysis_root,
+                    10,
+                    filter,
+                    &[],
+                ))
             } else {
                 None
             }

@@ -14,7 +14,12 @@ pub fn analyze_file_length(file_path: &Path) -> Option<LengthReport> {
 }
 
 /// Analyze function lengths across a codebase, returning longest functions
-pub fn analyze_codebase_length(root: &Path, limit: usize, filter: Option<&Filter>) -> LengthReport {
+pub fn analyze_codebase_length(
+    root: &Path,
+    limit: usize,
+    filter: Option<&Filter>,
+    allowlist: &[String],
+) -> LengthReport {
     let all_files = path_resolve::all_files(root);
     let code_files: Vec<_> = all_files
         .iter()
@@ -55,7 +60,19 @@ pub fn analyze_codebase_length(root: &Path, limit: usize, filter: Option<&Filter
         .flatten()
         .collect();
 
-    let mut sorted = all_functions;
+    // Filter by allowlist
+    let mut sorted: Vec<_> = if allowlist.is_empty() {
+        all_functions
+    } else {
+        all_functions
+            .into_iter()
+            .filter(|f| {
+                let key = f.qualified_name();
+                !allowlist.iter().any(|a| key.contains(a))
+            })
+            .collect()
+    };
+
     sorted.sort_by(|a, b| b.lines.cmp(&a.lines));
     sorted.truncate(limit);
 
