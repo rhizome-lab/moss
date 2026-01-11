@@ -45,8 +45,15 @@ pub mod macports;
 pub mod flatpak;
 pub mod snap;
 
+// Containers
+pub mod docker;
+
+// Mobile
+pub mod fdroid;
+
 // Language package managers
 pub mod cargo;
+pub mod clojars;
 pub mod composer;
 pub mod conan;
 pub mod conda;
@@ -106,7 +113,12 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         // Cross-platform
         &flatpak::Flatpak,
         &snap::Snap,
+        // Containers
+        &docker::Docker,
+        // Mobile
+        &fdroid::FDroid,
         // Language
+        &clojars::Clojars,
         &cargo::CargoIndex,
         &composer::Composer,
         &conan::Conan,

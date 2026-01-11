@@ -158,7 +158,7 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 - slackware: SlackBuilds - HTML only, using GitHub raw .info files as workaround
 - swiftpm: Swift Package Index requires authentication for API access
 
-**Implemented fetchers** (47 total: 16 distro, 4 Windows, 3 macOS, 2 cross-platform, 22 language):
+**Implemented fetchers** (50 total: 16 distro, 4 Windows, 3 macOS, 2 cross-platform, 1 container, 1 mobile, 23 language):
 - [x] APK (Alpine): APKINDEX.tar.gz with checksums, deps, archive URLs
 - [x] Artix Linux: Arch-based, shares arch_common logic with pacman
 - [x] NixOS/Nix: search.nixos.org Elasticsearch API
@@ -176,6 +176,9 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 - [x] MacPorts: ports.macports.org API
 - [x] Snap: api.snapcraft.io (requires Snap-Device-Series header)
 - [x] DUB: code.dlang.org API (D packages)
+- [x] Clojars: clojars.org API (Clojure packages)
+- [x] Docker: hub.docker.com API (container images)
+- [x] F-Droid: f-droid.org API (Android FOSS apps)
 
 **Note**: Debian-derivatives (Ubuntu, Mint, elementary) use apt fetcher.
 Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
@@ -198,6 +201,18 @@ Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
 - downloads counts from APIs that provide them
 - archive_url and checksum for verification
 - extra field for ecosystem-specific metadata not in normalized fields
+
+### Complexity Hotspots (threshold >21)
+- [ ] `crates/moss/src/commands/edit.rs:handle_glob_edit` (76)
+- [ ] `crates/moss/src/commands/view/file.rs:cmd_view_file` (69)
+- [ ] `crates/moss/src/commands/edit.rs:cmd_edit` (67)
+- [ ] `crates/moss/src/commands/daemon.rs:cmd_daemon` (66)
+- [ ] `crates/moss/src/commands/view/symbol.rs:cmd_view_symbol` (65)
+- [ ] `crates/moss-rules/src/runner.rs:evaluate_predicates` (53)
+- [ ] `crates/moss/src/commands/tools/lint.rs:cmd_lint_run` (49)
+- [ ] `crates/moss/src/commands/analyze/mod.rs:run` (49)
+- [ ] `crates/moss/src/tree.rs:collect_highlight_spans` (48)
+- [ ] `crates/moss-rules/src/runner.rs:run_rules` (44)
 
 ### Code Quality
 - [x] `--allow` for duplicate-functions: accept line range like output suggests (e.g., `--allow src/foo.rs:10-20`)

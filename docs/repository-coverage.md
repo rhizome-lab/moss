@@ -122,7 +122,7 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 ### Java/JVM
 - [x] maven - Maven Central
 - [ ] gradle - Gradle plugins
-- [ ] clojars - Clojure libraries
+- [x] clojars - Clojure libraries
 
 ### .NET
 - [x] nuget - NuGet Gallery
@@ -187,14 +187,14 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 
 ## Mobile/App Stores
 
-- [ ] fdroid - F-Droid (Android FOSS)
+- [x] fdroid - F-Droid (Android FOSS)
 - [ ] appimage - AppImage packages
 - [x] flatpak - Flathub (API)
 - [x] snap - Snapcraft
 
 ## Containers
 
-- [ ] docker - Docker Hub
+- [x] docker - Docker Hub
 - [ ] ghcr - GitHub Container Registry
 
 ## Other Package Systems
@@ -225,6 +225,9 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 9. [x] macports - macOS **DONE**
 10. [x] snap - Snapcraft **DONE**
 11. [x] dub - D packages **DONE**
+12. [x] clojars - Clojure **DONE**
+13. [x] docker - Docker Hub **DONE**
+14. [x] fdroid - F-Droid **DONE**
 
 ### Low Priority (niche or redundant)
 - Derivatives that reuse parent repos (manjaro uses Arch, elementary uses apt)

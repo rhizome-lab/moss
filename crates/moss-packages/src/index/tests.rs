@@ -421,8 +421,40 @@ fn test_snap() {
 }
 
 // =============================================================================
+// Containers
+// =============================================================================
+
+#[test]
+fn test_docker() {
+    let index = docker::Docker;
+    test_fetch(&index, "nginx");
+    test_versions(&index, "nginx");
+    test_search(&index, "nginx");
+}
+
+// =============================================================================
+// Mobile
+// =============================================================================
+
+#[test]
+fn test_fdroid() {
+    let index = fdroid::FDroid;
+    test_fetch(&index, "org.fdroid.fdroid");
+    test_versions(&index, "org.fdroid.fdroid");
+    test_search(&index, "browser");
+}
+
+// =============================================================================
 // Language package managers
 // =============================================================================
+
+#[test]
+fn test_clojars() {
+    let index = clojars::Clojars;
+    test_fetch(&index, "ring");
+    test_versions(&index, "ring");
+    test_search(&index, "ring");
+}
 
 #[test]
 fn test_cargo() {
@@ -640,8 +672,8 @@ fn test_pacman_fetch_all() {
 fn test_list_indices() {
     let indices = list_indices();
     assert!(
-        indices.len() >= 47,
-        "should have at least 47 indices, got {}",
+        indices.len() >= 50,
+        "should have at least 50 indices, got {}",
         indices.len()
     );
     println!("Available indices: {:?}", indices);
