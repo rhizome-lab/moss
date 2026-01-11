@@ -119,8 +119,13 @@ impl PackageIndex for LuaRocks {
             repository: None,
             license: None,
             binaries: Vec::new(),
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
             archive_url: Some(format!("{}/{}-{}.src.rock", Self::BASE_URL, name, latest)),
-            ..Default::default()
+            checksum: None,
+            extra: Default::default(),
         })
     }
 

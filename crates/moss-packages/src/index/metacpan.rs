@@ -55,11 +55,15 @@ impl PackageIndex for MetaCpan {
                 .map(String::from),
             binaries: Vec::new(),
             archive_url: response["download_url"].as_str().map(String::from),
+            keywords: Vec::new(),
             maintainers: response["author"]
                 .as_str()
                 .map(|a| vec![a.to_string()])
                 .unwrap_or_default(),
-            ..Default::default()
+            published: None,
+            downloads: None,
+            checksum: None,
+            extra: Default::default(),
         })
     }
 
@@ -123,11 +127,16 @@ impl PackageIndex for MetaCpan {
                         .and_then(|l| l.as_str())
                         .map(String::from),
                     binaries: Vec::new(),
+                    keywords: Vec::new(),
                     maintainers: source["author"]
                         .as_str()
                         .map(|a| vec![a.to_string()])
                         .unwrap_or_default(),
-                    ..Default::default()
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
+                    extra: Default::default(),
                 })
             })
             .collect())

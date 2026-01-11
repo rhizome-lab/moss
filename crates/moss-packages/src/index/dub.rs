@@ -61,7 +61,10 @@ impl PackageIndex for Dub {
             keywords: Vec::new(),
             maintainers: authors,
             published: latest["date"].as_str().map(String::from),
-            ..Default::default()
+            downloads: None,
+            archive_url: None,
+            checksum: None,
+            extra: Default::default(),
         })
     }
 
@@ -104,7 +107,17 @@ impl PackageIndex for Dub {
                     name: pkg["name"].as_str()?.to_string(),
                     version: pkg["version"].as_str().unwrap_or("unknown").to_string(),
                     description: pkg["description"].as_str().map(String::from),
-                    ..Default::default()
+                    homepage: None,
+                    repository: None,
+                    license: None,
+                    binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
+                    extra: Default::default(),
                 })
             })
             .collect())

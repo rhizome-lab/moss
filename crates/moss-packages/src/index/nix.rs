@@ -296,8 +296,12 @@ impl Nix {
                         .collect()
                 })
                 .unwrap_or_default(),
+            keywords: Vec::new(),
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
             extra,
-            ..Default::default()
         })
     }
 
@@ -389,8 +393,12 @@ impl Nix {
                                 .collect()
                         })
                         .unwrap_or_default(),
+                    keywords: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
                     extra,
-                    ..Default::default()
                 })
             })
             .collect())

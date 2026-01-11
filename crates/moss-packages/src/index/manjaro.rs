@@ -356,10 +356,13 @@ impl Manjaro {
             repository: None,
             license: fields.get("LICENSE").cloned(),
             binaries: Vec::new(),
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
             archive_url,
             checksum,
             extra,
-            ..Default::default()
         })
     }
 

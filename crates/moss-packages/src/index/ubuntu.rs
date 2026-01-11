@@ -440,7 +440,13 @@ impl PackageIndex for Ubuntu {
             repository: None,
             license: None,
             binaries: Vec::new(),
-            ..Default::default()
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
+            extra: Default::default(),
         })
     }
 
@@ -561,8 +567,11 @@ impl PackageBuilder {
             binaries: Vec::new(),
             archive_url: self.filename.map(|f| format!("{}/{}", UBUNTU_MIRROR, f)),
             checksum: self.sha256.map(|h| format!("sha256:{}", h)),
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
             extra,
-            ..Default::default()
         })
     }
 }

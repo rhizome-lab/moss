@@ -469,7 +469,13 @@ impl PackageIndex for Apt {
             repository: response["vcs_url"].as_str().map(String::from),
             license: None,
             binaries: Vec::new(),
-            ..Default::default()
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
+            extra: Default::default(),
         })
     }
 
@@ -625,10 +631,13 @@ impl PackageBuilder {
             repository: self.repository,
             license: None,
             binaries: Vec::new(),
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
             archive_url: self.filename.map(|f| format!("{}/{}", DEBIAN_MIRROR, f)),
             checksum: self.sha256.map(|h| format!("sha256:{}", h)),
             extra,
-            ..Default::default()
         })
     }
 }

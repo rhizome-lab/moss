@@ -68,8 +68,11 @@ impl PackageIndex for Clojars {
             binaries: Vec::new(),
             keywords: Vec::new(),
             maintainers,
+            published: None,
             downloads: response["downloads"].as_u64(),
-            ..Default::default()
+            archive_url: None,
+            checksum: None,
+            extra: Default::default(),
         })
     }
 
@@ -116,7 +119,17 @@ impl PackageIndex for Clojars {
                     ),
                     version: pkg["version"].as_str().unwrap_or("unknown").to_string(),
                     description: pkg["description"].as_str().map(String::from),
-                    ..Default::default()
+                    homepage: None,
+                    repository: None,
+                    license: None,
+                    binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
+                    extra: Default::default(),
                 })
             })
             .collect())

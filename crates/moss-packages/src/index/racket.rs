@@ -98,10 +98,12 @@ impl Racket {
             license: pkg["license"].as_str().map(String::from),
             binaries: Vec::new(),
             archive_url: source_url,
-            checksum,
+            keywords: Vec::new(),
             maintainers,
+            published: None,
+            downloads: None,
+            checksum,
             extra,
-            ..Default::default()
         })
     }
 

@@ -247,8 +247,13 @@ fn package_to_meta(
         repository: extract_repo(pkg),
         license: None, // Guix packages.json doesn't include license info
         binaries: Vec::new(),
+        keywords: Vec::new(),
+        maintainers: Vec::new(),
+        published: None,
+        downloads: None,
+        archive_url: None,
+        checksum: None,
         extra,
-        ..Default::default()
     }
 }
 

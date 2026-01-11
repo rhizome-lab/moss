@@ -44,10 +44,16 @@ impl Termux {
             homepage: extract_var("TERMUX_PKG_HOMEPAGE"),
             repository: extract_var("TERMUX_PKG_SRCURL"),
             license: extract_var("TERMUX_PKG_LICENSE"),
+            binaries: Vec::new(),
+            keywords: Vec::new(),
             maintainers: extract_var("TERMUX_PKG_MAINTAINER")
                 .map(|m| vec![m])
                 .unwrap_or_default(),
-            ..Default::default()
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
+            extra: Default::default(),
         }
     }
 }

@@ -66,13 +66,17 @@ impl PackageIndex for Cran {
                 .as_str()
                 .map(|m| vec![m.to_string()])
                 .unwrap_or_default(),
+            keywords: Vec::new(),
+            published: None,
+            downloads: None,
             archive_url: Some(format!(
                 "{}/src/contrib/{}_{}.tar.gz",
                 Self::CRAN_MIRROR,
                 name,
                 version
             )),
-            ..Default::default()
+            checksum: None,
+            extra: Default::default(),
         })
     }
 
@@ -129,7 +133,13 @@ impl PackageIndex for Cran {
                     repository: None,
                     license: pkg["License"].as_str().map(String::from),
                     binaries: Vec::new(),
-                    ..Default::default()
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
+                    extra: Default::default(),
                 })
             })
             .collect())

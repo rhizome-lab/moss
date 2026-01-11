@@ -236,8 +236,13 @@ impl Dnf {
                 .map(String::from),
             license: response["license"].as_str().map(String::from),
             binaries: Vec::new(),
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
             extra,
-            ..Default::default()
         })
     }
 
@@ -272,8 +277,13 @@ impl Dnf {
                     repository: None,
                     license: None,
                     binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
                     extra,
-                    ..Default::default()
                 }
             })
             .collect())
@@ -387,7 +397,13 @@ impl PackageIndex for Dnf {
                     repository: None,
                     license: pkg["license"].as_str().map(String::from),
                     binaries: Vec::new(),
-                    ..Default::default()
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
+                    extra: Default::default(),
                 })
             })
             .collect())

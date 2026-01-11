@@ -270,8 +270,12 @@ impl PackageIndex for Msys2 {
             license,
             binaries: Vec::new(),
             keywords,
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
             extra,
-            ..Default::default()
         })
     }
 
@@ -377,8 +381,13 @@ fn parse_msys2_package(
             .and_then(|u| u.as_str())
             .map(String::from),
         license,
+        binaries: Vec::new(),
         keywords,
+        maintainers: Vec::new(),
+        published: None,
+        downloads: None,
+        archive_url: None,
+        checksum: None,
         extra,
-        ..Default::default()
     })
 }

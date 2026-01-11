@@ -308,12 +308,16 @@ impl CachyOs {
             repository: None,
             license: fields.get("LICENSE").cloned(),
             binaries: Vec::new(),
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
+            archive_url: None,
             checksum: fields
                 .get("SHA256SUM")
                 .map(|s| format!("sha256:{}", s))
                 .or_else(|| fields.get("MD5SUM").map(|s| format!("md5:{}", s))),
             extra,
-            ..Default::default()
         })
     }
 

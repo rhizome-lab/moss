@@ -171,34 +171,28 @@ impl Maven {
             serde_json::Value::String("central".to_string()),
         );
 
+        let g = doc["g"].as_str().unwrap_or("");
+        let a = doc["a"].as_str().unwrap_or("");
         Ok((
             PackageMeta {
-                name: format!(
-                    "{}:{}",
-                    doc["g"].as_str().unwrap_or(""),
-                    doc["a"].as_str().unwrap_or("")
-                ),
+                name: format!("{}:{}", g, a),
                 version: doc["latestVersion"]
                     .as_str()
                     .or_else(|| doc["v"].as_str())
                     .unwrap_or("unknown")
                     .to_string(),
                 description: None,
-                homepage: Some(format!(
-                    "https://mvnrepository.com/artifact/{}/{}",
-                    doc["g"].as_str().unwrap_or(""),
-                    doc["a"].as_str().unwrap_or("")
-                )),
+                homepage: Some(format!("https://mvnrepository.com/artifact/{}/{}", g, a)),
                 repository: None,
                 license: None,
                 binaries: Vec::new(),
-                extra,
                 keywords: Vec::new(),
                 maintainers: Vec::new(),
                 published: None,
                 downloads: None,
                 archive_url: None,
                 checksum: None,
+                extra,
             },
             MavenRepo::Central,
         ))

@@ -72,8 +72,13 @@ impl Hunter {
                 repository: Some("https://github.com/cpp-pm/hunter".to_string()),
                 license: None,
                 binaries: Vec::new(),
+                keywords: Vec::new(),
+                maintainers: Vec::new(),
+                published: None,
+                downloads: None,
                 archive_url: None,
-                ..Default::default()
+                checksum: None,
+                extra: Default::default(),
             });
         }
 

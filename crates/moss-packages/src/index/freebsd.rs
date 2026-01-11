@@ -199,8 +199,12 @@ impl FreeBsd {
                 .map(|m| vec![m.to_string()])
                 .unwrap_or_default(),
             binaries: Vec::new(),
+            keywords: Vec::new(),
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
             extra,
-            ..Default::default()
         })
     }
 

@@ -57,10 +57,13 @@ impl Copr {
             repository: None,
             license: None,
             binaries: Vec::new(),
-            archive_url: None,
+            keywords: Vec::new(),
             maintainers: vec![owner.to_string()],
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
             extra,
-            ..Default::default()
         })
     }
 
@@ -97,9 +100,13 @@ impl Copr {
             repository: None,
             license: None,
             binaries: Vec::new(),
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
             archive_url: None,
+            checksum: None,
             extra,
-            ..Default::default()
         })
     }
 }

@@ -134,8 +134,13 @@ impl PackageIndex for Opam {
             repository: meta.dev_repo.map(|r| r.replace("git+", "")),
             license: meta.license,
             binaries: Vec::new(),
+            keywords: Vec::new(),
             maintainers: meta.maintainer.into_iter().chain(meta.authors).collect(),
-            ..Default::default()
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
+            extra: Default::default(),
         })
     }
 
@@ -208,7 +213,13 @@ impl PackageIndex for Opam {
                             repository: None,
                             license: None,
                             binaries: Vec::new(),
-                            ..Default::default()
+                            keywords: Vec::new(),
+                            maintainers: Vec::new(),
+                            published: None,
+                            downloads: None,
+                            archive_url: None,
+                            checksum: None,
+                            extra: Default::default(),
                         });
                     }
                 }

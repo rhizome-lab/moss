@@ -47,8 +47,13 @@ impl ChaoticAur {
             repository: Some("https://aur.chaotic.cx/".to_string()),
             license,
             binaries: Vec::new(),
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
             archive_url,
-            ..Default::default()
+            checksum: None,
+            extra: Default::default(),
         })
     }
 

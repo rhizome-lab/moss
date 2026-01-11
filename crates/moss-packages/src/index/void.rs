@@ -277,8 +277,12 @@ impl Void {
                             vec![maintainer.clone()]
                         },
                         binaries: Vec::new(),
+                        keywords: Vec::new(),
+                        published: None,
+                        downloads: None,
+                        archive_url: None,
+                        checksum: None,
                         extra,
-                        ..Default::default()
                     });
                 }
                 in_package = false;

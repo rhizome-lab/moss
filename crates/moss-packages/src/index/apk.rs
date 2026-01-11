@@ -477,11 +477,13 @@ impl ApkPackageBuilder {
             repository: None,
             license: self.license,
             binaries: Vec::new(),
+            keywords: Vec::new(),
             maintainers: self.maintainer.into_iter().collect(),
+            published: None,
+            downloads: None,
             archive_url,
             checksum,
             extra,
-            ..Default::default()
         })
     }
 }

@@ -336,9 +336,13 @@ fn pkg_to_meta(
         repository: None,
         license: pkg["license"].as_str().map(String::from),
         binaries: Vec::new(),
+        keywords: Vec::new(),
+        maintainers: Vec::new(),
+        published: None,
+        downloads: None,
+        archive_url: None,
         checksum: pkg["sha256"].as_str().map(|s| format!("sha256:{}", s)),
         extra,
-        ..Default::default()
     }
 }
 

@@ -165,8 +165,11 @@ impl FDroid {
                 binaries: Vec::new(),
                 keywords: Vec::new(),
                 maintainers: Vec::new(),
+                published: None,
+                downloads: None,
+                archive_url: None,
+                checksum: None,
                 extra,
-                ..Default::default()
             },
             FDroidRepo::Main,
         ))
@@ -222,8 +225,16 @@ impl FDroid {
                     version: "latest".to_string(),
                     description: app["summary"].as_str().map(String::from),
                     homepage: Some(url.to_string()),
+                    repository: None,
+                    license: None,
+                    binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
                     extra: extra.clone(),
-                    ..Default::default()
                 })
             })
             .collect())

@@ -117,10 +117,13 @@ impl Ctan {
             repository: None,
             license,
             binaries: Vec::new(),
-            archive_url,
+            keywords: Vec::new(),
             maintainers,
+            published: None,
+            downloads: None,
+            archive_url,
+            checksum: None,
             extra,
-            ..Default::default()
         })
     }
 }
@@ -196,7 +199,16 @@ impl PackageIndex for Ctan {
                     version: "unknown".to_string(), // List doesn't include versions
                     description: caption.map(String::from),
                     homepage: Some(format!("https://ctan.org/pkg/{}", key)),
-                    ..Default::default()
+                    repository: None,
+                    license: None,
+                    binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
+                    extra: Default::default(),
                 })
             })
             .collect();

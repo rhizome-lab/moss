@@ -279,9 +279,13 @@ fn parse_sbo_info(
             name
         )),
         license: None,
-        maintainers,
         binaries: Vec::new(),
+        keywords: Vec::new(),
+        maintainers,
+        published: None,
+        downloads: None,
+        archive_url: None,
+        checksum: None,
         extra,
-        ..Default::default()
     })
 }

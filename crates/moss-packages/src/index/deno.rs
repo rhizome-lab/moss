@@ -48,7 +48,13 @@ impl PackageIndex for Deno {
             }),
             license: None,
             binaries: Vec::new(),
-            ..Default::default()
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
+            extra: Default::default(),
         })
     }
 
@@ -106,7 +112,13 @@ impl PackageIndex for Deno {
                         }),
                         license: None,
                         binaries: Vec::new(),
-                        ..Default::default()
+                        keywords: Vec::new(),
+                        maintainers: Vec::new(),
+                        published: None,
+                        downloads: None,
+                        archive_url: None,
+                        checksum: None,
+                        extra: Default::default(),
                     });
                 }
             }
@@ -149,7 +161,13 @@ impl PackageIndex for Deno {
                     }),
                     license: None,
                     binaries: Vec::new(),
-                    ..Default::default()
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
+                    extra: Default::default(),
                 })
             })
             .collect())

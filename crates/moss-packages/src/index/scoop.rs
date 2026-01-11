@@ -206,8 +206,13 @@ impl Scoop {
                         .collect()
                 })
                 .unwrap_or_default(),
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
             extra,
-            ..Default::default()
         })
     }
 }
@@ -293,8 +298,13 @@ impl PackageIndex for Scoop {
                     repository: None,
                     license: app["license"].as_str().map(String::from),
                     binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
                     extra,
-                    ..Default::default()
                 })
             })
             .collect())

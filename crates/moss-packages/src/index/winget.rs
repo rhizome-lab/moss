@@ -121,8 +121,13 @@ impl Winget {
             repository: response["repository"].as_str().map(String::from),
             license: response["license"].as_str().map(String::from),
             binaries: Vec::new(),
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
             extra,
-            ..Default::default()
         })
     }
 
@@ -195,8 +200,13 @@ impl Winget {
                     repository: pkg["repository"].as_str().map(String::from),
                     license: pkg["license"].as_str().map(String::from),
                     binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
                     extra,
-                    ..Default::default()
                 })
             })
             .collect())

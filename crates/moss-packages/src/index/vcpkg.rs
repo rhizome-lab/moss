@@ -95,11 +95,17 @@ impl PackageIndex for Vcpkg {
                 homepage: manifest["homepage"].as_str().map(String::from),
                 repository: manifest["repository"].as_str().map(String::from),
                 license: manifest["license"].as_str().map(String::from),
+                binaries: Vec::new(),
                 keywords: manifest["features"]
                     .as_object()
                     .map(|f| f.keys().cloned().collect())
                     .unwrap_or_default(),
-                ..Default::default()
+                maintainers: Vec::new(),
+                published: None,
+                downloads: None,
+                archive_url: None,
+                checksum: None,
+                extra: Default::default(),
             }),
             Err(_) => {
                 // Fall back to baseline-only info
@@ -110,7 +116,18 @@ impl PackageIndex for Vcpkg {
                     } else {
                         version
                     },
-                    ..Default::default()
+                    description: None,
+                    homepage: None,
+                    repository: None,
+                    license: None,
+                    binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
+                    extra: Default::default(),
                 })
             }
         }
@@ -174,7 +191,18 @@ impl PackageIndex for Vcpkg {
                     } else {
                         version
                     },
-                    ..Default::default()
+                    description: None,
+                    homepage: None,
+                    repository: None,
+                    license: None,
+                    binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
+                    extra: Default::default(),
                 }
             })
             .collect())

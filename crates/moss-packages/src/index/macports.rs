@@ -75,7 +75,11 @@ impl PackageIndex for MacPorts {
             binaries: Vec::new(),
             keywords,
             maintainers,
-            ..Default::default()
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
+            extra: Default::default(),
         })
     }
 
@@ -114,9 +118,16 @@ impl PackageIndex for MacPorts {
                     version: port["version"].as_str().unwrap_or("unknown").to_string(),
                     description: port["description"].as_str().map(String::from),
                     homepage: port["homepage"].as_str().map(String::from),
+                    repository: None,
                     license: port["license"].as_str().map(String::from),
+                    binaries: Vec::new(),
                     keywords,
-                    ..Default::default()
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
+                    extra: Default::default(),
                 })
             })
             .collect())

@@ -129,7 +129,19 @@ fn pkg_to_meta(pkg: &serde_json::Value) -> PackageMeta {
         },
         license: pkg["license"].as_str().map(String::from),
         binaries: Vec::new(),
+        keywords: pkg["tags"]
+            .as_array()
+            .map(|t| {
+                t.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default(),
+        maintainers: Vec::new(),
+        published: None,
+        downloads: None,
         archive_url: Some(url.to_string()),
-        ..Default::default()
+        checksum: None,
+        extra: Default::default(),
     }
 }

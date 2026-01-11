@@ -212,6 +212,8 @@ impl Gentoo {
                 .and_then(|a| a.first())
                 .and_then(|l| l.as_str())
                 .map(String::from),
+            binaries: Vec::new(),
+            keywords: Vec::new(),
             maintainers: response["maintainers"]
                 .as_array()
                 .map(|m| {
@@ -221,9 +223,11 @@ impl Gentoo {
                         .collect()
                 })
                 .unwrap_or_default(),
-            binaries: Vec::new(),
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
             extra,
-            ..Default::default()
         })
     }
 
@@ -305,10 +309,14 @@ impl Gentoo {
             homepage: None,
             repository: None,
             license: None,
-            maintainers: Vec::new(),
             binaries: Vec::new(),
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published: None,
+            downloads: None,
+            archive_url: None,
+            checksum: None,
             extra,
-            ..Default::default()
         })
     }
 

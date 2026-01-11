@@ -75,10 +75,12 @@ impl Bioconductor {
             license: pkg["License"].as_str().map(String::from),
             binaries: Vec::new(),
             archive_url,
-            checksum,
+            keywords: Vec::new(),
             maintainers,
+            published: None,
+            downloads: None,
+            checksum,
             extra,
-            ..Default::default()
         })
     }
 }
