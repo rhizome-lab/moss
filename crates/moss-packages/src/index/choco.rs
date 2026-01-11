@@ -209,8 +209,13 @@ impl Properties {
                 .or_else(|| self.package_source_url.clone()),
             license: self.license_url.clone(),
             binaries: Vec::new(),
+            keywords: Vec::new(),    // NuGet OData doesn't expose tags in search
+            maintainers: Vec::new(), // Not exposed in OData API
+            published: self.published.clone(),
+            downloads: None, // Would need separate API call
+            archive_url: None,
+            checksum: None,
             extra,
-            ..Default::default()
         })
     }
 
