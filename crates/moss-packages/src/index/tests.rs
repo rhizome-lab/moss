@@ -318,6 +318,13 @@ fn test_copr() {
 }
 
 #[test]
+fn test_chaotic_aur() {
+    let index = chaotic_aur::ChaoticAur;
+    test_fetch(&index, "neovim-git");
+    test_search(&index, "firefox");
+}
+
+#[test]
 fn test_dnf_enhanced_metadata() {
     let index = dnf::Dnf;
     let curl = index.fetch("curl").unwrap();

@@ -17,9 +17,9 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 - [x] artix - Artix Linux
 - [x] cachyos - CachyOS
 - [x] endeavouros - EndeavourOS
-- [ ] manjaro - Manjaro Linux
+- [x] manjaro - Manjaro Linux
 - [ ] archlinuxcn - Chinese Arch repo
-- [ ] chaotic_aur - Pre-built AUR packages
+- [x] chaotic_aur - Pre-built AUR packages
 - [ ] blackarch - Security/pentesting packages
 - [ ] garuda - Garuda Linux
 - [ ] rebornos - RebornOS

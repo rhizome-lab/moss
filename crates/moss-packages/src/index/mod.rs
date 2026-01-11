@@ -17,6 +17,7 @@ pub mod apt;
 mod arch_common;
 pub mod artix;
 pub mod cachyos;
+pub mod chaotic_aur;
 pub mod copr;
 pub mod dnf;
 pub mod endeavouros;
@@ -97,6 +98,7 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         &apt::Apt,
         &artix::Artix,
         &cachyos::CachyOs,
+        &chaotic_aur::ChaoticAur,
         &copr::Copr,
         &dnf::Dnf,
         &endeavouros::EndeavourOs,
