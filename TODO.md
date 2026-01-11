@@ -139,44 +139,41 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 ✅ WORKING:
 - apk: Alpine - APKINDEX.tar.gz parsing (multi-member gzip + tar)
 - artix: packages.artixlinux.org/packages/search/json/?name={name} (Arch-compatible format)
+- conan: conan.io/api/search JSON API
 - dnf: mdapi.fedoraproject.org/rawhide/pkg/{name} (JSON)
+- freebsd: pkg.freebsd.org packagesite.pkg (zstd tar + JSON-lines)
 - gentoo: packages.gentoo.org/packages/{cat}/{name}.json (JSON)
 - guix: guix.gnu.org/packages.json (gzip-compressed JSON array, ~30k packages)
 - nix: search.nixos.org Elasticsearch (requires POST with query JSON)
 - pacman/aur: aur.archlinux.org/packages-meta-ext-v1.json.gz (full archive)
+- void: repo-default.voidlinux.org x86_64-repodata (zstd tar + XML plist)
 
 ⚠️ XML ONLY (needs XML parsing):
 - choco: community.chocolatey.org/api/v2 returns NuGet v2 OData/Atom XML
-- opensuse: api.opensuse.org uses XML (OBS API)
 
-❌ NO PUBLIC JSON API:
-- void: Uses XBPS binary repodata format, no REST API
-- freebsd: FreshPorts - HTML only, API was planned in 2017 but not public
-- openbsd: openports.pl - HTML only
-- netbsd: pkgsrc.se - HTML only
-- conan: Conan Center - CLI only (--format=json), no public REST API
-- slackware: SlackBuilds - HTML only, using GitHub raw .info files as workaround
+❌ NO PUBLIC API (removed from fetchers):
+- opensuse: api.opensuse.org uses XML (OBS API) - removed
+- openbsd: openports.pl - HTML only - removed
+- netbsd: pkgsrc.se - HTML only - removed
 - swiftpm: Swift Package Index requires authentication for API access
 - stackage: No JSON API (endpoints redirect, snapshot URLs 404)
 - ghcr: GitHub Container Registry requires authentication (401)
 - gradle: Plugin portal API returning 404 (plugins.gradle.org/api/plugins)
 
-**Implemented fetchers** (58 total: 19 distro, 5 Windows, 3 macOS, 2 cross-platform, 1 container, 1 mobile, 27 language):
+**Implemented fetchers** (56 total: 16 distro, 4 Windows, 3 macOS, 2 cross-platform, 1 container, 2 mobile, 28 language):
 - [x] APK (Alpine): APKINDEX.tar.gz with checksums, deps, archive URLs
 - [x] Artix Linux: Arch-based, shares arch_common logic with pacman
 - [x] NixOS/Nix: search.nixos.org Elasticsearch API
-- [x] Void Linux: xbps (API needs verification)
+- [x] Void Linux: zstd tar + XML plist parsing
 - [x] Gentoo: packages.gentoo.org API
-- [x] openSUSE: software.opensuse.org search API
 - [x] Guix: packages.guix.gnu.org with fetch_all support
 - [x] Slackware: SlackBuilds.org via GitHub raw .info files
-- [x] FreeBSD: freshports.org search API
-- [x] OpenBSD: openports.pl (API needs verification)
-- [x] NetBSD: pkgsrc.se (API needs verification)
+- [x] FreeBSD: zstd tar + JSON-lines parsing (packagesite.pkg)
 - [x] CachyOS: Arch-based, uses arch_common
 - [x] EndeavourOS: Arch-based, uses arch_common
 - [x] Manjaro: search.manjaro-sway.download API + AUR
 - [x] Copr: Fedora community builds (copr.fedorainfracloud.org API)
+- [x] Chaotic-AUR: chaotic-backend.garudalinux.org JSON API
 - [x] MSYS2: packages.msys2.org API (Windows development)
 - [x] MacPorts: ports.macports.org API
 - [x] Snap: api.snapcraft.io (requires Snap-Device-Series header)
@@ -190,6 +187,7 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 - [x] F-Droid: f-droid.org API (Android FOSS apps)
 - [x] vcpkg: GitHub baseline.json + port manifests (C++ packages)
 - [x] Termux: GitHub build.sh parsing (Android terminal packages)
+- [x] Conan: conan.io/api/search JSON API
 
 **Note**: Debian-derivatives (Ubuntu, Mint, elementary) use apt fetcher.
 Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
