@@ -26,6 +26,7 @@ pub mod gentoo;
 pub mod guix;
 pub mod manjaro;
 pub mod nix;
+pub mod opensuse;
 pub mod pacman;
 pub mod slackware;
 pub mod void;
@@ -104,6 +105,7 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         &guix::Guix,
         &manjaro::Manjaro,
         &nix::Nix,
+        &opensuse::OpenSuse,
         &pacman::Pacman,
         &slackware::Slackware,
         &void::Void,

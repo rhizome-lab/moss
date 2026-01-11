@@ -318,6 +318,15 @@ fn test_void() {
 }
 
 #[test]
+#[ignore = "Slow: downloads ~17MB openSUSE primary.xml"]
+fn test_opensuse() {
+    let index = opensuse::OpenSuse;
+    test_fetch(&index, "curl");
+    test_versions(&index, "curl");
+    test_search(&index, "curl");
+}
+
+#[test]
 fn test_apk_enhanced_metadata() {
     let index = apk::Apk;
     let curl = index.fetch("curl").unwrap();
