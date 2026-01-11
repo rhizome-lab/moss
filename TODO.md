@@ -218,16 +218,16 @@ Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
 
 **Multi-repo coverage done**:
 - [x] openSUSE: 36 repos (Tumbleweed, Leap 16.0, Leap 15.6 × OSS/Non-OSS/Updates, Factory, source RPMs, debug symbols, community repos: Games, KDE, GNOME, Xfce, Mozilla, Science, Wine, Server)
+- [x] Arch Linux: 12 repos (core, extra, multilib, testing, staging, gnome/kde-unstable, AUR)
+- [x] Artix Linux: 15 repos (system, world, galaxy, lib32, asteroids × stable/gremlins/goblins)
+- [x] Alpine/APK: 11 repos (edge, v3.21, v3.20, v3.19, v3.18 × main/community/testing)
+- [x] FreeBSD: 5 repos (FreeBSD 13/14/15 × quarterly/latest)
+- [x] Void Linux: 8 repos (x86_64/aarch64 × glibc/musl × free/nonfree)
 
 **Multi-repo coverage needed**:
-- [ ] Arch Linux: core, extra, multilib, testing, staging, community-testing, multilib-testing
-- [ ] Artix Linux: system, world, galaxy, lib32, testing variants of each
 - [ ] Manjaro: stable, testing, unstable branches
 - [ ] Debian/APT: stable, testing, unstable, experimental, backports
 - [ ] Fedora/DNF: multiple Fedora versions (39, 40, 41, rawhide)
-- [ ] Alpine/APK: main, community, testing for each version (3.18, 3.19, 3.20, edge)
-- [ ] FreeBSD: quarterly vs latest, multiple versions (13, 14)
-- [ ] Void: x86_64, x86_64-musl, aarch64 variants
 - [ ] Ubuntu: multiple releases (22.04, 24.04, etc) + universe/multiverse
 
 ### Complexity Hotspots (58 functions >21)

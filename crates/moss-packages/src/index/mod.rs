@@ -89,27 +89,32 @@ use std::sync::OnceLock;
 
 static INDEX_REGISTRY: OnceLock<Vec<&'static dyn PackageIndex>> = OnceLock::new();
 static OPENSUSE_INDEX: OnceLock<opensuse::OpenSuse> = OnceLock::new();
+static PACMAN_INDEX: OnceLock<pacman::Pacman> = OnceLock::new();
+static ARTIX_INDEX: OnceLock<artix::Artix> = OnceLock::new();
+static APK_INDEX: OnceLock<apk::Apk> = OnceLock::new();
+static FREEBSD_INDEX: OnceLock<freebsd::FreeBsd> = OnceLock::new();
+static VOID_INDEX: OnceLock<void::Void> = OnceLock::new();
 
 fn init_builtin() -> Vec<&'static dyn PackageIndex> {
     vec![
         // Distro
-        &apk::Apk,
+        APK_INDEX.get_or_init(apk::Apk::all),
         &apt::Apt,
-        &artix::Artix,
+        ARTIX_INDEX.get_or_init(artix::Artix::all),
         &cachyos::CachyOs,
         &chaotic_aur::ChaoticAur,
         &copr::Copr,
         &dnf::Dnf,
         &endeavouros::EndeavourOs,
-        &freebsd::FreeBsd,
+        FREEBSD_INDEX.get_or_init(freebsd::FreeBsd::all),
         &gentoo::Gentoo,
         &guix::Guix,
         &manjaro::Manjaro,
         &nix::Nix,
         OPENSUSE_INDEX.get_or_init(opensuse::OpenSuse::all),
-        &pacman::Pacman,
+        PACMAN_INDEX.get_or_init(pacman::Pacman::all),
         &slackware::Slackware,
-        &void::Void,
+        VOID_INDEX.get_or_init(void::Void::all),
         // Windows
         &choco::Choco,
         &msys2::Msys2,

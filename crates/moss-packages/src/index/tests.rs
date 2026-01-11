@@ -148,7 +148,7 @@ fn test_apt_enhanced_metadata() {
 
 #[test]
 fn test_pacman() {
-    let index = pacman::Pacman;
+    let index = pacman::Pacman::stable();
     test_fetch(&index, "ripgrep");
     test_versions(&index, "ripgrep");
     test_search(&index, "grep");
@@ -156,7 +156,7 @@ fn test_pacman() {
 
 #[test]
 fn test_pacman_enhanced_metadata() {
-    let index = pacman::Pacman;
+    let index = pacman::Pacman::stable();
 
     // Test official repo package
     let curl = index.fetch("curl").unwrap();
@@ -191,10 +191,32 @@ fn test_pacman_enhanced_metadata() {
 
 #[test]
 fn test_artix() {
-    let index = artix::Artix;
+    let index = artix::Artix::stable();
     test_fetch(&index, "ripgrep");
     test_versions(&index, "ripgrep");
     test_search(&index, "grep");
+}
+
+#[test]
+fn test_artix_repos() {
+    use artix::ArtixRepo;
+    let index = artix::Artix::with_repos(&[ArtixRepo::System, ArtixRepo::World]);
+    let packages = index.fetch_all().unwrap();
+    println!("artix: {} packages from system+world", packages.len());
+    assert!(packages.len() > 500, "should have many packages");
+
+    // Check source_repo tagging
+    let system_pkg = packages.iter().find(|p| {
+        p.extra
+            .get("source_repo")
+            .and_then(|v| v.as_str())
+            .map(|s| s == "system")
+            .unwrap_or(false)
+    });
+    assert!(
+        system_pkg.is_some(),
+        "should have packages tagged as 'system'"
+    );
 }
 
 #[test]
@@ -293,7 +315,7 @@ fn test_dnf_enhanced_metadata() {
 
 #[test]
 fn test_apk() {
-    let index = apk::Apk;
+    let index = apk::Apk::edge();
     test_fetch(&index, "curl");
     test_versions(&index, "curl");
     test_search(&index, "curl");
@@ -302,7 +324,7 @@ fn test_apk() {
 #[test]
 #[ignore = "Slow: downloads ~60MB FreeBSD packagesite"]
 fn test_freebsd() {
-    let index = freebsd::FreeBsd;
+    let index = freebsd::FreeBsd::freebsd14();
     test_fetch(&index, "curl");
     test_versions(&index, "curl");
     test_search(&index, "curl");
@@ -311,7 +333,7 @@ fn test_freebsd() {
 #[test]
 #[ignore = "Slow: downloads ~20MB Void repodata"]
 fn test_void() {
-    let index = void::Void;
+    let index = void::Void::x86_64();
     test_fetch(&index, "ripgrep");
     test_versions(&index, "ripgrep");
     test_search(&index, "grep");
@@ -373,7 +395,7 @@ fn test_opensuse_source_repo() {
 
 #[test]
 fn test_apk_enhanced_metadata() {
-    let index = apk::Apk;
+    let index = apk::Apk::edge();
     let curl = index.fetch("curl").unwrap();
     println!("Package: {}", curl.name);
     println!("Version: {}", curl.version);
@@ -388,10 +410,35 @@ fn test_apk_enhanced_metadata() {
 
 #[test]
 fn test_apk_fetch_all() {
-    let index = apk::Apk;
+    let index = apk::Apk::edge();
     let packages = index.fetch_all().unwrap();
     println!("apk: fetch_all() returned {} packages", packages.len());
     assert!(!packages.is_empty(), "fetch_all should return packages");
+}
+
+#[test]
+fn test_apk_repos() {
+    use apk::AlpineRepo;
+    let index = apk::Apk::with_repos(&[AlpineRepo::EdgeMain, AlpineRepo::V321Main]);
+    let packages = index.fetch_all().unwrap();
+    println!(
+        "apk: {} packages from edge-main + v3.21-main",
+        packages.len()
+    );
+    assert!(packages.len() > 5000, "should have many packages");
+
+    // Check source_repo tagging
+    let edge_pkg = packages.iter().find(|p| {
+        p.extra
+            .get("source_repo")
+            .and_then(|v| v.as_str())
+            .map(|s| s == "edge-main")
+            .unwrap_or(false)
+    });
+    assert!(
+        edge_pkg.is_some(),
+        "should have packages tagged as 'edge-main'"
+    );
 }
 
 // =============================================================================
@@ -766,8 +813,31 @@ fn test_racket() {
 #[test]
 #[ignore = "Slow: downloads entire AUR package archive (~30MB)"]
 fn test_pacman_fetch_all() {
-    let index = pacman::Pacman;
+    let index = pacman::Pacman::stable();
     test_fetch_all(&index);
+}
+
+#[test]
+fn test_pacman_official_repos() {
+    // Test just the official repos (no AUR) - much faster
+    use pacman::ArchRepo;
+    let index = pacman::Pacman::with_repos(&[ArchRepo::Core, ArchRepo::Extra]);
+    let packages = index.fetch_all().unwrap();
+    println!(
+        "pacman official: {} packages from core+extra",
+        packages.len()
+    );
+    assert!(packages.len() > 1000, "should have many packages");
+
+    // Check source_repo tagging
+    let core_pkg = packages.iter().find(|p| {
+        p.extra
+            .get("source_repo")
+            .and_then(|v| v.as_str())
+            .map(|s| s == "core")
+            .unwrap_or(false)
+    });
+    assert!(core_pkg.is_some(), "should have packages tagged as 'core'");
 }
 
 #[test]
