@@ -5,6 +5,7 @@
 
 use crate::parsers;
 use rhizome_moss_languages::{Language, support_for_path};
+use serde::Serialize;
 use std::path::Path;
 use tree_sitter;
 
@@ -42,7 +43,7 @@ impl RiskLevel {
 }
 
 /// Complexity data for a function
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FunctionComplexity {
     pub name: String,
     pub complexity: usize,

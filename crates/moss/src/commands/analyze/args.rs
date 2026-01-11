@@ -44,6 +44,10 @@ pub enum AnalyzeCommand {
         #[arg(short, long)]
         threshold: Option<usize>,
 
+        /// Maximum number of functions to show (0 = no limit)
+        #[arg(short = 'l', long, default_value = "10")]
+        limit: usize,
+
         /// Filter by symbol kind: function, method
         #[arg(long)]
         kind: Option<String>,

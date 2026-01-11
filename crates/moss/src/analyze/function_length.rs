@@ -3,6 +3,7 @@
 //! Identifies long functions that may be candidates for refactoring.
 use crate::parsers;
 use rhizome_moss_languages::{Language, support_for_path};
+use serde::Serialize;
 use std::path::Path;
 /// Length classification for functions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,7 +36,7 @@ impl LengthCategory {
     }
 }
 /// Function length data.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FunctionLength {
     pub name: String,
     pub lines: usize,

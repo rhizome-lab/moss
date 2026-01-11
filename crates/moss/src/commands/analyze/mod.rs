@@ -19,6 +19,7 @@ pub mod security;
 mod stale_docs;
 mod trace;
 
+use crate::analyze::complexity::{ComplexityReport, RiskLevel};
 use crate::commands::aliases::detect_project_languages;
 use crate::config::MossConfig;
 use crate::daemon;
@@ -281,32 +282,49 @@ pub fn run(args: AnalyzeArgs, format: crate::output::OutputFormat) -> i32 {
         Some(AnalyzeCommand::Complexity {
             target,
             threshold,
+            limit,
             kind,
             sarif,
         }) => {
+            // Use 0 to mean "no limit"
+            let effective_limit = if limit == 0 { usize::MAX } else { limit };
+            let effective_threshold = threshold.or(config.analyze.threshold());
+
             if sarif {
                 // Run complexity analysis and output in SARIF format
                 let report = complexity::analyze_codebase_complexity(
                     &effective_root,
-                    usize::MAX, // no limit for SARIF
-                    threshold.or(config.analyze.threshold()),
+                    effective_limit,
+                    effective_threshold,
                     filter.as_ref(),
                 );
                 sarif::print_complexity_sarif(&report.functions, &effective_root);
                 0
             } else {
-                let report = report::analyze(
-                    target.as_deref(),
-                    &effective_root,
-                    false, // health
-                    true,  // complexity
-                    false, // length
-                    false, // security
-                    threshold.or(config.analyze.threshold()),
-                    kind.as_deref(),
+                // For custom limit, call complexity directly to avoid hardcoded limit in report
+                let analysis_root = target
+                    .as_ref()
+                    .map(|t| effective_root.join(t))
+                    .unwrap_or_else(|| effective_root.clone());
+
+                let mut report = complexity::analyze_codebase_complexity(
+                    &analysis_root,
+                    effective_limit,
+                    effective_threshold,
                     filter.as_ref(),
                 );
-                print_report(&report, json, pretty)
+
+                // Note: kind filter not applicable to complexity (no kind field)
+                let _ = kind;
+
+                if json {
+                    println!("{}", serde_json::to_string(&report).unwrap_or_default());
+                } else if pretty {
+                    print_complexity_report_pretty(&report);
+                } else {
+                    print_complexity_report(&report);
+                }
+                0
             }
         }
 
@@ -871,4 +889,97 @@ fn run_all_passes(
 /// Check if a path is a source file we can analyze.
 pub(crate) fn is_source_file(path: &Path) -> bool {
     rhizome_moss_languages::support_for_path(path).is_some()
+}
+
+/// Print complexity report in plain format
+fn print_complexity_report(report: &ComplexityReport) {
+    println!("# Complexity Analysis");
+    println!();
+    println!("Functions: {}", report.functions.len());
+    println!("Average: {:.1}", report.avg_complexity());
+    println!("Maximum: {}", report.max_complexity());
+
+    let crit = report.critical_risk_count();
+    let high = report.high_risk_count();
+    if crit > 0 {
+        println!("Critical (>20): {}", crit);
+    }
+    if high > 0 || crit == 0 {
+        println!("High risk (11-20): {}", high);
+    }
+
+    if !report.functions.is_empty() {
+        println!();
+        println!("## Complex Functions");
+
+        let mut current_risk: Option<RiskLevel> = None;
+        for func in &report.functions {
+            let risk = func.risk_level();
+            if Some(risk) != current_risk {
+                println!("### {}", risk.as_title());
+                current_risk = Some(risk);
+            }
+            let display_name = if let Some(ref fp) = func.file_path {
+                format!("{}:{}", fp, func.short_name())
+            } else {
+                func.short_name()
+            };
+            println!("{} {}", func.complexity, display_name);
+        }
+    }
+}
+
+/// Print complexity report in pretty format with colors
+fn print_complexity_report_pretty(report: &ComplexityReport) {
+    use nu_ansi_term::{Color, Style};
+
+    println!("{}", Style::new().bold().paint("Complexity Analysis"));
+    println!();
+    println!("Functions: {}", report.functions.len());
+    println!("Average: {:.1}", report.avg_complexity());
+    println!("Maximum: {}", report.max_complexity());
+
+    let crit = report.critical_risk_count();
+    let high = report.high_risk_count();
+    if crit > 0 {
+        println!("{}: {}", Color::Red.paint("Critical (>20)"), crit);
+    }
+    if high > 0 || crit == 0 {
+        println!("{}: {}", Color::Yellow.paint("High risk (11-20)"), high);
+    }
+
+    if !report.functions.is_empty() {
+        println!();
+        println!("{}", Style::new().bold().paint("Complex Functions"));
+
+        let mut current_risk: Option<RiskLevel> = None;
+        for func in &report.functions {
+            let risk = func.risk_level();
+            if Some(risk) != current_risk {
+                let title = risk.as_title();
+                let colored_title = match risk {
+                    RiskLevel::Critical => Color::Red.paint(title),
+                    RiskLevel::High => Color::Yellow.paint(title),
+                    RiskLevel::Moderate => Color::Cyan.paint(title),
+                    RiskLevel::Low => Color::Green.paint(title),
+                };
+                println!();
+                println!("{}", colored_title);
+                current_risk = Some(risk);
+            }
+            let display_name = if let Some(ref fp) = func.file_path {
+                format!("{}:{}", fp, func.short_name())
+            } else {
+                func.short_name()
+            };
+            let complexity_str = format!("{:3}", func.complexity);
+            let colored_complexity = match risk {
+                RiskLevel::Critical => Color::Red.paint(&complexity_str),
+                RiskLevel::High => Color::Yellow.paint(&complexity_str),
+                RiskLevel::Moderate => Color::Cyan.paint(&complexity_str),
+                RiskLevel::Low => Color::Green.paint(&complexity_str),
+            };
+            println!("  {} {}", colored_complexity, display_name);
+        }
+    }
 }
