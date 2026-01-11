@@ -35,40 +35,157 @@ const CACHE_TTL: Duration = Duration::from_secs(60 * 60);
 /// Available openSUSE repositories.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OpenSuseRepo {
+    // === Official: Tumbleweed ===
     /// Tumbleweed OSS (rolling release, open source)
     TumbleweedOss,
     /// Tumbleweed Non-OSS (rolling release, proprietary)
     TumbleweedNonOss,
+    /// Tumbleweed Updates
+    TumbleweedUpdate,
+
+    // === Official: Leap 16.0 ===
     /// Leap 16.0 OSS
     Leap160Oss,
     /// Leap 16.0 Non-OSS
     Leap160NonOss,
+
+    // === Official: Leap 15.6 ===
     /// Leap 15.6 OSS
     Leap156Oss,
     /// Leap 15.6 Non-OSS
     Leap156NonOss,
+    /// Leap 15.6 Updates OSS
+    Leap156UpdateOss,
+    /// Leap 15.6 Updates Non-OSS
+    Leap156UpdateNonOss,
+    /// Leap 15.6 Backports
+    Leap156Backports,
+    /// Leap 15.6 SLE Updates
+    Leap156Sle,
+
+    // === Official: Source RPMs ===
+    /// Tumbleweed Source OSS
+    TumbleweedSrcOss,
+    /// Tumbleweed Source Non-OSS
+    TumbleweedSrcNonOss,
+    /// Leap 15.6 Source OSS
+    Leap156SrcOss,
+    /// Leap 15.6 Source Non-OSS
+    Leap156SrcNonOss,
+
+    // === Official: Debug ===
+    /// Tumbleweed Debug
+    TumbleweedDebug,
+    /// Leap 16.0 Debug
+    Leap160Debug,
+    /// Leap 15.6 Debug
+    Leap156Debug,
+    /// Leap 15.6 Debug Updates
+    Leap156DebugUpdate,
+
+    // === Factory (bleeding edge) ===
+    /// Factory OSS (development, becomes Tumbleweed)
+    FactoryOss,
+
+    // === Community: Games ===
+    /// Games for Tumbleweed
+    GamesTumbleweed,
+    /// Games for Leap 15.6
+    GamesLeap156,
+
+    // === Community: KDE ===
+    /// KDE Extra for Tumbleweed
+    KdeExtraTumbleweed,
+    /// KDE Frameworks for Tumbleweed
+    KdeFrameworksTumbleweed,
+    /// KDE Qt6 for Tumbleweed
+    KdeQt6Tumbleweed,
+
+    // === Community: GNOME ===
+    /// GNOME Apps for Leap 16.0
+    GnomeAppsLeap160,
+    /// GNOME Apps for Leap 15.6
+    GnomeAppsLeap156,
+    /// GNOME Factory
+    GnomeFactory,
+
+    // === Community: Desktop Environments ===
+    /// Xfce for Tumbleweed
+    XfceTumbleweed,
+    /// Xfce for Leap 16.0
+    XfceLeap160,
+    /// Xfce for Leap 15.6
+    XfceLeap156,
+
+    // === Community: Server/Tools ===
+    /// Mozilla (Firefox, Thunderbird) for Tumbleweed
+    MozillaTumbleweed,
+    /// Science packages for Tumbleweed
+    ScienceTumbleweed,
+    /// Wine for Tumbleweed
+    WineTumbleweed,
+    /// HTTP servers for Tumbleweed
+    ServerHttpTumbleweed,
+    /// Database servers for Tumbleweed
+    ServerDatabaseTumbleweed,
 }
 
 impl OpenSuseRepo {
     /// Get repo identifier for caching.
     fn id(&self) -> &'static str {
         match self {
+            // Official
             Self::TumbleweedOss => "tumbleweed-oss",
             Self::TumbleweedNonOss => "tumbleweed-non-oss",
+            Self::TumbleweedUpdate => "tumbleweed-update",
             Self::Leap160Oss => "leap-16.0-oss",
             Self::Leap160NonOss => "leap-16.0-non-oss",
             Self::Leap156Oss => "leap-15.6-oss",
             Self::Leap156NonOss => "leap-15.6-non-oss",
+            Self::Leap156UpdateOss => "leap-15.6-update-oss",
+            Self::Leap156UpdateNonOss => "leap-15.6-update-non-oss",
+            Self::Leap156Backports => "leap-15.6-backports",
+            Self::Leap156Sle => "leap-15.6-sle",
+            // Source
+            Self::TumbleweedSrcOss => "tumbleweed-src-oss",
+            Self::TumbleweedSrcNonOss => "tumbleweed-src-non-oss",
+            Self::Leap156SrcOss => "leap-15.6-src-oss",
+            Self::Leap156SrcNonOss => "leap-15.6-src-non-oss",
+            // Debug
+            Self::TumbleweedDebug => "tumbleweed-debug",
+            Self::Leap160Debug => "leap-16.0-debug",
+            Self::Leap156Debug => "leap-15.6-debug",
+            Self::Leap156DebugUpdate => "leap-15.6-debug-update",
+            Self::FactoryOss => "factory-oss",
+            // Community
+            Self::GamesTumbleweed => "games-tumbleweed",
+            Self::GamesLeap156 => "games-leap-15.6",
+            Self::KdeExtraTumbleweed => "kde-extra-tumbleweed",
+            Self::KdeFrameworksTumbleweed => "kde-frameworks-tumbleweed",
+            Self::KdeQt6Tumbleweed => "kde-qt6-tumbleweed",
+            Self::GnomeAppsLeap160 => "gnome-apps-leap-16.0",
+            Self::GnomeAppsLeap156 => "gnome-apps-leap-15.6",
+            Self::GnomeFactory => "gnome-factory",
+            Self::XfceTumbleweed => "xfce-tumbleweed",
+            Self::XfceLeap160 => "xfce-leap-16.0",
+            Self::XfceLeap156 => "xfce-leap-15.6",
+            Self::MozillaTumbleweed => "mozilla-tumbleweed",
+            Self::ScienceTumbleweed => "science-tumbleweed",
+            Self::WineTumbleweed => "wine-tumbleweed",
+            Self::ServerHttpTumbleweed => "server-http-tumbleweed",
+            Self::ServerDatabaseTumbleweed => "server-database-tumbleweed",
         }
     }
 
     /// Get repodata base URL.
     fn base_url(&self) -> &'static str {
         match self {
+            // Official main repos
             Self::TumbleweedOss => "https://download.opensuse.org/tumbleweed/repo/oss/repodata",
             Self::TumbleweedNonOss => {
                 "https://download.opensuse.org/tumbleweed/repo/non-oss/repodata"
             }
+            Self::TumbleweedUpdate => "https://download.opensuse.org/update/tumbleweed/repodata",
             Self::Leap160Oss => {
                 "https://download.opensuse.org/distribution/leap/16.0/repo/oss/repodata"
             }
@@ -81,39 +198,210 @@ impl OpenSuseRepo {
             Self::Leap156NonOss => {
                 "https://download.opensuse.org/distribution/leap/15.6/repo/non-oss/repodata"
             }
+            Self::Leap156UpdateOss => "https://download.opensuse.org/update/leap/15.6/oss/repodata",
+            Self::Leap156UpdateNonOss => {
+                "https://download.opensuse.org/update/leap/15.6/non-oss/repodata"
+            }
+            Self::Leap156Backports => {
+                "https://download.opensuse.org/update/leap/15.6/backports/repodata"
+            }
+            Self::Leap156Sle => "https://download.opensuse.org/update/leap/15.6/sle/repodata",
+            // Source repos
+            Self::TumbleweedSrcOss => {
+                "https://download.opensuse.org/tumbleweed/repo/src-oss/repodata"
+            }
+            Self::TumbleweedSrcNonOss => {
+                "https://download.opensuse.org/tumbleweed/repo/src-non-oss/repodata"
+            }
+            Self::Leap156SrcOss => {
+                "https://download.opensuse.org/source/distribution/leap/15.6/repo/oss/repodata"
+            }
+            Self::Leap156SrcNonOss => {
+                "https://download.opensuse.org/source/distribution/leap/15.6/repo/non-oss/repodata"
+            }
+            // Debug repos
+            Self::TumbleweedDebug => {
+                "https://download.opensuse.org/debug/tumbleweed/repo/oss/repodata"
+            }
+            Self::Leap160Debug => {
+                "https://download.opensuse.org/debug/distribution/leap/16.0/repo/oss/repodata"
+            }
+            Self::Leap156Debug => {
+                "https://download.opensuse.org/debug/distribution/leap/15.6/repo/oss/repodata"
+            }
+            Self::Leap156DebugUpdate => {
+                "https://download.opensuse.org/debug/update/leap/15.6/oss/repodata"
+            }
+            Self::FactoryOss => "https://download.opensuse.org/factory/repo/oss/repodata",
+            // Community repos
+            Self::GamesTumbleweed => {
+                "https://download.opensuse.org/repositories/games/openSUSE_Tumbleweed/repodata"
+            }
+            Self::GamesLeap156 => "https://download.opensuse.org/repositories/games/15.6/repodata",
+            Self::KdeExtraTumbleweed => {
+                "https://download.opensuse.org/repositories/KDE:/Extra/openSUSE_Tumbleweed/repodata"
+            }
+            Self::KdeFrameworksTumbleweed => {
+                "https://download.opensuse.org/repositories/KDE:/Frameworks/openSUSE_Tumbleweed/repodata"
+            }
+            Self::KdeQt6Tumbleweed => {
+                "https://download.opensuse.org/repositories/KDE:/Qt6/openSUSE_Tumbleweed/repodata"
+            }
+            Self::GnomeAppsLeap160 => {
+                "https://download.opensuse.org/repositories/GNOME:/Apps/16.0/repodata"
+            }
+            Self::GnomeAppsLeap156 => {
+                "https://download.opensuse.org/repositories/GNOME:/Apps/15.6/repodata"
+            }
+            Self::GnomeFactory => {
+                "https://download.opensuse.org/repositories/GNOME:/Factory/openSUSE_Factory/repodata"
+            }
+            Self::XfceTumbleweed => {
+                "https://download.opensuse.org/repositories/X11:/xfce/openSUSE_Tumbleweed/repodata"
+            }
+            Self::XfceLeap160 => {
+                "https://download.opensuse.org/repositories/X11:/xfce/16.0/repodata"
+            }
+            Self::XfceLeap156 => {
+                "https://download.opensuse.org/repositories/X11:/xfce/15.6/repodata"
+            }
+            Self::MozillaTumbleweed => {
+                "https://download.opensuse.org/repositories/mozilla/openSUSE_Tumbleweed/repodata"
+            }
+            Self::ScienceTumbleweed => {
+                "https://download.opensuse.org/repositories/science/openSUSE_Tumbleweed/repodata"
+            }
+            Self::WineTumbleweed => {
+                "https://download.opensuse.org/repositories/Emulators:/Wine/openSUSE_Tumbleweed/repodata"
+            }
+            Self::ServerHttpTumbleweed => {
+                "https://download.opensuse.org/repositories/server:/http/openSUSE_Tumbleweed/repodata"
+            }
+            Self::ServerDatabaseTumbleweed => {
+                "https://download.opensuse.org/repositories/server:/database/openSUSE_Tumbleweed/repodata"
+            }
         }
     }
 
-    /// All available repos.
+    /// All available repos (official + community).
     pub fn all() -> &'static [OpenSuseRepo] {
         &[
+            // Official binary
             Self::TumbleweedOss,
             Self::TumbleweedNonOss,
+            Self::TumbleweedUpdate,
             Self::Leap160Oss,
             Self::Leap160NonOss,
             Self::Leap156Oss,
             Self::Leap156NonOss,
+            Self::Leap156UpdateOss,
+            Self::Leap156UpdateNonOss,
+            Self::Leap156Backports,
+            Self::Leap156Sle,
+            // Source
+            Self::TumbleweedSrcOss,
+            Self::TumbleweedSrcNonOss,
+            Self::Leap156SrcOss,
+            Self::Leap156SrcNonOss,
+            // Debug
+            Self::TumbleweedDebug,
+            Self::Leap160Debug,
+            Self::Leap156Debug,
+            Self::Leap156DebugUpdate,
+            // Factory
+            Self::FactoryOss,
+            // Community
+            Self::GamesTumbleweed,
+            Self::GamesLeap156,
+            Self::KdeExtraTumbleweed,
+            Self::KdeFrameworksTumbleweed,
+            Self::KdeQt6Tumbleweed,
+            Self::GnomeAppsLeap160,
+            Self::GnomeAppsLeap156,
+            Self::GnomeFactory,
+            Self::XfceTumbleweed,
+            Self::XfceLeap160,
+            Self::XfceLeap156,
+            Self::MozillaTumbleweed,
+            Self::ScienceTumbleweed,
+            Self::WineTumbleweed,
+            Self::ServerHttpTumbleweed,
+            Self::ServerDatabaseTumbleweed,
+        ]
+    }
+
+    /// Official repos only (no community).
+    pub fn official() -> &'static [OpenSuseRepo] {
+        &[
+            // Binary
+            Self::TumbleweedOss,
+            Self::TumbleweedNonOss,
+            Self::TumbleweedUpdate,
+            Self::Leap160Oss,
+            Self::Leap160NonOss,
+            Self::Leap156Oss,
+            Self::Leap156NonOss,
+            Self::Leap156UpdateOss,
+            Self::Leap156UpdateNonOss,
+            Self::Leap156Backports,
+            Self::Leap156Sle,
+            // Source
+            Self::TumbleweedSrcOss,
+            Self::TumbleweedSrcNonOss,
+            Self::Leap156SrcOss,
+            Self::Leap156SrcNonOss,
+            // Debug
+            Self::TumbleweedDebug,
+            Self::Leap160Debug,
+            Self::Leap156Debug,
+            Self::Leap156DebugUpdate,
+            // Factory
+            Self::FactoryOss,
+        ]
+    }
+
+    /// Binary repos only (no source or debug).
+    pub fn binary_only() -> &'static [OpenSuseRepo] {
+        &[
+            Self::TumbleweedOss,
+            Self::TumbleweedNonOss,
+            Self::TumbleweedUpdate,
+            Self::Leap160Oss,
+            Self::Leap160NonOss,
+            Self::Leap156Oss,
+            Self::Leap156NonOss,
+            Self::Leap156UpdateOss,
+            Self::Leap156UpdateNonOss,
+            Self::Leap156Backports,
+            Self::Leap156Sle,
+            Self::FactoryOss,
         ]
     }
 
     /// Just Tumbleweed repos.
     pub fn tumbleweed() -> &'static [OpenSuseRepo] {
-        &[Self::TumbleweedOss, Self::TumbleweedNonOss]
+        &[
+            Self::TumbleweedOss,
+            Self::TumbleweedNonOss,
+            Self::TumbleweedUpdate,
+        ]
     }
 
     /// Just Leap 15.6 repos.
     pub fn leap_15_6() -> &'static [OpenSuseRepo] {
-        &[Self::Leap156Oss, Self::Leap156NonOss]
+        &[
+            Self::Leap156Oss,
+            Self::Leap156NonOss,
+            Self::Leap156UpdateOss,
+            Self::Leap156UpdateNonOss,
+            Self::Leap156Backports,
+            Self::Leap156Sle,
+        ]
     }
 
     /// Just Leap 16.0 repos.
     pub fn leap_16_0() -> &'static [OpenSuseRepo] {
         &[Self::Leap160Oss, Self::Leap160NonOss]
-    }
-
-    /// Just OSS repos (all versions).
-    pub fn oss_only() -> &'static [OpenSuseRepo] {
-        &[Self::TumbleweedOss, Self::Leap160Oss, Self::Leap156Oss]
     }
 }
 

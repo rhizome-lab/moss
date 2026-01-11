@@ -341,6 +341,37 @@ fn test_opensuse() {
 }
 
 #[test]
+fn test_opensuse_single_repo() {
+    // Quick test with just one repo (Tumbleweed OSS ~2MB)
+    let index = opensuse::OpenSuse::tumbleweed();
+    test_fetch(&index, "curl");
+    test_search(&index, "curl");
+}
+
+#[test]
+fn test_opensuse_source_repo() {
+    // Test source RPM repo parsing
+    use opensuse::OpenSuseRepo;
+    let index = opensuse::OpenSuse::with_repos(&[OpenSuseRepo::TumbleweedSrcOss]);
+    let packages = index.fetch_all().unwrap();
+    println!(
+        "opensuse src: fetch_all() returned {} source packages",
+        packages.len()
+    );
+    assert!(!packages.is_empty(), "source repo should have packages");
+
+    // Source packages should have source_repo in extra
+    let curl = packages.iter().find(|p| p.name == "curl");
+    if let Some(curl) = curl {
+        println!(
+            "Found curl source: {} (repo: {:?})",
+            curl.version,
+            curl.extra.get("source_repo")
+        );
+    }
+}
+
+#[test]
 fn test_apk_enhanced_metadata() {
     let index = apk::Apk;
     let curl = index.fetch("curl").unwrap();
