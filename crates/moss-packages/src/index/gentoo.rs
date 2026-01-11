@@ -1,6 +1,12 @@
 //! Gentoo package index fetcher (Portage).
 //!
 //! Fetches package metadata from packages.gentoo.org.
+//!
+//! ## API Strategy
+//! - **fetch**: `packages.gentoo.org/packages/{category}/{name}.json` - Official JSON API
+//! - **fetch_versions**: Same as fetch, extracts versions array
+//! - **search**: Not supported (API returns HTML, not JSON)
+//! - **fetch_all**: Not supported (no bulk endpoint)
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 
@@ -141,38 +147,12 @@ impl PackageIndex for Gentoo {
             .collect())
     }
 
-    fn search(&self, query: &str) -> Result<Vec<PackageMeta>, IndexError> {
-        let url = format!("{}/packages/search?q={}", Self::GENTOO_API, query);
-        let response: serde_json::Value = ureq::get(&url)
-            .set("Accept", "application/json")
-            .call()?
-            .into_json()?;
-
-        let packages = response["packages"]
-            .as_array()
-            .or_else(|| response.as_array())
-            .ok_or_else(|| IndexError::Parse("expected packages array".into()))?;
-
-        Ok(packages
-            .iter()
-            .filter_map(|pkg| {
-                Some(PackageMeta {
-                    name: format!(
-                        "{}/{}",
-                        pkg["category"].as_str().unwrap_or("unknown"),
-                        pkg["name"].as_str()?
-                    ),
-                    version: pkg["version"].as_str().unwrap_or("unknown").to_string(),
-                    description: pkg["description"].as_str().map(String::from),
-                    homepage: None,
-                    repository: None,
-                    license: None,
-                    maintainers: Vec::new(),
-                    binaries: Vec::new(),
-                    ..Default::default()
-                })
-            })
-            .collect())
+    fn search(&self, _query: &str) -> Result<Vec<PackageMeta>, IndexError> {
+        // Gentoo search API returns HTML, not JSON
+        // Use fetch() with category/package format instead (e.g., "sys-apps/ripgrep")
+        Err(IndexError::NotImplemented(
+            "Gentoo search API returns HTML. Use fetch() with category/name format.".into(),
+        ))
     }
 }
 

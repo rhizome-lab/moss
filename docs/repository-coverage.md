@@ -36,11 +36,11 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 - [ ] openmandriva - OpenMandriva
 
 ### SUSE Family
-- [~] opensuse - openSUSE (API needs verification)
+- [ ] opensuse - openSUSE (no public JSON API)
 - [ ] obs - Open Build Service (generic)
 
 ### Gentoo Family
-- [~] gentoo - Gentoo Linux (API needs verification)
+- [x] gentoo - Gentoo Linux (packages.gentoo.org JSON API, search not supported)
 - [ ] calculate - Calculate Linux
 - [ ] funtoo - Funtoo Linux
 - [ ] exherbo - Exherbo Linux
@@ -50,8 +50,8 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 - [x] apk (Alpine Linux)
 - [x] nix (NixOS)
 - [x] guix (GNU Guix)
-- [~] void - Void Linux (API needs verification)
-- [~] slackware - SlackBuilds.org (via GitHub raw files)
+- [ ] void - Void Linux (binary plist format, no JSON API)
+- [x] slackware - SlackBuilds.org (GitHub raw files)
 - [ ] solus - Solus Linux
 - [ ] chimera - Chimera Linux
 - [ ] adelie - Adelie Linux
@@ -75,9 +75,9 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 
 ## BSD Systems
 
-- [~] freebsd - FreeBSD ports/packages (API needs verification)
-- [~] openbsd - OpenBSD ports (API needs verification)
-- [~] netbsd - pkgsrc (API needs verification)
+- [ ] freebsd - FreeBSD ports/packages (no public JSON API, pkg uses binary format)
+- [ ] openbsd - OpenBSD ports (no public JSON API)
+- [ ] netbsd - pkgsrc (no public JSON API)
 - [ ] dragonfly - DragonflyBSD dports
 - [ ] midnightbsd - MidnightBSD mports
 - [ ] ravenports - Ravenports (multi-platform)

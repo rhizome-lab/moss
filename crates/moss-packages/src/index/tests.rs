@@ -206,57 +206,11 @@ fn test_nix() {
 }
 
 #[test]
-#[ignore = "Void Linux API needs verification"]
-fn test_void() {
-    let index = void::Void;
-    test_fetch(&index, "ripgrep");
-    test_versions(&index, "ripgrep");
-    test_search(&index, "grep");
-}
-
-#[test]
-#[ignore = "Gentoo API needs verification"]
 fn test_gentoo() {
     let index = gentoo::Gentoo;
     test_fetch(&index, "sys-apps/ripgrep");
     test_versions(&index, "sys-apps/ripgrep");
-    test_search(&index, "grep");
-}
-
-#[test]
-#[ignore = "openSUSE API needs verification"]
-fn test_opensuse() {
-    let index = opensuse::OpenSuse;
-    test_fetch(&index, "ripgrep");
-    test_versions(&index, "ripgrep");
-    test_search(&index, "grep");
-}
-
-#[test]
-#[ignore = "FreeBSD FreshPorts API needs verification"]
-fn test_freebsd() {
-    let index = freebsd::FreeBsd;
-    test_fetch(&index, "ripgrep");
-    test_versions(&index, "ripgrep");
-    test_search(&index, "grep");
-}
-
-#[test]
-#[ignore = "OpenBSD API needs verification"]
-fn test_openbsd() {
-    let index = openbsd::OpenBsd;
-    test_fetch(&index, "ripgrep");
-    test_versions(&index, "ripgrep");
-    test_search(&index, "grep");
-}
-
-#[test]
-#[ignore = "NetBSD API needs verification"]
-fn test_netbsd() {
-    let index = netbsd::NetBsd;
-    test_fetch(&index, "ripgrep");
-    test_versions(&index, "ripgrep");
-    test_search(&index, "grep");
+    // Note: search returns HTML not JSON, so it's not supported
 }
 
 #[test]
