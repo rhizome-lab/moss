@@ -229,6 +229,24 @@ Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
 - [x] Debian/APT: 21 repos (stable/testing/unstable/experimental/oldstable × main/contrib/non-free + backports)
 - [x] Fedora/DNF: 6 repos (Fedora 39/40/41, Rawhide, EPEL 8/9)
 - [x] Ubuntu: 22 repos (Noble 24.04/Jammy 22.04/Oracular 24.10 × main/restricted/universe/multiverse + updates/security/backports)
+- [x] Nix: 5 channels (nixos-stable, nixos-unstable, nixpkgs-unstable, nixos-24.05, nixos-24.11)
+- [x] CachyOS: 8 repos (cachyos, cachyos-v3/v4, core-v3/v4, extra-v3/v4, testing)
+- [x] EndeavourOS: 5 repos (endeavouros, core, extra, multilib, testing)
+- [x] Gentoo: 5 repos (gentoo, guru, science, haskell, games overlays)
+- [x] Guix: 2 channels (guix, nonguix)
+- [x] Slackware: 3 versions (current, 15.0, 14.2)
+- [x] Scoop: 8 buckets (main, extras, versions, games, nerd-fonts, java, php, nonportable)
+- [x] Chocolatey: community repository
+- [x] WinGet: 2 sources (winget, msstore)
+- [x] Flatpak: 2 remotes (flathub, flathub-beta)
+- [x] Snap: 4 channels (stable, candidate, beta, edge)
+- [x] Conda: 4 channels (conda-forge, defaults, bioconda, pytorch)
+- [x] Maven: 3 repos (central, google, sonatype)
+- [x] Docker: 4 registries (docker-hub, ghcr, quay, gcr)
+
+**Multi-repo coverage remaining**:
+
+All major package managers now have multi-repo support. Remaining unit-struct fetchers are single-source registries where multi-repo doesn't apply (npm, PyPI, crates.io, etc.).
 
 ### Complexity Hotspots (58 functions >21)
 - [ ] `crates/moss/src/commands/edit.rs:handle_glob_edit` (76)
