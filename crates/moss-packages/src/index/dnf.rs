@@ -207,6 +207,21 @@ impl Dnf {
             }
         }
 
+        // Extract provides (virtual packages and shared libraries)
+        if let Some(provides) = response["provides"].as_array() {
+            let parsed_provides: Vec<serde_json::Value> = provides
+                .iter()
+                .filter_map(|p| p["name"].as_str())
+                .map(|name| serde_json::Value::String(name.to_string()))
+                .collect();
+            if !parsed_provides.is_empty() {
+                extra.insert(
+                    "provides".to_string(),
+                    serde_json::Value::Array(parsed_provides),
+                );
+            }
+        }
+
         // Extract arch
         if let Some(arch) = response["arch"].as_str() {
             extra.insert(

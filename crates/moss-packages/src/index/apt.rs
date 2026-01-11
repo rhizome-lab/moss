@@ -350,6 +350,7 @@ impl Apt {
                     "Filename" => builder.filename = Some(value.to_string()),
                     "SHA256" => builder.sha256 = Some(value.to_string()),
                     "Depends" => builder.depends = Some(value.to_string()),
+                    "Provides" => builder.provides = Some(value.to_string()),
                     "Size" => builder.size = value.parse().ok(),
                     _ => {}
                 }
@@ -576,6 +577,7 @@ struct PackageBuilder {
     filename: Option<String>,
     sha256: Option<String>,
     depends: Option<String>,
+    provides: Option<String>,
     size: Option<u64>,
 }
 
@@ -610,6 +612,33 @@ impl PackageBuilder {
                         .collect(),
                 ),
             );
+        }
+
+        // Store provides (virtual packages and shared libraries)
+        if let Some(provides) = self.provides {
+            let parsed_provides: Vec<String> = provides
+                .split(',')
+                .map(|p| {
+                    // Strip version constraints: "libfoo.so.1 (= 1.0)" -> "libfoo.so.1"
+                    p.trim()
+                        .split_once(' ')
+                        .map(|(name, _)| name)
+                        .unwrap_or(p.trim())
+                        .to_string()
+                })
+                .filter(|p| !p.is_empty())
+                .collect();
+            if !parsed_provides.is_empty() {
+                extra.insert(
+                    "provides".to_string(),
+                    serde_json::Value::Array(
+                        parsed_provides
+                            .into_iter()
+                            .map(serde_json::Value::String)
+                            .collect(),
+                    ),
+                );
+            }
         }
 
         // Store size in extra
@@ -771,6 +800,7 @@ impl Iterator for AptPackageIter {
                             "Filename" => builder.filename = Some(value.to_string()),
                             "SHA256" => builder.sha256 = Some(value.to_string()),
                             "Depends" => builder.depends = Some(value.to_string()),
+                            "Provides" => builder.provides = Some(value.to_string()),
                             "Size" => builder.size = value.parse().ok(),
                             _ => {}
                         }

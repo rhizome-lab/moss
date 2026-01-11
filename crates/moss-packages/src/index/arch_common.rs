@@ -43,6 +43,28 @@ pub fn parse_official_package(pkg: &serde_json::Value, name: &str) -> Option<Pac
         extra.insert("depends".to_string(), serde_json::Value::Array(parsed_deps));
     }
 
+    // Extract provides (virtual packages and shared libraries)
+    if let Some(provides) = pkg["provides"].as_array() {
+        let parsed_provides: Vec<serde_json::Value> = provides
+            .iter()
+            .filter_map(|p| p.as_str())
+            .map(|p| {
+                // Strip version constraints: "libfoo.so=1" -> "libfoo.so"
+                let name = p
+                    .split(|c| c == '>' || c == '<' || c == '=' || c == ':')
+                    .next()
+                    .unwrap_or(p);
+                serde_json::Value::String(name.to_string())
+            })
+            .collect();
+        if !parsed_provides.is_empty() {
+            extra.insert(
+                "provides".to_string(),
+                serde_json::Value::Array(parsed_provides),
+            );
+        }
+    }
+
     // Extract size
     if let Some(size) = pkg["compressed_size"].as_u64() {
         extra.insert("size".to_string(), serde_json::Value::Number(size.into()));
@@ -96,6 +118,28 @@ pub fn parse_aur_package(pkg: &serde_json::Value, name: &str) -> Option<PackageM
             })
             .collect();
         extra.insert("depends".to_string(), serde_json::Value::Array(parsed_deps));
+    }
+
+    // Extract provides (virtual packages and shared libraries)
+    if let Some(provides) = pkg["Provides"].as_array() {
+        let parsed_provides: Vec<serde_json::Value> = provides
+            .iter()
+            .filter_map(|p| p.as_str())
+            .map(|p| {
+                // Strip version constraints
+                let name = p
+                    .split(|c| c == '>' || c == '<' || c == '=' || c == ':')
+                    .next()
+                    .unwrap_or(p);
+                serde_json::Value::String(name.to_string())
+            })
+            .collect();
+        if !parsed_provides.is_empty() {
+            extra.insert(
+                "provides".to_string(),
+                serde_json::Value::Array(parsed_provides),
+            );
+        }
     }
 
     // Mark as AUR package

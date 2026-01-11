@@ -176,6 +176,18 @@ impl FreeBsd {
             extra.insert("depends".to_string(), serde_json::Value::Array(dep_names));
         }
 
+        // Extract provides (shared libraries)
+        if let Some(shlibs) = pkg["shlibs_provided"].as_array() {
+            let provides: Vec<serde_json::Value> = shlibs
+                .iter()
+                .filter_map(|s| s.as_str())
+                .map(|s| serde_json::Value::String(s.to_string()))
+                .collect();
+            if !provides.is_empty() {
+                extra.insert("provides".to_string(), serde_json::Value::Array(provides));
+            }
+        }
+
         // Tag with source repo
         extra.insert(
             "source_repo".to_string(),

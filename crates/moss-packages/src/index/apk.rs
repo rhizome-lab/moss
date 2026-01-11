@@ -448,6 +448,27 @@ impl ApkPackageBuilder {
             extra.insert("origin".to_string(), serde_json::Value::String(origin));
         }
 
+        // Parse provides (shared libraries and virtual packages)
+        if let Some(provides) = self.provides {
+            let parsed_provides: Vec<serde_json::Value> = provides
+                .split_whitespace()
+                .map(|p| {
+                    // Strip version constraints
+                    let name = p
+                        .split(|c| c == '>' || c == '<' || c == '=' || c == '~')
+                        .next()
+                        .unwrap_or(p);
+                    serde_json::Value::String(name.to_string())
+                })
+                .collect();
+            if !parsed_provides.is_empty() {
+                extra.insert(
+                    "provides".to_string(),
+                    serde_json::Value::Array(parsed_provides),
+                );
+            }
+        }
+
         // Tag with source repo
         extra.insert(
             "source_repo".to_string(),
