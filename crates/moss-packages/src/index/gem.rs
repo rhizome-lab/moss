@@ -6,9 +6,11 @@
 //! - **fetch**: `rubygems.org/api/v1/gems/{name}.json` - Official RubyGems JSON API
 //! - **fetch_versions**: `rubygems.org/api/v1/versions/{name}.json`
 //! - **search**: `rubygems.org/api/v1/search.json?query=`
-//! - **fetch_all**: Not supported (too large)
+//! - **fetch_all**: Compact Index `/versions` endpoint (streaming)
+//! - **iter_all**: Streaming iterator over `/versions` file
 
-use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
+use super::{IndexError, PackageIndex, PackageIter, PackageMeta, VersionMeta};
+use std::io::{BufRead, BufReader};
 
 /// RubyGems package index fetcher.
 pub struct Gem;
@@ -16,6 +18,8 @@ pub struct Gem;
 impl Gem {
     /// RubyGems API.
     const RUBYGEMS_API: &'static str = "https://rubygems.org/api/v1";
+    /// Compact Index base URL.
+    const COMPACT_INDEX: &'static str = "https://rubygems.org";
 }
 
 impl PackageIndex for Gem {
@@ -141,5 +145,104 @@ impl PackageIndex for Gem {
                 })
             })
             .collect())
+    }
+
+    fn supports_fetch_all(&self) -> bool {
+        true
+    }
+
+    fn fetch_all(&self) -> Result<Vec<PackageMeta>, IndexError> {
+        // Use iter_all and collect
+        self.iter_all()?.collect()
+    }
+
+    fn iter_all(&self) -> Result<PackageIter<'_>, IndexError> {
+        let url = format!("{}/versions", Self::COMPACT_INDEX);
+        let response = ureq::get(&url).call()?;
+        let reader = BufReader::new(response.into_reader());
+
+        Ok(Box::new(GemVersionsIter {
+            reader,
+            seen: std::collections::HashSet::new(),
+        }))
+    }
+}
+
+/// Iterator over RubyGems Compact Index /versions file.
+/// Format: gem_name version1,version2,... md5_hash
+struct GemVersionsIter<R: BufRead> {
+    reader: R,
+    /// Track seen gem names to deduplicate (versions file is append-only, same gem can appear multiple times)
+    seen: std::collections::HashSet<String>,
+}
+
+impl<R: BufRead + Send> Iterator for GemVersionsIter<R> {
+    type Item = Result<PackageMeta, IndexError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut line = String::new();
+
+        loop {
+            line.clear();
+            match self.reader.read_line(&mut line) {
+                Ok(0) => return None, // EOF
+                Ok(_) => {
+                    let line = line.trim();
+
+                    // Skip header line (starts with "---")
+                    if line.starts_with("---") || line.is_empty() {
+                        continue;
+                    }
+
+                    // Format: gem_name version1,version2,... md5_hash
+                    // Split from the end to handle gem names with spaces
+                    let parts: Vec<&str> = line.rsplitn(3, ' ').collect();
+                    if parts.len() < 2 {
+                        continue;
+                    }
+
+                    // parts is [md5, versions, name] due to rsplitn
+                    let name = if parts.len() == 3 {
+                        parts[2].to_string()
+                    } else {
+                        parts[1].to_string()
+                    };
+
+                    // Skip if we've already seen this gem (return only latest entry)
+                    if self.seen.contains(&name) {
+                        continue;
+                    }
+
+                    let versions_str = if parts.len() == 3 { parts[1] } else { parts[0] };
+
+                    // Parse versions (comma-separated, may include platform like "1.0.0-java")
+                    let versions: Vec<&str> = versions_str.split(',').collect();
+                    let latest = versions.last().unwrap_or(&"unknown");
+
+                    // Extract version number (strip platform suffix)
+                    let version = latest.split('-').next().unwrap_or(latest).to_string();
+
+                    self.seen.insert(name.clone());
+
+                    return Some(Ok(PackageMeta {
+                        name,
+                        version,
+                        description: None, // Compact index doesn't include this
+                        homepage: None,
+                        repository: None,
+                        license: None,
+                        binaries: Vec::new(),
+                        keywords: Vec::new(),
+                        maintainers: Vec::new(),
+                        published: None,
+                        downloads: None,
+                        archive_url: None,
+                        checksum: None,
+                        extra: Default::default(),
+                    }));
+                }
+                Err(e) => return Some(Err(IndexError::Io(e))),
+            }
+        }
     }
 }
