@@ -88,6 +88,7 @@ pub use types::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use std::sync::OnceLock;
 
 static INDEX_REGISTRY: OnceLock<Vec<&'static dyn PackageIndex>> = OnceLock::new();
+static OPENSUSE_INDEX: OnceLock<opensuse::OpenSuse> = OnceLock::new();
 
 fn init_builtin() -> Vec<&'static dyn PackageIndex> {
     vec![
@@ -105,7 +106,7 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         &guix::Guix,
         &manjaro::Manjaro,
         &nix::Nix,
-        &opensuse::OpenSuse,
+        OPENSUSE_INDEX.get_or_init(opensuse::OpenSuse::all),
         &pacman::Pacman,
         &slackware::Slackware,
         &void::Void,

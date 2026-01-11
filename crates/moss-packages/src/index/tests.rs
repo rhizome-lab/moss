@@ -318,12 +318,26 @@ fn test_void() {
 }
 
 #[test]
-#[ignore = "Slow: downloads ~17MB openSUSE primary.xml"]
+#[ignore = "Slow: downloads ~100MB openSUSE repos"]
 fn test_opensuse() {
-    let index = opensuse::OpenSuse;
+    let index = opensuse::OpenSuse::all();
     test_fetch(&index, "curl");
     test_versions(&index, "curl");
     test_search(&index, "curl");
+
+    // Verify we get versions from multiple repos
+    let versions = index.fetch_versions("curl").unwrap();
+    println!(
+        "opensuse: curl has {} versions across repos",
+        versions.len()
+    );
+    for v in &versions {
+        println!("  {}", v.version);
+    }
+    assert!(
+        versions.len() > 1,
+        "should have versions from multiple repos"
+    );
 }
 
 #[test]

@@ -212,6 +212,10 @@ Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
 - archive_url and checksum for verification
 - extra field for ecosystem-specific metadata not in normalized fields
 
+**Performance improvements needed**:
+- [ ] Streaming/iterator API: Currently fetchers load all packages into memory before filtering. For cross-referencing 50+ ecosystems, this is ~1GB+ in memory. Need lazy/streaming approach where we iterate packages without loading all into Vec first.
+- [ ] Parallel repo fetching: openSUSE fetches 6 repos sequentially. Could parallelize with rayon or async.
+
 ### Complexity Hotspots (58 functions >21)
 - [ ] `crates/moss/src/commands/edit.rs:handle_glob_edit` (76)
 - [ ] `crates/moss/src/commands/view/file.rs:cmd_view_file` (69)
