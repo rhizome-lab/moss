@@ -145,6 +145,7 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 - gentoo: packages.gentoo.org/packages/{cat}/{name}.json (JSON)
 - guix: guix.gnu.org/packages.json (gzip-compressed JSON array, ~30k packages)
 - nix: search.nixos.org Elasticsearch (requires POST with query JSON)
+- opensuse: download.opensuse.org repodata/primary.xml.zst (zstd XML)
 - pacman/aur: aur.archlinux.org/packages-meta-ext-v1.json.gz (full archive)
 - void: repo-default.voidlinux.org x86_64-repodata (zstd tar + XML plist)
 
@@ -152,7 +153,6 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 - choco: community.chocolatey.org/api/v2 returns NuGet v2 OData/Atom XML
 
 ❌ NO PUBLIC API (removed from fetchers):
-- opensuse: api.opensuse.org uses XML (OBS API) - removed
 - openbsd: openports.pl - HTML only - removed
 - netbsd: pkgsrc.se - HTML only - removed
 - swiftpm: Swift Package Index requires authentication for API access
@@ -160,7 +160,7 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 - ghcr: GitHub Container Registry requires authentication (401)
 - gradle: Plugin portal API returning 404 (plugins.gradle.org/api/plugins)
 
-**Implemented fetchers** (56 total: 16 distro, 4 Windows, 3 macOS, 2 cross-platform, 1 container, 2 mobile, 28 language):
+**Implemented fetchers** (57 total: 17 distro, 4 Windows, 3 macOS, 2 cross-platform, 1 container, 2 mobile, 28 language):
 - [x] APK (Alpine): APKINDEX.tar.gz with checksums, deps, archive URLs
 - [x] Artix Linux: Arch-based, shares arch_common logic with pacman
 - [x] NixOS/Nix: search.nixos.org Elasticsearch API
@@ -169,6 +169,7 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
 - [x] Guix: packages.guix.gnu.org with fetch_all support
 - [x] Slackware: SlackBuilds.org via GitHub raw .info files
 - [x] FreeBSD: zstd tar + JSON-lines parsing (packagesite.pkg)
+- [x] openSUSE: zstd XML parsing (repodata/primary.xml.zst)
 - [x] CachyOS: Arch-based, uses arch_common
 - [x] EndeavourOS: Arch-based, uses arch_common
 - [x] Manjaro: search.manjaro-sway.download API + AUR
