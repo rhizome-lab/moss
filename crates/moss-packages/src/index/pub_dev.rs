@@ -42,8 +42,22 @@ impl PackageIndex for Pub {
             repository: pubspec["repository"].as_str().map(String::from),
             license: None, // pub.dev doesn't expose license in API
             binaries: Vec::new(),
+            keywords: Vec::new(), // pub.dev doesn't have keywords
+            maintainers: pubspec["authors"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|author| author.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            published: latest["published"].as_str().map(String::from),
+            downloads: None, // pub.dev doesn't expose download counts
             archive_url: latest["archive_url"].as_str().map(String::from),
-            ..Default::default()
+            checksum: latest["archive_sha256"]
+                .as_str()
+                .map(|h| format!("sha256:{}", h)),
+            extra: Default::default(),
         })
     }
 
@@ -83,13 +97,19 @@ impl PackageIndex for Pub {
             .filter_map(|pkg| {
                 Some(PackageMeta {
                     name: pkg["package"].as_str()?.to_string(),
-                    version: "unknown".to_string(),
+                    version: "unknown".to_string(), // Search only returns names
                     description: None,
                     homepage: None,
                     repository: None,
                     license: None,
                     binaries: Vec::new(),
-                    ..Default::default()
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: None,
+                    archive_url: None,
+                    checksum: None,
+                    extra: Default::default(),
                 })
             })
             .collect())

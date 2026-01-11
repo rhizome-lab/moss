@@ -60,6 +60,26 @@ impl PackageIndex for Hackage {
                 .map(String::from),
             license: response["license"].as_str().map(String::from),
             binaries: Vec::new(),
+            keywords: response["category"]
+                .as_str()
+                .map(|c| c.split(',').map(|s| s.trim().to_string()).collect())
+                .unwrap_or_default(),
+            maintainers: {
+                let mut m = Vec::new();
+                if let Some(author) = response["author"].as_str() {
+                    if !author.is_empty() {
+                        m.push(author.to_string());
+                    }
+                }
+                if let Some(maintainer) = response["maintainer"].as_str() {
+                    if !maintainer.is_empty() && !m.contains(&maintainer.to_string()) {
+                        m.push(maintainer.to_string());
+                    }
+                }
+                m
+            },
+            published: None, // Hackage doesn't expose upload time in this endpoint
+            downloads: response["downloads"].as_u64(),
             archive_url: Some(format!(
                 "{}/package/{}-{}/{}-{}.tar.gz",
                 Self::API_BASE,
@@ -68,7 +88,8 @@ impl PackageIndex for Hackage {
                 name,
                 latest_version
             )),
-            ..Default::default()
+            checksum: None, // Would need to download .cabal file
+            extra: Default::default(),
         })
     }
 
@@ -134,7 +155,13 @@ impl PackageIndex for Hackage {
                     repository: None,
                     license: None,
                     binaries: Vec::new(),
-                    ..Default::default()
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: pkg["downloads"].as_u64(),
+                    archive_url: None,
+                    checksum: None,
+                    extra: Default::default(),
                 })
             })
             .collect())

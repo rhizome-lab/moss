@@ -60,7 +60,21 @@ impl PackageIndex for Gem {
                         .collect()
                 })
                 .unwrap_or_default(),
-            ..Default::default()
+            keywords: Vec::new(), // RubyGems doesn't expose keywords
+            maintainers: response["authors"]
+                .as_str()
+                .map(|a| a.split(',').map(|s| s.trim().to_string()).collect())
+                .unwrap_or_default(),
+            published: response["version_created_at"]
+                .as_str()
+                .or_else(|| response["created_at"].as_str())
+                .map(String::from),
+            downloads: response["version_downloads"]
+                .as_u64()
+                .or_else(|| response["downloads"].as_u64()),
+            archive_url: response["gem_uri"].as_str().map(String::from),
+            checksum: response["sha"].as_str().map(|h| format!("sha256:{}", h)),
+            extra: Default::default(),
         })
     }
 
@@ -113,8 +127,17 @@ impl PackageIndex for Gem {
                         .and_then(|l| l.first())
                         .and_then(|l| l.as_str())
                         .map(String::from),
-                    binaries: Vec::new(),
-                    ..Default::default()
+                    binaries: Vec::new(), // Not in search results
+                    keywords: Vec::new(),
+                    maintainers: gem["authors"]
+                        .as_str()
+                        .map(|a| a.split(',').map(|s| s.trim().to_string()).collect())
+                        .unwrap_or_default(),
+                    published: None, // Not in search results
+                    downloads: gem["downloads"].as_u64(),
+                    archive_url: gem["gem_uri"].as_str().map(String::from),
+                    checksum: gem["sha"].as_str().map(|h| format!("sha256:{}", h)),
+                    extra: Default::default(),
                 })
             })
             .collect())

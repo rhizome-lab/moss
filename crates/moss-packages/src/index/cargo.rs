@@ -35,6 +35,7 @@ impl PackageIndex for CargoIndex {
             .into_json()?;
 
         let crate_data = &response["crate"];
+        let latest_version = response["versions"].as_array().and_then(|v| v.first());
 
         Ok(PackageMeta {
             name: crate_data["id"].as_str().unwrap_or(name).to_string(),
@@ -46,14 +47,10 @@ impl PackageIndex for CargoIndex {
             description: crate_data["description"].as_str().map(String::from),
             homepage: crate_data["homepage"].as_str().map(String::from),
             repository: crate_data["repository"].as_str().map(String::from),
-            license: response["versions"]
-                .as_array()
-                .and_then(|v| v.first())
+            license: latest_version
                 .and_then(|v| v["license"].as_str())
                 .map(String::from),
-            binaries: response["versions"]
-                .as_array()
-                .and_then(|v| v.first())
+            binaries: latest_version
                 .and_then(|v| v["bin_names"].as_array())
                 .map(|bins| {
                     bins.iter()
@@ -61,7 +58,28 @@ impl PackageIndex for CargoIndex {
                         .collect()
                 })
                 .unwrap_or_default(),
-            ..Default::default()
+            keywords: crate_data["keywords"]
+                .as_array()
+                .map(|kw| {
+                    kw.iter()
+                        .filter_map(|k| k.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            maintainers: Vec::new(), // Not directly exposed in API
+            published: latest_version
+                .and_then(|v| v["created_at"].as_str())
+                .map(String::from),
+            downloads: crate_data["downloads"].as_u64(),
+            archive_url: latest_version.and_then(|v| {
+                v["dl_path"]
+                    .as_str()
+                    .map(|p| format!("https://crates.io{}", p))
+            }),
+            checksum: latest_version
+                .and_then(|v| v["checksum"].as_str())
+                .map(|h| format!("sha256:{}", h)),
+            extra: Default::default(),
         })
     }
 
@@ -112,9 +130,22 @@ impl PackageIndex for CargoIndex {
                     description: c["description"].as_str().map(String::from),
                     homepage: c["homepage"].as_str().map(String::from),
                     repository: c["repository"].as_str().map(String::from),
-                    license: None,
-                    binaries: Vec::new(),
-                    ..Default::default()
+                    license: None,        // Not in search results
+                    binaries: Vec::new(), // Not in search results
+                    keywords: c["keywords"]
+                        .as_array()
+                        .map(|kw| {
+                            kw.iter()
+                                .filter_map(|k| k.as_str().map(String::from))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    maintainers: Vec::new(),
+                    published: c["created_at"].as_str().map(String::from),
+                    downloads: c["downloads"].as_u64(),
+                    archive_url: None, // Not in search results
+                    checksum: None,    // Not in search results
+                    extra: Default::default(),
                 })
             })
             .collect())

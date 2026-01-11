@@ -32,10 +32,19 @@ impl PackageIndex for PipIndex {
         let response: serde_json::Value = ureq::get(&url).call()?.into_json()?;
 
         let info = &response["info"];
+        let version = info["version"].as_str().unwrap_or("unknown");
+        let latest_release = response["releases"][version]
+            .as_array()
+            .and_then(|files| files.iter().find(|f| f["packagetype"] == "sdist"))
+            .or_else(|| {
+                response["releases"][version]
+                    .as_array()
+                    .and_then(|f| f.first())
+            });
 
         Ok(PackageMeta {
             name: info["name"].as_str().unwrap_or(name).to_string(),
-            version: info["version"].as_str().unwrap_or("unknown").to_string(),
+            version: version.to_string(),
             description: info["summary"].as_str().map(String::from),
             homepage: info["home_page"]
                 .as_str()
@@ -44,7 +53,35 @@ impl PackageIndex for PipIndex {
             repository: extract_repo_url(info),
             license: info["license"].as_str().map(String::from),
             binaries: Vec::new(), // PyPI doesn't expose this directly
-            ..Default::default()
+            keywords: info["keywords"]
+                .as_str()
+                .map(|s| s.split(',').map(|k| k.trim().to_string()).collect())
+                .unwrap_or_default(),
+            maintainers: {
+                let mut m = Vec::new();
+                if let Some(author) = info["author"].as_str() {
+                    if !author.is_empty() {
+                        m.push(author.to_string());
+                    }
+                }
+                if let Some(maintainer) = info["maintainer"].as_str() {
+                    if !maintainer.is_empty() && !m.contains(&maintainer.to_string()) {
+                        m.push(maintainer.to_string());
+                    }
+                }
+                m
+            },
+            published: latest_release
+                .and_then(|r| r["upload_time"].as_str())
+                .map(String::from),
+            downloads: None, // Requires separate API (pypistats.org)
+            archive_url: latest_release
+                .and_then(|r| r["url"].as_str())
+                .map(String::from),
+            checksum: latest_release
+                .and_then(|r| r["digests"]["sha256"].as_str())
+                .map(|h| format!("sha256:{}", h)),
+            extra: Default::default(),
         })
     }
 

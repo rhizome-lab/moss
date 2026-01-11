@@ -48,15 +48,34 @@ impl PackageIndex for Go {
             None
         };
 
+        // Get version info for release time
+        let info_url = format!("{}/{}/@v/{}.info", Self::GO_PROXY, name, latest.version);
+        let published = ureq::get(&info_url)
+            .call()
+            .ok()
+            .and_then(|r| r.into_json::<serde_json::Value>().ok())
+            .and_then(|v| v["Time"].as_str().map(String::from));
+
         Ok(PackageMeta {
             name: name.to_string(),
             version: latest.version.clone(),
             description: None, // Would need to scrape pkg.go.dev
             homepage: Some(format!("{}/{}", Self::PKG_GO_DEV, name)),
             repository,
-            license: None,
+            license: None, // Would need to scrape pkg.go.dev
             binaries: Vec::new(),
-            ..Default::default()
+            keywords: Vec::new(),
+            maintainers: Vec::new(),
+            published,
+            downloads: None, // Go proxy doesn't track downloads
+            archive_url: Some(format!(
+                "{}/{}/@v/{}.zip",
+                Self::GO_PROXY,
+                name,
+                latest.version
+            )),
+            checksum: None, // Would need to parse go.sum format
+            extra: Default::default(),
         })
     }
 

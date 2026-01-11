@@ -68,7 +68,35 @@ impl PackageIndex for Composer {
                         .collect()
                 })
                 .unwrap_or_default(),
-            ..Default::default()
+            keywords: version_info
+                .and_then(|v| v["keywords"].as_array())
+                .map(|kw| {
+                    kw.iter()
+                        .filter_map(|k| k.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            maintainers: version_info
+                .and_then(|v| v["authors"].as_array())
+                .map(|authors| {
+                    authors
+                        .iter()
+                        .filter_map(|a| a["name"].as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            published: version_info
+                .and_then(|v| v["time"].as_str())
+                .map(String::from),
+            downloads: package["downloads"]["total"].as_u64(),
+            archive_url: version_info
+                .and_then(|v| v["dist"]["url"].as_str())
+                .map(String::from),
+            checksum: version_info
+                .and_then(|v| v["dist"]["shasum"].as_str())
+                .filter(|s| !s.is_empty())
+                .map(|h| format!("sha1:{}", h)),
+            extra: Default::default(),
         })
     }
 
@@ -108,9 +136,15 @@ impl PackageIndex for Composer {
                     description: pkg["description"].as_str().map(String::from),
                     homepage: pkg["url"].as_str().map(String::from),
                     repository: pkg["repository"].as_str().map(String::from),
-                    license: None,
+                    license: None, // Not in search results
                     binaries: Vec::new(),
-                    ..Default::default()
+                    keywords: Vec::new(),
+                    maintainers: Vec::new(),
+                    published: None,
+                    downloads: pkg["downloads"].as_u64(),
+                    archive_url: None,
+                    checksum: None,
+                    extra: Default::default(),
                 })
             })
             .collect())

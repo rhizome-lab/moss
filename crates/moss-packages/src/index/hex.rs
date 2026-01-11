@@ -53,7 +53,26 @@ impl PackageIndex for Hex {
                 .and_then(|l| l.as_str())
                 .map(String::from),
             binaries: Vec::new(),
-            ..Default::default()
+            keywords: Vec::new(), // Hex doesn't have keywords
+            maintainers: meta["maintainers"]
+                .as_array()
+                .map(|m| {
+                    m.iter()
+                        .filter_map(|maint| maint["username"].as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            published: latest_release
+                .and_then(|r| r["inserted_at"].as_str())
+                .map(String::from),
+            downloads: response["downloads"]["all"].as_u64(),
+            archive_url: latest_release
+                .and_then(|r| r["url"].as_str())
+                .map(String::from),
+            checksum: latest_release
+                .and_then(|r| r["checksum"].as_str())
+                .map(|h| format!("sha256:{}", h)),
+            extra: Default::default(),
         })
     }
 
@@ -89,11 +108,10 @@ impl PackageIndex for Hex {
             .iter()
             .filter_map(|pkg| {
                 let meta = &pkg["meta"];
+                let latest_release = pkg["releases"].as_array().and_then(|r| r.first());
                 Some(PackageMeta {
                     name: pkg["name"].as_str()?.to_string(),
-                    version: pkg["releases"]
-                        .as_array()
-                        .and_then(|r| r.first())
+                    version: latest_release
                         .and_then(|r| r["version"].as_str())
                         .unwrap_or("unknown")
                         .to_string(),
@@ -109,7 +127,26 @@ impl PackageIndex for Hex {
                         .and_then(|l| l.as_str())
                         .map(String::from),
                     binaries: Vec::new(),
-                    ..Default::default()
+                    keywords: Vec::new(),
+                    maintainers: meta["maintainers"]
+                        .as_array()
+                        .map(|m| {
+                            m.iter()
+                                .filter_map(|maint| maint["username"].as_str().map(String::from))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    published: latest_release
+                        .and_then(|r| r["inserted_at"].as_str())
+                        .map(String::from),
+                    downloads: pkg["downloads"]["all"].as_u64(),
+                    archive_url: latest_release
+                        .and_then(|r| r["url"].as_str())
+                        .map(String::from),
+                    checksum: latest_release
+                        .and_then(|r| r["checksum"].as_str())
+                        .map(|h| format!("sha256:{}", h)),
+                    extra: Default::default(),
                 })
             })
             .collect())

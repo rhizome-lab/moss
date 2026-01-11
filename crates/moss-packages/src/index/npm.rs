@@ -58,7 +58,29 @@ impl PackageIndex for NpmIndex {
                 .as_object()
                 .map(|bins| bins.keys().cloned().collect())
                 .unwrap_or_default(),
-            ..Default::default()
+            keywords: response["keywords"]
+                .as_array()
+                .map(|kw| {
+                    kw.iter()
+                        .filter_map(|k| k.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            maintainers: response["maintainers"]
+                .as_array()
+                .map(|m| {
+                    m.iter()
+                        .filter_map(|maint| maint["name"].as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            published: response["time"][latest_version].as_str().map(String::from),
+            downloads: None, // Requires separate API call
+            archive_url: latest["dist"]["tarball"].as_str().map(String::from),
+            checksum: latest["dist"]["shasum"]
+                .as_str()
+                .map(|h| format!("sha1:{}", h)),
+            extra: Default::default(),
         })
     }
 
@@ -110,9 +132,29 @@ impl PackageIndex for NpmIndex {
                     description: pkg["description"].as_str().map(String::from),
                     homepage: pkg["links"]["homepage"].as_str().map(String::from),
                     repository: pkg["links"]["repository"].as_str().map(String::from),
-                    license: None,
+                    license: None, // Not in search results
                     binaries: Vec::new(),
-                    ..Default::default()
+                    keywords: pkg["keywords"]
+                        .as_array()
+                        .map(|kw| {
+                            kw.iter()
+                                .filter_map(|k| k.as_str().map(String::from))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    maintainers: pkg["maintainers"]
+                        .as_array()
+                        .map(|m| {
+                            m.iter()
+                                .filter_map(|maint| maint["username"].as_str().map(String::from))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    published: pkg["date"].as_str().map(String::from),
+                    downloads: None,
+                    archive_url: None, // Not in search results
+                    checksum: None,    // Not in search results
+                    extra: Default::default(),
                 })
             })
             .collect())
