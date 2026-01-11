@@ -54,6 +54,7 @@ pub mod fdroid;
 pub mod termux;
 
 // Language package managers
+pub mod bioconductor;
 pub mod cargo;
 pub mod clojars;
 pub mod composer;
@@ -125,6 +126,7 @@ fn init_builtin() -> Vec<&'static dyn PackageIndex> {
         &fdroid::FDroid,
         &termux::Termux,
         // Language
+        &bioconductor::Bioconductor,
         &vcpkg::Vcpkg,
         &clojars::Clojars,
         &cargo::CargoIndex,

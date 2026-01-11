@@ -640,6 +640,14 @@ fn test_cran() {
 }
 
 #[test]
+fn test_bioconductor() {
+    let index = bioconductor::Bioconductor;
+    test_fetch(&index, "BiocManager");
+    test_versions(&index, "BiocManager");
+    test_search(&index, "genomic");
+}
+
+#[test]
 fn test_homebrew_casks() {
     let index = homebrew_casks::HomebrewCasks;
     test_fetch(&index, "visual-studio-code");
@@ -719,8 +727,8 @@ fn test_pacman_fetch_all() {
 fn test_list_indices() {
     let indices = list_indices();
     assert!(
-        indices.len() >= 55,
-        "should have at least 55 indices, got {}",
+        indices.len() >= 56,
+        "should have at least 56 indices, got {}",
         indices.len()
     );
     println!("Available indices: {:?}", indices);

@@ -149,7 +149,7 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 
 ### R
 - [x] cran - CRAN (crandb.r-pkg.org API)
-- [ ] bioconductor - Bioconductor
+- [x] bioconductor - Bioconductor (r-universe.dev API)
 
 ### OCaml
 - [x] opam - OPAM (GitHub opam-repository)
