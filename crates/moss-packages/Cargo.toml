@@ -7,7 +7,7 @@ description = "Package registry queries for multiple ecosystems"
 [features]
 default = ["ecosystem", "index"]
 ecosystem = []  # Project dependency management (Ecosystem trait)
-index = ["flate2", "xz2", "quick-xml", "tar", "zstd"]  # Package index ingestion (PackageIndex trait)
+index = ["flate2", "xz2", "quick-xml", "tar", "zstd", "rayon"]  # Package index ingestion (PackageIndex trait)
 test-network = ["index"]  # Enable tests that hit real APIs (disabled in CI)
 
 [dependencies]
@@ -25,6 +25,7 @@ flate2 = { version = "1", optional = true }  # gzip (apt Sources.gz)
 xz2 = { version = "0.1", optional = true }   # xz (pacman DBs)
 tar = { version = "0.4", optional = true }   # tar archives (apk APKINDEX)
 zstd = { version = "0.13", optional = true } # zstd (FreeBSD, Void Linux)
+rayon = { workspace = true, optional = true } # parallel fetching
 
 [dev-dependencies]
 base64 = "0.22"

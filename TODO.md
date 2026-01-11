@@ -216,6 +216,17 @@ Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
 - [ ] Streaming/iterator API: Currently fetchers load all packages into memory before filtering. For cross-referencing 50+ ecosystems, this is ~1GB+ in memory. Need lazy/streaming approach where we iterate packages without loading all into Vec first.
 - [ ] Parallel repo fetching: openSUSE fetches 6 repos sequentially. Could parallelize with rayon or async.
 
+**Multi-repo coverage needed** (like openSUSE, fetch ALL repos not just main):
+- [ ] Arch Linux: core, extra, multilib, testing, staging, community-testing, multilib-testing
+- [ ] Artix Linux: system, world, galaxy, lib32, testing variants of each
+- [ ] Manjaro: stable, testing, unstable branches
+- [ ] Debian/APT: stable, testing, unstable, experimental, backports
+- [ ] Fedora/DNF: multiple Fedora versions (39, 40, 41, rawhide)
+- [ ] Alpine/APK: main, community, testing for each version (3.18, 3.19, 3.20, edge)
+- [ ] FreeBSD: quarterly vs latest, multiple versions (13, 14)
+- [ ] Void: x86_64, x86_64-musl, aarch64 variants
+- [ ] Ubuntu: multiple releases (22.04, 24.04, etc) + universe/multiverse
+
 ### Complexity Hotspots (58 functions >21)
 - [ ] `crates/moss/src/commands/edit.rs:handle_glob_edit` (76)
 - [ ] `crates/moss/src/commands/view/file.rs:cmd_view_file` (69)

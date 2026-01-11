@@ -25,6 +25,7 @@
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
 use crate::cache;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -312,12 +313,17 @@ impl OpenSuse {
         Ok(Self::parse_primary(&xml, repo.id()))
     }
 
-    /// Load packages from configured repos.
+    /// Load packages from configured repos in parallel.
     fn load_packages(&self) -> Result<Vec<PackageMeta>, IndexError> {
-        let mut all_packages = Vec::new();
+        let results: Vec<_> = self
+            .repos
+            .par_iter()
+            .map(|&repo| Self::load_repo(repo))
+            .collect();
 
-        for &repo in &self.repos {
-            match Self::load_repo(repo) {
+        let mut all_packages = Vec::new();
+        for (repo, result) in self.repos.iter().zip(results) {
+            match result {
                 Ok(packages) => {
                     all_packages.extend(packages);
                 }
