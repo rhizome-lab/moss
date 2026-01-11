@@ -6,6 +6,126 @@ use crate::{deps, skeleton, tree};
 use rhizome_moss_languages::support_for_path;
 use std::path::{Path, PathBuf};
 
+/// Format a skeleton for a file path and return formatted lines.
+fn format_skeleton_lines(
+    path: &Path,
+    content: &str,
+    types_only: bool,
+    pretty: bool,
+    use_colors: bool,
+) -> Vec<String> {
+    let extractor = skeleton::SkeletonExtractor::new();
+    let skeleton = extractor.extract(path, content);
+    let skeleton = if types_only {
+        skeleton.filter_types()
+    } else {
+        skeleton
+    };
+
+    let grammar = support_for_path(path).map(|s| s.grammar_name().to_string());
+    let view_node = skeleton.to_view_node(grammar.as_deref());
+    let format_options = FormatOptions {
+        docstrings: DocstringDisplay::None,
+        line_numbers: true,
+        skip_root: true,
+        max_depth: None,
+        minimal: !pretty,
+        use_colors,
+    };
+    tree::format_view_node(&view_node, &format_options)
+}
+
+/// Print fisheye view of imported modules' skeletons.
+fn print_fisheye_imports(
+    deps: &deps::DepsResult,
+    focus_filter: &str,
+    current_file: &Path,
+    root: &Path,
+    types_only: bool,
+    pretty: bool,
+    use_colors: bool,
+) {
+    let filter_all = focus_filter == "*";
+
+    // Resolve matching imports
+    let resolved: Vec<_> = deps
+        .imports
+        .iter()
+        .filter(|imp| filter_all || imp.module.contains(focus_filter) || imp.module == focus_filter)
+        .filter_map(|imp| {
+            let resolved_path = resolve_import(&imp.module, current_file, root)?;
+            let display = resolved_path
+                .strip_prefix(root)
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| format!("[{}]", imp.module));
+            Some((imp.module.clone(), resolved_path, display))
+        })
+        .collect();
+
+    if resolved.is_empty() {
+        return;
+    }
+
+    println!("\n## Imported Modules (Skeletons)");
+    let deps_extractor = deps::DepsExtractor::new();
+
+    for (module_name, resolved_path, display) in resolved {
+        let Ok(import_content) = std::fs::read_to_string(&resolved_path) else {
+            continue;
+        };
+
+        let lines = format_skeleton_lines(
+            &resolved_path,
+            &import_content,
+            types_only,
+            pretty,
+            use_colors,
+        );
+        if !lines.is_empty() {
+            println!("\n### {} ({})", module_name, display);
+            for line in lines {
+                println!("{}", line);
+            }
+        }
+
+        // Check for barrel file re-exports
+        let import_deps = deps_extractor.extract(&resolved_path, &import_content);
+        for reexp in &import_deps.reexports {
+            let Some(reexp_path) = resolve_import(&reexp.module, &resolved_path, root) else {
+                continue;
+            };
+            let Ok(reexp_content) = std::fs::read_to_string(&reexp_path) else {
+                continue;
+            };
+
+            let lines =
+                format_skeleton_lines(&reexp_path, &reexp_content, types_only, pretty, use_colors);
+            if !lines.is_empty() {
+                let reexp_display = reexp_path
+                    .strip_prefix(root)
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|_| format!("[{}]", reexp.module));
+                let export_desc = if reexp.is_star {
+                    format!("export * from '{}'", reexp.module)
+                } else {
+                    format!(
+                        "export {{ {} }} from '{}'",
+                        reexp.names.join(", "),
+                        reexp.module
+                    )
+                };
+                println!(
+                    "\n### {} → {} ({})",
+                    module_name, export_desc, reexp_display
+                );
+                for line in lines {
+                    println!("{}", line);
+                }
+            }
+        }
+    }
+}
+
 /// Resolve an import to a local file path based on the source file's language.
 fn resolve_import(module: &str, current_file: &Path, root: &Path) -> Option<PathBuf> {
     let lang = rhizome_moss_languages::support_for_path(current_file)?;
@@ -162,117 +282,15 @@ pub fn cmd_view_file(
 
         // Fisheye mode: show skeletons of imported files
         if let Some(focus_filter) = focus {
-            let deps = deps_result.as_ref().unwrap();
-            let filter_all = focus_filter == "*";
-
-            let mut resolved: Vec<(String, PathBuf, String)> = Vec::new();
-            for imp in &deps.imports {
-                let matches_filter =
-                    filter_all || imp.module.contains(focus_filter) || imp.module == focus_filter;
-
-                if matches_filter {
-                    if let Some(resolved_path) = resolve_import(&imp.module, &full_path, root) {
-                        let display = if let Ok(rel_path) = resolved_path.strip_prefix(root) {
-                            rel_path.display().to_string()
-                        } else {
-                            format!("[{}]", imp.module)
-                        };
-                        resolved.push((imp.module.clone(), resolved_path, display));
-                    }
-                }
-            }
-
-            if !resolved.is_empty() {
-                println!("\n## Imported Modules (Skeletons)");
-                let deps_extractor = deps::DepsExtractor::new();
-
-                for (module_name, resolved_path, display) in resolved {
-                    if let Ok(import_content) = std::fs::read_to_string(&resolved_path) {
-                        let import_extractor = skeleton::SkeletonExtractor::new();
-                        let import_skeleton =
-                            import_extractor.extract(&resolved_path, &import_content);
-                        let import_skeleton = if types_only {
-                            import_skeleton.filter_types()
-                        } else {
-                            import_skeleton
-                        };
-
-                        let import_grammar =
-                            support_for_path(&resolved_path).map(|s| s.grammar_name().to_string());
-                        let view_node = import_skeleton.to_view_node(import_grammar.as_deref());
-                        let format_options = FormatOptions {
-                            docstrings: DocstringDisplay::None,
-                            line_numbers: true,
-                            skip_root: true,
-                            max_depth: None,
-                            minimal: !pretty,
-                            use_colors,
-                        };
-                        let lines = tree::format_view_node(&view_node, &format_options);
-                        if !lines.is_empty() {
-                            println!("\n### {} ({})", module_name, display);
-                            for line in lines {
-                                println!("{}", line);
-                            }
-                        }
-
-                        // Check for barrel file re-exports
-                        let import_deps = deps_extractor.extract(&resolved_path, &import_content);
-                        for reexp in &import_deps.reexports {
-                            if let Some(reexp_path) =
-                                resolve_import(&reexp.module, &resolved_path, root)
-                            {
-                                if let Ok(reexp_content) = std::fs::read_to_string(&reexp_path) {
-                                    let reexp_extractor = skeleton::SkeletonExtractor::new();
-                                    let reexp_skeleton =
-                                        reexp_extractor.extract(&reexp_path, &reexp_content);
-                                    let reexp_skeleton = if types_only {
-                                        reexp_skeleton.filter_types()
-                                    } else {
-                                        reexp_skeleton
-                                    };
-
-                                    let reexp_grammar = support_for_path(&reexp_path)
-                                        .map(|s| s.grammar_name().to_string());
-                                    let view_node =
-                                        reexp_skeleton.to_view_node(reexp_grammar.as_deref());
-                                    let format_options = FormatOptions {
-                                        docstrings: DocstringDisplay::None,
-                                        line_numbers: true,
-                                        skip_root: true,
-                                        max_depth: None,
-                                        minimal: !pretty,
-                                        use_colors,
-                                    };
-                                    let lines = tree::format_view_node(&view_node, &format_options);
-                                    if !lines.is_empty() {
-                                        let reexp_display = reexp_path
-                                            .strip_prefix(root)
-                                            .map(|p| p.display().to_string())
-                                            .unwrap_or_else(|_| format!("[{}]", reexp.module));
-                                        let export_desc = if reexp.is_star {
-                                            format!("export * from '{}'", reexp.module)
-                                        } else {
-                                            format!(
-                                                "export {{ {} }} from '{}'",
-                                                reexp.names.join(", "),
-                                                reexp.module
-                                            )
-                                        };
-                                        println!(
-                                            "\n### {} → {} ({})",
-                                            module_name, export_desc, reexp_display
-                                        );
-                                        for line in lines {
-                                            println!("{}", line);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            print_fisheye_imports(
+                deps_result.as_ref().unwrap(),
+                focus_filter,
+                &full_path,
+                root,
+                types_only,
+                pretty,
+                use_colors,
+            );
         }
 
         // Resolve imports mode

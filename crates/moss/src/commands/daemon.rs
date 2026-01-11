@@ -1,8 +1,30 @@
 //! Daemon management commands for moss CLI.
 
-use crate::daemon::{self, DaemonClient, global_socket_path};
+use crate::daemon::{self, DaemonClient, Response, global_socket_path};
 use clap::Subcommand;
 use std::path::PathBuf;
+
+/// Handle a daemon response, calling success_fn for Ok(resp.ok) case.
+/// Returns exit code: 0 for success, 1 for error.
+fn handle_response<F>(result: Result<Response, String>, json: bool, success_fn: F) -> i32
+where
+    F: FnOnce(&Response, bool),
+{
+    match result {
+        Ok(resp) if resp.ok => {
+            success_fn(&resp, json);
+            0
+        }
+        Ok(resp) => {
+            eprintln!("Error: {}", resp.error.unwrap_or_default());
+            1
+        }
+        Err(e) => {
+            eprintln!("Failed: {}", e);
+            1
+        }
+    }
+}
 
 #[derive(Subcommand)]
 pub enum DaemonAction {
@@ -176,31 +198,20 @@ pub fn cmd_daemon(action: DaemonAction, json: bool) -> i32 {
                 return 1;
             }
 
-            match client.add_root(&root) {
-                Ok(resp) if resp.ok => {
-                    if json {
-                        println!("{}", serde_json::to_string(&resp.data).unwrap_or_default());
-                    } else if let Some(data) = &resp.data {
-                        if data.get("added") == Some(&serde_json::json!(true)) {
-                            println!("Added: {}", root.display());
-                        } else {
-                            println!(
-                                "Already watching: {}",
-                                data.get("reason").and_then(|r| r.as_str()).unwrap_or("")
-                            );
-                        }
+            handle_response(client.add_root(&root), json, |resp, json| {
+                if json {
+                    println!("{}", serde_json::to_string(&resp.data).unwrap_or_default());
+                } else if let Some(data) = &resp.data {
+                    if data.get("added") == Some(&serde_json::json!(true)) {
+                        println!("Added: {}", root.display());
+                    } else {
+                        println!(
+                            "Already watching: {}",
+                            data.get("reason").and_then(|r| r.as_str()).unwrap_or("")
+                        );
                     }
-                    0
                 }
-                Ok(resp) => {
-                    eprintln!("Error: {}", resp.error.unwrap_or_default());
-                    1
-                }
-                Err(e) => {
-                    eprintln!("Failed: {}", e);
-                    1
-                }
-            }
+            })
         }
 
         DaemonAction::Remove { path } => {
@@ -211,28 +222,17 @@ pub fn cmd_daemon(action: DaemonAction, json: bool) -> i32 {
                 return 1;
             }
 
-            match client.remove_root(&root) {
-                Ok(resp) if resp.ok => {
-                    if json {
-                        println!("{}", serde_json::to_string(&resp.data).unwrap_or_default());
-                    } else if let Some(data) = &resp.data {
-                        if data.get("removed") == Some(&serde_json::json!(true)) {
-                            println!("Removed: {}", root.display());
-                        } else {
-                            println!("Was not watching: {}", root.display());
-                        }
+            handle_response(client.remove_root(&root), json, |resp, json| {
+                if json {
+                    println!("{}", serde_json::to_string(&resp.data).unwrap_or_default());
+                } else if let Some(data) = &resp.data {
+                    if data.get("removed") == Some(&serde_json::json!(true)) {
+                        println!("Removed: {}", root.display());
+                    } else {
+                        println!("Was not watching: {}", root.display());
                     }
-                    0
                 }
-                Ok(resp) => {
-                    eprintln!("Error: {}", resp.error.unwrap_or_default());
-                    1
-                }
-                Err(e) => {
-                    eprintln!("Failed: {}", e);
-                    1
-                }
-            }
+            })
         }
 
         DaemonAction::List => {
@@ -245,35 +245,24 @@ pub fn cmd_daemon(action: DaemonAction, json: bool) -> i32 {
                 return 1;
             }
 
-            match client.list_roots() {
-                Ok(resp) if resp.ok => {
-                    if json {
-                        println!("{}", serde_json::to_string(&resp.data).unwrap_or_default());
-                    } else if let Some(data) = resp.data
-                        && let Some(roots) = data.as_array()
-                    {
-                        if roots.is_empty() {
-                            println!("No roots being watched");
-                        } else {
-                            println!("Watched roots:");
-                            for root in roots {
-                                if let Some(path) = root.as_str() {
-                                    println!("  {}", path);
-                                }
+            handle_response(client.list_roots(), json, |resp, json| {
+                if json {
+                    println!("{}", serde_json::to_string(&resp.data).unwrap_or_default());
+                } else if let Some(data) = &resp.data
+                    && let Some(roots) = data.as_array()
+                {
+                    if roots.is_empty() {
+                        println!("No roots being watched");
+                    } else {
+                        println!("Watched roots:");
+                        for root in roots {
+                            if let Some(path) = root.as_str() {
+                                println!("  {}", path);
                             }
                         }
                     }
-                    0
                 }
-                Ok(resp) => {
-                    eprintln!("Error: {}", resp.error.unwrap_or_default());
-                    1
-                }
-                Err(e) => {
-                    eprintln!("Failed: {}", e);
-                    1
-                }
-            }
+            })
         }
     }
 }

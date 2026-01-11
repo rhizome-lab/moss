@@ -428,46 +428,21 @@ pub fn cmd_edit(
             let source_content = content[loc.start_byte..loc.end_byte].to_string();
             let without_source = editor.delete_symbol(&content, &loc);
 
-            let result = match at {
-                Position::Before | Position::After => {
-                    let dest_loc = match editor.find_symbol(
-                        &file_path,
-                        &without_source,
-                        destination,
-                        case_insensitive,
-                    ) {
-                        Some(l) => l,
-                        None => {
-                            eprintln!("Destination not found: {}", destination);
-                            return 1;
-                        }
-                    };
-                    if matches!(at, Position::Before) {
-                        editor.insert_before(&without_source, &dest_loc, &source_content)
-                    } else {
-                        editor.insert_after(&without_source, &dest_loc, &source_content)
-                    }
+            match insert_single_at_destination(
+                &editor,
+                &file_path,
+                &without_source,
+                &source_content,
+                destination,
+                at,
+                case_insensitive,
+            ) {
+                Ok(result) => (Operation::Move(at), result),
+                Err(e) => {
+                    eprintln!("{}", e);
+                    return 1;
                 }
-                Position::Prepend | Position::Append => {
-                    let body = match editor.find_container_body(
-                        &file_path,
-                        &without_source,
-                        destination,
-                    ) {
-                        Some(b) => b,
-                        None => {
-                            eprintln!("Container not found: {}", destination);
-                            return 1;
-                        }
-                    };
-                    if matches!(at, Position::Prepend) {
-                        editor.prepend_to_container(&without_source, &body, &source_content)
-                    } else {
-                        editor.append_to_container(&without_source, &body, &source_content)
-                    }
-                }
-            };
-            (Operation::Move(at), result)
+            }
         }
 
         EditAction::Copy {
@@ -476,42 +451,21 @@ pub fn cmd_edit(
         } => {
             let source_content = &content[loc.start_byte..loc.end_byte];
 
-            let result = match at {
-                Position::Before | Position::After => {
-                    let dest_loc = match editor.find_symbol(
-                        &file_path,
-                        &content,
-                        destination,
-                        case_insensitive,
-                    ) {
-                        Some(l) => l,
-                        None => {
-                            eprintln!("Destination not found: {}", destination);
-                            return 1;
-                        }
-                    };
-                    if matches!(at, Position::Before) {
-                        editor.insert_before(&content, &dest_loc, source_content)
-                    } else {
-                        editor.insert_after(&content, &dest_loc, source_content)
-                    }
+            match insert_single_at_destination(
+                &editor,
+                &file_path,
+                &content,
+                source_content,
+                destination,
+                at,
+                case_insensitive,
+            ) {
+                Ok(result) => (Operation::Copy(at), result),
+                Err(e) => {
+                    eprintln!("{}", e);
+                    return 1;
                 }
-                Position::Prepend | Position::Append => {
-                    let body = match editor.find_container_body(&file_path, &content, destination) {
-                        Some(b) => b,
-                        None => {
-                            eprintln!("Container not found: {}", destination);
-                            return 1;
-                        }
-                    };
-                    if matches!(at, Position::Prepend) {
-                        editor.prepend_to_container(&content, &body, source_content)
-                    } else {
-                        editor.append_to_container(&content, &body, source_content)
-                    }
-                }
-            };
-            (Operation::Copy(at), result)
+            }
         }
     };
 
@@ -673,6 +627,113 @@ fn output_result(
     0
 }
 
+/// Insert content at a destination symbol or container.
+/// Used by both Move and Copy operations to avoid duplication.
+/// Returns Ok(new_content) on success, Err(error_message) on failure.
+fn insert_at_destination(
+    editor: &edit::Editor,
+    file_path: &Path,
+    content: &str,
+    original_content: &str,
+    matches: &[edit::SymbolLocation],
+    destination: &str,
+    at: Position,
+    case_insensitive: bool,
+) -> Result<String, String> {
+    let mut result = content.to_string();
+
+    // Insert at destination, order depends on position type:
+    // - append: original order [first..last] → iterate reversed matches
+    // - others: reverse order [last..first] → iterate matches as-is
+    let iter: Box<dyn Iterator<Item = _>> = if matches!(at, Position::Append) {
+        Box::new(matches.iter().rev())
+    } else {
+        Box::new(matches.iter())
+    };
+
+    for loc in iter {
+        let source_content = &original_content[loc.start_byte..loc.end_byte];
+        result = match at {
+            Position::Before | Position::After => {
+                let dest_loc = editor
+                    .find_symbol(file_path, &result, destination, case_insensitive)
+                    .ok_or_else(|| format!("Destination not found: {}", destination))?;
+                if matches!(at, Position::Before) {
+                    editor.insert_before(&result, &dest_loc, source_content)
+                } else {
+                    editor.insert_after(&result, &dest_loc, source_content)
+                }
+            }
+            Position::Prepend | Position::Append => {
+                let body = editor
+                    .find_container_body(file_path, &result, destination)
+                    .ok_or_else(|| format!("Container not found: {}", destination))?;
+                if matches!(at, Position::Prepend) {
+                    editor.prepend_to_container(&result, &body, source_content)
+                } else {
+                    editor.append_to_container(&result, &body, source_content)
+                }
+            }
+        };
+    }
+
+    Ok(result)
+}
+
+/// Insert source content at a destination symbol by position.
+/// For single-symbol operations in cmd_edit.
+fn insert_single_at_destination(
+    editor: &edit::Editor,
+    file_path: &std::path::Path,
+    content: &str,
+    source_content: &str,
+    destination: &str,
+    at: Position,
+    case_insensitive: bool,
+) -> Result<String, String> {
+    match at {
+        Position::Before | Position::After => {
+            let dest_loc = editor
+                .find_symbol(file_path, content, destination, case_insensitive)
+                .ok_or_else(|| format!("Destination not found: {}", destination))?;
+            Ok(if matches!(at, Position::Before) {
+                editor.insert_before(content, &dest_loc, source_content)
+            } else {
+                editor.insert_after(content, &dest_loc, source_content)
+            })
+        }
+        Position::Prepend | Position::Append => {
+            let body = editor
+                .find_container_body(file_path, content, destination)
+                .ok_or_else(|| format!("Container not found: {}", destination))?;
+            Ok(if matches!(at, Position::Prepend) {
+                editor.prepend_to_container(content, &body, source_content)
+            } else {
+                editor.append_to_container(content, &body, source_content)
+            })
+        }
+    }
+}
+
+/// Get the operation name for a position-based action.
+fn position_op_name(prefix: &str, at: Position) -> &'static str {
+    match (prefix, at) {
+        ("move", Position::Before) => "move_before",
+        ("move", Position::After) => "move_after",
+        ("move", Position::Prepend) => "move_prepend",
+        ("move", Position::Append) => "move_append",
+        ("copy", Position::Before) => "copy_before",
+        ("copy", Position::After) => "copy_after",
+        ("copy", Position::Prepend) => "copy_prepend",
+        ("copy", Position::Append) => "copy_append",
+        ("insert", Position::Before) => "insert_before",
+        ("insert", Position::After) => "insert_after",
+        ("insert", Position::Prepend) => "prepend",
+        ("insert", Position::Append) => "append",
+        _ => "unknown",
+    }
+}
+
 /// Handle glob pattern edits (multi-symbol operations)
 #[allow(clippy::too_many_arguments)]
 fn handle_glob_edit(
@@ -760,15 +821,7 @@ fn handle_glob_edit(
                     }
                 };
             }
-            (
-                match at {
-                    Position::Before => "insert_before",
-                    Position::After => "insert_after",
-                    Position::Prepend => "prepend",
-                    Position::Append => "append",
-                },
-                result,
-            )
+            (position_op_name("insert", at), result)
         }
 
         EditAction::Move {
@@ -781,128 +834,43 @@ fn handle_glob_edit(
                 result = editor.delete_symbol(&result, loc);
             }
 
-            // Insert at destination, order depends on position type:
-            // - append: original order [first..last] → iterate reversed matches
-            // - others: reverse order [last..first] → iterate matches as-is
-            let iter: Box<dyn Iterator<Item = _>> = if matches!(at, Position::Append) {
-                Box::new(matches.iter().rev())
-            } else {
-                Box::new(matches.iter())
-            };
-
-            for loc in iter {
-                let source_content = &content[loc.start_byte..loc.end_byte];
-                result = match at {
-                    Position::Before | Position::After => {
-                        let dest_loc = match editor.find_symbol(
-                            file_path,
-                            &result,
-                            destination,
-                            case_insensitive,
-                        ) {
-                            Some(l) => l,
-                            None => {
-                                eprintln!("Destination not found: {}", destination);
-                                return 1;
-                            }
-                        };
-                        if matches!(at, Position::Before) {
-                            editor.insert_before(&result, &dest_loc, source_content)
-                        } else {
-                            editor.insert_after(&result, &dest_loc, source_content)
-                        }
-                    }
-                    Position::Prepend | Position::Append => {
-                        let body = match editor.find_container_body(file_path, &result, destination)
-                        {
-                            Some(b) => b,
-                            None => {
-                                eprintln!("Container not found: {}", destination);
-                                return 1;
-                            }
-                        };
-                        if matches!(at, Position::Prepend) {
-                            editor.prepend_to_container(&result, &body, source_content)
-                        } else {
-                            editor.append_to_container(&result, &body, source_content)
-                        }
-                    }
-                };
+            match insert_at_destination(
+                editor,
+                file_path,
+                &result,
+                content,
+                &matches,
+                destination,
+                at,
+                case_insensitive,
+            ) {
+                Ok(new_content) => (position_op_name("move", at), new_content),
+                Err(e) => {
+                    eprintln!("{}", e);
+                    return 1;
+                }
             }
-            (
-                match at {
-                    Position::Before => "move_before",
-                    Position::After => "move_after",
-                    Position::Prepend => "move_prepend",
-                    Position::Append => "move_append",
-                },
-                result,
-            )
         }
 
         EditAction::Copy {
             ref destination,
             at,
-        } => {
-            let mut result = content.to_string();
-            // Insert at destination, order depends on position type:
-            // - append: original order [first..last] → iterate reversed matches
-            // - others: reverse order [last..first] → iterate matches as-is
-            let iter: Box<dyn Iterator<Item = _>> = if matches!(at, Position::Append) {
-                Box::new(matches.iter().rev())
-            } else {
-                Box::new(matches.iter())
-            };
-
-            for loc in iter {
-                let source_content = &content[loc.start_byte..loc.end_byte];
-                result = match at {
-                    Position::Before | Position::After => {
-                        let dest_loc = match editor.find_symbol(
-                            file_path,
-                            &result,
-                            destination,
-                            case_insensitive,
-                        ) {
-                            Some(l) => l,
-                            None => {
-                                eprintln!("Destination not found: {}", destination);
-                                return 1;
-                            }
-                        };
-                        if matches!(at, Position::Before) {
-                            editor.insert_before(&result, &dest_loc, source_content)
-                        } else {
-                            editor.insert_after(&result, &dest_loc, source_content)
-                        }
-                    }
-                    Position::Prepend | Position::Append => {
-                        let body = match editor.find_container_body(file_path, &result, destination)
-                        {
-                            Some(b) => b,
-                            None => {
-                                eprintln!("Container not found: {}", destination);
-                                return 1;
-                            }
-                        };
-                        if matches!(at, Position::Prepend) {
-                            editor.prepend_to_container(&result, &body, source_content)
-                        } else {
-                            editor.append_to_container(&result, &body, source_content)
-                        }
-                    }
-                };
+        } => match insert_at_destination(
+            editor,
+            file_path,
+            content,
+            content,
+            &matches,
+            destination,
+            at,
+            case_insensitive,
+        ) {
+            Ok(new_content) => (position_op_name("copy", at), new_content),
+            Err(e) => {
+                eprintln!("{}", e);
+                return 1;
             }
-            (
-                match at {
-                    Position::Before => "copy_before",
-                    Position::After => "copy_after",
-                    Position::Prepend => "copy_prepend",
-                    Position::Append => "copy_append",
-                },
-                result,
-            )
-        }
+        },
 
         EditAction::Swap { .. } => {
             eprintln!("Error: 'swap' is not supported with glob patterns (ambiguous pairing)");

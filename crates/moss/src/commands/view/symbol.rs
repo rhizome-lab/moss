@@ -319,6 +319,68 @@ pub fn find_symbol_signature(symbols: &[skeleton::SkeletonSymbol], name: &str) -
     find_symbol(symbols, name).map(|sym| sym.signature.clone())
 }
 
+/// Print smart header imports: only imports used by the given source
+fn print_smart_imports(
+    source: &str,
+    grammar: &str,
+    full_path: &Path,
+    content: &str,
+    imports: &[rhizome_moss_languages::Import],
+) {
+    let used_ids = extract_identifiers(source, grammar);
+    let lang = support_for_path(full_path);
+    let lines: Vec<&str> = content.lines().collect();
+    let mut seen_imports = HashSet::new();
+    let mut has_imports = false;
+
+    for import in imports {
+        let used_names: Vec<&str> = import
+            .names
+            .iter()
+            .filter(|n| used_ids.contains(*n))
+            .map(|s| s.as_str())
+            .collect();
+
+        let module_used = used_ids.contains(&import.module)
+            || import
+                .module
+                .rsplit("::")
+                .next()
+                .map(|last| used_ids.contains(last))
+                .unwrap_or(false);
+
+        if used_names.is_empty() && !module_used && !import.is_wildcard {
+            continue;
+        }
+
+        let import_text = if used_names.len() == import.names.len() || import.names.is_empty() {
+            if import.line > 0 && import.line <= lines.len() {
+                lines[import.line - 1].trim().to_string()
+            } else if let Some(ref l) = lang {
+                l.format_import(import, None)
+            } else {
+                import.format_summary()
+            }
+        } else if let Some(ref l) = lang {
+            l.format_import(import, Some(&used_names))
+        } else {
+            import.format_summary()
+        };
+
+        if seen_imports.insert(import_text.clone()) {
+            if !has_imports {
+                println!();
+                has_imports = true;
+            }
+            println!("{}", import_text);
+        }
+    }
+
+    if has_imports {
+        println!();
+    }
+}
+
 /// View a symbol within a file
 #[allow(clippy::too_many_arguments)]
 pub fn cmd_view_symbol(
@@ -394,59 +456,7 @@ pub fn cmd_view_symbol(
             // Smart Header: show only imports used by this symbol
             if !deps_result.imports.is_empty() {
                 if let Some(ref g) = grammar {
-                    let used_ids = extract_identifiers(&source, g);
-                    let lang = support_for_path(&full_path);
-                    let lines: Vec<&str> = content.lines().collect();
-                    let mut seen_imports = HashSet::new();
-                    let mut has_imports = false;
-
-                    for import in &deps_result.imports {
-                        let used_names: Vec<&str> = import
-                            .names
-                            .iter()
-                            .filter(|n| used_ids.contains(*n))
-                            .map(|s| s.as_str())
-                            .collect();
-
-                        let module_used = used_ids.contains(&import.module)
-                            || import
-                                .module
-                                .rsplit("::")
-                                .next()
-                                .map(|last| used_ids.contains(last))
-                                .unwrap_or(false);
-
-                        if used_names.is_empty() && !module_used && !import.is_wildcard {
-                            continue;
-                        }
-
-                        let import_text =
-                            if used_names.len() == import.names.len() || import.names.is_empty() {
-                                if import.line > 0 && import.line <= lines.len() {
-                                    lines[import.line - 1].trim().to_string()
-                                } else if let Some(ref l) = lang {
-                                    l.format_import(import, None)
-                                } else {
-                                    import.format_summary()
-                                }
-                            } else if let Some(ref l) = lang {
-                                l.format_import(import, Some(&used_names))
-                            } else {
-                                import.format_summary()
-                            };
-
-                        if seen_imports.insert(import_text.clone()) {
-                            if !has_imports {
-                                println!();
-                                has_imports = true;
-                            }
-                            println!("{}", import_text);
-                        }
-                    }
-
-                    if has_imports {
-                        println!();
-                    }
+                    print_smart_imports(&source, g, &full_path, &content, &deps_result.imports);
                 }
             }
 
