@@ -1,15 +1,69 @@
 //! Conan package index fetcher (C/C++).
 //!
-//! Fetches package metadata from ConanCenter.
+//! Fetches package metadata from ConanCenter using the conan.io search API.
 
 use super::{IndexError, PackageIndex, PackageMeta, VersionMeta};
+use crate::cache;
+use std::time::Duration;
+
+/// Cache TTL for Conan package list (1 hour).
+const CACHE_TTL: Duration = Duration::from_secs(60 * 60);
 
 /// Conan package index fetcher.
 pub struct Conan;
 
 impl Conan {
-    /// ConanCenter API.
-    const CONAN_API: &'static str = "https://center2.conan.io/api/ui";
+    /// Conan.io search API base URL.
+    const API_BASE: &'static str = "https://conan.io/api/search";
+
+    /// Parse a package from API response.
+    fn parse_package(name: &str, info: &serde_json::Value) -> Option<PackageMeta> {
+        let version = info["version"].as_str().unwrap_or("unknown");
+        let description = info["description"].as_str().map(String::from);
+
+        // Extract first license from licenses object
+        let license = info["licenses"]
+            .as_object()
+            .and_then(|obj| obj.keys().next())
+            .map(String::from);
+
+        Some(PackageMeta {
+            name: name.to_string(),
+            version: version.to_string(),
+            description,
+            homepage: Some(format!("https://conan.io/center/recipes/{}", name)),
+            repository: None,
+            license,
+            binaries: Vec::new(),
+            ..Default::default()
+        })
+    }
+
+    /// Load all packages from API (cached).
+    fn load_all_packages() -> Result<Vec<PackageMeta>, IndexError> {
+        let url = format!("{}{}?topics=&licenses=", Self::API_BASE, "/all");
+        let (data, _was_cached) = cache::fetch_with_cache("conan", "all-packages", &url, CACHE_TTL)
+            .map_err(IndexError::Network)?;
+
+        let response: serde_json::Value =
+            serde_json::from_slice(&data).map_err(|e| IndexError::Parse(e.to_string()))?;
+
+        // Response is an object with numeric keys: {"0": {...}, "1": {...}, ...}
+        let packages: Vec<PackageMeta> = response
+            .as_object()
+            .map(|obj| {
+                obj.values()
+                    .filter_map(|pkg| {
+                        let name = pkg["name"].as_str()?;
+                        let info = &pkg["info"];
+                        Self::parse_package(name, info)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        Ok(packages)
+    }
 }
 
 impl PackageIndex for Conan {
@@ -22,91 +76,58 @@ impl PackageIndex for Conan {
     }
 
     fn fetch(&self, name: &str) -> Result<PackageMeta, IndexError> {
-        let url = format!("{}/recipes/{}", Self::CONAN_API, name);
+        // Search for exact package name
+        let url = format!("{}/{}?topics=&licenses=", Self::API_BASE, name);
         let response: serde_json::Value = ureq::get(&url).call()?.into_json()?;
 
-        let versions = response["versions"]
-            .as_array()
-            .ok_or_else(|| IndexError::Parse("missing versions".into()))?;
+        // Response is object with numeric keys, find exact match
+        if let Some(obj) = response.as_object() {
+            for pkg in obj.values() {
+                if let Some(pkg_name) = pkg["name"].as_str() {
+                    if pkg_name.eq_ignore_ascii_case(name) {
+                        if let Some(meta) = Self::parse_package(pkg_name, &pkg["info"]) {
+                            return Ok(meta);
+                        }
+                    }
+                }
+            }
+        }
 
-        let latest = versions
-            .first()
-            .ok_or_else(|| IndexError::NotFound(name.to_string()))?;
-
-        Ok(PackageMeta {
-            name: response["name"].as_str().unwrap_or(name).to_string(),
-            version: latest["version"].as_str().unwrap_or("unknown").to_string(),
-            description: response["description"].as_str().map(String::from),
-            homepage: response["homepage"].as_str().map(String::from),
-            repository: response["url"]
-                .as_str()
-                .filter(|u| u.contains("github.com") || u.contains("gitlab.com"))
-                .map(String::from),
-            license: response["license"]
-                .as_str()
-                .or_else(|| {
-                    response["licenses"]
-                        .as_array()
-                        .and_then(|l| l.first())
-                        .and_then(|l| l.as_str())
-                })
-                .map(String::from),
-            binaries: Vec::new(),
-            ..Default::default()
-        })
+        Err(IndexError::NotFound(name.to_string()))
     }
 
     fn fetch_versions(&self, name: &str) -> Result<Vec<VersionMeta>, IndexError> {
-        let url = format!("{}/recipes/{}", Self::CONAN_API, name);
-        let response: serde_json::Value = ureq::get(&url).call()?.into_json()?;
-
-        let versions = response["versions"]
-            .as_array()
-            .ok_or_else(|| IndexError::Parse("missing versions".into()))?;
-
-        Ok(versions
-            .iter()
-            .filter_map(|v| {
-                Some(VersionMeta {
-                    version: v["version"].as_str()?.to_string(),
-                    released: None,
-                    yanked: false,
-                })
-            })
-            .collect())
+        // The search API only returns latest version
+        // For now, return just that
+        let pkg = self.fetch(name)?;
+        Ok(vec![VersionMeta {
+            version: pkg.version,
+            released: None,
+            yanked: false,
+        }])
     }
 
     fn search(&self, query: &str) -> Result<Vec<PackageMeta>, IndexError> {
-        let url = format!("{}/recipes?q={}", Self::CONAN_API, query);
+        let url = format!("{}/{}?topics=&licenses=", Self::API_BASE, query);
         let response: serde_json::Value = ureq::get(&url).call()?.into_json()?;
 
-        let recipes = response["recipes"]
-            .as_array()
-            .or_else(|| response.as_array())
-            .ok_or_else(|| IndexError::Parse("missing recipes".into()))?;
-
-        Ok(recipes
-            .iter()
-            .filter_map(|recipe| {
-                Some(PackageMeta {
-                    name: recipe["name"].as_str()?.to_string(),
-                    version: recipe["versions"]
-                        .as_array()
-                        .and_then(|v| v.first())
-                        .and_then(|v| v["version"].as_str())
-                        .unwrap_or("unknown")
-                        .to_string(),
-                    description: recipe["description"].as_str().map(String::from),
-                    homepage: recipe["homepage"].as_str().map(String::from),
-                    repository: recipe["url"]
-                        .as_str()
-                        .filter(|u| u.contains("github.com") || u.contains("gitlab.com"))
-                        .map(String::from),
-                    license: recipe["license"].as_str().map(String::from),
-                    binaries: Vec::new(),
-                    ..Default::default()
-                })
+        let packages: Vec<PackageMeta> = response
+            .as_object()
+            .map(|obj| {
+                obj.values()
+                    .filter_map(|pkg| {
+                        let name = pkg["name"].as_str()?;
+                        Self::parse_package(name, &pkg["info"])
+                    })
+                    .take(50)
+                    .collect()
             })
-            .collect())
+            .unwrap_or_default();
+
+        Ok(packages)
+    }
+
+    fn fetch_all(&self) -> Result<Vec<PackageMeta>, IndexError> {
+        Self::load_all_packages()
     }
 }

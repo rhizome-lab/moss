@@ -177,7 +177,7 @@ Legend: `[x]` implemented, `[ ]` not implemented, `[~]` partial/needs verificati
 - [x] dub - DUB (D packages)
 
 ### C/C++
-- [~] conan - Conan Center (CLI only, no REST API)
+- [x] conan - Conan Center
 - [x] vcpkg - vcpkg (GitHub baseline.json)
 - [x] hunter - Hunter C++ (GitHub cmake parsing)
 - [ ] biicode - Biicode (discontinued)

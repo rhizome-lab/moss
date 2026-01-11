@@ -605,11 +605,10 @@ fn test_composer() {
 }
 
 #[test]
-#[ignore = "ConanCenter API endpoint needs verification"]
 fn test_conan() {
     let index = conan::Conan;
-    test_fetch(&index, "boost");
-    test_versions(&index, "boost");
+    test_fetch(&index, "zlib");
+    test_versions(&index, "zlib");
     test_search(&index, "boost");
 }
 
