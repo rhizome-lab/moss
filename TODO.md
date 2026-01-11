@@ -130,6 +130,75 @@ Document edge-case workflows - unusual scenarios that don't fit standard pattern
   - Very low priority - needs concrete use case showing value beyond direct tool usage
   - Possible value-adds: install across all ecosystems, auto-audit after install, config-driven installs
 
+### Package Index Fetchers (moss-packages)
+
+**Full coverage tracking**: See `docs/repository-coverage.md` for complete repository list.
+
+**API Verification Results**:
+
+✅ WORKING:
+- apk: Alpine - APKINDEX.tar.gz parsing (multi-member gzip + tar)
+- artix: packages.artixlinux.org/packages/search/json/?name={name} (Arch-compatible format)
+- dnf: mdapi.fedoraproject.org/rawhide/pkg/{name} (JSON)
+- gentoo: packages.gentoo.org/packages/{cat}/{name}.json (JSON)
+- guix: guix.gnu.org/packages.json (gzip-compressed JSON array, ~30k packages)
+- nix: search.nixos.org Elasticsearch (requires POST with query JSON)
+- pacman/aur: aur.archlinux.org/packages-meta-ext-v1.json.gz (full archive)
+
+⚠️ XML ONLY (needs XML parsing):
+- choco: community.chocolatey.org/api/v2 returns NuGet v2 OData/Atom XML
+- opensuse: api.opensuse.org uses XML (OBS API)
+
+❌ NO PUBLIC JSON API:
+- void: Uses XBPS binary repodata format, no REST API
+- freebsd: FreshPorts - HTML only, API was planned in 2017 but not public
+- openbsd: openports.pl - HTML only
+- netbsd: pkgsrc.se - HTML only
+- conan: Conan Center - CLI only (--format=json), no public REST API
+- slackware: SlackBuilds - HTML only, using GitHub raw .info files as workaround
+- swiftpm: Swift Package Index requires authentication for API access
+
+**Implemented fetchers** (47 total: 16 distro, 4 Windows, 3 macOS, 2 cross-platform, 22 language):
+- [x] APK (Alpine): APKINDEX.tar.gz with checksums, deps, archive URLs
+- [x] Artix Linux: Arch-based, shares arch_common logic with pacman
+- [x] NixOS/Nix: search.nixos.org Elasticsearch API
+- [x] Void Linux: xbps (API needs verification)
+- [x] Gentoo: packages.gentoo.org API
+- [x] openSUSE: software.opensuse.org search API
+- [x] Guix: packages.guix.gnu.org with fetch_all support
+- [x] Slackware: SlackBuilds.org via GitHub raw .info files
+- [x] FreeBSD: freshports.org search API
+- [x] OpenBSD: openports.pl (API needs verification)
+- [x] NetBSD: pkgsrc.se (API needs verification)
+- [x] CachyOS: Arch-based, uses arch_common
+- [x] EndeavourOS: Arch-based, uses arch_common
+- [x] MSYS2: packages.msys2.org API (Windows development)
+- [x] MacPorts: ports.macports.org API
+- [x] Snap: api.snapcraft.io (requires Snap-Device-Series header)
+- [x] DUB: code.dlang.org API (D packages)
+
+**Note**: Debian-derivatives (Ubuntu, Mint, elementary) use apt fetcher.
+Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
+
+**fetch_all implementations**:
+- [x] APK: APKINDEX.tar.gz (main + community repos)
+- [x] AUR: packages-meta-ext-v1.json.gz (~30MB, ~5min refresh)
+- [x] Homebrew: formula.json
+- [x] Deno: paginated API
+- [x] Guix: packages.json
+- Arch official: has package databases per repo (not yet implemented)
+- Crates.io: has db-dump.tar.gz (not real-time, could implement)
+- npm: has registry replicate API (massive - may not be practical)
+- PyPI: has simple index but no bulk JSON API
+- RubyGems: has versions dump at /versions endpoint
+- NuGet: has catalog API for incremental updates
+
+**Struct completeness audit**: Each fetcher should populate all available fields from their APIs:
+- keywords, maintainers, published dates where available
+- downloads counts from APIs that provide them
+- archive_url and checksum for verification
+- extra field for ecosystem-specific metadata not in normalized fields
+
 ### Code Quality
 - [x] `--allow` for duplicate-functions: accept line range like output suggests (e.g., `--allow src/foo.rs:10-20`)
 - Unnecessary aliases: `let x = Foo; x.bar()` → `Foo.bar()`. Lint for pointless intermediate bindings.
