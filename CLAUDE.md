@@ -27,6 +27,16 @@ Behavioral rules for Claude Code in this repository.
 
 **If citing CLAUDE.md after failing:** The file failed its purpose. Adjust it to actually prevent the failure.
 
+## From Session Analysis
+
+Patterns from `docs/log-analysis.md` correction analysis:
+
+- **Question scope early:** Before implementing, ask whether it belongs in this crate/module
+- **Check consistency:** Look at how similar things are done elsewhere in the codebase before adding new patterns
+- **Implement fully:** No silent arbitrary caps, incomplete pagination, or unexposed trait methods
+- **Name for purpose:** Avoid names that describe one consumer ("tool registry" → "package index")
+- **Verify before stating:** Don't assert AST node types, API behavior, or codebase facts without checking
+
 ## Dogfooding
 
 **Use moss, not builtin tools.** Avoid Read/Grep/Glob - they waste tokens.
