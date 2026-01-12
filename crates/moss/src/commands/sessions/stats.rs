@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 /// Parse a date string (YYYY-MM-DD) to SystemTime.
-fn parse_date(s: &str) -> Option<SystemTime> {
+pub(crate) fn parse_date(s: &str) -> Option<SystemTime> {
     let parts: Vec<&str> = s.split('-').collect();
     if parts.len() != 3 {
         return None;
@@ -187,7 +187,7 @@ pub fn cmd_sessions_stats(
 }
 
 /// List sessions from all projects in ~/.claude/projects/
-fn list_all_project_sessions(format: &dyn LogFormat) -> Vec<SessionFile> {
+pub(crate) fn list_all_project_sessions(format: &dyn LogFormat) -> Vec<SessionFile> {
     let home = match std::env::var("HOME") {
         Ok(h) => h,
         Err(_) => return Vec::new(),
