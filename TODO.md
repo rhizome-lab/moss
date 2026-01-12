@@ -205,6 +205,7 @@ Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
 - Crates.io: has db-dump.tar.gz (~800MB - could implement, low priority)
 - npm: has registry replicate API (massive - probably not practical)
 - PyPI: no bulk API (BigQuery only alternative)
+- Docker Hub: no bulk index (millions of images, search API paginated/rate-limited, no `/v2/_catalog`)
 
 **fetch_all design**: Should return one PackageMeta per *version*, not per package:
 - Distro indexes already do this (different repos have different versions)
@@ -213,6 +214,7 @@ Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
 - [x] `fetch_all_versions(name)` added to trait - returns Vec<PackageMeta> for all versions
   - npm: full implementation with per-version deps, engines, checksums
   - cargo: full implementation with per-version features, MSRV, checksums
+  - docker: full implementation with per-tag digest, size, architectures, OS
   - Default: falls back to fetch_versions() with minimal data
 
 **Struct completeness audit**: Each fetcher should populate all available fields from their APIs:
