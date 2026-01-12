@@ -167,6 +167,130 @@ impl PackageIndex for NpmIndex {
             .collect())
     }
 
+    fn fetch_all_versions(&self, name: &str) -> Result<Vec<PackageMeta>, IndexError> {
+        let url = format!("{}/{}", Self::NPM_REGISTRY, name);
+        let response: serde_json::Value = ureq::get(&url).call()?.into_json()?;
+
+        if response.get("error").is_some() {
+            return Err(IndexError::NotFound(name.to_string()));
+        }
+
+        let versions = response["versions"]
+            .as_object()
+            .ok_or_else(|| IndexError::Parse("missing versions".into()))?;
+
+        let time = response["time"].as_object();
+        let pkg_name = response["name"].as_str().unwrap_or(name);
+
+        Ok(versions
+            .iter()
+            .map(|(ver, data)| {
+                let mut extra = HashMap::new();
+
+                // Full bin mapping
+                if let Some(bin) = data["bin"].as_object() {
+                    let bin_map: serde_json::Map<String, serde_json::Value> =
+                        bin.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                    if !bin_map.is_empty() {
+                        extra.insert("bin".to_string(), serde_json::Value::Object(bin_map));
+                    }
+                }
+
+                // Engines
+                if let Some(engines) = data["engines"].as_object() {
+                    let engines_map: serde_json::Map<String, serde_json::Value> = engines
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect();
+                    if !engines_map.is_empty() {
+                        extra.insert(
+                            "engines".to_string(),
+                            serde_json::Value::Object(engines_map),
+                        );
+                    }
+                }
+
+                // Dependencies
+                if let Some(deps) = data["dependencies"].as_object() {
+                    let deps_map: serde_json::Map<String, serde_json::Value> =
+                        deps.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                    if !deps_map.is_empty() {
+                        extra.insert(
+                            "dependencies".to_string(),
+                            serde_json::Value::Object(deps_map),
+                        );
+                    }
+                }
+
+                // Peer dependencies
+                if let Some(peers) = data["peerDependencies"].as_object() {
+                    let peers_map: serde_json::Map<String, serde_json::Value> =
+                        peers.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                    if !peers_map.is_empty() {
+                        extra.insert(
+                            "peerDependencies".to_string(),
+                            serde_json::Value::Object(peers_map),
+                        );
+                    }
+                }
+
+                // Deprecated flag
+                if let Some(deprecated) = data["deprecated"].as_str() {
+                    extra.insert(
+                        "deprecated".to_string(),
+                        serde_json::Value::String(deprecated.to_string()),
+                    );
+                }
+
+                PackageMeta {
+                    name: pkg_name.to_string(),
+                    version: ver.clone(),
+                    description: data["description"].as_str().map(String::from),
+                    homepage: response["homepage"].as_str().map(String::from),
+                    repository: response["repository"]["url"]
+                        .as_str()
+                        .or_else(|| response["repository"].as_str())
+                        .map(|s| {
+                            s.trim_start_matches("git+")
+                                .trim_end_matches(".git")
+                                .to_string()
+                        }),
+                    license: data["license"].as_str().map(String::from),
+                    binaries: data["bin"]
+                        .as_object()
+                        .map(|bins| bins.keys().cloned().collect())
+                        .unwrap_or_default(),
+                    keywords: response["keywords"]
+                        .as_array()
+                        .map(|kw| {
+                            kw.iter()
+                                .filter_map(|k| k.as_str().map(String::from))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    maintainers: response["maintainers"]
+                        .as_array()
+                        .map(|m| {
+                            m.iter()
+                                .filter_map(|maint| maint["name"].as_str().map(String::from))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    published: time
+                        .and_then(|t| t.get(ver))
+                        .and_then(|t| t.as_str())
+                        .map(String::from),
+                    downloads: None,
+                    archive_url: data["dist"]["tarball"].as_str().map(String::from),
+                    checksum: data["dist"]["shasum"]
+                        .as_str()
+                        .map(|h| format!("sha1:{}", h)),
+                    extra,
+                }
+            })
+            .collect())
+    }
+
     fn search(&self, query: &str) -> Result<Vec<PackageMeta>, IndexError> {
         let url = format!(
             "https://registry.npmjs.org/-/v1/search?text={}&size=50",

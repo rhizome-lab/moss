@@ -210,7 +210,10 @@ Arch-derivatives (Manjaro, etc.) can use pacman fetcher.
 - Distro indexes already do this (different repos have different versions)
 - When implementing for npm/crates.io, expand to all versions
 - Keep `fetch()` returning single latest for quick lookups
-- Consider `fetch_all_versions(name)` for per-package version expansion
+- [x] `fetch_all_versions(name)` added to trait - returns Vec<PackageMeta> for all versions
+  - npm: full implementation with per-version deps, engines, checksums
+  - cargo: full implementation with per-version features, MSRV, checksums
+  - Default: falls back to fetch_versions() with minimal data
 
 **Struct completeness audit**: Each fetcher should populate all available fields from their APIs:
 - keywords, maintainers, published dates where available

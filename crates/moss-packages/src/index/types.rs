@@ -132,8 +132,26 @@ pub trait PackageIndex: Send + Sync {
     /// Fetch metadata for a specific package.
     fn fetch(&self, name: &str) -> Result<PackageMeta, IndexError>;
 
-    /// Fetch available versions for a package.
+    /// Fetch available versions for a package (minimal metadata).
     fn fetch_versions(&self, name: &str) -> Result<Vec<VersionMeta>, IndexError>;
+
+    /// Fetch all versions of a package with full metadata.
+    ///
+    /// Returns one PackageMeta per version. Default implementation uses
+    /// `fetch_versions` and returns minimal data; override for indexes
+    /// where the API provides full per-version metadata (npm, crates.io).
+    fn fetch_all_versions(&self, name: &str) -> Result<Vec<PackageMeta>, IndexError> {
+        let versions = self.fetch_versions(name)?;
+        Ok(versions
+            .into_iter()
+            .map(|v| PackageMeta {
+                name: name.to_string(),
+                version: v.version,
+                published: v.released,
+                ..Default::default()
+            })
+            .collect())
+    }
 
     /// Whether this index supports bulk fetching via `fetch_all()`.
     fn supports_fetch_all(&self) -> bool {
