@@ -256,6 +256,123 @@ impl Docker {
             .collect())
     }
 
+    /// Fetch all tags with full metadata from Docker Hub.
+    fn fetch_all_versions_dockerhub(name: &str) -> Result<Vec<PackageMeta>, IndexError> {
+        let (namespace, repo) = if name.contains('/') {
+            let parts: Vec<&str> = name.splitn(2, '/').collect();
+            (parts[0], parts[1])
+        } else {
+            ("library", name)
+        };
+
+        // Get repository info for shared metadata
+        let repo_url = format!(
+            "https://hub.docker.com/v2/repositories/{}/{}/",
+            namespace, repo
+        );
+        let repo_info: serde_json::Value = ureq::get(&repo_url)
+            .call()
+            .map_err(|_| IndexError::NotFound(name.to_string()))?
+            .into_json()?;
+
+        let description = repo_info["description"].as_str().map(String::from);
+        let pull_count = repo_info["pull_count"].as_u64();
+
+        // Get tags with full metadata
+        let tags_url = format!(
+            "https://hub.docker.com/v2/repositories/{}/{}/tags?page_size=100&ordering=-last_updated",
+            namespace, repo
+        );
+        let response: serde_json::Value = ureq::get(&tags_url)
+            .call()
+            .map_err(|_| IndexError::NotFound(name.to_string()))?
+            .into_json()?;
+
+        let tags = response["results"]
+            .as_array()
+            .ok_or_else(|| IndexError::NotFound(name.to_string()))?;
+
+        let full_name = format!("{}/{}", namespace, repo);
+
+        Ok(tags
+            .iter()
+            .filter_map(|t| {
+                let tag_name = t["name"].as_str()?;
+                let mut extra = HashMap::new();
+
+                extra.insert(
+                    "source_repo".to_string(),
+                    serde_json::Value::String("docker-hub".to_string()),
+                );
+
+                // Digest
+                if let Some(digest) = t["digest"].as_str() {
+                    extra.insert(
+                        "digest".to_string(),
+                        serde_json::Value::String(digest.to_string()),
+                    );
+                }
+
+                // Full size in bytes
+                if let Some(size) = t["full_size"].as_u64() {
+                    extra.insert("size".to_string(), serde_json::Value::Number(size.into()));
+                }
+
+                // Architecture info from images array
+                if let Some(images) = t["images"].as_array() {
+                    let archs: Vec<serde_json::Value> = images
+                        .iter()
+                        .filter_map(|img| {
+                            img["architecture"]
+                                .as_str()
+                                .map(|a| serde_json::Value::String(a.to_string()))
+                        })
+                        .collect();
+                    if !archs.is_empty() {
+                        extra.insert("architectures".to_string(), serde_json::Value::Array(archs));
+                    }
+
+                    // OS info
+                    let os_list: Vec<serde_json::Value> = images
+                        .iter()
+                        .filter_map(|img| {
+                            img["os"]
+                                .as_str()
+                                .map(|o| serde_json::Value::String(o.to_string()))
+                        })
+                        .collect();
+                    if !os_list.is_empty() {
+                        // Dedupe
+                        let unique: std::collections::HashSet<_> =
+                            os_list.iter().filter_map(|v| v.as_str()).collect();
+                        let unique_vec: Vec<serde_json::Value> = unique
+                            .into_iter()
+                            .map(|s| serde_json::Value::String(s.to_string()))
+                            .collect();
+                        extra.insert("os".to_string(), serde_json::Value::Array(unique_vec));
+                    }
+                }
+
+                Some(PackageMeta {
+                    name: full_name.clone(),
+                    version: tag_name.to_string(),
+                    description: description.clone(),
+                    homepage: None,
+                    repository: None,
+                    license: None,
+                    binaries: Vec::new(),
+                    keywords: Vec::new(),
+                    maintainers: vec![namespace.to_string()],
+                    published: t["last_updated"].as_str().map(String::from),
+                    downloads: pull_count,
+                    archive_url: None,
+                    checksum: t["digest"].as_str().map(String::from),
+                    extra,
+                })
+            })
+            .collect())
+    }
+
     /// Fetch from Quay.io.
     fn fetch_from_quay(name: &str) -> Result<(PackageMeta, DockerRegistry), IndexError> {
         let (namespace, repo) = if name.contains('/') {
@@ -532,6 +649,39 @@ impl PackageIndex for Docker {
         }
 
         Ok(all_versions)
+    }
+
+    fn fetch_all_versions(&self, name: &str) -> Result<Vec<PackageMeta>, IndexError> {
+        let (detected_registry, clean_name) = Self::detect_registry(name);
+
+        // If the detected registry is in our configured list, use it
+        if self.registries.contains(&detected_registry) {
+            return match detected_registry {
+                DockerRegistry::DockerHub => Self::fetch_all_versions_dockerhub(&clean_name),
+                DockerRegistry::Quay | DockerRegistry::Ghcr | DockerRegistry::Gcr => {
+                    // Fall back to default implementation for other registries
+                    let versions = self.fetch_versions(name)?;
+                    Ok(versions
+                        .into_iter()
+                        .map(|v| PackageMeta {
+                            name: name.to_string(),
+                            version: v.version,
+                            published: v.released,
+                            ..Default::default()
+                        })
+                        .collect())
+                }
+            };
+        }
+
+        // Try Docker Hub if configured
+        if self.registries.contains(&DockerRegistry::DockerHub) {
+            if let Ok(versions) = Self::fetch_all_versions_dockerhub(name) {
+                return Ok(versions);
+            }
+        }
+
+        Err(IndexError::NotFound(name.to_string()))
     }
 
     fn search(&self, query: &str) -> Result<Vec<PackageMeta>, IndexError> {
