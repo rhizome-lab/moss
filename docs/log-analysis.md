@@ -308,4 +308,100 @@ Curated context isn't just cheaper - it's *better*:
 
 ---
 
-*Analysis performed on session from Dec 17-18, 2025*
+## Correction Patterns Meta-Analysis
+
+Analysis of user corrections across 20 moss sessions (Jan 2026), using `moss sessions show --jq` to extract patterns.
+
+### Summary
+
+**Total: 2,785 assistant text blocks**
+
+| Pattern | Count |
+|---------|-------|
+| "You're right" | 69 |
+| "Good/Fair/Great point" | 53 |
+| Apologies/mistakes | 1 |
+
+The low apology count suggests most corrections are course adjustments on design decisions rather than outright mistakes.
+
+### Correction Themes
+
+#### 1. Scope/Design (most frequent)
+
+Wrong layer, mixing concerns, overcomplicating.
+
+- "You're right - helper functions defeat the purpose. Each language should have its own proper implementation"
+- "You're right - `Symbol::is_test()` is wrong because test detection is language-specific"
+- "You're right - this is a separate concern"
+- "Grouping ≠ simplifying - merging commands with flags doesn't reduce concepts, just moves them"
+
+#### 2. Incomplete Implementations
+
+Arbitrary limits, missing pagination, silent truncation.
+
+- "You're right - it's capped at 1000 which is just one page"
+- "You're right - the limit is arbitrary and defeats the purpose"
+- "You're right - `find_sessions_dir` should return where sessions *would* be stored, not whether it exists"
+
+#### 3. Consistency Issues
+
+Patterns that don't match the rest of the codebase.
+
+- "You're right - that's inconsistent. Agent is just a Lua module, should work via `moss @agent` like other scripts"
+- "You're right - scripts ARE embedded (`include_str!`). My earlier statement was wrong"
+- "Good point - `--list` vs `list` subcommand - `tools lint list` IS consistent. `--list` would be inconsistent"
+
+#### 4. Naming/Framing
+
+Names tied to one use case, confusing identifiers.
+
+- "Good point - 'm1/m2' are too similar, model might autocomplete wrong. Let me use random short IDs"
+- "Good point - 'tool registry' is one application, not the core purpose"
+- "You're right - that's an assumption worth questioning. LLMs are literally trained on text, not JSON schemas"
+
+#### 5. Missing Extensibility
+
+Not exposing what's built, hardcoding what should be configurable.
+
+- "You're right. `fetch_versions()` exists on the trait but isn't exposed in the CLI"
+- "You're right - the `ToolsAction` enum and its dispatch should live in `commands/tools/mod.rs`"
+- "The crates stay pure Rust with no Lua dependency... `moss` can optionally wrap these in Lua bindings - that's an application concern, not a library concern"
+
+#### 6. Wrong Assumptions
+
+Stating things that turn out to be incorrect on inspection.
+
+- "You're right, that's nonsense. The model is frozen - it doesn't 'learn' from usage"
+- "You're right! `Some`/`Ok`/`Err` take arguments so they'd be `call_expression`, not `identifier`. Only `None` is a bare identifier"
+- "You're right - the logs only have lengths, not actual content - the most important stuff for debugging"
+
+### User Correction Triggers
+
+Common phrasings that indicate a correction is coming:
+- Questions that reveal overlooked aspects: "but what about...?", "did you consider...?"
+- Probing assumptions: "are you sure...?", "deno.land's fetch_all only fetches the first page?"
+- Verification requests: "you oneshotted all of these, right?"
+
+### Implications for CLAUDE.md Rules
+
+These patterns suggest rules like:
+1. **Question scope early**: Before implementing, ask whether it belongs in this crate/module
+2. **Check consistency**: Look at how similar things are done elsewhere in the codebase
+3. **Implement fully or document limits**: No silent arbitrary caps or incomplete pagination
+4. **Name for purpose, not use case**: Avoid names that describe one consumer
+5. **Expose what you build**: If a trait method exists, make it accessible via CLI
+6. **Verify assumptions**: Don't state things as fact without checking (AST node types, API behavior, etc.)
+
+### Methodology
+
+Extraction command:
+```bash
+moss sessions show <SESSION> --jq 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text'
+```
+
+Pattern matching via grep on combined output from all sessions.
+
+---
+
+*Initial analysis performed on session from Dec 17-18, 2025*
+*Correction patterns analysis performed Jan 13, 2026*
