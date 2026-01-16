@@ -7,6 +7,7 @@ use glob::Pattern;
 use std::collections::HashMap;
 use std::path::Path;
 
+use crate::commands::analyze::complexity::analyze_codebase_complexity;
 use crate::index::FileIndex;
 
 /// Large file info for reporting
@@ -268,31 +269,53 @@ fn is_allowed(path: &str, patterns: &[Pattern]) -> bool {
     patterns.iter().any(|p| p.matches(path))
 }
 
+struct ComplexityStats {
+    total_functions: usize,
+    avg_complexity: f64,
+    max_complexity: usize,
+    high_risk_functions: usize,
+}
+
+fn compute_complexity_stats(root: &Path, allowlist: &[String]) -> ComplexityStats {
+    let report = analyze_codebase_complexity(root, usize::MAX, None, None, allowlist);
+    ComplexityStats {
+        total_functions: report.functions.len(),
+        avg_complexity: report.avg_complexity(),
+        max_complexity: report.max_complexity(),
+        high_risk_functions: report.high_risk_count() + report.critical_risk_count(),
+    }
+}
+
 pub fn analyze_health(root: &Path) -> HealthReport {
     let allow_patterns = load_allow_patterns(root, "large-files-allow");
 
-    // Try index first, fall back to filesystem walk
+    // Compute complexity upfront (before entering async context to avoid nested runtime)
+    let complexity = compute_complexity_stats(root, &[]);
+
+    // Try index first for file/line stats, fall back to filesystem walk
     let rt = tokio::runtime::Runtime::new().unwrap();
     if let Some(mut index) = rt.block_on(FileIndex::open_if_enabled(root)) {
-        return rt.block_on(analyze_health_indexed(root, &mut index, &allow_patterns));
+        return rt.block_on(analyze_health_indexed(
+            root,
+            &mut index,
+            &allow_patterns,
+            complexity,
+        ));
     }
-    analyze_health_unindexed(root, &allow_patterns)
+    analyze_health_unindexed(root, &allow_patterns, complexity)
 }
 
 async fn analyze_health_indexed(
     _root: &Path,
     index: &mut FileIndex,
     allow_patterns: &[Pattern],
+    complexity: ComplexityStats,
 ) -> HealthReport {
-    // Ensure file index is up to date (incremental - only changed files)
     let _ = index.incremental_refresh().await;
-    // Note: We don't call refresh_call_graph() here - it's slow.
-    // Complexity is computed during symbol indexing, which happens via other commands.
 
-    // Query complexity stats from the index
     let conn = index.connection();
 
-    // Get file counts by language (using file extensions)
+    // Get file counts by language
     let mut files_by_language: HashMap<String, usize> = HashMap::new();
     let mut total_files = 0;
 
@@ -313,35 +336,7 @@ async fn analyze_health_indexed(
         }
     }
 
-    // Get complexity stats from symbols table
-    let mut total_functions = 0usize;
-    let mut total_complexity = 0usize;
-    let mut max_complexity = 0usize;
-    let mut high_risk_functions = 0usize;
-
-    if let Ok(mut rows) = conn
-        .query(
-            "SELECT complexity FROM symbols WHERE complexity IS NOT NULL",
-            (),
-        )
-        .await
-    {
-        while let Ok(Some(row)) = rows.next().await {
-            if let Ok(complexity_result) = row.get::<i64>(0) {
-                let complexity = complexity_result as usize;
-                total_functions += 1;
-                total_complexity += complexity;
-                if complexity > max_complexity {
-                    max_complexity = complexity;
-                }
-                if complexity > 10 {
-                    high_risk_functions += 1;
-                }
-            }
-        }
-    }
-
-    // Use cached line counts from index
+    // Get line counts from index
     let mut total_lines = 0usize;
     let mut large_files = Vec::new();
 
@@ -363,29 +358,26 @@ async fn analyze_health_indexed(
         }
     }
 
-    // Sort large files by line count descending
     large_files.sort_by(|a, b| b.lines.cmp(&a.lines));
-
-    let avg_complexity = if total_functions > 0 {
-        total_complexity as f64 / total_functions as f64
-    } else {
-        0.0
-    };
 
     HealthReport {
         total_files,
         files_by_language,
         total_lines,
-        avg_complexity,
-        max_complexity,
-        high_risk_functions,
-        total_functions,
+        avg_complexity: complexity.avg_complexity,
+        max_complexity: complexity.max_complexity,
+        high_risk_functions: complexity.high_risk_functions,
+        total_functions: complexity.total_functions,
         large_files,
     }
 }
 
-/// Analyze health by walking the filesystem (slower, no complexity data)
-fn analyze_health_unindexed(root: &Path, allow_patterns: &[Pattern]) -> HealthReport {
+/// Analyze health by walking the filesystem (no index available)
+fn analyze_health_unindexed(
+    root: &Path,
+    allow_patterns: &[Pattern],
+    complexity: ComplexityStats,
+) -> HealthReport {
     use ignore::WalkBuilder;
 
     let mut files_by_language: HashMap<String, usize> = HashMap::new();
@@ -409,7 +401,6 @@ fn analyze_health_unindexed(root: &Path, allow_patterns: &[Pattern]) -> HealthRe
                 .or_insert(0) += 1;
         }
 
-        // Count lines
         if let Ok(content) = std::fs::read_to_string(path) {
             let lines = content.lines().count();
             total_lines += lines;
@@ -434,10 +425,10 @@ fn analyze_health_unindexed(root: &Path, allow_patterns: &[Pattern]) -> HealthRe
         total_files,
         files_by_language,
         total_lines,
-        avg_complexity: 0.0, // No complexity without index
-        max_complexity: 0,
-        high_risk_functions: 0,
-        total_functions: 0,
+        avg_complexity: complexity.avg_complexity,
+        max_complexity: complexity.max_complexity,
+        high_risk_functions: complexity.high_risk_functions,
+        total_functions: complexity.total_functions,
         large_files,
     }
 }
