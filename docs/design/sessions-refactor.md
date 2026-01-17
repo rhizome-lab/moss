@@ -1,8 +1,10 @@
 # moss-sessions Refactor: Unified Parsing
 
+**Status: Complete** - Implemented in moss-sessions, analysis moved to `crates/moss/src/sessions/analysis.rs`.
+
 ## Problem
 
-moss-sessions currently conflates two concerns:
+moss-sessions previously conflated two concerns:
 
 1. **Parsing** - converting format-specific logs (Claude Code JSONL, Gemini CLI JSON, Codex, Moss Agent) into structured data
 2. **Analysis** - computing statistics (tool call counts, token usage, error patterns, parallelization opportunities)
@@ -29,11 +31,11 @@ This is problematic because:
 
 ## Design
 
-Split into two layers:
+Split parsing from analysis into two layers:
 
-### 1. Unified Session Type (new)
+### 1. Unified Session Type
 
-A format-agnostic representation of session data:
+A format-agnostic representation of session data (from `moss-sessions/src/session.rs`):
 
 ```rust
 pub struct Session {
@@ -48,6 +50,7 @@ pub struct SessionMetadata {
     pub timestamp: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
+    pub project: Option<String>,
 }
 
 pub struct Turn {
@@ -68,7 +71,7 @@ pub enum Role {
 }
 
 pub enum ContentBlock {
-    Text(String),
+    Text { text: String },
     ToolUse {
         id: String,
         name: String,
@@ -79,6 +82,7 @@ pub enum ContentBlock {
         content: String,
         is_error: bool,
     },
+    Thinking { text: String },
 }
 
 pub struct TokenUsage {
@@ -88,6 +92,13 @@ pub struct TokenUsage {
     pub cache_create: Option<u64>,
 }
 ```
+
+Helper methods on `Session`:
+- `message_count()` - total messages
+- `messages_by_role(role)` - count by role
+- `tool_uses()` - iterator over (name, input) pairs
+- `tool_results()` - iterator over (tool_use_id, is_error) pairs
+- `total_tokens()` - aggregate TokenUsage
 
 ### 2. Updated LogFormat Trait
 
@@ -140,38 +151,39 @@ For `moss sessions` CLI, analysis helpers can live in moss-cli or a separate `mo
 
 5. **Composability** - Different consumers can share the parser but compute different analyses. `moss sessions --compact` and Iris insights don't need to agree on what to track.
 
-## Migration
+## Migration (Complete)
 
-1. Add `Session` type and `parse()` method to `LogFormat` trait
-2. Implement `parse()` for each format (extract from current `analyze()` implementations)
-3. Move analysis logic to moss CLI (for `moss sessions` command)
-4. Deprecate then remove `analyze()` from trait
-5. `SessionAnalysis` becomes internal to moss CLI, not part of moss-sessions public API
+1. ~~Add `Session` type and `parse()` method to `LogFormat` trait~~ Done
+2. ~~Implement `parse()` for each format~~ Done (Claude Code, Gemini CLI, Codex, Moss Agent)
+3. ~~Move analysis logic to moss CLI~~ Done (`crates/moss/src/sessions/analysis.rs`)
+4. ~~Remove `analyze()` from trait~~ Done
+5. ~~`SessionAnalysis` becomes internal to moss CLI~~ Done
 
-## spore-sessions Integration
+## spore-moss-sessions Integration
 
-With this refactor, spore-sessions becomes trivial:
+With parsing exposed, `spore-moss-sessions` provides Lua bindings:
 
 ```rust
-// spore-sessions/src/lib.rs
-pub struct SessionsIntegration;
+// spore-moss-sessions/src/lib.rs
+pub struct MossSessionsIntegration;
 
-impl Integration for SessionsIntegration {
+impl Integration for MossSessionsIntegration {
     fn register(&self, lua: &Lua) -> Result<()> {
         let sessions = lua.create_table()?;
 
+        // sessions.parse(path) -> Session table
         sessions.set("parse", lua.create_function(|lua, path: String| {
             let session = moss_sessions::parse_session(Path::new(&path))?;
-            // Convert Session to Lua table
             session_to_lua(lua, &session)
         })?)?;
 
+        // sessions.list(project?) -> array of SessionFile
         sessions.set("list", lua.create_function(|lua, project: Option<String>| {
-            let files = moss_sessions::list_sessions(project.as_deref().map(Path::new));
-            // Convert to Lua array
+            let files = moss_sessions::list_all_sessions(project.as_deref().map(Path::new));
             files_to_lua(lua, &files)
         })?)?;
 
+        // sessions.formats() -> array of format names
         sessions.set("formats", lua.create_function(|_, ()| {
             Ok(moss_sessions::list_formats())
         })?)?;
@@ -182,4 +194,4 @@ impl Integration for SessionsIntegration {
 }
 ```
 
-Lua gets raw session data. Analysis lives in Lua scripts that Iris controls.
+Lua gets raw session data. Analysis lives in Lua scripts that consumers (like Iris) control.
