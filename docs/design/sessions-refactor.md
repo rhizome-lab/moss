@@ -97,7 +97,7 @@ Helper methods on `Session`:
 - `message_count()` - total messages
 - `messages_by_role(role)` - count by role
 - `tool_uses()` - iterator over (name, input) pairs
-- `tool_results()` - iterator over (tool_use_id, is_error) pairs
+- `tool_results()` - iterator over (content, is_error) pairs
 - `total_tokens()` - aggregate TokenUsage
 
 ### 2. Updated LogFormat Trait
