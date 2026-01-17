@@ -1,6 +1,8 @@
 # Claude Code Session Log Analysis
 
-Analysis of session logs from `~/.claude/projects/-home-me-git-moss/`.
+Historical analysis of session logs from `~/.claude/projects/-home-me-git-moss/`.
+
+> **Note:** This analysis predates the spore split. References to `moss @agent` and `moss workflow` describe functionality that now lives in [spore](https://github.com/user/spore).
 
 ## Session Overview
 

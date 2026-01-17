@@ -181,7 +181,7 @@ Within-project parallelization makes sense when you're *forced* to work on one c
 - Checkpoints map to moss's Shadow Git approach
 - MCP integration shows importance of protocol interoperability
 - The SDK release confirms: agent infrastructure is becoming a platform play
-- Boris's Plan Mode + auto-accept pattern could inform moss agent UX
+- Boris's Plan Mode + auto-accept pattern could inform spore agent UX
 - CLAUDE.md as institutional memory is similar to moss's approach
 - Verification loops are critical - moss already runs tests unprompted
 
@@ -1266,8 +1266,8 @@ MCP tool definitions use JSON Schema, which is verbose:
 - Chunking/context approach for managing LLM context windows
 - Research for context window optimization
 
-### Moss Implementation Notes
-- [ ] Design compact tool encoding for moss agent (bypass JSON Schema)
+### Spore Implementation Notes
+- [ ] Design compact tool encoding for spore agent (bypass JSON Schema)
 - [ ] Investigate code-mode approach (LLM writes Python, not tool calls)
 - [ ] Benchmark token savings vs MCP overhead
 

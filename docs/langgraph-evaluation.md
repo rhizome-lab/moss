@@ -19,10 +19,10 @@ flowchart TB
     Frontends --> Orchestration
     Frontends --> DirectAccess
 
-    subgraph Orchestration["Orchestration (moss agent)"]
+    subgraph Orchestration["Orchestration (spore)"]
         O1[Agent loops]
         O2[Sessions]
-        O3[Shadow Git]
+        O3[Memory]
     end
 
     subgraph DirectAccess["Direct Tool Access (MCP, external)"]
@@ -94,9 +94,9 @@ Pure, stateless tools that any orchestrator can call:
 - `analyze(target)` → health/complexity/security
 
 ### Orchestration is optional, separate
-- Ship `moss agent` for low-friction OOTB experience
-- But don't bake it into MossAPI
-- External callers (LangGraph, Claude) bring their own
+- Orchestration now lives in [spore](https://github.com/user/spore)
+- Moss provides intelligence primitives, not agent loops
+- External callers (LangGraph, Claude, spore) bring their own orchestration
 
 ### Context Layer is the product
 What makes moss valuable:
@@ -149,17 +149,16 @@ Not a reason to adopt or reject LangGraph.
 
 ## Recommendations
 
-1. **Don't replace our orchestration with LangGraph** - Different problem
+1. **Don't add orchestration to moss** - That's spore's domain
 2. **Do keep MossAPI tool-shaped** - Usable by any orchestrator
-3. **Do ship orchestration separately** - `moss agent` for OOTB experience
-4. **Do make Context Layer explicit** - Reusable by external callers
-5. **Consider LangGraph integration** - As one frontend, not foundation
+3. **Do make Context Layer explicit** - Reusable by external callers
+4. **Consider LangGraph integration** - As one frontend, not foundation
 
 ## Summary
 
 | Concern | LangGraph | Moss |
 |---------|-----------|------|
-| Orchestration | ✓ Their strength | Optional, ships separately |
+| Orchestration | ✓ Their strength | Not in scope (see spore) |
 | Working memory | ✗ Chat history | ✓ Structured, manageable |
 | Persistence | ✓ Mature | Shadow Git (code-specific) |
 | Multi-frontend | ✗ Python graphs | ✓ MCP, TUI, CLI, HTTP, A2A |

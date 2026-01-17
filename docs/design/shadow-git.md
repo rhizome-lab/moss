@@ -33,7 +33,7 @@ Philosophy:
 
 ### Automatic Tracking
 - Every `moss edit` operation creates a shadow commit
-- Workflow-driven edits (`moss @workflow`) also tracked, with workflow name as context
+- External tools (e.g., spore) can integrate with shadow git for tracking their edits
 - Commit message includes: operation, target, timestamp, optional user message
 - Only tracks files modified by moss, not external changes
 

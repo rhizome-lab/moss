@@ -63,6 +63,12 @@ Audit found fragmentation across commands. Fix for consistent UX:
 - [x] Unify `lint`/`test` under `moss tools`: `moss tools lint [run|list]`, `moss tools test [run|list]`
 - [x] Remove `analyze lint`: duplicate of `moss lint`, adds no value
 
+### Documentation Cleanup
+- [x] Remove `moss @` and `moss workflow` references from docs - spore handles workflow running now
+  - Archived: script.md, agent*.md, lua-cli.md, agent-state-machine.md, workflow-format.md, agent-commands.md, lua-api.md, agent-dogfooding.md
+  - Updated: shadow-git.md, log-analysis.md, workflows/README.md, security-audit.md, dogfooding.md, langgraph-evaluation.md, prior-art.md
+  - Kept: moss-sessions parser (format still valid for reading old logs)
+
 ### Rust Redesign Candidates
 - Rules engine: consider semgrep/ruff integration instead of custom
 - Plugin system: Rust trait-based plugins or external tool orchestration

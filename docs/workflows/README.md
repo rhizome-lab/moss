@@ -1,6 +1,6 @@
 # Workflow Design
 
-Design documents for moss workflows - structured patterns for accomplishing common software engineering tasks.
+Design documents for structured patterns accomplishing common software engineering tasks. These patterns inform [spore](https://github.com/user/spore) workflow implementations.
 
 ## What is a Workflow?
 

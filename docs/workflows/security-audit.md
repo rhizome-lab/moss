@@ -470,11 +470,11 @@ For each applicable OWASP category, identify:
 3. How to fix it
 ```
 
-## Agent-Assisted Audit (moss)
+## Agent-Assisted Audit (spore)
 
 ```bash
-# Use auditor role for systematic review
-moss @agent --audit "find SQL injection vulnerabilities in src/"
+# Use auditor role for systematic review (via spore)
+spore @agent --audit "find SQL injection vulnerabilities in src/"
 
 # Structured output format
 # $(note SECURITY:HIGH src/api/search.py:23 - SQL injection in user input)
