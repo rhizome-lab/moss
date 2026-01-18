@@ -1,12 +1,12 @@
 //! Sessions command - analyze Claude Code and other agent session logs.
 
-mod analyze;
-mod list;
-mod plans;
+pub mod analyze;
+pub mod list;
+pub mod plans;
 #[cfg(feature = "sessions-web")]
 mod serve;
-mod show;
-mod stats;
+pub mod show;
+pub mod stats;
 
 pub use list::cmd_sessions_list;
 #[cfg(feature = "sessions-web")]

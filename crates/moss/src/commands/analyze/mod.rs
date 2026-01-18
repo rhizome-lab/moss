@@ -1,23 +1,23 @@
 //! Analyze command - run analysis on target.
 
 mod args;
-mod ast;
-mod call_graph;
-mod check_examples;
-mod check_refs;
+pub mod ast;
+pub mod call_graph;
+pub mod check_examples;
+pub mod check_refs;
 pub mod complexity;
-mod docs;
-mod duplicates;
-mod files;
-mod hotspots;
+pub mod docs;
+pub mod duplicates;
+pub mod files;
+pub mod hotspots;
 pub mod length;
-mod query;
+pub mod query;
 pub mod report;
-mod rules_cmd;
+pub mod rules_cmd;
 mod sarif;
 pub mod security;
-mod stale_docs;
-mod trace;
+pub mod stale_docs;
+pub mod trace;
 
 use crate::analyze::complexity::{ComplexityReport, RiskLevel};
 use crate::analyze::function_length::LengthReport;

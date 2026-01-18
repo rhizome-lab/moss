@@ -1,11 +1,11 @@
 //! View command - unified view of files, directories, and symbols.
 
-mod file;
-mod history;
-mod lines;
-mod search;
-mod symbol;
-mod tree;
+pub mod file;
+pub mod history;
+pub mod lines;
+pub mod search;
+pub mod symbol;
+pub mod tree;
 
 use crate::commands::aliases::detect_project_languages;
 use crate::config::MossConfig;
